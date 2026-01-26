@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wise (WISE.L) Financial Metrics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4aa, #00b894);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #888;
+            font-size: 1.1rem;
+        }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .kpi-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .kpi-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 212, 170, 0.2);
+        }
+        .kpi-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #00d4aa;
+            margin-bottom: 5px;
+        }
+        .kpi-label {
+            font-size: 0.85rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .kpi-change {
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+        .kpi-change.positive {
+            color: #00d4aa;
+        }
+        .kpi-change.negative {
+            color: #ff6b6b;
+        }
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 25px;
+        }
+        .chart-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .chart-card h3 {
+            margin-bottom: 20px;
+            color: #fff;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .chart-card h3::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, #00d4aa, #00b894);
+            border-radius: 2px;
+        }
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+        }
+        .section-title {
+            font-size: 1.5rem;
+            color: #fff;
+            margin: 40px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(0, 212, 170, 0.3);
+        }
+        @media (max-width: 768px) {
+            .charts-container {
+                grid-template-columns: 1fr;
+            }
+            .chart-card {
+                min-width: unset;
+            }
+            .header h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Wise (WISE.L) Financial Dashboard</h1>
+        <p>Quarterly Metrics Analysis | FY23 - FY25</p>
+    </div>
+
+    <div class="kpi-grid" id="kpiGrid"></div>
+
+    <h2 class="section-title">Customer & Volume Metrics</h2>
+    <div class="charts-container">
+        <div class="chart-card">
+            <h3>Active Customers (thousands)</h3>
+            <div class="chart-wrapper">
+                <canvas id="customersChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3>Cross-Border Volume (£bn)</h3>
+            <div class="chart-wrapper">
+                <canvas id="volumeChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3>Customer Balances (£bn)</h3>
+            <div class="chart-wrapper">
+                <canvas id="balancesChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3>Personal vs Business Customers</h3>
+            <div class="chart-wrapper">
+                <canvas id="customerSegmentChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="section-title">Revenue & Income Metrics</h2>
+    <div class="charts-container">
+        <div class="chart-card">
+            <h3>Underlying Income (£m)</h3>
+            <div class="chart-wrapper">
+                <canvas id="underlyingIncomeChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3>Total Income Breakdown (£m)</h3>
+            <div class="chart-wrapper">
+                <canvas id="revenueBreakdownChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3>Interest Income Components (£m)</h3>
+            <div class="chart-wrapper">
+                <canvas id="interestIncomeChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3>Income by Segment (£m)</h3>
+            <div class="chart-wrapper">
+                <canvas id="incomeSegmentChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3>Core Income vs Reported (excl. >1% Interest)</h3>
+            <div class="chart-wrapper">
+                <canvas id="coreIncomeChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="section-title">Unit Economics & Efficiency</h2>
+    <div class="charts-container">
+        <div class="chart-card">
+            <h3>Cross-Border Take Rate (%)</h3>
+            <div class="chart-wrapper">
+                <canvas id="takeRateChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3>Instant Transfers (%)</h3>
+            <div class="chart-wrapper">
+                <canvas id="instantTransfersChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3>Revenue per Active Customer (£)</h3>
+            <div class="chart-wrapper">
+                <canvas id="revenuePerCustomerChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3>Volume per Active Customer (£k)</h3>
+            <div class="chart-wrapper">
+                <canvas id="volumePerCustomerChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const chartDefaults = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#e0e0e0',
+                        font: { size: 11 }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#888' },
+                    grid: { color: 'rgba(255,255,255,0.05)' }
+                },
+                y: {
+                    ticks: { color: '#888' },
+                    grid: { color: 'rgba(255,255,255,0.05)' }
+                }
+            }
+        };
+
+        const colors = {
+            primary: '#00d4aa',
+            secondary: '#00b894',
+            tertiary: '#0984e3',
+            quaternary: '#6c5ce7',
+            warning: '#fdcb6e',
+            danger: '#ff6b6b',
+            primaryAlpha: 'rgba(0, 212, 170, 0.2)',
+            secondaryAlpha: 'rgba(0, 184, 148, 0.2)',
+            tertiaryAlpha: 'rgba(9, 132, 227, 0.2)',
+            quaternaryAlpha: 'rgba(108, 92, 231, 0.2)'
+        };
+
+        let data = [];
+
+        async function loadData() {
+            try {
+                const response = await fetch('WISE_Quarterly_Metrics.csv');
+                const csvText = await response.text();
+                const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+                data = parsed.data;
+                renderDashboard();
+            } catch (error) {
+                console.error('Error loading CSV:', error);
+                document.body.innerHTML += '<p style="color: red; text-align: center;">Error loading data. Please ensure WISE_Quarterly_Metrics.csv is in the same directory.</p>';
+            }
+        }
+
+        function renderDashboard() {
+            const labels = data.map(d => d.Period);
+            const latest = data[data.length - 1];
+            const previous = data[data.length - 5]; // YoY comparison (4 quarters back)
+
+            // Render KPIs
+            renderKPIs(latest, previous);
+
+            // Customer Charts
+            createLineChart('customersChart', labels, [
+                { label: 'Total', data: data.map(d => parseFloat(d.Active_Customers_Total_K) || 0), color: colors.primary },
+            ]);
+
+            createLineChart('volumeChart', labels, [
+                { label: 'Total', data: data.map(d => parseFloat(d.Cross_Border_Volume_Total_GBP_Bn) || 0), color: colors.primary },
+            ]);
+
+            createLineChart('balancesChart', labels, [
+                { label: 'Total', data: data.map(d => parseFloat(d.Customer_Balances_Total_GBP_Bn) || 0), color: colors.primary },
+                { label: 'Personal', data: data.map(d => parseFloat(d.Customer_Balances_Personal_GBP_Bn) || 0), color: colors.tertiary },
+                { label: 'Business', data: data.map(d => parseFloat(d.Customer_Balances_Business_GBP_Bn) || 0), color: colors.quaternary },
+            ]);
+
+            createStackedBarChart('customerSegmentChart', labels, [
+                { label: 'Personal', data: data.map(d => parseFloat(d.Active_Customers_Personal_K) || 0), color: colors.primary },
+                { label: 'Business', data: data.map(d => parseFloat(d.Active_Customers_Business_K) || 0), color: colors.tertiary },
+            ]);
+
+            // Revenue Charts
+            createLineChart('underlyingIncomeChart', labels, [
+                { label: 'Total', data: data.map(d => parseFloat(d.Underlying_Income_Total_GBP_M) || 0), color: colors.primary },
+                { label: 'Personal', data: data.map(d => parseFloat(d.Underlying_Income_Personal_GBP_M) || 0), color: colors.tertiary },
+                { label: 'Business', data: data.map(d => parseFloat(d.Underlying_Income_Business_GBP_M) || 0), color: colors.quaternary },
+            ]);
+
+            createStackedBarChart('revenueBreakdownChart', labels, [
+                { label: 'Cross-Border Revenue', data: data.map(d => parseFloat(d.Cross_Border_Revenue_Total_GBP_M) || 0), color: colors.primary },
+                { label: 'Card & Other', data: data.map(d => parseFloat(d.Card_Other_Revenue_Total_GBP_M) || 0), color: colors.tertiary },
+                { label: 'Interest (First 1%)', data: data.map(d => parseFloat(d.Underlying_Interest_Income_First_1pct_GBP_M) || 0), color: colors.quaternary },
+                { label: 'Interest (Above 1%)', data: data.map(d => parseFloat(d.Interest_Income_Above_1pct_GBP_M) || 0), color: colors.warning },
+                { label: 'Benefits Paid', data: data.map(d => parseFloat(d.Benefits_Paid_Total_GBP_M) || 0), color: colors.danger },
+            ]);
+
+            createInterestIncomeChart('interestIncomeChart', labels, data);
+
+            createStackedBarChart('incomeSegmentChart', labels, [
+                { label: 'Personal', data: data.map(d => parseFloat(d.Underlying_Income_Personal_GBP_M) || 0), color: colors.primary },
+                { label: 'Business', data: data.map(d => parseFloat(d.Underlying_Income_Business_GBP_M) || 0), color: colors.tertiary },
+            ]);
+
+            // Core income excluding >1% interest
+            const coreIncome = data.map(d => {
+                const underlying = parseFloat(d.Underlying_Income_Total_GBP_M) || 0;
+                const above1pct = parseFloat(d.Interest_Income_Above_1pct_GBP_M) || 0;
+                const benefits = parseFloat(d.Benefits_Paid_Total_GBP_M) || 0;
+                return underlying - above1pct - benefits; // benefits is already negative
+            });
+
+            createCoreIncomeChart('coreIncomeChart', labels, data, coreIncome);
+
+            // Unit Economics Charts
+            createLineChart('takeRateChart', labels, [
+                { label: 'Take Rate', data: data.map(d => parseFloat(d.Cross_Border_Take_Rate_Pct) * 100 || 0), color: colors.primary },
+            ], { yAxisSuffix: 'bps', yAxisMultiplier: 1 });
+
+            createLineChart('instantTransfersChart', labels, [
+                { label: 'Instant %', data: data.map(d => parseFloat(d.Instant_Transfers_Pct) || 0), color: colors.primary },
+            ]);
+
+            // Calculate derived metrics
+            const revenuePerCustomer = data.map(d => {
+                const income = parseFloat(d.Underlying_Income_Total_GBP_M) || 0;
+                const customers = parseFloat(d.Active_Customers_Total_K) || 1;
+                return (income * 1000 / customers).toFixed(2);
+            });
+
+            createLineChart('revenuePerCustomerChart', labels, [
+                { label: 'Revenue/Customer', data: revenuePerCustomer, color: colors.primary },
+            ]);
+
+            const volumePerCustomer = data.map(d => {
+                const volume = parseFloat(d.Cross_Border_Volume_Total_GBP_Bn) || 0;
+                const customers = parseFloat(d.Active_Customers_Total_K) || 1;
+                return ((volume * 1000000) / customers).toFixed(2);
+            });
+
+            createLineChart('volumePerCustomerChart', labels, [
+                { label: 'Volume/Customer (£k)', data: volumePerCustomer, color: colors.primary },
+            ]);
+        }
+
+        function renderKPIs(latest, previous) {
+            const kpiGrid = document.getElementById('kpiGrid');
+
+            const kpis = [
+                {
+                    label: 'Active Customers',
+                    value: (parseFloat(latest.Active_Customers_Total_K) / 1000).toFixed(1) + 'm',
+                    change: calcYoYChange(latest.Active_Customers_Total_K, previous?.Active_Customers_Total_K)
+                },
+                {
+                    label: 'Quarterly Volume',
+                    value: '£' + parseFloat(latest.Cross_Border_Volume_Total_GBP_Bn).toFixed(1) + 'bn',
+                    change: calcYoYChange(latest.Cross_Border_Volume_Total_GBP_Bn, previous?.Cross_Border_Volume_Total_GBP_Bn)
+                },
+                {
+                    label: 'Customer Balances',
+                    value: '£' + parseFloat(latest.Customer_Balances_Total_GBP_Bn).toFixed(1) + 'bn',
+                    change: calcYoYChange(latest.Customer_Balances_Total_GBP_Bn, previous?.Customer_Balances_Total_GBP_Bn)
+                },
+                {
+                    label: 'Underlying Income',
+                    value: '£' + parseFloat(latest.Underlying_Income_Total_GBP_M).toFixed(0) + 'm',
+                    change: calcYoYChange(latest.Underlying_Income_Total_GBP_M, previous?.Underlying_Income_Total_GBP_M)
+                },
+                {
+                    label: 'Take Rate',
+                    value: (parseFloat(latest.Cross_Border_Take_Rate_Pct) * 100).toFixed(0) + 'bps',
+                    change: calcBpsChange(latest.Cross_Border_Take_Rate_Pct, previous?.Cross_Border_Take_Rate_Pct),
+                    invertColor: true
+                },
+                {
+                    label: 'Instant Transfers',
+                    value: latest.Instant_Transfers_Pct + '%',
+                    change: calcPptChange(latest.Instant_Transfers_Pct, previous?.Instant_Transfers_Pct)
+                },
+                {
+                    label: 'Card & Other Revenue',
+                    value: '£' + parseFloat(latest.Card_Other_Revenue_Total_GBP_M).toFixed(0) + 'm',
+                    change: calcYoYChange(latest.Card_Other_Revenue_Total_GBP_M, previous?.Card_Other_Revenue_Total_GBP_M)
+                },
+                {
+                    label: 'Latest Period',
+                    value: latest.Period,
+                    change: null
+                }
+            ];
+
+            kpiGrid.innerHTML = kpis.map(kpi => `
+                <div class="kpi-card">
+                    <div class="kpi-value">${kpi.value}</div>
+                    <div class="kpi-label">${kpi.label}</div>
+                    ${kpi.change !== null ? `<div class="kpi-change ${getChangeClass(kpi.change, kpi.invertColor)}">${kpi.change}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function calcYoYChange(current, previous) {
+            if (!previous || !current) return 'N/A';
+            const change = ((parseFloat(current) - parseFloat(previous)) / parseFloat(previous) * 100).toFixed(1);
+            return change >= 0 ? `+${change}% YoY` : `${change}% YoY`;
+        }
+
+        function calcBpsChange(current, previous) {
+            if (!previous || !current) return 'N/A';
+            const change = ((parseFloat(current) - parseFloat(previous)) * 100).toFixed(0);
+            return change >= 0 ? `+${change}bps YoY` : `${change}bps YoY`;
+        }
+
+        function calcPptChange(current, previous) {
+            if (!previous || !current) return 'N/A';
+            const change = (parseFloat(current) - parseFloat(previous)).toFixed(0);
+            return change >= 0 ? `+${change}ppt YoY` : `${change}ppt YoY`;
+        }
+
+        function getChangeClass(change, invertColor = false) {
+            if (change === 'N/A') return '';
+            const isPositive = change.startsWith('+');
+            if (invertColor) return isPositive ? 'negative' : 'positive';
+            return isPositive ? 'positive' : 'negative';
+        }
+
+        function createLineChart(canvasId, labels, datasets, options = {}) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: datasets.map(ds => ({
+                        label: ds.label,
+                        data: ds.data,
+                        borderColor: ds.color,
+                        backgroundColor: ds.color.replace(')', ', 0.1)').replace('rgb', 'rgba'),
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: datasets.length === 1,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
+                    }))
+                },
+                options: {
+                    ...chartDefaults,
+                    plugins: {
+                        ...chartDefaults.plugins,
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    }
+                }
+            });
+        }
+
+        function createStackedBarChart(canvasId, labels, datasets) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: datasets.map(ds => ({
+                        label: ds.label,
+                        data: ds.data,
+                        backgroundColor: ds.color,
+                        borderColor: ds.color,
+                        borderWidth: 1
+                    }))
+                },
+                options: {
+                    ...chartDefaults,
+                    scales: {
+                        ...chartDefaults.scales,
+                        x: { ...chartDefaults.scales.x, stacked: true },
+                        y: { ...chartDefaults.scales.y, stacked: true }
+                    }
+                }
+            });
+        }
+
+        function createInterestIncomeChart(canvasId, labels, data) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'First 1% Yield (£m)',
+                            data: data.map(d => parseFloat(d.Underlying_Interest_Income_First_1pct_GBP_M) || 0),
+                            borderColor: colors.primary,
+                            backgroundColor: 'rgba(0, 212, 170, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: false,
+                            pointRadius: 3,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Above 1% Yield (£m)',
+                            data: data.map(d => parseFloat(d.Interest_Income_Above_1pct_GBP_M) || 0),
+                            borderColor: colors.tertiary,
+                            backgroundColor: 'rgba(9, 132, 227, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: false,
+                            pointRadius: 3,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Benefits Paid (£m)',
+                            data: data.map(d => Math.abs(parseFloat(d.Benefits_Paid_Total_GBP_M) || 0)),
+                            borderColor: colors.danger,
+                            backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: false,
+                            pointRadius: 3,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'BoE Rate (%)',
+                            data: data.map(d => parseFloat(d.BoE_Rate_Pct) || 0),
+                            borderColor: colors.warning,
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.3,
+                            fill: false,
+                            pointRadius: 2,
+                            yAxisID: 'y1'
+                        },
+                        {
+                            label: 'Fed Funds (%)',
+                            data: data.map(d => parseFloat(d.Fed_Funds_Rate_Pct) || 0),
+                            borderColor: '#e17055',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.3,
+                            fill: false,
+                            pointRadius: 2,
+                            yAxisID: 'y1'
+                        },
+                        {
+                            label: 'ECB Rate (%)',
+                            data: data.map(d => parseFloat(d.ECB_Deposit_Rate_Pct) || 0),
+                            borderColor: '#a29bfe',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.3,
+                            fill: false,
+                            pointRadius: 2,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#e0e0e0',
+                                font: { size: 10 }
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#888' },
+                            grid: { color: 'rgba(255,255,255,0.05)' }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Income (£m)',
+                                color: '#888'
+                            },
+                            ticks: { color: '#888' },
+                            grid: { color: 'rgba(255,255,255,0.05)' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Interest Rate (%)',
+                                color: '#888'
+                            },
+                            ticks: { color: '#888' },
+                            grid: { drawOnChartArea: false },
+                            min: 0,
+                            max: 7
+                        }
+                    }
+                }
+            });
+        }
+
+        function createCoreIncomeChart(canvasId, labels, data, coreIncome) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+
+            // Calculate YoY growth rates (need 4 quarters back)
+            const coreGrowth = coreIncome.map((val, i) => {
+                if (i < 4) return null;
+                const prev = coreIncome[i - 4];
+                if (!prev || prev === 0) return null;
+                return ((val - prev) / prev * 100).toFixed(1);
+            });
+
+            const reportedGrowth = data.map((d, i) => {
+                if (i < 4) return null;
+                const current = parseFloat(d.Underlying_Income_Total_GBP_M) || 0;
+                const prev = parseFloat(data[i - 4].Underlying_Income_Total_GBP_M) || 0;
+                if (!prev || prev === 0) return null;
+                return ((current - prev) / prev * 100).toFixed(1);
+            });
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Underlying Income (£m)',
+                            data: data.map(d => parseFloat(d.Underlying_Income_Total_GBP_M) || 0),
+                            backgroundColor: colors.tertiary,
+                            borderColor: colors.tertiary,
+                            borderWidth: 1,
+                            yAxisID: 'y',
+                            order: 2
+                        },
+                        {
+                            label: 'Core Income (£m)',
+                            data: coreIncome,
+                            backgroundColor: colors.primary,
+                            borderColor: colors.primary,
+                            borderWidth: 1,
+                            yAxisID: 'y',
+                            order: 1
+                        },
+                        {
+                            label: 'Reported YoY %',
+                            data: reportedGrowth,
+                            type: 'line',
+                            borderColor: colors.tertiary,
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.3,
+                            pointRadius: 3,
+                            yAxisID: 'y1',
+                            order: 0
+                        },
+                        {
+                            label: 'Core YoY %',
+                            data: coreGrowth,
+                            type: 'line',
+                            borderColor: colors.primary,
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            pointRadius: 3,
+                            yAxisID: 'y1',
+                            order: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#e0e0e0',
+                                font: { size: 10 }
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#888' },
+                            grid: { color: 'rgba(255,255,255,0.05)' }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Income (£m)',
+                                color: '#888'
+                            },
+                            ticks: { color: '#888' },
+                            grid: { color: 'rgba(255,255,255,0.05)' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'YoY Growth (%)',
+                                color: '#888'
+                            },
+                            ticks: { color: '#888' },
+                            grid: { drawOnChartArea: false },
+                            min: 0,
+                            max: 30
+                        }
+                    }
+                }
+            });
+        }
+
+        // Load data on page load
+        loadData();
+    </script>
+</body>
+</html>

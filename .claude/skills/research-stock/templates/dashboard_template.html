@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{COMPANY_NAME}} ({{TICKER}}) Financial Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, {{PRIMARY_COLOR}}, {{SECONDARY_COLOR}});
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #888;
+            font-size: 1.1rem;
+        }
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #888;
+            font-size: 1.2rem;
+        }
+        .error {
+            text-align: center;
+            padding: 50px;
+            color: #ff6b6b;
+            font-size: 1.2rem;
+        }
+        .error code {
+            display: block;
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255, 107, 107, 0.1);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            text-align: left;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .kpi-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .kpi-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 212, 170, 0.2);
+        }
+        .kpi-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: {{PRIMARY_COLOR}};
+            margin-bottom: 5px;
+        }
+        .kpi-label {
+            font-size: 0.85rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .kpi-change {
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+        .kpi-change.positive {
+            color: #00d4aa;
+        }
+        .kpi-change.negative {
+            color: #ff6b6b;
+        }
+        .section-title {
+            font-size: 1.5rem;
+            color: #fff;
+            margin: 40px auto 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(0, 212, 170, 0.3);
+            max-width: 1400px;
+        }
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 25px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .chart-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .chart-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .chart-header-left {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .chart-header h3 {
+            color: #fff;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .chart-header h3::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, {{PRIMARY_COLOR}}, {{SECONDARY_COLOR}});
+            border-radius: 2px;
+        }
+        .growth-stats {
+            display: flex;
+            gap: 16px;
+            font-size: 0.8rem;
+        }
+        .growth-stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .growth-stat .label {
+            color: #888;
+        }
+        .growth-stat .value {
+            font-weight: 600;
+        }
+        .growth-stat .value.positive {
+            color: #00d4aa;
+        }
+        .growth-stat .value.negative {
+            color: #ff6b6b;
+        }
+        .help-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(0, 212, 170, 0.2);
+            border: 1px solid {{PRIMARY_COLOR}};
+            color: {{PRIMARY_COLOR}};
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+        .help-btn:hover {
+            background: {{PRIMARY_COLOR}};
+            color: #1a1a2e;
+        }
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+        }
+
+        /* Modal styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal {
+            background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%);
+            border-radius: 16px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid rgba(0, 212, 170, 0.3);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+        .modal-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h3 {
+            color: {{PRIMARY_COLOR}};
+            font-size: 1.4rem;
+            margin: 0;
+        }
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(255, 107, 107, 0.2);
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        .modal-close:hover {
+            background: #ff6b6b;
+            color: #fff;
+        }
+        .modal-body {
+            padding: 25px;
+            color: #e0e0e0;
+            line-height: 1.7;
+        }
+        .modal-body p {
+            margin-bottom: 15px;
+        }
+        .modal-body strong {
+            color: {{PRIMARY_COLOR}};
+        }
+        .modal-body ul {
+            margin: 15px 0;
+            padding-left: 20px;
+        }
+        .modal-body li {
+            margin-bottom: 8px;
+        }
+        .metric-highlight {
+            background: rgba(0, 212, 170, 0.1);
+            border-left: 3px solid {{PRIMARY_COLOR}};
+            padding: 12px 15px;
+            margin: 15px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        @media (max-width: 768px) {
+            .charts-container {
+                grid-template-columns: 1fr;
+            }
+            .chart-card {
+                min-width: unset;
+            }
+            .header h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{COMPANY_NAME}} ({{TICKER}}) Financial Dashboard</h1>
+        <p id="dateRange">Loading data...</p>
+    </div>
+
+    <div id="content">
+        <div class="loading">Loading data from CSV...</div>
+    </div>
+
+    <!-- Help Modal -->
+    <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3 id="modalTitle">Metric Title</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+
+    <script>
+        // Color palette
+        const colors = {
+            primary: '{{PRIMARY_COLOR}}',
+            secondary: '{{SECONDARY_COLOR}}',
+            tertiary: '#0984e3',
+            quaternary: '#6c5ce7',
+            warning: '#fdcb6e',
+            danger: '#ff6b6b'
+        };
+
+        // Chart defaults
+        const chartDefaults = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#e0e0e0',
+                        font: { size: 11 }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#888' },
+                    grid: { color: 'rgba(255,255,255,0.05)' }
+                },
+                y: {
+                    ticks: { color: '#888' },
+                    grid: { color: 'rgba(255,255,255,0.05)' }
+                }
+            }
+        };
+
+        // Metric descriptions for help modals
+        const metricDescriptions = {
+            revenue: {
+                title: "Revenue",
+                content: `
+                    <p><strong>Revenue</strong> (also called Net Sales or Total Revenue) is the total income the company receives from its primary business operations.</p>
+                    <div class="metric-highlight">
+                        <strong>Why it matters:</strong> Revenue is the top-line metric that shows the company's ability to generate sales. Growth in revenue is typically the primary driver of stock appreciation for growth companies.
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li>YoY growth rate trends</li>
+                        <li>Consistency of growth across quarters</li>
+                        <li>Revenue vs guidance/expectations</li>
+                    </ul>
+                `
+            },
+            grossProfit: {
+                title: "Gross Profit & Margin",
+                content: `
+                    <p><strong>Gross Profit</strong> = Revenue - Cost of Goods Sold (COGS)</p>
+                    <p><strong>Gross Margin</strong> = Gross Profit / Revenue × 100</p>
+                    <div class="metric-highlight">
+                        <strong>Why it matters:</strong> Gross margin shows how efficiently the company produces its products/services. Higher margins indicate pricing power and competitive advantages.
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li>Margin expansion/contraction over time</li>
+                        <li>Comparison to industry peers</li>
+                        <li>Impact of scale on margins</li>
+                    </ul>
+                `
+            },
+            operatingIncome: {
+                title: "Operating Income",
+                content: `
+                    <p><strong>Operating Income</strong> (also called EBIT) = Gross Profit - Operating Expenses</p>
+                    <p>Operating expenses include R&D, Sales & Marketing, and G&A costs.</p>
+                    <div class="metric-highlight">
+                        <strong>Why it matters:</strong> Operating income shows profitability from core business operations, excluding interest and taxes. It reveals operational efficiency.
+                    </div>
+                `
+            },
+            netIncome: {
+                title: "Net Income",
+                content: `
+                    <p><strong>Net Income</strong> is the bottom-line profit after all expenses, including interest, taxes, depreciation, and one-time items.</p>
+                    <div class="metric-highlight">
+                        <strong>Why it matters:</strong> Net income is the definitive measure of profitability. It's used to calculate EPS (Earnings Per Share), a key metric for valuation.
+                    </div>
+                `
+            },
+            ebitda: {
+                title: "EBITDA",
+                content: `
+                    <p><strong>EBITDA</strong> = Earnings Before Interest, Taxes, Depreciation, and Amortization</p>
+                    <div class="metric-highlight">
+                        <strong>Why it matters:</strong> EBITDA approximates operating cash flow and allows comparison across companies with different capital structures and tax situations.
+                    </div>
+                    <p><strong>Adjusted EBITDA</strong> excludes stock-based compensation and other non-recurring items, showing "cash" operating profitability.</p>
+                `
+            },
+            freeCashFlow: {
+                title: "Free Cash Flow",
+                content: `
+                    <p><strong>Free Cash Flow</strong> = Operating Cash Flow - Capital Expenditures</p>
+                    <div class="metric-highlight">
+                        <strong>Why it matters:</strong> FCF represents the cash available for dividends, buybacks, debt repayment, or acquisitions. Unlike accounting earnings, cash flow can't be manipulated.
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li>FCF conversion (FCF / Net Income)</li>
+                        <li>FCF yield (FCF / Market Cap)</li>
+                        <li>Consistency of cash generation</li>
+                    </ul>
+                `
+            },
+            eps: {
+                title: "Earnings Per Share (EPS)",
+                content: `
+                    <p><strong>EPS</strong> = Net Income / Weighted Average Shares Outstanding</p>
+                    <p><strong>Diluted EPS</strong> includes potential shares from options and convertible securities.</p>
+                    <div class="metric-highlight">
+                        <strong>Why it matters:</strong> EPS is the primary metric for valuation. P/E ratio = Stock Price / EPS. Investors compare actual EPS to analyst estimates.
+                    </div>
+                `
+            }
+        };
+
+        let data = [];
+
+        // Load CSV data
+        async function loadData() {
+            try {
+                const response = await fetch('{{TICKER}}_Metrics.csv');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const csvText = await response.text();
+                const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+                data = parsed.data;
+                renderDashboard();
+            } catch (error) {
+                document.getElementById('content').innerHTML = `
+                    <div class="error">
+                        <p>Failed to load data from CSV file.</p>
+                        <p>Make sure <strong>{{TICKER}}_Metrics.csv</strong> is in the same folder as this HTML file.</p>
+                        <code>Error: ${error.message}</code>
+                    </div>
+                `;
+            }
+        }
+
+        // Calculate YoY change
+        function calcYoYChange(current, previous) {
+            if (!previous || !current) return null;
+            const change = ((parseFloat(current) - parseFloat(previous)) / parseFloat(previous) * 100).toFixed(1);
+            return parseFloat(change);
+        }
+
+        // Format percentage change
+        function formatChange(change) {
+            if (change === null) return 'N/A';
+            const sign = change >= 0 ? '+' : '';
+            return `${sign}${change}% YoY`;
+        }
+
+        // Get change class
+        function getChangeClass(change, invertColor = false) {
+            if (change === null) return '';
+            const isPositive = change >= 0;
+            if (invertColor) return isPositive ? 'negative' : 'positive';
+            return isPositive ? 'positive' : 'negative';
+        }
+
+        // Render dashboard
+        function renderDashboard() {
+            const labels = data.map(d => d.Period);
+            const latest = data[data.length - 1];
+            const yoyIndex = data.length - 5; // 4 quarters back for YoY
+            const previous = yoyIndex >= 0 ? data[yoyIndex] : null;
+
+            // Update date range
+            document.getElementById('dateRange').textContent =
+                `${data[0].Period} - ${latest.Period} | Financial Metrics Analysis`;
+
+            // Render KPIs and charts
+            renderKPIs(latest, previous);
+            renderCharts(labels);
+        }
+
+        function renderKPIs(latest, previous) {
+            const kpiGrid = document.getElementById('content');
+
+            // Define KPIs to display (customize based on available data)
+            const kpis = [];
+
+            if (latest.Revenue) {
+                const change = previous ? calcYoYChange(latest.Revenue, previous.Revenue) : null;
+                kpis.push({
+                    label: 'Revenue',
+                    value: '$' + parseFloat(latest.Revenue).toFixed(1) + 'M',
+                    change: change,
+                    changeText: formatChange(change)
+                });
+            }
+
+            if (latest.GrossMargin) {
+                kpis.push({
+                    label: 'Gross Margin',
+                    value: parseFloat(latest.GrossMargin).toFixed(1) + '%',
+                    change: previous ? parseFloat(latest.GrossMargin) - parseFloat(previous.GrossMargin) : null,
+                    changeText: previous ? (parseFloat(latest.GrossMargin) - parseFloat(previous.GrossMargin)).toFixed(1) + 'pp YoY' : 'N/A'
+                });
+            }
+
+            if (latest.OperatingIncome) {
+                const change = previous ? calcYoYChange(latest.OperatingIncome, previous.OperatingIncome) : null;
+                kpis.push({
+                    label: 'Operating Income',
+                    value: '$' + parseFloat(latest.OperatingIncome).toFixed(1) + 'M',
+                    change: change,
+                    changeText: formatChange(change)
+                });
+            }
+
+            if (latest.NetIncome) {
+                const change = previous ? calcYoYChange(latest.NetIncome, previous.NetIncome) : null;
+                kpis.push({
+                    label: 'Net Income',
+                    value: '$' + parseFloat(latest.NetIncome).toFixed(1) + 'M',
+                    change: change,
+                    changeText: formatChange(change)
+                });
+            }
+
+            if (latest.EPS) {
+                const change = previous ? calcYoYChange(latest.EPS, previous.EPS) : null;
+                kpis.push({
+                    label: 'EPS',
+                    value: '$' + parseFloat(latest.EPS).toFixed(2),
+                    change: change,
+                    changeText: formatChange(change)
+                });
+            }
+
+            if (latest.FreeCashFlow) {
+                const change = previous ? calcYoYChange(latest.FreeCashFlow, previous.FreeCashFlow) : null;
+                kpis.push({
+                    label: 'Free Cash Flow',
+                    value: '$' + parseFloat(latest.FreeCashFlow).toFixed(1) + 'M',
+                    change: change,
+                    changeText: formatChange(change)
+                });
+            }
+
+            kpis.push({
+                label: 'Latest Period',
+                value: latest.Period,
+                change: null,
+                changeText: null
+            });
+
+            // Build HTML
+            let html = `<div class="kpi-grid">`;
+            kpis.forEach(kpi => {
+                html += `
+                    <div class="kpi-card">
+                        <div class="kpi-value">${kpi.value}</div>
+                        <div class="kpi-label">${kpi.label}</div>
+                        ${kpi.changeText ? `<div class="kpi-change ${getChangeClass(kpi.change)}">${kpi.changeText}</div>` : ''}
+                    </div>
+                `;
+            });
+            html += `</div>`;
+
+            // Add charts container
+            html += `
+                <h2 class="section-title">Financial Performance</h2>
+                <div class="charts-container" id="chartsContainer"></div>
+            `;
+
+            kpiGrid.innerHTML = html;
+        }
+
+        function renderCharts(labels) {
+            const chartsContainer = document.getElementById('chartsContainer');
+            let chartsHtml = '';
+
+            // Revenue chart
+            if (data[0].Revenue) {
+                chartsHtml += createChartCard('revenueChart', 'Revenue', 'revenue');
+            }
+
+            // Gross Margin chart
+            if (data[0].GrossMargin) {
+                chartsHtml += createChartCard('grossMarginChart', 'Gross Margin (%)', 'grossProfit');
+            }
+
+            // Operating Income chart
+            if (data[0].OperatingIncome) {
+                chartsHtml += createChartCard('operatingIncomeChart', 'Operating Income', 'operatingIncome');
+            }
+
+            // Net Income chart
+            if (data[0].NetIncome) {
+                chartsHtml += createChartCard('netIncomeChart', 'Net Income', 'netIncome');
+            }
+
+            // EPS chart
+            if (data[0].EPS) {
+                chartsHtml += createChartCard('epsChart', 'Earnings Per Share', 'eps');
+            }
+
+            // Free Cash Flow chart
+            if (data[0].FreeCashFlow) {
+                chartsHtml += createChartCard('fcfChart', 'Free Cash Flow', 'freeCashFlow');
+            }
+
+            chartsContainer.innerHTML = chartsHtml;
+
+            // Create the actual charts
+            if (data[0].Revenue) {
+                createLineChart('revenueChart', labels, data.map(d => parseFloat(d.Revenue)), colors.primary);
+            }
+            if (data[0].GrossMargin) {
+                createLineChart('grossMarginChart', labels, data.map(d => parseFloat(d.GrossMargin)), colors.secondary);
+            }
+            if (data[0].OperatingIncome) {
+                createBarChart('operatingIncomeChart', labels, data.map(d => parseFloat(d.OperatingIncome)), colors.tertiary);
+            }
+            if (data[0].NetIncome) {
+                createBarChart('netIncomeChart', labels, data.map(d => parseFloat(d.NetIncome)), colors.quaternary);
+            }
+            if (data[0].EPS) {
+                createLineChart('epsChart', labels, data.map(d => parseFloat(d.EPS)), colors.warning);
+            }
+            if (data[0].FreeCashFlow) {
+                createBarChart('fcfChart', labels, data.map(d => parseFloat(d.FreeCashFlow)), colors.primary);
+            }
+        }
+
+        function createChartCard(id, title, helpKey) {
+            return `
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div class="chart-header-left">
+                            <h3>${title}</h3>
+                        </div>
+                        <button class="help-btn" onclick="openModal('${helpKey}')">?</button>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="${id}"></canvas>
+                    </div>
+                </div>
+            `;
+        }
+
+        function createLineChart(canvasId, labels, dataPoints, color) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: dataPoints,
+                        borderColor: color,
+                        backgroundColor: color.replace(')', ', 0.1)').replace('rgb', 'rgba').replace('#', 'rgba('),
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    ...chartDefaults,
+                    plugins: {
+                        ...chartDefaults.plugins,
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        function createBarChart(canvasId, labels, dataPoints, color) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: dataPoints,
+                        backgroundColor: dataPoints.map(v => v >= 0 ? color : colors.danger),
+                        borderColor: dataPoints.map(v => v >= 0 ? color : colors.danger),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    ...chartDefaults,
+                    plugins: {
+                        ...chartDefaults.plugins,
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        // Modal functions
+        function openModal(metricKey) {
+            const metric = metricDescriptions[metricKey];
+            if (!metric) return;
+            document.getElementById('modalTitle').textContent = metric.title;
+            document.getElementById('modalBody').innerHTML = metric.content;
+            document.getElementById('modalOverlay').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal(event) {
+            if (event && event.target !== document.getElementById('modalOverlay')) return;
+            document.getElementById('modalOverlay').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        // Initialize
+        loadData();
+    </script>
+</body>
+</html>

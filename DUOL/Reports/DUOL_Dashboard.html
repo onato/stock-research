@@ -1,0 +1,1639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duolingo (DUOL) Metrics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #fff;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            color: #58cc02;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #a0a0a0;
+            font-size: 1.1rem;
+        }
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #a0a0a0;
+            font-size: 1.2rem;
+        }
+        .error {
+            text-align: center;
+            padding: 50px;
+            color: #ff4b4b;
+            font-size: 1.2rem;
+        }
+        .error code {
+            display: block;
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255,75,75,0.1);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            text-align: left;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .kpi-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .kpi-card h3 {
+            color: #a0a0a0;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+        .kpi-card .value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #58cc02;
+        }
+        .kpi-card .change {
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+        .positive { color: #58cc02; }
+        .negative { color: #ff4b4b; }
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 30px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .chart-container {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 25px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .chart-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .chart-header h2 {
+            color: #fff;
+            font-size: 1.3rem;
+            margin: 0;
+        }
+        .chart-header-left {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .growth-stats {
+            display: flex;
+            gap: 16px;
+            font-size: 0.8rem;
+        }
+        .growth-stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .growth-stat .label {
+            color: #a0a0a0;
+        }
+        .growth-stat .value {
+            font-weight: 600;
+        }
+        .growth-stat .value.positive {
+            color: #58cc02;
+        }
+        .growth-stat .value.negative {
+            color: #ff4b4b;
+        }
+        .growth-stat .value.neutral {
+            color: #a0a0a0;
+        }
+        .trend-up::before {
+            content: "▲ ";
+            font-size: 0.7rem;
+        }
+        .trend-down::before {
+            content: "▼ ";
+            font-size: 0.7rem;
+        }
+        .help-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(88, 204, 2, 0.2);
+            border: 1px solid #58cc02;
+            color: #58cc02;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+            margin-left: 10px;
+        }
+        .help-btn:hover {
+            background: #58cc02;
+            color: #1a1a2e;
+        }
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+        }
+
+        /* Modal styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal {
+            background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%);
+            border-radius: 16px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid rgba(88, 204, 2, 0.3);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+        .modal-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h3 {
+            color: #58cc02;
+            font-size: 1.4rem;
+            margin: 0;
+        }
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(255, 75, 75, 0.2);
+            border: 1px solid #ff4b4b;
+            color: #ff4b4b;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        .modal-close:hover {
+            background: #ff4b4b;
+            color: #fff;
+        }
+        .modal-body {
+            padding: 25px;
+            color: #e0e0e0;
+            line-height: 1.7;
+        }
+        .modal-body p {
+            margin-bottom: 15px;
+        }
+        .modal-body strong {
+            color: #58cc02;
+        }
+        .modal-body ul {
+            margin: 15px 0;
+            padding-left: 20px;
+        }
+        .modal-body li {
+            margin-bottom: 8px;
+        }
+        .metric-highlight {
+            background: rgba(88, 204, 2, 0.1);
+            border-left: 3px solid #58cc02;
+            padding: 12px 15px;
+            margin: 15px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        /* Investment Overview Section */
+        .overview-section {
+            max-width: 1400px;
+            margin: 0 auto 30px;
+        }
+        .overview-toggle {
+            width: 100%;
+            background: rgba(88, 204, 2, 0.1);
+            border: 1px solid rgba(88, 204, 2, 0.3);
+            border-radius: 12px;
+            padding: 16px 24px;
+            color: #58cc02;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+        .overview-toggle:hover {
+            background: rgba(88, 204, 2, 0.2);
+        }
+        .overview-toggle .arrow {
+            transition: transform 0.3s ease;
+        }
+        .overview-toggle.active .arrow {
+            transform: rotate(180deg);
+        }
+        .overview-content {
+            display: none;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            padding: 30px;
+            margin-top: -12px;
+        }
+        .overview-content.active {
+            display: block;
+        }
+        .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px;
+        }
+        .overview-card {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .overview-card h3 {
+            color: #58cc02;
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .overview-card ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .overview-card li {
+            padding: 8px 0;
+            color: #e0e0e0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            line-height: 1.5;
+        }
+        .overview-card li:last-child {
+            border-bottom: none;
+        }
+        .overview-card li strong {
+            color: #fff;
+        }
+        .timeline-year {
+            color: #58cc02;
+            font-weight: 600;
+            font-size: 1rem;
+            margin-top: 15px;
+            margin-bottom: 8px;
+        }
+        .timeline-year:first-child {
+            margin-top: 0;
+        }
+        .risk-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        .risk-number {
+            background: rgba(255, 75, 75, 0.2);
+            color: #ff4b4b;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        .bull-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        .bull-check {
+            color: #58cc02;
+            font-size: 1.1rem;
+        }
+
+        @media (max-width: 700px) {
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
+            .header h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Duolingo (DUOL) Metrics Dashboard</h1>
+        <p id="dateRange">Loading data...</p>
+    </div>
+
+    <div id="content">
+        <div class="loading">Loading data from CSV...</div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3 id="modalTitle">Metric Title</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Metric descriptions
+        const metricDescriptions = {
+            revenue: {
+                title: "Revenue",
+                content: `
+                    <p><strong>Revenue</strong> is the total income Duolingo receives from all sources during the quarter, recognized according to GAAP accounting standards.</p>
+                    <div class="metric-highlight">
+                        <strong>Duolingo's Revenue Sources:</strong>
+                        <ul>
+                            <li><strong>Subscriptions (85%+):</strong> Super Duolingo ($7-14/mo) and Duolingo Max ($30/mo)</li>
+                            <li><strong>Advertising:</strong> Ads shown to free users</li>
+                            <li><strong>Duolingo English Test (DET):</strong> $59 per test for English proficiency certification</li>
+                            <li><strong>In-app purchases:</strong> Gems, streak freezes, etc.</li>
+                        </ul>
+                    </div>
+                    <p><strong>Why it matters:</strong> Revenue shows top-line growth and the company's ability to monetize its user base. Duolingo has grown revenue 40%+ YoY consistently since IPO.</p>
+                    <p><strong>Key insight:</strong> Unlike bookings, revenue is recognized over the subscription period. A $120 annual subscription is recognized as $10/month over 12 months.</p>
+                `
+            },
+            revenueGrowth: {
+                title: "Revenue YoY Growth",
+                content: `
+                    <p><strong>Year-over-Year (YoY) Revenue Growth</strong> compares each quarter's revenue to the same quarter in the prior year, expressed as a percentage.</p>
+                    <div class="metric-highlight">
+                        <strong>Formula:</strong> ((Current Quarter Revenue - Same Quarter Last Year) / Same Quarter Last Year) x 100
+                    </div>
+                    <p><strong>Why it matters:</strong> YoY growth removes seasonality and shows the true underlying growth rate. It's the primary metric investors use to evaluate growth companies.</p>
+                    <p><strong>Duolingo's track record:</strong></p>
+                    <ul>
+                        <li>Consistently 40-50% YoY growth since IPO</li>
+                        <li>Slight deceleration from 50%+ to ~40% is natural as the base grows larger</li>
+                        <li>Maintaining 40%+ at $1B+ revenue run-rate is exceptional</li>
+                    </ul>
+                    <p><strong>Key insight:</strong> Growth has remained remarkably stable despite the larger revenue base, suggesting strong product-market fit and effective user acquisition.</p>
+                `
+            },
+            dau: {
+                title: "Daily Active Users (DAU)",
+                content: `
+                    <p><strong>Daily Active Users (DAU)</strong> measures the number of unique users who engage with Duolingo on a given day. The reported figure is typically an average over the quarter.</p>
+                    <div class="metric-highlight">
+                        <strong>Duolingo's Definition:</strong> A user who completes at least one lesson or practice session on any given day.
+                    </div>
+                    <p><strong>Why it matters:</strong> DAU is the most important engagement metric for Duolingo. It directly indicates:</p>
+                    <ul>
+                        <li><strong>Product stickiness:</strong> How many people find enough value to return daily</li>
+                        <li><strong>Monetization potential:</strong> Daily users see more ads and are more likely to subscribe</li>
+                        <li><strong>Learning outcomes:</strong> Daily practice leads to better results, driving word-of-mouth</li>
+                    </ul>
+                    <p><strong>Key insight:</strong> Duolingo's DAU grew from 10.1M to 50.5M (5x) since IPO, driven by gamification features like streaks, leaderboards, and social pressure. The "streak" mechanic is specifically designed to maximize DAU.</p>
+                `
+            },
+            mau: {
+                title: "Monthly Active Users (MAU)",
+                content: `
+                    <p><strong>Monthly Active Users (MAU)</strong> measures the number of unique users who engage with Duolingo at least once during a calendar month.</p>
+                    <div class="metric-highlight">
+                        <strong>Duolingo's Definition:</strong> A user who completes at least one lesson or practice session during the month.
+                    </div>
+                    <p><strong>Why it matters:</strong></p>
+                    <ul>
+                        <li><strong>Total addressable audience:</strong> Shows the reach of the platform</li>
+                        <li><strong>Top of funnel:</strong> MAU represents potential users who could become daily users and subscribers</li>
+                        <li><strong>Market penetration:</strong> Indicates how much of the language learning market Duolingo has captured</li>
+                    </ul>
+                    <p><strong>Key insight:</strong> MAU (135.3M) is valuable context, but DAU is more important for Duolingo's business model. A user who opens the app once a month generates minimal ad revenue and is unlikely to subscribe. The goal is converting MAU to DAU.</p>
+                `
+            },
+            subscribers: {
+                title: "Paid Subscribers",
+                content: `
+                    <p><strong>Paid Subscribers</strong> counts users with active paid subscriptions at the end of the quarter. This includes Super Duolingo, Duolingo Max, and Family Plan members.</p>
+                    <div class="metric-highlight">
+                        <strong>Subscription Tiers:</strong>
+                        <ul>
+                            <li><strong>Super Duolingo:</strong> $7-14/month - Unlimited hearts, no ads, offline access</li>
+                            <li><strong>Duolingo Max:</strong> ~$30/month - All Super features plus AI-powered Roleplay and Explain My Answer</li>
+                            <li><strong>Family Plan:</strong> Up to 6 members at discounted rate</li>
+                        </ul>
+                    </div>
+                    <p><strong>Why it matters:</strong> Subscriptions are 85%+ of revenue and have much higher margins than advertising. Subscriber growth directly drives revenue and profitability.</p>
+                    <p><strong>Key insight:</strong> The conversion rate (Subscribers / DAU) has remained steady at ~23%, meaning growth in DAU translates directly to subscriber growth. Family Plans have been a key driver of recent subscriber acceleration.</p>
+                `
+            },
+            subBookings: {
+                title: "Subscription Bookings",
+                content: `
+                    <p><strong>Subscription Bookings</strong> measures the total cash value of subscription purchases made during the quarter, regardless of when the revenue will be recognized.</p>
+                    <div class="metric-highlight">
+                        <strong>Bookings vs Revenue:</strong> If a user buys a $120 annual subscription in Q1, the full $120 is booked in Q1, but only ~$30 (3 months) is recognized as revenue in Q1.
+                    </div>
+                    <p><strong>Why it matters:</strong></p>
+                    <ul>
+                        <li><strong>Leading indicator:</strong> Bookings predict future revenue before it's recognized</li>
+                        <li><strong>Cash flow insight:</strong> Shows actual money coming in the door</li>
+                        <li><strong>Demand signal:</strong> Rising bookings indicate strong user demand</li>
+                    </ul>
+                    <p><strong>Key insight:</strong> Subscription bookings growing faster than revenue means the deferred revenue balance is building, which provides visibility into future quarters. This is a sign of business health.</p>
+                `
+            },
+            bookings: {
+                title: "Total Bookings",
+                content: `
+                    <p><strong>Total Bookings</strong> includes all cash received during the quarter from subscriptions, in-app purchases, advertising, and the Duolingo English Test.</p>
+                    <div class="metric-highlight">
+                        <strong>Components:</strong>
+                        <ul>
+                            <li><strong>Subscription Bookings:</strong> ~85% of total</li>
+                            <li><strong>Advertising:</strong> ~8-10%</li>
+                            <li><strong>Duolingo English Test:</strong> ~5%</li>
+                            <li><strong>In-app purchases:</strong> ~2%</li>
+                        </ul>
+                    </div>
+                    <p><strong>Why it matters:</strong> Total bookings is the best measure of current business momentum. It captures all economic activity in the quarter, regardless of accounting treatment.</p>
+                    <p><strong>Key insight:</strong> The gap between bookings and revenue represents deferred revenue - money collected but not yet recognized. This "backlog" provides revenue visibility and stability.</p>
+                `
+            },
+            ebitda: {
+                title: "Adjusted EBITDA & Margin",
+                content: `
+                    <p><strong>Adjusted EBITDA</strong> (Earnings Before Interest, Taxes, Depreciation, and Amortization) is a measure of operating profitability that excludes non-cash and non-recurring items.</p>
+                    <div class="metric-highlight">
+                        <strong>Duolingo's Adjustments:</strong> Excludes stock-based compensation, acquisition-related costs, and other non-recurring items to show "cash" operating profitability.
+                    </div>
+                    <p><strong>EBITDA Margin</strong> = Adjusted EBITDA / Revenue</p>
+                    <p><strong>Why it matters:</strong></p>
+                    <ul>
+                        <li><strong>Operating efficiency:</strong> Shows how much profit the business generates from each dollar of revenue</li>
+                        <li><strong>Cash generation proxy:</strong> Better approximates cash flow than GAAP net income</li>
+                        <li><strong>Comparability:</strong> Allows comparison across companies with different capital structures</li>
+                    </ul>
+                    <p><strong>Key insight:</strong> Duolingo's EBITDA margin expanded from 6% to 30% since IPO, demonstrating massive operating leverage. The business is becoming significantly more profitable as it scales, a hallmark of great software businesses.</p>
+                `
+            },
+            netIncome: {
+                title: "Net Income",
+                content: `
+                    <p><strong>Net Income</strong> is the bottom-line GAAP profit after all expenses, including stock-based compensation, taxes, interest, and depreciation.</p>
+                    <div class="metric-highlight">
+                        <strong>GAAP Net Income vs Adjusted EBITDA:</strong> Net income includes stock-based compensation (~$40-50M/quarter for Duolingo), which is a real economic cost but non-cash.
+                    </div>
+                    <p><strong>Why it matters:</strong></p>
+                    <ul>
+                        <li><strong>True profitability:</strong> The definitive measure of whether the company makes money</li>
+                        <li><strong>EPS calculation:</strong> Used to calculate earnings per share</li>
+                        <li><strong>Investor confidence:</strong> GAAP profitability attracts institutional investors</li>
+                    </ul>
+                    <p><strong>Key insight:</strong> Duolingo went from -$60M annual net loss (FY21) to +$88M profit (FY24). The transition to GAAP profitability in 2023 was a major milestone that expanded the investor base and validated the business model.</p>
+                `
+            },
+            fcf: {
+                title: "Free Cash Flow",
+                content: `
+                    <p><strong>Free Cash Flow (FCF)</strong> measures the cash a company generates after accounting for capital expenditures. It represents cash available for dividends, buybacks, acquisitions, or debt paydown.</p>
+                    <div class="metric-highlight">
+                        <strong>Formula:</strong> Operating Cash Flow - Capital Expenditures
+                    </div>
+                    <p><strong>Why it matters:</strong></p>
+                    <ul>
+                        <li><strong>Cash is king:</strong> Unlike accounting profits, FCF can't be manipulated</li>
+                        <li><strong>Valuation basis:</strong> Many investors value companies on FCF, not earnings</li>
+                        <li><strong>Financial flexibility:</strong> FCF funds growth without dilution or debt</li>
+                    </ul>
+                    <p><strong>Key insight:</strong> Duolingo has been FCF positive since IPO, even when GAAP unprofitable. This is because stock-based compensation (a large expense) is non-cash, and the subscription model collects cash upfront. FCF grew from $12.5M (Q4'21) to $80.3M (Q3'25) - 6.4x increase.</p>
+                `
+            },
+            dauMau: {
+                title: "DAU/MAU Ratio (Stickiness)",
+                content: `
+                    <p><strong>DAU/MAU Ratio</strong> (also called "stickiness") measures how often monthly users return daily. It answers: "Of all people who use the app at least once a month, what percentage use it every day?"</p>
+                    <div class="metric-highlight">
+                        <strong>Duolingo's DAU/MAU: ~34-38%</strong><br>
+                        This is exceptionally high. For context:
+                        <ul>
+                            <li><strong>Facebook:</strong> ~50-60% (best-in-class)</li>
+                            <li><strong>Typical social apps:</strong> 20-30%</li>
+                            <li><strong>Most apps:</strong> 10-20%</li>
+                        </ul>
+                    </div>
+                    <p><strong>Why it matters:</strong></p>
+                    <ul>
+                        <li><strong>Habit formation:</strong> High stickiness means the gamification (streaks, leaderboards, hearts) successfully drives daily engagement</li>
+                        <li><strong>Monetization:</strong> Daily users are far more likely to convert to subscribers</li>
+                        <li><strong>Durability:</strong> The ratio staying stable at 37% even as MAU grew from 42M to 135M shows growth isn't from low-quality users</li>
+                    </ul>
+                    <p><strong>Key insight:</strong> This ratio shows Duolingo has solved the hardest problem in consumer apps - making people come back every day. A 37% ratio means users open the app roughly 11 days per month on average. This is extremely difficult to replicate and represents a durable competitive moat.</p>
+                `
+            },
+            arpu: {
+                title: "ARPU - Revenue per Subscriber",
+                content: `
+                    <p><strong>ARPU (Average Revenue Per User)</strong> in this context measures quarterly revenue divided by paid subscribers, showing the average revenue generated per paying customer.</p>
+                    <div class="metric-highlight">
+                        <strong>Note:</strong> This simplified ARPU divides total revenue by subscribers. True ARPU would only count subscription revenue, but this gives a useful approximation of subscriber value.
+                    </div>
+                    <p><strong>Why it matters:</strong></p>
+                    <ul>
+                        <li><strong>Pricing power:</strong> Rising ARPU indicates ability to raise prices or upsell</li>
+                        <li><strong>Product mix:</strong> Shows shift between subscription tiers</li>
+                        <li><strong>LTV estimation:</strong> ARPU x retention = customer lifetime value</li>
+                    </ul>
+                    <p><strong>What affects ARPU:</strong></p>
+                    <ul>
+                        <li><strong>Duolingo Max adoption:</strong> $30/month vs $7-14 for Super</li>
+                        <li><strong>Family Plan mix:</strong> Lower per-user revenue but higher retention</li>
+                        <li><strong>Geographic mix:</strong> Different pricing in different countries</li>
+                        <li><strong>Annual vs monthly:</strong> Annual plans have lower monthly ARPU but better retention</li>
+                    </ul>
+                    <p><strong>Key insight:</strong> ARPU has been relatively stable (~$23-24/quarter), suggesting Duolingo is growing subscribers without sacrificing pricing. The launch of Duolingo Max provides upside to ARPU as adoption increases.</p>
+                `
+            },
+            dauTrend: {
+                title: "DAU Growth Trend Analysis",
+                content: `
+                    <p><strong>DAU Growth Trend Analysis</strong> compares actual year-over-year DAU growth against a 4-quarter moving average to identify whether growth is accelerating, decelerating, or hitting unusual outliers.</p>
+                    <div class="metric-highlight">
+                        <strong>How to read this chart:</strong>
+                        <ul>
+                            <li><strong>Blue bars:</strong> Actual YoY DAU growth each quarter</li>
+                            <li><strong>Orange line:</strong> 4-quarter moving average (smoothed trend)</li>
+                            <li><strong>Gap between them:</strong> Shows if a quarter over/underperformed the trend</li>
+                        </ul>
+                    </div>
+                    <p><strong>Why it matters:</strong></p>
+                    <ul>
+                        <li><strong>Identifies true outliers:</strong> A quarter may look weak due to "tough comps" (strong prior year), but the moving average reveals if it actually underperformed the trend</li>
+                        <li><strong>Smooths volatility:</strong> Removes noise from seasonal or one-time factors</li>
+                        <li><strong>Spots inflections:</strong> When actual growth crosses the moving average, it may signal a trend change</li>
+                    </ul>
+                    <p><strong>Q3 2025 Analysis:</strong></p>
+                    <ul>
+                        <li>YoY growth of 36% was 9 points below the 4Q moving average of 45%</li>
+                        <li>Q3 2024 (the "tough comp") was actually slightly below its own moving average</li>
+                        <li>This suggests Q3 2025 weakness is real, not just a comparison artifact</li>
+                        <li>Management attributed this to reduced social media activity and a strategic shift toward long-term investments</li>
+                    </ul>
+                    <p><strong>Key insight:</strong> The moving average helps separate "tough comps" narratives from actual performance changes. When a company claims tough comps, check if the prior period was actually above trend.</p>
+                `
+            },
+            dauLog: {
+                title: "DAU Log Scale (Growth Deceleration)",
+                content: `
+                    <p><strong>Logarithmic scale</strong> transforms the Y-axis so that equal vertical distances represent equal percentage changes, not equal absolute changes.</p>
+                    <div class="metric-highlight">
+                        <strong>How to read this chart:</strong>
+                        <ul>
+                            <li><strong>Straight line</strong> = constant percentage growth rate</li>
+                            <li><strong>Curve bending upward</strong> = accelerating growth</li>
+                            <li><strong>Curve bending downward</strong> = decelerating growth</li>
+                        </ul>
+                    </div>
+                    <p><strong>Why it matters:</strong></p>
+                    <ul>
+                        <li>On a linear scale, 60% growth and 30% growth can look similar if the base is different</li>
+                        <li>Log scale makes growth rate changes visually obvious</li>
+                        <li>It's the standard way to visualize compound growth over time</li>
+                    </ul>
+                    <p><strong>What you should see:</strong></p>
+                    <ul>
+                        <li>Early periods (2022-2023): Steeper slope indicating faster growth</li>
+                        <li>Recent periods (2024-2025): Flattening slope indicating slower growth</li>
+                        <li>The curve bending rightward/flattening confirms growth deceleration</li>
+                    </ul>
+                    <p><strong>Key insight:</strong> If Duolingo maintained 60% growth, the line would stay straight. The visible flattening shows growth is genuinely slowing, not just a base effect.</p>
+                `
+            }
+        };
+
+        function openModal(metricKey) {
+            const metric = metricDescriptions[metricKey];
+            document.getElementById('modalTitle').textContent = metric.title;
+            document.getElementById('modalBody').innerHTML = metric.content;
+            document.getElementById('modalOverlay').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal(event) {
+            if (event && event.target !== document.getElementById('modalOverlay')) return;
+            document.getElementById('modalOverlay').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        function toggleOverview() {
+            const btn = document.querySelector('.overview-toggle');
+            const content = document.getElementById('overviewContent');
+            btn.classList.toggle('active');
+            content.classList.toggle('active');
+        }
+
+        // CSV Parser
+        function parseCSV(text) {
+            const lines = text.trim().split('\n');
+            const headers = lines[0].split(',');
+            const data = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',');
+                const row = {};
+                headers.forEach((header, index) => {
+                    row[header.trim()] = values[index]?.trim();
+                });
+                data.push(row);
+            }
+            return data;
+        }
+
+        // Calculate YoY growth (compare to 4 quarters ago)
+        function calculateYoY(data, field, index) {
+            if (index < 4) return null;
+            const current = parseFloat(data[index][field]);
+            const previous = parseFloat(data[index - 4][field]);
+            if (isNaN(current) || isNaN(previous) || previous === 0) return null;
+            return ((current - previous) / previous * 100).toFixed(0);
+        }
+
+        // Calculate all YoY growth rates for a field
+        function getAllYoYGrowth(data, field) {
+            const growthRates = [];
+            for (let i = 4; i < data.length; i++) {
+                const rate = calculateYoY(data, field, i);
+                if (rate !== null) growthRates.push(parseFloat(rate));
+            }
+            return growthRates;
+        }
+
+        // Calculate average of array
+        function average(arr) {
+            if (arr.length === 0) return null;
+            return arr.reduce((a, b) => a + b, 0) / arr.length;
+        }
+
+        // Get growth stats for a metric
+        function getGrowthStats(data, field) {
+            const allGrowth = getAllYoYGrowth(data, field);
+            if (allGrowth.length === 0) return { avg: null, recent: null, trend: null };
+
+            const avg = average(allGrowth);
+            const recentGrowth = allGrowth.slice(-4); // Last 4 quarters
+            const recent = average(recentGrowth);
+            const trend = recent > avg ? 'up' : recent < avg ? 'down' : 'flat';
+
+            return { avg: avg.toFixed(0), recent: recent.toFixed(0), trend };
+        }
+
+        // Generate growth stats HTML
+        function growthStatsHTML(stats, suffix = '%') {
+            if (stats.avg === null) return '';
+            const trendClass = stats.trend === 'up' ? 'trend-up' : stats.trend === 'down' ? 'trend-down' : '';
+            const valueClass = parseFloat(stats.recent) >= 0 ? 'positive' : 'negative';
+            const avgClass = parseFloat(stats.avg) >= 0 ? 'positive' : 'negative';
+            return `
+                <div class="growth-stats">
+                    <div class="growth-stat">
+                        <span class="label">Avg YoY:</span>
+                        <span class="value ${avgClass}">${stats.avg > 0 ? '+' : ''}${stats.avg}${suffix}</span>
+                    </div>
+                    <div class="growth-stat">
+                        <span class="label">Recent:</span>
+                        <span class="value ${valueClass} ${trendClass}">${stats.recent > 0 ? '+' : ''}${stats.recent}${suffix}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Load and render dashboard
+        async function loadDashboard() {
+            try {
+                const response = await fetch('DUOL_Metrics_Analysis.csv');
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                const csvText = await response.text();
+                const data = parseCSV(csvText);
+
+                if (data.length === 0) throw new Error('CSV file is empty');
+
+                renderDashboard(data);
+            } catch (error) {
+                document.getElementById('content').innerHTML = `
+                    <div class="error">
+                        <p>Failed to load data from CSV file.</p>
+                        <p>Make sure <strong>DUOL_Metrics_Analysis.csv</strong> is in the same folder as this HTML file.</p>
+                        <code>Error: ${error.message}
+
+To add new data, edit the CSV file with these columns:
+Period,Revenue,Bookings,DAU,MAU,Subscribers,SubBookings,EBITDA,EBITDAMargin,NetIncome,FCF
+
+Example row:
+Q4 2025,290.0,340.0,52.0,140.0,12.0,290.0,85.0,29.3,38.0,85.0</code>
+                    </div>
+                `;
+            }
+        }
+
+        function renderDashboard(data) {
+            const labels = data.map(d => d.Period.replace(' ', "'").replace('20', ''));
+            const latest = data[data.length - 1];
+            const latestIdx = data.length - 1;
+
+            // Find the last complete row (where Revenue is not empty)
+            // Use this for KPI values when latest row has missing data
+            let lastCompleteIdx = latestIdx;
+            for (let i = data.length - 1; i >= 0; i--) {
+                if (data[i].Revenue && data[i].Revenue.trim() !== '') {
+                    lastCompleteIdx = i;
+                    break;
+                }
+            }
+            const lastComplete = data[lastCompleteIdx];
+
+            // Helper to get value - use latest if available, otherwise last complete
+            const getValue = (field) => {
+                const latestVal = parseFloat(latest[field]);
+                if (!isNaN(latestVal)) return { value: latestVal, row: latest, idx: latestIdx };
+                const completeVal = parseFloat(lastComplete[field]);
+                return { value: completeVal, row: lastComplete, idx: lastCompleteIdx };
+            };
+
+            // Calculate derived metrics
+            const dauMauRatio = data.map(d => ((parseFloat(d.DAU) / parseFloat(d.MAU)) * 100).toFixed(1));
+            const arpu = data.map(d => (parseFloat(d.Revenue) / parseFloat(d.Subscribers)).toFixed(2));
+            const revenueYoY = data.map((d, i) => calculateYoY(data, 'Revenue', i));
+
+            // Get first period for growth calculation
+            const first = data[0];
+            const revenueGrowth = (parseFloat(lastComplete.Revenue) / parseFloat(first.Revenue)).toFixed(1);
+
+            // Calculate growth stats for each metric
+            const growthStats = {
+                revenue: getGrowthStats(data, 'Revenue'),
+                bookings: getGrowthStats(data, 'Bookings'),
+                dau: getGrowthStats(data, 'DAU'),
+                mau: getGrowthStats(data, 'MAU'),
+                subscribers: getGrowthStats(data, 'Subscribers'),
+                subBookings: getGrowthStats(data, 'SubBookings'),
+                ebitda: getGrowthStats(data, 'EBITDA'),
+                fcf: getGrowthStats(data, 'FCF'),
+            };
+
+            // Calculate EBITDA margin change (not YoY %)
+            const marginChanges = [];
+            for (let i = 4; i < data.length; i++) {
+                const current = parseFloat(data[i].EBITDAMargin);
+                const previous = parseFloat(data[i - 4].EBITDAMargin);
+                marginChanges.push(current - previous);
+            }
+            const avgMarginChange = marginChanges.length > 0 ? average(marginChanges) : null;
+            const recentMarginChange = marginChanges.length >= 4 ? average(marginChanges.slice(-4)) : avgMarginChange;
+            growthStats.margin = {
+                avg: avgMarginChange?.toFixed(1),
+                recent: recentMarginChange?.toFixed(1),
+                trend: recentMarginChange > avgMarginChange ? 'up' : recentMarginChange < avgMarginChange ? 'down' : 'flat'
+            };
+
+            // DAU/MAU ratio stats (absolute change, not %)
+            const dauMauChanges = [];
+            for (let i = 4; i < data.length; i++) {
+                const current = parseFloat(data[i].DAU) / parseFloat(data[i].MAU) * 100;
+                const previous = parseFloat(data[i - 4].DAU) / parseFloat(data[i - 4].MAU) * 100;
+                dauMauChanges.push(current - previous);
+            }
+            const avgDauMauChange = dauMauChanges.length > 0 ? average(dauMauChanges) : null;
+            const recentDauMauChange = dauMauChanges.length >= 4 ? average(dauMauChanges.slice(-4)) : avgDauMauChange;
+            growthStats.dauMau = {
+                avg: avgDauMauChange?.toFixed(1),
+                recent: recentDauMauChange?.toFixed(1),
+                trend: recentDauMauChange > avgDauMauChange ? 'up' : recentDauMauChange < avgDauMauChange ? 'down' : 'flat'
+            };
+
+            // ARPU stats (derived metric)
+            const arpuGrowth = [];
+            for (let i = 4; i < data.length; i++) {
+                const currentArpu = parseFloat(data[i].Revenue) / parseFloat(data[i].Subscribers);
+                const prevArpu = parseFloat(data[i - 4].Revenue) / parseFloat(data[i - 4].Subscribers);
+                arpuGrowth.push(((currentArpu - prevArpu) / prevArpu) * 100);
+            }
+            const avgArpuGrowth = arpuGrowth.length > 0 ? average(arpuGrowth) : null;
+            const recentArpuGrowth = arpuGrowth.length >= 4 ? average(arpuGrowth.slice(-4)) : avgArpuGrowth;
+            growthStats.arpu = {
+                avg: avgArpuGrowth?.toFixed(0),
+                recent: recentArpuGrowth?.toFixed(0),
+                trend: recentArpuGrowth > avgArpuGrowth ? 'up' : recentArpuGrowth < avgArpuGrowth ? 'down' : 'flat'
+            };
+
+            // DAU Trend Analysis - YoY growth vs trailing 4-quarter moving average
+            const dauYoYGrowth = [];
+            const dauMovingAvg = [];
+            const dauDeviation = [];
+
+            // First pass: calculate all YoY growth rates
+            for (let i = 0; i < data.length; i++) {
+                if (i < 4) {
+                    dauYoYGrowth.push(null);
+                } else {
+                    const current = parseFloat(data[i].DAU);
+                    const previous = parseFloat(data[i - 4].DAU);
+                    const yoyGrowth = ((current - previous) / previous) * 100;
+                    dauYoYGrowth.push(yoyGrowth);
+                }
+            }
+
+            // Second pass: calculate trailing 4Q moving average (previous 4 quarters, not including current)
+            for (let i = 0; i < data.length; i++) {
+                if (i < 8) {
+                    // Need at least 8 quarters: 4 for first YoY calc + 4 more for trailing MA
+                    dauMovingAvg.push(null);
+                    dauDeviation.push(null);
+                } else {
+                    // Trailing MA: average of previous 4 YoY growth rates (indices i-4 to i-1)
+                    const trailingGrowths = dauYoYGrowth.slice(i - 4, i).filter(g => g !== null);
+                    const ma = trailingGrowths.length === 4 ? average(trailingGrowths) : null;
+                    dauMovingAvg.push(ma);
+                    dauDeviation.push(ma !== null && dauYoYGrowth[i] !== null ? dauYoYGrowth[i] - ma : null);
+                }
+            }
+
+            const dauTrendAnalysis = {
+                yoyGrowth: dauYoYGrowth,
+                movingAvg: dauMovingAvg,
+                deviation: dauDeviation,
+                latestYoY: dauYoYGrowth[dauYoYGrowth.length - 1]?.toFixed(0),
+                latestMA: dauMovingAvg[dauMovingAvg.length - 1]?.toFixed(0),
+                latestDeviation: dauDeviation[dauDeviation.length - 1]?.toFixed(0)
+            };
+
+            // Calculate 4-quarter trailing moving average for raw DAU values
+            const dauMA = [];
+            for (let i = 0; i < data.length; i++) {
+                if (i < 4) {
+                    dauMA.push(null);
+                } else {
+                    // Average of current and previous 3 quarters
+                    const vals = data.slice(i - 3, i + 1).map(d => parseFloat(d.DAU));
+                    dauMA.push(average(vals));
+                }
+            }
+
+            // Update header
+            document.getElementById('dateRange').textContent =
+                `${data[0].Period} - ${latest.Period} | Data from Quarterly Shareholder Letters`;
+
+            // Get values for KPI cards (falls back to last complete quarter if missing)
+            const revenueData = getValue('Revenue');
+            const dauData = getValue('DAU');
+            const subsData = getValue('Subscribers');
+            const marginData = getValue('EBITDAMargin');
+            const fcfData = getValue('FCF');
+
+            // Calculate YoY values using the appropriate index for each metric
+            const latestRevenueYoY = calculateYoY(data, 'Revenue', revenueData.idx);
+            const latestDAUYoY = calculateYoY(data, 'DAU', dauData.idx);
+            const latestSubsYoY = calculateYoY(data, 'Subscribers', subsData.idx);
+            const latestFCFYoY = calculateYoY(data, 'FCF', fcfData.idx);
+            const latestMarginYoY = marginData.idx >= 4 ?
+                (marginData.value - parseFloat(data[marginData.idx - 4].EBITDAMargin)).toFixed(1) : null;
+
+            // Helper to format values
+            const fmt = (val, suffix = '', prefix = '') => {
+                const num = parseFloat(val);
+                return isNaN(num) ? '--' : `${prefix}${num.toFixed(1)}${suffix}`;
+            };
+
+            // Render content
+            document.getElementById('content').innerHTML = `
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <h3>Revenue (${revenueData.row.Period.replace(' 20', "'")})</h3>
+                        <div class="value">${fmt(revenueData.value, 'M', '$')}</div>
+                        <div class="change positive">${latestRevenueYoY ? `+${latestRevenueYoY}% YoY` : ''}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <h3>Daily Active Users (${dauData.row.Period.replace(' 20', "'")})</h3>
+                        <div class="value">${fmt(dauData.value, 'M')}</div>
+                        <div class="change positive">${latestDAUYoY ? `+${latestDAUYoY}% YoY` : ''}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <h3>Paid Subscribers (${subsData.row.Period.replace(' 20', "'")})</h3>
+                        <div class="value">${fmt(subsData.value, 'M')}</div>
+                        <div class="change positive">${latestSubsYoY ? `+${latestSubsYoY}% YoY` : ''}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <h3>EBITDA Margin (${marginData.row.Period.replace(' 20', "'")})</h3>
+                        <div class="value">${fmt(marginData.value, '%')}</div>
+                        <div class="change positive">${latestMarginYoY && !isNaN(parseFloat(latestMarginYoY)) ? `+${latestMarginYoY}pp YoY` : ''}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <h3>Free Cash Flow (${fcfData.row.Period.replace(' 20', "'")})</h3>
+                        <div class="value">${fmt(fcfData.value, 'M', '$')}</div>
+                        <div class="change positive">${latestFCFYoY ? `+${latestFCFYoY}% YoY` : ''}</div>
+                    </div>
+                    <div class="kpi-card">
+                        <h3>Total Growth Since ${first.Period.replace(' 20', "'")}</h3>
+                        <div class="value">${isNaN(parseFloat(revenueGrowth)) ? '--' : revenueGrowth + 'x'}</div>
+                        <div class="change positive">Revenue</div>
+                    </div>
+                </div>
+
+                <div class="overview-section">
+                    <button class="overview-toggle" onclick="toggleOverview()">
+                        <span>Investment Overview & Thesis</span>
+                        <span class="arrow">▼</span>
+                    </button>
+                    <div class="overview-content" id="overviewContent">
+                        <div class="overview-grid">
+                            <div class="overview-card">
+                                <h3>Growth Drivers</h3>
+                                <ul>
+                                    <li><strong>A/B Testing Culture:</strong> ~500 tests/quarter, every product change is data-driven</li>
+                                    <li><strong>Gamification:</strong> Streaks, leaderboards, hearts/lives create daily habit</li>
+                                    <li><strong>Social-First Marketing:</strong> Viral TikTok presence, "unhinged" brand personality</li>
+                                    <li><strong>Freemium Model:</strong> Free tier is useful; Super/Max tiers remove friction</li>
+                                    <li><strong>AI Integration:</strong> GPT-4 powers Roleplay, Video Call, Explain My Answer</li>
+                                    <li><strong>Product Expansion:</strong> Math (2022), Music (2023), Chess (2025)</li>
+                                    <li><strong>Network Effects:</strong> More users → better AI/ML → better product</li>
+                                </ul>
+                            </div>
+                            <div class="overview-card">
+                                <h3>Key Events Timeline</h3>
+                                <div class="timeline-year">2021</div>
+                                <ul>
+                                    <li>July: IPO at $102/share, raised ~$521M</li>
+                                </ul>
+                                <div class="timeline-year">2022</div>
+                                <ul>
+                                    <li>Q1: "Super Duolingo" rebrand (better conversion)</li>
+                                    <li>Q3: Duolingo Math course launched</li>
+                                </ul>
+                                <div class="timeline-year">2023</div>
+                                <ul>
+                                    <li>Q1: Duolingo Max with GPT-4 ($30/month)</li>
+                                    <li>Q2: First profitable quarter</li>
+                                    <li>Q4: Duolingo Music course launched</li>
+                                </ul>
+                                <div class="timeline-year">2024</div>
+                                <ul>
+                                    <li>Q3: Video Call feature (AI conversations)</li>
+                                    <li>Q4: 6-for-1 stock split</li>
+                                </ul>
+                                <div class="timeline-year">2025</div>
+                                <ul>
+                                    <li>Q3: Chess course launched</li>
+                                    <li>Q3: Strategic shift to long-term investments</li>
+                                </ul>
+                            </div>
+                            <div class="overview-card">
+                                <h3>Risks to Consider</h3>
+                                <ul>
+                                    <li class="risk-item"><span class="risk-number">1</span><span><strong>DAU Deceleration:</strong> YoY growth slowed from 65% to 36%</span></li>
+                                    <li class="risk-item"><span class="risk-number">2</span><span><strong>Competition:</strong> Google, Apple investing in language learning</span></li>
+                                    <li class="risk-item"><span class="risk-number">3</span><span><strong>DET Risk:</strong> English Test faces traditional test competition</span></li>
+                                    <li class="risk-item"><span class="risk-number">4</span><span><strong>Key Person:</strong> CEO Luis von Ahn is the visionary</span></li>
+                                    <li class="risk-item"><span class="risk-number">5</span><span><strong>Valuation:</strong> Premium multiples require continued execution</span></li>
+                                </ul>
+                            </div>
+                            <div class="overview-card">
+                                <h3>Bull Case Thesis</h3>
+                                <ul>
+                                    <li class="bull-item"><span class="bull-check">✓</span><span>Massive TAM expansion beyond languages (Math, Music, Chess)</span></li>
+                                    <li class="bull-item"><span class="bull-check">✓</span><span>AI integration provides sustainable competitive moat</span></li>
+                                    <li class="bull-item"><span class="bull-check">✓</span><span>Operating leverage: margins expanding at 40%+ growth</span></li>
+                                    <li class="bull-item"><span class="bull-check">✓</span><span>Network effects and brand create barriers to entry</span></li>
+                                    <li class="bull-item"><span class="bull-check">✓</span><span>Management consistently under-promises, over-delivers</span></li>
+                                    <li class="bull-item"><span class="bull-check">✓</span><span>Path to $2B+ revenue with 30%+ EBITDA margins visible</span></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-grid">
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <div class="chart-header-left">
+                                <h2>Revenue ($M)</h2>
+                                ${growthStatsHTML(growthStats.revenue)}
+                            </div>
+                            <button class="help-btn" onclick="openModal('revenue')">?</button>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="revenueChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <div class="chart-header-left">
+                                <h2>Revenue YoY Growth (%)</h2>
+                            </div>
+                            <button class="help-btn" onclick="openModal('revenueGrowth')">?</button>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="revenueGrowthChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <div class="chart-header-left">
+                                <h2>Daily Active Users (Millions)</h2>
+                                ${growthStatsHTML(growthStats.dau)}
+                            </div>
+                            <button class="help-btn" onclick="openModal('dau')">?</button>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="dauChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <div class="chart-header-left">
+                                <h2>DAU Log Scale (Growth Deceleration)</h2>
+                                <div class="growth-stats">
+                                    <div class="growth-stat">
+                                        <span class="label">Tip:</span>
+                                        <span class="value neutral">Straight line = constant growth</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="help-btn" onclick="openModal('dauLog')">?</button>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="dauLogChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <div class="chart-header-left">
+                                <h2>DAU Growth Trend Analysis</h2>
+                                <div class="growth-stats">
+                                    <div class="growth-stat">
+                                        <span class="label">Latest vs Trend:</span>
+                                        <span class="value ${dauTrendAnalysis.latestDeviation >= 0 ? 'positive' : 'negative'}">${dauTrendAnalysis.latestDeviation > 0 ? '+' : ''}${dauTrendAnalysis.latestDeviation}pp</span>
+                                    </div>
+                                    <div class="growth-stat">
+                                        <span class="label">4Q Avg:</span>
+                                        <span class="value positive">${dauTrendAnalysis.latestMA}%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="help-btn" onclick="openModal('dauTrend')">?</button>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="dauTrendChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <div class="chart-header-left">
+                                <h2>Monthly Active Users (Millions)</h2>
+                                ${growthStatsHTML(growthStats.mau)}
+                            </div>
+                            <button class="help-btn" onclick="openModal('mau')">?</button>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="mauChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <div class="chart-header-left">
+                                <h2>Paid Subscribers (Millions)</h2>
+                                ${growthStatsHTML(growthStats.subscribers)}
+                            </div>
+                            <button class="help-btn" onclick="openModal('subscribers')">?</button>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="subscribersChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <div class="chart-header-left">
+                                <h2>Subscription Bookings ($M)</h2>
+                                ${growthStatsHTML(growthStats.subBookings)}
+                            </div>
+                            <button class="help-btn" onclick="openModal('subBookings')">?</button>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="subBookingsChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <div class="chart-header-left">
+                                <h2>Total Bookings ($M)</h2>
+                                ${growthStatsHTML(growthStats.bookings)}
+                            </div>
+                            <button class="help-btn" onclick="openModal('bookings')">?</button>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="bookingsChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <div class="chart-header-left">
+                                <h2>Adjusted EBITDA ($M) & Margin (%)</h2>
+                                <div class="growth-stats">
+                                    <div class="growth-stat">
+                                        <span class="label">EBITDA Avg YoY:</span>
+                                        <span class="value positive">+${growthStats.ebitda.avg}%</span>
+                                    </div>
+                                    <div class="growth-stat">
+                                        <span class="label">Margin Δ Avg:</span>
+                                        <span class="value ${parseFloat(growthStats.margin.avg) >= 0 ? 'positive' : 'negative'}">${growthStats.margin.avg > 0 ? '+' : ''}${growthStats.margin.avg}pp</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="help-btn" onclick="openModal('ebitda')">?</button>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="ebitdaChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <div class="chart-header-left">
+                                <h2>Net Income ($M)</h2>
+                                <div class="growth-stats">
+                                    <div class="growth-stat">
+                                        <span class="label">Trend:</span>
+                                        <span class="value positive">Loss → Profit</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="help-btn" onclick="openModal('netIncome')">?</button>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="netIncomeChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <div class="chart-header-left">
+                                <h2>Free Cash Flow ($M)</h2>
+                                ${growthStatsHTML(growthStats.fcf)}
+                            </div>
+                            <button class="help-btn" onclick="openModal('fcf')">?</button>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="fcfChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <div class="chart-header-left">
+                                <h2>DAU/MAU Ratio (Engagement %)</h2>
+                                <div class="growth-stats">
+                                    <div class="growth-stat">
+                                        <span class="label">Avg Δ YoY:</span>
+                                        <span class="value ${parseFloat(growthStats.dauMau.avg) >= 0 ? 'positive' : 'negative'}">${growthStats.dauMau.avg > 0 ? '+' : ''}${growthStats.dauMau.avg}pp</span>
+                                    </div>
+                                    <div class="growth-stat">
+                                        <span class="label">Recent Δ:</span>
+                                        <span class="value ${parseFloat(growthStats.dauMau.recent) >= 0 ? 'positive' : 'negative'}">${growthStats.dauMau.recent > 0 ? '+' : ''}${growthStats.dauMau.recent}pp</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="help-btn" onclick="openModal('dauMau')">?</button>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="engagementChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <div class="chart-header">
+                            <div class="chart-header-left">
+                                <h2>ARPU - Revenue per Subscriber ($)</h2>
+                                ${growthStatsHTML(growthStats.arpu)}
+                            </div>
+                            <button class="help-btn" onclick="openModal('arpu')">?</button>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="arpuChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Create charts
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#a0a0a0' } },
+                    y: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#a0a0a0' } }
+                }
+            };
+
+            const makeGradient = (ctx, color) => {
+                const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, 300);
+                gradient.addColorStop(0, color.replace('1)', '0.4)'));
+                gradient.addColorStop(1, color.replace('1)', '0.0)'));
+                return gradient;
+            };
+
+            // Revenue Chart
+            new Chart(document.getElementById('revenueChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data.map(d => parseFloat(d.Revenue)),
+                        borderColor: '#58cc02',
+                        backgroundColor: (ctx) => makeGradient(ctx, 'rgba(88, 204, 2, 1)'),
+                        fill: true, tension: 0.3, pointBackgroundColor: '#58cc02', pointRadius: 4
+                    }]
+                },
+                options: chartOptions
+            });
+
+            // Revenue YoY Growth Chart
+            new Chart(document.getElementById('revenueGrowthChart'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: revenueYoY,
+                        backgroundColor: 'rgba(88, 204, 2, 0.7)',
+                        borderColor: '#58cc02', borderWidth: 1
+                    }]
+                },
+                options: chartOptions
+            });
+
+            // DAU Chart with Moving Average
+            new Chart(document.getElementById('dauChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'DAU',
+                        data: data.map(d => parseFloat(d.DAU)),
+                        borderColor: '#1cb0f6',
+                        backgroundColor: (ctx) => makeGradient(ctx, 'rgba(28, 176, 246, 1)'),
+                        fill: true, tension: 0.3, pointBackgroundColor: '#1cb0f6', pointRadius: 4
+                    }, {
+                        label: '4Q Moving Avg',
+                        data: dauMA,
+                        borderColor: '#ff9600',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        tension: 0.3,
+                        pointBackgroundColor: '#ff9600',
+                        pointRadius: 3,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: true, labels: { color: '#a0a0a0' } } },
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#a0a0a0' } },
+                        y: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#a0a0a0' } }
+                    }
+                }
+            });
+
+            // DAU Log Scale Chart
+            new Chart(document.getElementById('dauLogChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'DAU (log scale)',
+                        data: data.map(d => parseFloat(d.DAU)),
+                        borderColor: '#1cb0f6',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        tension: 0,
+                        pointBackgroundColor: '#1cb0f6',
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#a0a0a0' } },
+                        y: {
+                            type: 'logarithmic',
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            ticks: {
+                                color: '#a0a0a0',
+                                callback: function(value) {
+                                    return value + 'M';
+                                }
+                            },
+                            min: 10,
+                            max: 60
+                        }
+                    }
+                }
+            });
+
+            // DAU Trend Analysis Chart
+            new Chart(document.getElementById('dauTrendChart'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        type: 'bar',
+                        label: 'YoY Growth (%)',
+                        data: dauTrendAnalysis.yoyGrowth,
+                        backgroundColor: dauTrendAnalysis.deviation.map(d =>
+                            d === null ? 'rgba(28, 176, 246, 0.7)' :
+                            d >= 0 ? 'rgba(88, 204, 2, 0.7)' : 'rgba(255, 75, 75, 0.7)'
+                        ),
+                        borderColor: dauTrendAnalysis.deviation.map(d =>
+                            d === null ? '#1cb0f6' :
+                            d >= 0 ? '#58cc02' : '#ff4b4b'
+                        ),
+                        borderWidth: 1,
+                        yAxisID: 'y'
+                    }, {
+                        type: 'line',
+                        label: '4Q Moving Avg',
+                        data: dauTrendAnalysis.movingAvg,
+                        borderColor: '#ff9600',
+                        backgroundColor: 'transparent',
+                        borderWidth: 3,
+                        tension: 0.3,
+                        pointBackgroundColor: '#ff9600',
+                        pointRadius: 4,
+                        yAxisID: 'y'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: { color: '#a0a0a0' }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                afterBody: function(context) {
+                                    const idx = context[0].dataIndex;
+                                    const dev = dauTrendAnalysis.deviation[idx];
+                                    if (dev !== null) {
+                                        return `Deviation: ${dev >= 0 ? '+' : ''}${dev.toFixed(1)}pp`;
+                                    }
+                                    return '';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#a0a0a0' } },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            ticks: { color: '#a0a0a0' },
+                            title: { display: true, text: 'YoY Growth (%)', color: '#a0a0a0' }
+                        }
+                    }
+                }
+            });
+
+            // MAU Chart
+            new Chart(document.getElementById('mauChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data.map(d => parseFloat(d.MAU)),
+                        borderColor: '#ce82ff',
+                        backgroundColor: (ctx) => makeGradient(ctx, 'rgba(206, 130, 255, 1)'),
+                        fill: true, tension: 0.3, pointBackgroundColor: '#ce82ff', pointRadius: 4
+                    }]
+                },
+                options: chartOptions
+            });
+
+            // Subscribers Chart
+            new Chart(document.getElementById('subscribersChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data.map(d => parseFloat(d.Subscribers)),
+                        borderColor: '#ff9600',
+                        backgroundColor: (ctx) => makeGradient(ctx, 'rgba(255, 150, 0, 1)'),
+                        fill: true, tension: 0.3, pointBackgroundColor: '#ff9600', pointRadius: 4
+                    }]
+                },
+                options: chartOptions
+            });
+
+            // Subscription Bookings Chart
+            new Chart(document.getElementById('subBookingsChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data.map(d => parseFloat(d.SubBookings)),
+                        borderColor: '#ff4b4b',
+                        backgroundColor: (ctx) => makeGradient(ctx, 'rgba(255, 75, 75, 1)'),
+                        fill: true, tension: 0.3, pointBackgroundColor: '#ff4b4b', pointRadius: 4
+                    }]
+                },
+                options: chartOptions
+            });
+
+            // Total Bookings Chart
+            new Chart(document.getElementById('bookingsChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data.map(d => parseFloat(d.Bookings)),
+                        borderColor: '#58cc02',
+                        backgroundColor: (ctx) => makeGradient(ctx, 'rgba(88, 204, 2, 1)'),
+                        fill: true, tension: 0.3, pointBackgroundColor: '#58cc02', pointRadius: 4
+                    }]
+                },
+                options: chartOptions
+            });
+
+            // EBITDA Chart
+            new Chart(document.getElementById('ebitdaChart'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        type: 'bar', label: 'Adj. EBITDA ($M)',
+                        data: data.map(d => parseFloat(d.EBITDA)),
+                        backgroundColor: 'rgba(88, 204, 2, 0.7)', borderColor: '#58cc02', borderWidth: 1, yAxisID: 'y'
+                    }, {
+                        type: 'line', label: 'Margin (%)',
+                        data: data.map(d => parseFloat(d.EBITDAMargin)),
+                        borderColor: '#ff9600', backgroundColor: 'transparent',
+                        tension: 0.3, pointBackgroundColor: '#ff9600', pointRadius: 4, yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: true, labels: { color: '#a0a0a0' } } },
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#a0a0a0' } },
+                        y: { type: 'linear', position: 'left', grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#a0a0a0' }, title: { display: true, text: 'EBITDA ($M)', color: '#a0a0a0' } },
+                        y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#ff9600' }, title: { display: true, text: 'Margin (%)', color: '#ff9600' }, min: 0, max: 40 }
+                    }
+                }
+            });
+
+            // Net Income Chart
+            const netIncomeData = data.map(d => parseFloat(d.NetIncome));
+            new Chart(document.getElementById('netIncomeChart'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: netIncomeData,
+                        backgroundColor: netIncomeData.map(v => v >= 0 ? 'rgba(88, 204, 2, 0.7)' : 'rgba(255, 75, 75, 0.7)'),
+                        borderColor: netIncomeData.map(v => v >= 0 ? '#58cc02' : '#ff4b4b'), borderWidth: 1
+                    }]
+                },
+                options: chartOptions
+            });
+
+            // Free Cash Flow Chart
+            new Chart(document.getElementById('fcfChart'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data.map(d => parseFloat(d.FCF)),
+                        backgroundColor: 'rgba(28, 176, 246, 0.7)', borderColor: '#1cb0f6', borderWidth: 1
+                    }]
+                },
+                options: chartOptions
+            });
+
+            // DAU/MAU Engagement Chart
+            new Chart(document.getElementById('engagementChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: dauMauRatio,
+                        borderColor: '#ce82ff',
+                        backgroundColor: (ctx) => makeGradient(ctx, 'rgba(206, 130, 255, 1)'),
+                        fill: true, tension: 0.3, pointBackgroundColor: '#ce82ff', pointRadius: 4
+                    }]
+                },
+                options: { ...chartOptions, scales: { ...chartOptions.scales, y: { ...chartOptions.scales.y, min: 20, max: 40 } } }
+            });
+
+            // ARPU Chart
+            new Chart(document.getElementById('arpuChart'), {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: arpu,
+                        borderColor: '#ff9600',
+                        backgroundColor: (ctx) => makeGradient(ctx, 'rgba(255, 150, 0, 1)'),
+                        fill: true, tension: 0.3, pointBackgroundColor: '#ff9600', pointRadius: 4
+                    }]
+                },
+                options: chartOptions
+            });
+        }
+
+        // Load dashboard on page load
+        loadDashboard();
+    </script>
+</body>
+</html>

@@ -1,0 +1,1940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprouts Farmers Market (SFM) Financial Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4aa, #00b894);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #888;
+            font-size: 1.1rem;
+        }
+
+        /* Investment Overview Section */
+        .overview-section {
+            max-width: 1400px;
+            margin: 0 auto 30px;
+        }
+        .overview-toggle {
+            width: 100%;
+            background: rgba(0, 212, 170, 0.1);
+            border: 1px solid rgba(0, 212, 170, 0.3);
+            border-radius: 12px;
+            padding: 16px 24px;
+            color: #00d4aa;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+        .overview-toggle:hover {
+            background: rgba(0, 212, 170, 0.2);
+        }
+        .overview-toggle .arrow {
+            transition: transform 0.3s ease;
+        }
+        .overview-toggle.active .arrow {
+            transform: rotate(180deg);
+        }
+        .overview-content {
+            display: none;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            padding: 30px;
+            margin-top: -12px;
+        }
+        .overview-content.active {
+            display: block;
+        }
+        .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+        }
+        .overview-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .overview-card h3 {
+            color: #00d4aa;
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .overview-card p {
+            margin-bottom: 12px;
+            line-height: 1.6;
+        }
+        .overview-card ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .overview-card li {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            line-height: 1.5;
+        }
+        .overview-card li:last-child {
+            border-bottom: none;
+        }
+        .overview-card.bull h3 { color: #00d4aa; }
+        .overview-card.bear h3 { color: #ff6b6b; }
+        .overview-card.risks h3 { color: #fdcb6e; }
+        .risk-high { color: #ff6b6b; font-weight: 600; }
+        .risk-moderate { color: #fdcb6e; font-weight: 600; }
+        .risk-low { color: #00d4aa; font-weight: 600; }
+        .revenue-stream {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .revenue-stream .percent {
+            color: #00d4aa;
+            font-weight: 600;
+        }
+        .trend-growing { color: #00d4aa; }
+        .trend-stable { color: #888; }
+        .trend-declining { color: #ff6b6b; }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .kpi-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .kpi-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 212, 170, 0.2);
+        }
+        .kpi-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #00d4aa;
+            margin-bottom: 5px;
+        }
+        .kpi-label {
+            font-size: 0.85rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .kpi-change {
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+        .kpi-change.positive { color: #00d4aa; }
+        .kpi-change.negative { color: #ff6b6b; }
+
+        /* Guidance Section */
+        .guidance-section {
+            max-width: 1400px;
+            margin: 0 auto 30px;
+        }
+        .guidance-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .guidance-header h3 {
+            color: #fff;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .guidance-header h3::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, #00d4aa, #00b894);
+            border-radius: 2px;
+        }
+        .guidance-meta {
+            font-size: 0.85rem;
+            color: #888;
+        }
+        .guidance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .guidance-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.2s ease;
+        }
+        .guidance-card:hover {
+            transform: translateY(-2px);
+        }
+        .guidance-metric {
+            font-size: 0.8rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .guidance-target {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #00d4aa;
+            margin-bottom: 6px;
+        }
+        .guidance-period {
+            font-size: 0.85rem;
+            color: #e0e0e0;
+            margin-bottom: 8px;
+        }
+        .guidance-vs-prior {
+            display: inline-block;
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        .guidance-vs-prior.raised {
+            background: rgba(0, 212, 170, 0.15);
+            color: #00d4aa;
+        }
+        .guidance-vs-prior.lowered {
+            background: rgba(255, 107, 107, 0.15);
+            color: #ff6b6b;
+        }
+        .guidance-vs-prior.maintained {
+            background: rgba(255, 255, 255, 0.1);
+            color: #888;
+        }
+        .guidance-vs-prior.new {
+            background: rgba(99, 102, 241, 0.15);
+            color: #818cf8;
+        }
+        .guidance-notes {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 8px;
+            line-height: 1.4;
+        }
+        .guidance-commentary {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+            padding: 16px 20px;
+            border-left: 3px solid #00d4aa;
+            font-style: italic;
+            color: #b0b0b0;
+            line-height: 1.6;
+        }
+        .guidance-commentary::before {
+            content: '"';
+            font-size: 1.5rem;
+            color: #00d4aa;
+            margin-right: 4px;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            color: #fff;
+            margin: 40px auto 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(0, 212, 170, 0.3);
+            max-width: 1400px;
+        }
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 25px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .chart-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .chart-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .chart-header h3 {
+            color: #fff;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .chart-header h3::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, #00d4aa, #00b894);
+            border-radius: 2px;
+        }
+        .help-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(0, 212, 170, 0.2);
+            border: 1px solid #00d4aa;
+            color: #00d4aa;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        .help-btn:hover {
+            background: #00d4aa;
+            color: #1a1a2e;
+        }
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%);
+            border-radius: 16px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid rgba(0, 212, 170, 0.3);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+        .modal-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h3 {
+            color: #00d4aa;
+            font-size: 1.4rem;
+            margin: 0;
+        }
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(255, 107, 107, 0.2);
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-close:hover {
+            background: #ff6b6b;
+            color: #fff;
+        }
+        .modal-body {
+            padding: 25px;
+            line-height: 1.7;
+        }
+        .modal-body p { margin-bottom: 15px; }
+        .modal-body strong { color: #00d4aa; }
+        .modal-body ul { margin: 15px 0; padding-left: 20px; }
+        .modal-body li { margin-bottom: 8px; }
+        .metric-highlight {
+            background: rgba(0, 212, 170, 0.1);
+            border-left: 3px solid #00d4aa;
+            padding: 12px 15px;
+            margin: 15px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        /* DCF Valuation Section */
+        .dcf-section {
+            max-width: 1400px;
+            margin: 0 auto 40px;
+        }
+        .dcf-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .dcf-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease;
+        }
+        .dcf-card:hover {
+            transform: translateY(-3px);
+        }
+        .dcf-card.highlight {
+            background: rgba(0, 212, 170, 0.1);
+            border-color: rgba(0, 212, 170, 0.3);
+        }
+        .dcf-label {
+            font-size: 0.85rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        .dcf-value {
+            font-size: 2.2rem;
+            font-weight: bold;
+            color: #00d4aa;
+        }
+        .dcf-card:not(.highlight) .dcf-value {
+            color: #fff;
+        }
+        .dcf-change {
+            font-size: 1rem;
+            margin-top: 8px;
+            font-weight: 600;
+        }
+        .dcf-change.positive { color: #00d4aa; }
+        .dcf-change.negative { color: #ff6b6b; }
+        .dcf-sublabel {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 8px;
+        }
+        .dcf-warning {
+            background: rgba(253, 203, 110, 0.15);
+            border: 1px solid rgba(253, 203, 110, 0.4);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #fdcb6e;
+        }
+        .warning-icon {
+            font-size: 1.2rem;
+        }
+        .dcf-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+            padding: 25px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .slider-group label {
+            font-size: 0.95rem;
+            color: #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+        }
+        .slider-group label span {
+            color: #00d4aa;
+            font-weight: 600;
+        }
+        .slider-group input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            outline: none;
+        }
+        .slider-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #00d4aa;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .slider-group input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+        .slider-group input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #00d4aa;
+            cursor: pointer;
+            border: none;
+        }
+        .slider-hint {
+            font-size: 0.8rem;
+            color: #666;
+        }
+        .scenario-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .scenario-tab {
+            padding: 10px 24px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: transparent;
+            color: #888;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+        .scenario-tab:hover {
+            border-color: rgba(0, 212, 170, 0.5);
+            color: #e0e0e0;
+        }
+        .scenario-tab.active {
+            background: rgba(0, 212, 170, 0.15);
+            border-color: #00d4aa;
+            color: #00d4aa;
+        }
+        .scenario-details {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .scenario-details h4 {
+            color: #00d4aa;
+            margin-bottom: 15px;
+        }
+        .assumption-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        .assumption-item {
+            text-align: center;
+        }
+        .assumption-item .label {
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 4px;
+        }
+        .assumption-item .value {
+            font-size: 1.1rem;
+            color: #e0e0e0;
+            font-weight: 500;
+        }
+        .sensitivity-section {
+            margin-bottom: 30px;
+        }
+        .sensitivity-section h4 {
+            color: #e0e0e0;
+            margin-bottom: 15px;
+        }
+        .sensitivity-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .sensitivity-table th,
+        .sensitivity-table td {
+            padding: 12px 16px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .sensitivity-table th {
+            background: rgba(0, 212, 170, 0.1);
+            color: #00d4aa;
+            font-weight: 600;
+        }
+        .sensitivity-table td {
+            color: #e0e0e0;
+        }
+        .sensitivity-table td.highlight {
+            background: rgba(0, 212, 170, 0.15);
+            color: #00d4aa;
+            font-weight: 600;
+        }
+        .sensitivity-table td.below-current {
+            color: #ff6b6b;
+        }
+        .sensitivity-table td.above-current {
+            color: #00d4aa;
+        }
+        .historical-growth {
+            margin-bottom: 30px;
+        }
+        .historical-growth h4 {
+            color: #e0e0e0;
+            margin-bottom: 15px;
+        }
+        .growth-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+        }
+        .growth-item {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .growth-item .metric {
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 6px;
+        }
+        .growth-item .rate {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+        .growth-item .rate.positive { color: #00d4aa; }
+        .growth-item .rate.negative { color: #ff6b6b; }
+        .growth-item.selected {
+            border-color: #00d4aa;
+            background: rgba(0, 212, 170, 0.1);
+        }
+
+        @media (max-width: 768px) {
+            .charts-container { grid-template-columns: 1fr; }
+            .overview-grid { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.8rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Sprouts Farmers Market (SFM)</h1>
+        <p>Specialty Natural & Organic Grocery Retailer | Financial Dashboard</p>
+    </div>
+
+    <!-- Investment Overview Section -->
+    <div class="overview-section">
+        <button class="overview-toggle" onclick="toggleOverview()">
+            <span>Investment Overview & Analysis</span>
+            <span class="arrow">▼</span>
+        </button>
+        <div class="overview-content" id="overviewContent">
+            <div class="overview-grid">
+                <!-- Company Overview -->
+                <div class="overview-card">
+                    <h3>Company Overview</h3>
+                    <p>Sprouts Farmers Market is a specialty grocery retailer focused on fresh, natural, and organic foods with 440 stores across 24 states as of December 2024. The company positions itself between conventional supermarkets and premium natural food retailers like Whole Foods, offering a differentiated farmers market experience with produce at the heart of the store. Over 70% of sales come from attribute-driven products (organic, gluten-free, plant-based, etc.) targeting health-conscious consumers.</p>
+                </div>
+
+                <!-- Business Model -->
+                <div class="overview-card">
+                    <h3>Business Model</h3>
+                    <p>Specialty grocery with emphasis on fresh produce, natural and organic products at competitive prices. Revenue driven by in-store sales (86%) and growing e-commerce channel (14%). Expanding private label Sprouts Brand contributes 23% of sales with higher margins.</p>
+                    <ul>
+                        <li class="revenue-stream">
+                            <span>Perishables (produce, meat, seafood, deli, bakery, dairy)</span>
+                            <span class="percent">57.3%</span>
+                        </li>
+                        <li class="revenue-stream">
+                            <span>Non-Perishables (grocery, vitamins, supplements, frozen, wine/beer)</span>
+                            <span class="percent">42.7%</span>
+                        </li>
+                        <li class="revenue-stream">
+                            <span>E-commerce (delivery/pickup) <span class="trend-growing">Growing</span></span>
+                            <span class="percent">14%</span>
+                        </li>
+                        <li class="revenue-stream">
+                            <span>Sprouts Brand private label <span class="trend-growing">Growing</span></span>
+                            <span class="percent">23%</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Competitive Position -->
+                <div class="overview-card">
+                    <h3>Competitive Position</h3>
+                    <p><strong>Main Competitors:</strong> Whole Foods (Amazon), Trader Joe's, Kroger, Albertsons/Safeway, Walmart, Target</p>
+                    <p><strong>Market Position:</strong> Specialty natural/organic grocer positioned between Trader Joe's (lower price) and Whole Foods (premium). Smaller store format (21k-25k sq ft) vs conventional supermarkets (40k-60k sq ft).</p>
+                    <p><strong>Competitive Moat:</strong></p>
+                    <ul>
+                        <li><strong>Strong:</strong> Differentiated product assortment - 70% attribute-driven products, 7,100 new products in 2024</li>
+                        <li><strong>Strong:</strong> Produce expertise with self-distribution through 6 distribution centers</li>
+                        <li><strong>Moderate:</strong> Sprouts Brand private label at 23% of sales creates loyalty</li>
+                        <li><strong>Moderate:</strong> Efficient smaller store format (21k-25k sq ft) enables lower costs and faster ROI</li>
+                    </ul>
+                    <p><strong>Key Weaknesses:</strong> Geographic concentration (34% in California), limited scale vs conventional grocers, incomplete one-stop shop for many customers</p>
+                </div>
+
+                <!-- Growth Drivers -->
+                <div class="overview-card">
+                    <h3>Growth Drivers</h3>
+                    <ul>
+                        <li>10% annual unit growth target with 35+ new stores planned for 2025, all in updated smaller format</li>
+                        <li>Florida expansion with 7+ stores opening in 2025, building East Coast presence</li>
+                        <li>E-commerce sales exceeded $1 billion in 2024 (14% of sales), seamless digital/in-store integration</li>
+                        <li>Sprouts Rewards loyalty program launched Q3 2025 chainwide - driving customer data from 11% to 80%+ peer levels</li>
+                        <li>Self-distribution expansion into meat and seafood to improve margins and freshness like produce model</li>
+                        <li>Secular health and wellness trends - organic sales grew 5.2% to $71.6B in 2024, projected 5.1% CAGR through 2029</li>
+                    </ul>
+                </div>
+
+                <!-- Key Risks -->
+                <div class="overview-card risks">
+                    <h3>Key Risks</h3>
+                    <ul>
+                        <li><span class="risk-high">High Risk:</span> Intense grocery competition from Walmart, Kroger, Whole Foods expanding natural/organic offerings</li>
+                        <li><span class="risk-high">High Risk:</span> Produce supply disruption - 18-19% of sales from fresh produce, vulnerable to weather and climate</li>
+                        <li><span class="risk-high">High Risk:</span> Geographic concentration - 34% of stores in California creates regional exposure</li>
+                        <li><span class="risk-high">High Risk:</span> Recession vulnerability - premium pricing makes Sprouts more discretionary vs conventional grocers</li>
+                        <li><span class="risk-high">High Risk:</span> Meat/seafood self-distribution transition creates execution and supply disruption risk</li>
+                        <li><span class="risk-moderate">Moderate Risk:</span> Commodity price volatility and energy cost increases may compress margins</li>
+                        <li><span class="risk-moderate">Moderate Risk:</span> New store execution - 10% annual unit growth requires flawless site selection and staffing</li>
+                    </ul>
+                </div>
+
+                <!-- Bull Case -->
+                <div class="overview-card bull">
+                    <h3>Bull Case</h3>
+                    <ul>
+                        <li>Strong secular tailwinds - organic food market growing 5.2% annually with 5.1% CAGR through 2029</li>
+                        <li>Differentiated positioning winning share from conventional grocers - 8.1% foot traffic growth in Q3 2024</li>
+                        <li>Significant expansion runway - 440 stores vs 1,900+ for Whole Foods and 2,700+ for Trader Joe's</li>
+                        <li>Loyalty program transformational - will increase customer data from 11% to 80%+ peer levels, enabling personalization</li>
+                        <li>Operating leverage and margin expansion - self-distribution for meat/seafood, smaller store format, Sprouts Brand growth</li>
+                        <li>Capital allocation - $600M buyback program, share count declining, strong cash generation ($645M OCF in FY2024)</li>
+                        <li>Defensive characteristics - food staple with loyal health-conscious customer base proved resilient in pandemic</li>
+                    </ul>
+                </div>
+
+                <!-- Bear Case -->
+                <div class="overview-card bear">
+                    <h3>Bear Case</h3>
+                    <ul>
+                        <li>Valuation risk - strong 2024-2025 performance likely reflected in price, Q4 2025 comp guidance shows deceleration</li>
+                        <li>Intensifying competition - Walmart, Target, Kroger all expanding natural/organic, could squeeze margins</li>
+                        <li>Recession vulnerability - consumers will trade down to Walmart, Aldi in downturn; California exposure (34% stores) risky</li>
+                        <li>Execution risks on multiple fronts - meat/seafood self-distribution, loyalty program, 35+ new stores annually, Florida expansion</li>
+                        <li>Geographic and supply concentration - California sourcing (40-70%) vulnerable to droughts, wildfires, water scarcity</li>
+                        <li>Market saturation concerns - conventional grocers may offer sufficient natural/organic for mainstream consumers</li>
+                        <li>Tariff and cost inflation - labor inflation in California, energy costs, potential tariffs on international sourcing</li>
+                    </ul>
+                </div>
+
+                <!-- Recent Developments -->
+                <div class="overview-card">
+                    <h3>Recent Developments</h3>
+                    <ul>
+                        <li><strong>Q3 2025:</strong> Sprouts Rewards loyalty program launched chainwide (October 2025). Critical for increasing customer data from 11% to 80%+</li>
+                        <li><strong>Q3 2025:</strong> Strong results - Diluted EPS $1.22 (vs $0.91 in Q3 2024). Opened 9 new stores for total of 464 stores</li>
+                        <li><strong>2025:</strong> Announced 7+ new Florida stores opening as part of East Coast expansion, creating 650+ jobs</li>
+                        <li><strong>FY2024:</strong> Record year - $7.7B sales (+13%), 7.6% comp sales growth, diluted EPS $3.75 (+50%). Opened 33 new stores</li>
+                        <li><strong>FY2024:</strong> E-commerce surpassed $1B (14% of sales). Email subscribers up 8.6%, 17M weekly digital flyer views</li>
+                        <li><strong>FY2024:</strong> Authorized new $600M buyback. Repurchased 2.7M shares for $238M. Share count down to 98.6M by Feb 2025</li>
+                        <li><strong>2024:</strong> Achieved AAA rating in MSCI ESG assessment. 30% of sales from organic products, rescued 35M lbs of food</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid" id="kpiGrid">
+        <!-- Populated by JavaScript -->
+    </div>
+
+    <!-- Management Guidance Section -->
+    <div class="guidance-section" id="guidanceSection">
+        <div class="guidance-header">
+            <h3>Management Guidance</h3>
+            <span class="guidance-meta">As of <span id="guidanceAsOf">Q3 2025 Earnings (October 2025)</span> | <span id="guidanceFY">FY2025</span></span>
+        </div>
+        <div class="guidance-grid" id="guidanceGrid">
+            <!-- Populated by JavaScript -->
+        </div>
+        <div class="guidance-commentary" id="guidanceCommentary">
+            <!-- Populated by JavaScript -->
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <h2 class="section-title">Financial Performance</h2>
+    <div class="charts-container">
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>Revenue Growth</h3>
+                <button class="help-btn" onclick="openModal('revenue')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="revenueChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>Revenue & Comp Sales Growth</h3>
+                <button class="help-btn" onclick="openModal('comp')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="compChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>Profit Margins</h3>
+                <button class="help-btn" onclick="openModal('margins')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="marginsChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>Net Income & EPS</h3>
+                <button class="help-btn" onclick="openModal('earnings')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="earningsChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>Free Cash Flow</h3>
+                <button class="help-btn" onclick="openModal('fcf')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="fcfChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>Store Count Growth</h3>
+                <button class="help-btn" onclick="openModal('stores')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="storesChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>Quarterly Revenue Trend</h3>
+                <button class="help-btn" onclick="openModal('quarterly')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="quarterlyChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>Balance Sheet Health</h3>
+                <button class="help-btn" onclick="openModal('balance')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="balanceChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- DCF Valuation Section -->
+    <h2 class="section-title">DCF Valuation</h2>
+    <div class="dcf-section">
+        <!-- Valuation Summary Cards -->
+        <div class="dcf-summary">
+            <div class="dcf-card highlight">
+                <div class="dcf-label">Intrinsic Value (Base)</div>
+                <div class="dcf-value" id="dcfIV">$79</div>
+                <div class="dcf-change" id="dcfUpside">-52% from current</div>
+            </div>
+            <div class="dcf-card">
+                <div class="dcf-label">Entry Price (15% CAGR)</div>
+                <div class="dcf-value" id="dcfEntry">$46</div>
+                <div class="dcf-sublabel">Buy below for 15% annual return</div>
+            </div>
+            <div class="dcf-card">
+                <div class="dcf-label">Current Price</div>
+                <div class="dcf-value" id="dcfCurrent">$165</div>
+            </div>
+            <div class="dcf-card">
+                <div class="dcf-label">Prob-Weighted IV</div>
+                <div class="dcf-value" id="dcfWeighted">$72</div>
+                <div class="dcf-sublabel">20% Bull / 55% Base / 25% Bear</div>
+            </div>
+        </div>
+
+        <!-- Growth Rate Warning -->
+        <div class="dcf-warning" id="growthWarning">
+            <span class="warning-icon">&#9888;</span>
+            <span id="warningText">EPS growth significantly higher than equity/revenue growth. Using conservative equity CAGR for base case projections.</span>
+        </div>
+
+        <!-- Interactive Sliders -->
+        <div class="dcf-controls">
+            <div class="slider-group">
+                <label>Growth Rate: <span id="growthValue">9.1%</span></label>
+                <input type="range" id="growthSlider" min="0" max="25" value="9.1" step="0.1">
+                <div class="slider-hint" id="growthHint">Based on equity 5yr CAGR</div>
+            </div>
+            <div class="slider-group">
+                <label>WACC: <span id="waccValue">9.0%</span></label>
+                <input type="range" id="waccSlider" min="6" max="15" value="9.0" step="0.1">
+            </div>
+            <div class="slider-group">
+                <label>Terminal Growth: <span id="terminalValue">3.0%</span></label>
+                <input type="range" id="terminalSlider" min="0" max="5" value="3.0" step="0.1">
+            </div>
+        </div>
+
+        <!-- Scenario Tabs -->
+        <div class="scenario-tabs">
+            <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+            <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+            <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+        </div>
+
+        <!-- Scenario Details -->
+        <div class="scenario-details" id="scenarioDetails">
+            <div class="scenario-assumptions">
+                <h4>Assumptions</h4>
+                <div class="assumption-grid" id="assumptionGrid">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Sensitivity Table -->
+        <div class="sensitivity-section">
+            <h4>Sensitivity Analysis: Intrinsic Value by WACC & Terminal Growth</h4>
+            <table class="sensitivity-table" id="sensitivityMatrix">
+                <!-- Populated by JavaScript -->
+            </table>
+        </div>
+
+        <!-- Historical Growth Rates -->
+        <div class="historical-growth">
+            <h4>Historical Growth Rates (CAGR)</h4>
+            <div class="growth-grid" id="growthGrid">
+                <!-- Populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modalTitle"></h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+
+    <script>
+        // EMBEDDED DATA - CSV
+        const csvData = `Period,Revenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,EBITDA,NetIncome,NetMargin,EPSBasic,EPSDiluted,TotalAssets,TotalLiabilities,ShareholdersEquity,CashAndEquivalents,TotalDebt,OperatingCashFlow,CapEx,FreeCashFlow,ShareRepurchases,SharesOutstanding,BookValuePerShare,StoreCount,CompStoreSalesGrowth
+FY2013,2437.9,725.3,29.7,139.5,5.7,186.7,51.3,2.1,0.38,0.37,1172.4,658.6,513.8,77.7,688.1,160.6,87.5,73.1,0.1,139.8,3.67,178,
+FY2014,2967.4,885.2,29.8,199.7,6.7,260.1,107.7,3.6,0.72,0.70,1369.1,683.7,685.4,130.5,348.0,181.2,127.1,54.1,0.0,154.3,4.44,203,
+FY2015,3593.0,1051.6,29.3,228.8,6.4,298.0,129.0,3.6,0.84,0.83,1426.4,603.4,823.0,136.1,261.3,239.9,125.3,114.6,25.7,155.9,5.28,217,
+FY2016,4046.4,1182.0,29.2,212.9,5.3,293.3,124.3,3.1,0.84,0.83,1439.9,767.0,672.9,12.5,95.0,254.4,181.0,73.4,294.3,149.7,4.50,253,
+FY2017,4664.6,1262.7,27.1,188.0,4.0,268.7,99.5,2.1,0.68,0.67,1581.6,930.9,650.7,22.9,348.0,236.8,185.7,51.1,0.0,148.0,4.40,285,
+FY2018,5207.3,1411.1,27.1,189.4,3.6,300.1,100.5,1.9,0.68,0.67,1675.6,1086.4,589.2,104.3,453.0,276.1,196.3,79.8,0.0,150.5,3.91,313,2.1
+FY2019,5634.8,1894.8,33.6,217.4,3.9,337.9,149.6,2.7,1.25,1.25,1844.2,989.0,855.2,260.1,255.0,399.6,183.2,216.4,176.3,119.7,7.14,340,1.1
+FY2020,6468.8,2379.3,36.8,391.7,6.1,515.8,287.5,4.4,2.44,2.43,2806.4,1925.1,881.3,267.7,250.0,423.8,121.9,301.9,0.0,118.2,7.45,362,6.9
+FY2021,6099.9,2209.2,36.2,334.1,5.5,456.4,244.2,4.0,2.12,2.10,2923.1,1963.2,959.9,295.8,250.0,425.8,102.4,323.4,188.3,116.1,8.27,374,-6.7
+FY2022,6404.2,2348.6,36.7,358.4,5.6,481.9,261.2,4.1,2.41,2.39,3070.4,2024.0,1046.5,402.7,250.0,424.2,124.0,300.2,200.0,109.1,9.59,386,2.2
+FY2023,6837.4,2521.8,36.9,350.2,5.1,482.1,258.9,3.8,2.53,2.50,3327.4,2178.9,1148.5,201.8,125.0,465.1,225.3,239.8,203.5,103.4,11.11,407,3.4
+Q1-2023,1733.3,488.8,28.2,58.6,3.4,,54.7,3.2,0.45,0.45,3208.2,2133.0,1075.2,220.8,175.0,,,,,,8.88,391,3.2
+Q2-2023,1692.2,476.6,28.2,57.9,3.4,,50.8,3.0,0.42,0.42,3208.2,2133.0,1075.2,220.8,175.0,,,,,,8.88,391,3.2
+Q3-2023,1713.3,478.1,27.9,58.2,3.4,,59.1,3.5,0.50,0.49,3290.5,2175.5,1115.0,171.1,150.0,,,,,,9.19,401,3.9
+FY2024,7719.3,2562.2,33.2,504.5,6.5,644.7,380.6,4.9,3.29,3.27,3640.7,2318.8,1321.9,269.8,0.0,645.2,230.4,414.8,228.5,116.4,11.36,440,7.6
+Q1-2024,1884.0,531.6,28.2,72.1,3.8,,52.8,2.8,0.46,0.46,3472.4,2261.4,1211.0,310.6,0.0,,,,,,10.47,414,5.4
+Q2-2024,1893.5,532.1,28.1,72.3,3.8,,56.7,3.0,0.49,0.49,3410.5,2141.2,1269.3,194.0,0.0,,,,,,11.00,419,6.7
+Q3-2024,1945.7,548.0,28.2,78.5,4.0,,87.5,4.5,0.77,0.76,3585.5,2242.0,1343.5,309.7,0.0,,,,,,11.62,428,8.4
+Q1-2025,1996.2,561.1,28.1,83.5,4.2,,66.9,3.4,0.60,0.59,3738.3,2450.3,1288.0,252.9,0.0,,,,,,11.14,443,`;
+
+        // EMBEDDED DATA - Analysis JSON
+        const analysis = {
+            "ticker": "SFM",
+            "company_name": "Sprouts Farmers Market, Inc.",
+            "guidance": {
+                "as_of": "Q3 2025 Earnings (October 2025)",
+                "fiscal_year": "FY2025",
+                "items": [
+                    {
+                        "metric": "Total Sales Growth",
+                        "target": "~14%",
+                        "period": "FY2025",
+                        "vs_prior": "maintained",
+                        "notes": "Implies ~$8.8B in sales for FY2025 vs $7.7B in FY2024"
+                    },
+                    {
+                        "metric": "Comparable Store Sales",
+                        "target": "~7%",
+                        "period": "FY2025",
+                        "vs_prior": "maintained",
+                        "notes": "Solid growth on top of strong 7.6% comp in FY2024"
+                    },
+                    {
+                        "metric": "EBIT",
+                        "target": "$675-680M",
+                        "period": "FY2025",
+                        "vs_prior": "maintained",
+                        "notes": "Strong margin improvement continuing"
+                    },
+                    {
+                        "metric": "Diluted EPS",
+                        "target": "$5.24-5.28",
+                        "period": "FY2025",
+                        "vs_prior": "maintained",
+                        "notes": "40% growth at midpoint vs FY2024 EPS of $3.75"
+                    },
+                    {
+                        "metric": "Q4 Comparable Store Sales",
+                        "target": "0-2%",
+                        "period": "Q4 2025",
+                        "vs_prior": "n/a",
+                        "notes": "Deceleration vs full-year ~7% reflects difficult comparisons (Q4 2024 had 11.5% comp growth)"
+                    },
+                    {
+                        "metric": "Q4 Diluted EPS",
+                        "target": "$0.86-0.90",
+                        "period": "Q4 2025",
+                        "vs_prior": "n/a",
+                        "notes": "Sequential deceleration due to comp slowdown and tougher YoY comparisons"
+                    },
+                    {
+                        "metric": "New Store Openings",
+                        "target": "35+ stores",
+                        "period": "FY2025",
+                        "vs_prior": "n/a",
+                        "notes": "All in updated smaller format. Consistent with 10% annual unit growth target. Up from 33 stores in FY2024"
+                    }
+                ],
+                "management_commentary": "Management expressed confidence in 10% annual unit growth runway, loyalty program rollout driving customer data from 11% to peer levels (80%+), and self-distribution expansion for meat/seafood improving margins. Florida remains key growth market for East Coast expansion. Emphasized strong execution on strategic initiatives including smaller store format delivering higher returns and Sprouts Brand differentiation."
+            }
+        };
+
+        // EMBEDDED DATA - DCF JSON
+        const dcfData = {
+            "ticker": "SFM",
+            "valuation_date": "2026-01-21",
+            "current_price": 165.00,
+            "inputs": {
+                "shares_outstanding": 116.4,
+                "net_debt": -269.8,
+                "last_fcf": 414.8,
+                "currency": "USD",
+                "units": "millions"
+            },
+            "historical_growth": {
+                "revenue_3yr_cagr": 8.1,
+                "revenue_5yr_cagr": 6.5,
+                "eps_3yr_cagr": 16.0,
+                "eps_5yr_cagr": 21.2,
+                "equity_3yr_cagr": 11.3,
+                "equity_5yr_cagr": 9.1,
+                "fcf_3yr_cagr": 8.7,
+                "fcf_5yr_cagr": 13.9,
+                "selected_growth_rate": 9.1,
+                "growth_rate_source": "equity_5yr_cagr",
+                "growth_divergence_warning": "EPS growth significantly higher than equity/revenue growth. EPS growth driven by margin expansion and share buybacks. Using conservative equity CAGR for base case projections."
+            },
+            "assumptions": {
+                "base": {
+                    "growth_rates": [12.0, 10.0, 8.5, 7.0, 6.0],
+                    "fcf_margin": 5.4,
+                    "wacc": 9.0,
+                    "terminal_growth": 3.0,
+                    "rationale": "Base case assumes continued strong growth from new store openings (10% unit growth), loyalty program success, and market share gains. Growth decelerates from FY2025 guidance of 14% toward long-term sustainable rate. FCF margin of 5.4% consistent with FY2024 actual (414.8M / 7719.3M). WACC of 9% reflects low debt, equity beta around 1.0-1.2, and current risk-free rates."
+                },
+                "bull": {
+                    "growth_rates": [18.0, 15.0, 12.0, 10.0, 8.0],
+                    "fcf_margin": 6.2,
+                    "wacc": 8.5,
+                    "terminal_growth": 3.5,
+                    "rationale": "Bull case assumes loyalty program drives significant customer data monetization (from 11% to 80%+ capture rate), self-distribution for meat/seafood replicates produce margin success, aggressive new store growth continues with strong returns, market share gains accelerate as consumers shift from conventional grocers. Operating leverage and margin expansion drive FCF margin to 6.2%. Secular organic food trends remain strong (5%+ industry growth)."
+                },
+                "bear": {
+                    "growth_rates": [6.0, 4.0, 3.0, 2.5, 2.0],
+                    "fcf_margin": 4.5,
+                    "wacc": 10.0,
+                    "terminal_growth": 2.5,
+                    "rationale": "Bear case assumes recession drives customer trade-down to Walmart/Aldi, intense competition from conventional grocers and Whole Foods compresses margins, new store expansion disappoints due to poor site selection or market saturation, loyalty program fails to drive expected data capture, self-distribution transition for meat/seafood creates supply disruptions and cost overruns, California exposure (34% of stores) vulnerable to climate events and economic weakness. FCF margin compresses to 4.5%."
+                }
+            },
+            "valuation": {
+                "base": {
+                    "intrinsic_value": 79.39,
+                    "upside": -51.9
+                },
+                "bull": {
+                    "intrinsic_value": 141.62,
+                    "upside": -14.2
+                },
+                "bear": {
+                    "intrinsic_value": 40.21,
+                    "upside": -75.6
+                }
+            },
+            "entry_price": {
+                "base": {
+                    "entry_price": 46.14
+                },
+                "bull": {
+                    "entry_price": 66.46
+                },
+                "bear": {
+                    "entry_price": 24.66
+                }
+            },
+            "sensitivity": {
+                "wacc_range": [7.0, 8.0, 9.0, 10.0, 11.0],
+                "terminal_growth_range": [2.0, 2.5, 3.0, 3.5, 4.0],
+                "matrix": [
+                    [108.72, 117.89, 129.35, 143.84, 162.73],
+                    [91.24, 97.95, 106.15, 116.26, 128.98],
+                    [78.25, 83.37, 89.52, 96.99, 106.19],
+                    [68.15, 72.09, 76.76, 82.35, 89.14],
+                    [60.15, 63.35, 67.03, 71.35, 76.45]
+                ]
+            },
+            "probability_weighted": {
+                "weights": {
+                    "bull": 0.20,
+                    "base": 0.55,
+                    "bear": 0.25
+                },
+                "weighted_iv": 71.97
+            }
+        };
+
+        // Parse CSV
+        function parseCSV(csv) {
+            const lines = csv.trim().split('\n');
+            const headers = lines[0].split(',');
+            return lines.slice(1).map(line => {
+                const values = line.split(',');
+                const obj = {};
+                headers.forEach((h, i) => obj[h.trim()] = values[i]?.trim());
+                return obj;
+            });
+        }
+
+        const data = parseCSV(csvData);
+        const annualData = data.filter(d => d.Period.startsWith('FY'));
+        const quarterlyData = data.filter(d => d.Period.startsWith('Q'));
+
+        // Helper functions
+        function calcYoYChange(current, previous) {
+            if (!previous || !current || previous === '' || current === '') return null;
+            const change = ((parseFloat(current) - parseFloat(previous)) / Math.abs(parseFloat(previous)) * 100);
+            return change.toFixed(1);
+        }
+
+        function formatNumber(num, decimals = 1) {
+            if (!num || num === '') return 'N/A';
+            const n = parseFloat(num);
+            if (n >= 1000) return (n / 1000).toFixed(decimals) + 'B';
+            return n.toFixed(decimals) + 'M';
+        }
+
+        // Toggle overview
+        function toggleOverview() {
+            const btn = document.querySelector('.overview-toggle');
+            const content = document.getElementById('overviewContent');
+            btn.classList.toggle('active');
+            content.classList.toggle('active');
+        }
+
+        // Render KPIs
+        function renderKPIs() {
+            const latest = annualData[annualData.length - 1];
+            const previous = annualData[annualData.length - 2];
+
+            const kpis = [
+                {
+                    label: 'Revenue',
+                    value: '$' + formatNumber(latest.Revenue),
+                    change: calcYoYChange(latest.Revenue, previous.Revenue)
+                },
+                {
+                    label: 'Net Income',
+                    value: '$' + formatNumber(latest.NetIncome),
+                    change: calcYoYChange(latest.NetIncome, previous.NetIncome)
+                },
+                {
+                    label: 'EPS (Diluted)',
+                    value: '$' + parseFloat(latest.EPSDiluted).toFixed(2),
+                    change: calcYoYChange(latest.EPSDiluted, previous.EPSDiluted)
+                },
+                {
+                    label: 'Free Cash Flow',
+                    value: '$' + formatNumber(latest.FreeCashFlow),
+                    change: calcYoYChange(latest.FreeCashFlow, previous.FreeCashFlow)
+                },
+                {
+                    label: 'Store Count',
+                    value: latest.StoreCount,
+                    change: calcYoYChange(latest.StoreCount, previous.StoreCount)
+                },
+                {
+                    label: 'Comp Store Sales',
+                    value: latest.CompStoreSalesGrowth + '%',
+                    change: null
+                }
+            ];
+
+            const grid = document.getElementById('kpiGrid');
+            grid.innerHTML = kpis.map(kpi => `
+                <div class="kpi-card">
+                    <div class="kpi-value">${kpi.value}</div>
+                    <div class="kpi-label">${kpi.label}</div>
+                    ${kpi.change ? `<div class="kpi-change ${parseFloat(kpi.change) >= 0 ? 'positive' : 'negative'}">
+                        ${parseFloat(kpi.change) >= 0 ? '+' : ''}${kpi.change}% YoY
+                    </div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        // Render guidance
+        function renderGuidance() {
+            if (!analysis.guidance || !analysis.guidance.items || analysis.guidance.items.length === 0) {
+                document.getElementById('guidanceSection').style.display = 'none';
+                return;
+            }
+
+            const guidance = analysis.guidance;
+            document.getElementById('guidanceAsOf').textContent = guidance.as_of || '';
+            document.getElementById('guidanceFY').textContent = guidance.fiscal_year || '';
+
+            const grid = document.getElementById('guidanceGrid');
+            grid.innerHTML = guidance.items.map(item => {
+                const vsClass = item.vs_prior ? item.vs_prior.toLowerCase() : 'new';
+                const vsLabel = item.vs_prior ? item.vs_prior.charAt(0).toUpperCase() + item.vs_prior.slice(1) : 'New';
+                return `
+                    <div class="guidance-card">
+                        <div class="guidance-metric">${item.metric}</div>
+                        <div class="guidance-target">${item.target}</div>
+                        <div class="guidance-period">${item.period}</div>
+                        <span class="guidance-vs-prior ${vsClass}">${vsLabel}</span>
+                        ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+
+            const commentary = document.getElementById('guidanceCommentary');
+            if (guidance.management_commentary) {
+                commentary.textContent = guidance.management_commentary;
+                commentary.style.display = 'block';
+            } else {
+                commentary.style.display = 'none';
+            }
+        }
+
+        // Chart defaults
+        const chartDefaults = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { labels: { color: '#e0e0e0', font: { size: 11 } } }
+            },
+            scales: {
+                x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+            }
+        };
+
+        const colors = {
+            primary: '#00d4aa',
+            secondary: '#00b894',
+            tertiary: '#0984e3',
+            quaternary: '#6c5ce7',
+            warning: '#fdcb6e',
+            danger: '#ff6b6b'
+        };
+
+        // Create charts
+        function createCharts() {
+            // Revenue Growth
+            new Chart(document.getElementById('revenueChart'), {
+                type: 'bar',
+                data: {
+                    labels: annualData.map(d => d.Period),
+                    datasets: [{
+                        label: 'Revenue ($M)',
+                        data: annualData.map(d => parseFloat(d.Revenue)),
+                        backgroundColor: colors.primary,
+                        borderColor: colors.secondary,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    ...chartDefaults,
+                    plugins: {
+                        ...chartDefaults.plugins,
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => 'Revenue: $' + context.parsed.y.toFixed(1) + 'M'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Revenue & Comp Sales Growth
+            new Chart(document.getElementById('compChart'), {
+                type: 'bar',
+                data: {
+                    labels: annualData.filter(d => d.CompStoreSalesGrowth).map(d => d.Period),
+                    datasets: [
+                        {
+                            type: 'line',
+                            label: 'Comp Store Sales Growth (%)',
+                            data: annualData.filter(d => d.CompStoreSalesGrowth).map(d => parseFloat(d.CompStoreSalesGrowth)),
+                            borderColor: colors.warning,
+                            backgroundColor: colors.warning,
+                            yAxisID: 'y1',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Revenue ($M)',
+                            data: annualData.filter(d => d.CompStoreSalesGrowth).map(d => parseFloat(d.Revenue)),
+                            backgroundColor: colors.primary,
+                            yAxisID: 'y'
+                        }
+                    ]
+                },
+                options: {
+                    ...chartDefaults,
+                    scales: {
+                        x: chartDefaults.scales.x,
+                        y: {
+                            ...chartDefaults.scales.y,
+                            position: 'left',
+                            title: { display: true, text: 'Revenue ($M)', color: '#888' }
+                        },
+                        y1: {
+                            ...chartDefaults.scales.y,
+                            position: 'right',
+                            title: { display: true, text: 'Comp Sales (%)', color: '#888' },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+
+            // Margins
+            new Chart(document.getElementById('marginsChart'), {
+                type: 'line',
+                data: {
+                    labels: annualData.map(d => d.Period),
+                    datasets: [
+                        {
+                            label: 'Gross Margin (%)',
+                            data: annualData.map(d => parseFloat(d.GrossMargin)),
+                            borderColor: colors.primary,
+                            backgroundColor: colors.primary,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Operating Margin (%)',
+                            data: annualData.map(d => parseFloat(d.OperatingMargin)),
+                            borderColor: colors.tertiary,
+                            backgroundColor: colors.tertiary,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Net Margin (%)',
+                            data: annualData.map(d => parseFloat(d.NetMargin)),
+                            borderColor: colors.quaternary,
+                            backgroundColor: colors.quaternary,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: chartDefaults
+            });
+
+            // Earnings
+            new Chart(document.getElementById('earningsChart'), {
+                type: 'bar',
+                data: {
+                    labels: annualData.map(d => d.Period),
+                    datasets: [
+                        {
+                            type: 'line',
+                            label: 'EPS (Diluted)',
+                            data: annualData.map(d => parseFloat(d.EPSDiluted)),
+                            borderColor: colors.warning,
+                            backgroundColor: colors.warning,
+                            yAxisID: 'y1',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Net Income ($M)',
+                            data: annualData.map(d => parseFloat(d.NetIncome)),
+                            backgroundColor: colors.primary,
+                            yAxisID: 'y'
+                        }
+                    ]
+                },
+                options: {
+                    ...chartDefaults,
+                    scales: {
+                        x: chartDefaults.scales.x,
+                        y: {
+                            ...chartDefaults.scales.y,
+                            position: 'left',
+                            title: { display: true, text: 'Net Income ($M)', color: '#888' }
+                        },
+                        y1: {
+                            ...chartDefaults.scales.y,
+                            position: 'right',
+                            title: { display: true, text: 'EPS ($)', color: '#888' },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+
+            // Free Cash Flow
+            new Chart(document.getElementById('fcfChart'), {
+                type: 'bar',
+                data: {
+                    labels: annualData.map(d => d.Period),
+                    datasets: [{
+                        label: 'Free Cash Flow ($M)',
+                        data: annualData.map(d => parseFloat(d.FreeCashFlow) || 0),
+                        backgroundColor: colors.primary,
+                        borderColor: colors.secondary,
+                        borderWidth: 1
+                    }]
+                },
+                options: chartDefaults
+            });
+
+            // Store Count
+            new Chart(document.getElementById('storesChart'), {
+                type: 'bar',
+                data: {
+                    labels: annualData.map(d => d.Period),
+                    datasets: [{
+                        label: 'Store Count',
+                        data: annualData.map(d => parseFloat(d.StoreCount)),
+                        backgroundColor: colors.tertiary,
+                        borderColor: colors.quaternary,
+                        borderWidth: 1
+                    }]
+                },
+                options: chartDefaults
+            });
+
+            // Quarterly Revenue
+            if (quarterlyData.length > 0) {
+                new Chart(document.getElementById('quarterlyChart'), {
+                    type: 'line',
+                    data: {
+                        labels: quarterlyData.map(d => d.Period),
+                        datasets: [{
+                            label: 'Quarterly Revenue ($M)',
+                            data: quarterlyData.map(d => parseFloat(d.Revenue)),
+                            borderColor: colors.primary,
+                            backgroundColor: colors.primary,
+                            tension: 0.4,
+                            fill: false
+                        }]
+                    },
+                    options: chartDefaults
+                });
+            }
+
+            // Balance Sheet
+            new Chart(document.getElementById('balanceChart'), {
+                type: 'bar',
+                data: {
+                    labels: annualData.map(d => d.Period),
+                    datasets: [
+                        {
+                            label: 'Total Assets ($M)',
+                            data: annualData.map(d => parseFloat(d.TotalAssets)),
+                            backgroundColor: colors.primary
+                        },
+                        {
+                            label: 'Shareholders Equity ($M)',
+                            data: annualData.map(d => parseFloat(d.ShareholdersEquity)),
+                            backgroundColor: colors.tertiary
+                        },
+                        {
+                            label: 'Total Debt ($M)',
+                            data: annualData.map(d => parseFloat(d.TotalDebt)),
+                            backgroundColor: colors.danger
+                        }
+                    ]
+                },
+                options: chartDefaults
+            });
+        }
+
+        // Metric descriptions for modals
+        const metricDescriptions = {
+            revenue: {
+                title: "Revenue",
+                content: `
+                    <p><strong>Revenue</strong> is the total income from Sprouts' grocery store sales and e-commerce operations.</p>
+                    <div class="metric-highlight">
+                        <strong>For Sprouts:</strong> Revenue is split 57.3% Perishables (produce, meat, seafood, deli) and 42.7% Non-Perishables (grocery, vitamins, supplements). E-commerce reached $1B+ in FY2024 (14% of sales). Revenue growth driven by new store openings (10% annual unit growth target) and comparable store sales growth.
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li>Comparable store sales growth - indicates same-store performance excluding new locations. FY2024 comp growth of 7.6% shows strong organic momentum</li>
+                        <li>New store contribution - 35+ stores planned for FY2025 will drive revenue growth</li>
+                        <li>E-commerce penetration - currently 14% of sales, important channel for customer engagement</li>
+                        <li>Seasonal patterns - produce-heavy business with Q4 typically strongest due to holidays</li>
+                    </ul>
+                `
+            },
+            comp: {
+                title: "Comparable Store Sales Growth",
+                content: `
+                    <p><strong>Comp Store Sales Growth</strong> measures revenue growth at stores open for at least one year, excluding new store openings. This is a key retail metric showing organic business health.</p>
+                    <div class="metric-highlight">
+                        <strong>For Sprouts:</strong> FY2024 comp growth of 7.6% was exceptional, driven by foot traffic growth of 8.1% and strong customer engagement. This follows 3.4% in FY2023, showing significant acceleration. Management guides ~7% for FY2025.
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li>Sustained 5%+ comp growth indicates market share gains from conventional grocers</li>
+                        <li>Traffic vs. ticket breakdown - growth driven by customer count (healthy) vs. price increases (less sustainable)</li>
+                        <li>Negative comps in FY2021 (-6.7%) reflected post-pandemic normalization after FY2020 surge</li>
+                        <li>Q4 2025 guidance of 0-2% comp shows deceleration but reflects difficult comparisons (Q4 2024 had 11.5% comp)</li>
+                    </ul>
+                `
+            },
+            margins: {
+                title: "Profit Margins",
+                content: `
+                    <p><strong>Margins</strong> show profitability at different levels of the income statement. Critical for specialty grocers competing against conventional stores.</p>
+                    <div class="metric-highlight">
+                        <strong>For Sprouts:</strong> Gross margin rebounded from 33.6% in FY2019 to 36.8% in FY2020 due to favorable mix shift to perishables during pandemic. FY2024 gross margin of 33.2% reflects normalization but remains healthy. Operating margin improved to 6.5% in FY2024 (vs. 5.1% in FY2023), showing operating leverage.
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li>Gross margin expansion opportunities: Sprouts Brand private label (23% of sales), self-distribution for meat/seafood</li>
+                        <li>Operating margin improvement from scale: smaller store format (21k-25k sq ft) has lower occupancy costs</li>
+                        <li>Net margin of 4.9% in FY2024 is strong for grocery retail (conventional grocers typically 1-3%)</li>
+                        <li>Margin pressure risks: commodity inflation, competition from Whole Foods/Kroger, promotional activity</li>
+                    </ul>
+                `
+            },
+            earnings: {
+                title: "Net Income & EPS",
+                content: `
+                    <p><strong>Net Income</strong> is the bottom-line profit. <strong>EPS (Earnings Per Share)</strong> divides net income by shares outstanding, showing per-share profitability.</p>
+                    <div class="metric-highlight">
+                        <strong>For Sprouts:</strong> FY2024 net income of $380.6M was up 47% YoY, driven by revenue growth and margin expansion. Diluted EPS of $3.27 was up 31% YoY. Management guides $5.24-$5.28 EPS for FY2025, implying 40%+ growth. Share buybacks boost EPS - share count declined from 139.8M in FY2013 to 116.4M in FY2024.
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li>EPS growth sustainability - FY2024-2025 growth driven by margin expansion and buybacks, not just revenue</li>
+                        <li>Share buyback impact - $600M authorization with $238M repurchased in FY2024. Share count down to 98.6M by Feb 2025</li>
+                        <li>EPS 5-year CAGR of 21.2% significantly exceeds revenue CAGR of 6.5%, showing operating leverage</li>
+                        <li>Earnings quality - strong cash conversion with FCF exceeding net income in most years</li>
+                    </ul>
+                `
+            },
+            fcf: {
+                title: "Free Cash Flow",
+                content: `
+                    <p><strong>Free Cash Flow (FCF)</strong> is operating cash flow minus capital expenditures. It represents cash available for shareholders after maintaining/growing the business.</p>
+                    <div class="metric-highlight">
+                        <strong>For Sprouts:</strong> FY2024 FCF of $414.8M was strong, calculated as $645.2M operating cash flow minus $230.4M capex. FCF margin of 5.4% is healthy for retail. FCF funds growth investments and shareholder returns. Historical FCF ranged from $54M (FY2014) to $415M (FY2024), with volatility driven by capex timing for new stores.
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li>FCF margin sustainability - 5-6% range is appropriate for Sprouts' growth phase</li>
+                        <li>Capex intensity - FY2024 capex of $230M for 33 new stores implies ~$7M per store. With 35+ stores planned for FY2025, expect capex of $245-280M</li>
+                        <li>Working capital efficiency - produce business has negative cash conversion cycle (customers pay before suppliers)</li>
+                        <li>Capital allocation - FCF used for share buybacks ($238M in FY2024), debt paydown (eliminated $125M debt in FY2024), and new store investments</li>
+                    </ul>
+                `
+            },
+            stores: {
+                title: "Store Count Growth",
+                content: `
+                    <p><strong>Store Count</strong> is the total number of operating locations. For Sprouts, this is the primary driver of revenue growth.</p>
+                    <div class="metric-highlight">
+                        <strong>For Sprouts:</strong> 440 stores as of FY2024 (up from 407 in FY2023). Opened 33 new stores in FY2024. Management targets 10% annual unit growth, implying 35+ stores in FY2025. New stores are in updated smaller format (21k-25k sq ft vs. 28k average historical), enabling faster payback and higher returns.
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li>Unit growth consistency - target 10% annual growth (40-45 stores per year) demonstrates conviction in expansion runway</li>
+                        <li>Geographic expansion - Florida getting 7+ stores in 2025 as East Coast expansion market. California still 34% of store base (149 stores)</li>
+                        <li>New store productivity - smaller format stores should deliver faster ramp and higher ROIC than legacy larger stores</li>
+                        <li>Market saturation risk - 440 stores today vs. 1,900+ for Whole Foods and 2,700+ for Trader Joe's suggests long runway, but must avoid over-penetration in existing markets</li>
+                    </ul>
+                `
+            },
+            quarterly: {
+                title: "Quarterly Revenue Trend",
+                content: `
+                    <p><strong>Quarterly Revenue</strong> shows seasonality and recent performance trends at a more granular level than annual data.</p>
+                    <div class="metric-highlight">
+                        <strong>For Sprouts:</strong> Q1 2025 revenue of $1,996M shows continued momentum (up 6% YoY from Q1 2024 $1,884M). Quarterly pattern shows Q4 typically strongest due to holiday season and produce sales. Q1-Q3 relatively balanced. Sequential growth each quarter in 2024 demonstrates consistent execution.
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li>Sequential quarterly growth - healthy business should show QoQ increases as new stores ramp</li>
+                        <li>Seasonality - Q4 spike due to Thanksgiving/holiday produce sales and new store openings concentrated in fall</li>
+                        <li>Quarterly comp trends - Q1 2025 guide implies some deceleration from Q3 2024's strong 8.4% comp growth</li>
+                        <li>Weather impact - severe weather can disrupt stores (hurricanes in Florida) and produce supply (California droughts)</li>
+                    </ul>
+                `
+            },
+            balance: {
+                title: "Balance Sheet Health",
+                content: `
+                    <p><strong>Balance Sheet</strong> shows assets, liabilities, and equity. For Sprouts, key metrics are debt levels and equity growth.</p>
+                    <div class="metric-highlight">
+                        <strong>For Sprouts:</strong> FY2024 total assets of $3,640.7M include store properties, inventory, and cash. Total debt of $0 (eliminated in FY2024) with cash of $269.8M creates net cash position of $269.8M. Shareholders equity of $1,321.9M has grown steadily from $513.8M in FY2013 (11.3% 3-year CAGR). Debt-to-equity ratio of 0.0 provides maximum financial flexibility.
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li>Debt elimination - paying off all debt in FY2024 removed $125M balance, demonstrating strong cash generation</li>
+                        <li>Equity growth - 11.3% 3-year CAGR in shareholders equity shows value creation beyond EPS (which benefits from buybacks)</li>
+                        <li>Lease obligations - as retailer, Sprouts has significant operating lease commitments (not shown on balance sheet pre-2019)</li>
+                        <li>Working capital - negative cash conversion cycle means suppliers finance inventory (customers pay immediately, suppliers paid in 30+ days)</li>
+                    </ul>
+                `
+            }
+        };
+
+        // Modal functions
+        function openModal(key) {
+            document.getElementById('modalTitle').textContent = metricDescriptions[key].title;
+            document.getElementById('modalBody').innerHTML = metricDescriptions[key].content;
+            document.getElementById('modalOverlay').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal(event) {
+            if (event && event.target !== document.getElementById('modalOverlay') && event.target !== document.querySelector('.modal-close')) return;
+            document.getElementById('modalOverlay').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+        // DCF Functions
+        function calculateDCF(growthRate, wacc, terminalGrowth) {
+            const years = 5;
+            const fcf = dcfData.inputs.last_fcf;
+            let pvFCF = 0;
+            let projectedFCF = fcf;
+
+            for (let i = 0; i < years; i++) {
+                projectedFCF *= (1 + growthRate / 100);
+                pvFCF += projectedFCF / Math.pow(1 + wacc/100, i + 1);
+            }
+
+            const terminalFCF = projectedFCF * (1 + terminalGrowth/100);
+            const terminalValue = terminalFCF / (wacc/100 - terminalGrowth/100);
+            const pvTerminal = terminalValue / Math.pow(1 + wacc/100, years);
+
+            const enterpriseValue = pvFCF + pvTerminal;
+            const equityValue = enterpriseValue - dcfData.inputs.net_debt;
+            const iv = equityValue / dcfData.inputs.shares_outstanding;
+
+            const terminalPerShare = terminalValue / dcfData.inputs.shares_outstanding;
+            const entryPrice = terminalPerShare / Math.pow(1.15, years);
+
+            return {
+                iv: iv,
+                entryPrice: entryPrice,
+                terminalPerShare: terminalPerShare,
+                pvFCF: pvFCF,
+                pvTerminal: pvTerminal,
+                enterpriseValue: enterpriseValue
+            };
+        }
+
+        window.updateDCFDisplay = function() {
+            const growth = parseFloat(document.getElementById('growthSlider').value);
+            const wacc = parseFloat(document.getElementById('waccSlider').value);
+            const terminal = parseFloat(document.getElementById('terminalSlider').value);
+
+            document.getElementById('growthValue').textContent = growth.toFixed(1) + '%';
+            document.getElementById('waccValue').textContent = wacc.toFixed(1) + '%';
+            document.getElementById('terminalValue').textContent = terminal.toFixed(1) + '%';
+
+            const result = calculateDCF(growth, wacc, terminal);
+
+            document.getElementById('dcfIV').textContent = '$' + result.iv.toFixed(0);
+            document.getElementById('dcfEntry').textContent = '$' + result.entryPrice.toFixed(0);
+
+            const upside = ((result.iv - dcfData.current_price) / dcfData.current_price * 100);
+            const upsideEl = document.getElementById('dcfUpside');
+            upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(0) + '% from current';
+            upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+            const grid = document.getElementById('assumptionGrid');
+            if (grid) {
+                grid.innerHTML = `
+                    <div class="assumption-item">
+                        <div class="label">Growth Rate</div>
+                        <div class="value">${growth.toFixed(1)}%</div>
+                    </div>
+                    <div class="assumption-item">
+                        <div class="label">WACC</div>
+                        <div class="value">${wacc.toFixed(1)}%</div>
+                    </div>
+                    <div class="assumption-item">
+                        <div class="label">Terminal Growth</div>
+                        <div class="value">${terminal.toFixed(1)}%</div>
+                    </div>
+                    <div class="assumption-item">
+                        <div class="label">Intrinsic Value</div>
+                        <div class="value" style="color: #00d4aa;">$${result.iv.toFixed(0)}</div>
+                    </div>
+                    <div class="assumption-item">
+                        <div class="label">Entry Price</div>
+                        <div class="value" style="color: #00d4aa;">$${result.entryPrice.toFixed(0)}</div>
+                    </div>
+                `;
+            }
+        };
+
+        window.switchScenario = function(scenario) {
+            document.querySelectorAll('.scenario-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.scenario === scenario);
+            });
+
+            const assumptions = dcfData.assumptions[scenario];
+            const valuation = dcfData.valuation[scenario];
+            const entry = dcfData.entry_price[scenario];
+
+            document.getElementById('growthSlider').value = assumptions.growth_rates[0];
+            document.getElementById('waccSlider').value = assumptions.wacc;
+            document.getElementById('terminalSlider').value = assumptions.terminal_growth;
+
+            const grid = document.getElementById('assumptionGrid');
+            grid.innerHTML = `
+                <div class="assumption-item">
+                    <div class="label">Year 1 Growth</div>
+                    <div class="value">${assumptions.growth_rates[0]}%</div>
+                </div>
+                <div class="assumption-item">
+                    <div class="label">Year 5 Growth</div>
+                    <div class="value">${assumptions.growth_rates[4]}%</div>
+                </div>
+                <div class="assumption-item">
+                    <div class="label">FCF Margin</div>
+                    <div class="value">${assumptions.fcf_margin}%</div>
+                </div>
+                <div class="assumption-item">
+                    <div class="label">WACC</div>
+                    <div class="value">${assumptions.wacc}%</div>
+                </div>
+                <div class="assumption-item">
+                    <div class="label">Terminal Growth</div>
+                    <div class="value">${assumptions.terminal_growth}%</div>
+                </div>
+                <div class="assumption-item">
+                    <div class="label">Intrinsic Value</div>
+                    <div class="value" style="color: #00d4aa;">$${valuation.intrinsic_value.toFixed(0)}</div>
+                </div>
+                <div class="assumption-item">
+                    <div class="label">Entry Price</div>
+                    <div class="value" style="color: #00d4aa;">$${entry.entry_price.toFixed(0)}</div>
+                </div>
+            `;
+
+            updateDCFDisplay();
+        };
+
+        function renderHistoricalGrowth() {
+            const growth = dcfData.historical_growth;
+            const selectedSource = growth.growth_rate_source;
+            const grid = document.getElementById('growthGrid');
+
+            const metrics = [
+                { key: 'revenue_3yr_cagr', label: 'Revenue 3Y' },
+                { key: 'revenue_5yr_cagr', label: 'Revenue 5Y' },
+                { key: 'eps_3yr_cagr', label: 'EPS 3Y' },
+                { key: 'eps_5yr_cagr', label: 'EPS 5Y' },
+                { key: 'equity_3yr_cagr', label: 'Equity 3Y' },
+                { key: 'equity_5yr_cagr', label: 'Equity 5Y' },
+                { key: 'fcf_3yr_cagr', label: 'FCF 3Y' },
+                { key: 'fcf_5yr_cagr', label: 'FCF 5Y' }
+            ];
+
+            grid.innerHTML = metrics.map(m => {
+                const rate = growth[m.key];
+                const isSelected = m.key === selectedSource;
+                const colorClass = rate >= 0 ? 'positive' : 'negative';
+                return `
+                    <div class="growth-item ${isSelected ? 'selected' : ''}">
+                        <div class="metric">${m.label}</div>
+                        <div class="rate ${colorClass}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderSensitivityMatrix() {
+            const sens = dcfData.sensitivity;
+            const table = document.getElementById('sensitivityMatrix');
+            const currentPrice = dcfData.current_price;
+
+            let html = '<tr><th>WACC \\ Term G</th>';
+            sens.terminal_growth_range.forEach(tg => {
+                html += `<th>${tg}%</th>`;
+            });
+            html += '</tr>';
+
+            sens.wacc_range.forEach((wacc, i) => {
+                html += `<tr><th>${wacc}%</th>`;
+                sens.matrix[i].forEach((val, j) => {
+                    const isHighlight = wacc === dcfData.assumptions.base.wacc &&
+                                       sens.terminal_growth_range[j] === dcfData.assumptions.base.terminal_growth;
+                    const colorClass = val >= currentPrice ? 'above-current' : 'below-current';
+                    html += `<td class="${isHighlight ? 'highlight' : colorClass}">$${val.toFixed(0)}</td>`;
+                });
+                html += '</tr>';
+            });
+
+            table.innerHTML = html;
+        }
+
+        function initDCF() {
+            if (!dcfData || !dcfData.valuation) return;
+
+            document.getElementById('dcfCurrent').textContent = '$' + dcfData.current_price.toFixed(0);
+
+            if (dcfData.historical_growth.growth_divergence_warning) {
+                document.getElementById('growthWarning').style.display = 'flex';
+                document.getElementById('warningText').textContent = dcfData.historical_growth.growth_divergence_warning;
+            }
+
+            const base = dcfData.assumptions.base;
+            document.getElementById('growthSlider').value = dcfData.historical_growth.selected_growth_rate;
+            document.getElementById('waccSlider').value = base.wacc;
+            document.getElementById('terminalSlider').value = base.terminal_growth;
+
+            document.getElementById('growthValue').textContent = dcfData.historical_growth.selected_growth_rate + '%';
+            document.getElementById('waccValue').textContent = base.wacc + '%';
+            document.getElementById('terminalValue').textContent = base.terminal_growth + '%';
+
+            document.getElementById('growthHint').textContent =
+                'Based on ' + dcfData.historical_growth.growth_rate_source.replace(/_/g, ' ');
+
+            document.getElementById('dcfWeighted').textContent = '$' + dcfData.probability_weighted.weighted_iv.toFixed(0);
+
+            renderHistoricalGrowth();
+            renderSensitivityMatrix();
+            updateDCFDisplay();
+            switchScenario('base');
+        }
+
+        // Initialize dashboard
+        renderKPIs();
+        renderGuidance();
+        createCharts();
+        initDCF();
+
+        // Bind slider events
+        (function() {
+            var growthSlider = document.getElementById('growthSlider');
+            var waccSlider = document.getElementById('waccSlider');
+            var terminalSlider = document.getElementById('terminalSlider');
+
+            if (growthSlider) {
+                growthSlider.oninput = window.updateDCFDisplay;
+                growthSlider.onchange = window.updateDCFDisplay;
+            }
+            if (waccSlider) {
+                waccSlider.oninput = window.updateDCFDisplay;
+                waccSlider.onchange = window.updateDCFDisplay;
+            }
+            if (terminalSlider) {
+                terminalSlider.oninput = window.updateDCFDisplay;
+                terminalSlider.onchange = window.updateDCFDisplay;
+            }
+        })();
+    </script>
+</body>
+</html>
