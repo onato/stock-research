@@ -1,0 +1,2147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetEase (9999.HK) Financial Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4aa, #00b894);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #888;
+            font-size: 1.1rem;
+        }
+        .header .subtitle {
+            color: #666;
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .kpi-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .kpi-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 212, 170, 0.2);
+        }
+        .kpi-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #00d4aa;
+            margin-bottom: 5px;
+        }
+        .kpi-label {
+            font-size: 0.85rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .kpi-change {
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+        .kpi-change.positive { color: #00d4aa; }
+        .kpi-change.negative { color: #ff6b6b; }
+
+        /* Investment Overview Section */
+        .overview-section {
+            max-width: 1400px;
+            margin: 0 auto 30px;
+        }
+        .overview-toggle {
+            width: 100%;
+            background: rgba(0, 212, 170, 0.1);
+            border: 1px solid rgba(0, 212, 170, 0.3);
+            border-radius: 12px;
+            padding: 16px 24px;
+            color: #00d4aa;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+        .overview-toggle:hover {
+            background: rgba(0, 212, 170, 0.2);
+        }
+        .overview-toggle .arrow {
+            transition: transform 0.3s ease;
+        }
+        .overview-toggle.active .arrow {
+            transform: rotate(180deg);
+        }
+        .overview-content {
+            display: none;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            padding: 30px;
+            margin-top: -12px;
+        }
+        .overview-content.active {
+            display: block;
+        }
+        .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+        }
+        .overview-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .overview-card h3 {
+            color: #00d4aa;
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .overview-card p {
+            margin-bottom: 12px;
+            line-height: 1.6;
+        }
+        .overview-card ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .overview-card li {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            line-height: 1.5;
+        }
+        .overview-card li:last-child {
+            border-bottom: none;
+        }
+        .overview-card.bull h3 { color: #00d4aa; }
+        .overview-card.bear h3 { color: #ff6b6b; }
+        .overview-card.risks h3 { color: #fdcb6e; }
+        .risk-high { color: #ff6b6b; }
+        .risk-moderate { color: #fdcb6e; }
+        .risk-low { color: #00d4aa; }
+        .revenue-stream {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .revenue-stream .percent {
+            color: #00d4aa;
+            font-weight: 600;
+        }
+        .trend-growing { color: #00d4aa; }
+        .trend-stable { color: #888; }
+        .trend-declining { color: #ff6b6b; }
+
+        /* Guidance Section */
+        .guidance-section {
+            max-width: 1400px;
+            margin: 0 auto 30px;
+        }
+        .guidance-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .guidance-header h3 {
+            color: #fff;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .guidance-header h3::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, #00d4aa, #00b894);
+            border-radius: 2px;
+        }
+        .guidance-meta {
+            font-size: 0.85rem;
+            color: #888;
+        }
+        .guidance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .guidance-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.2s ease;
+        }
+        .guidance-card:hover {
+            transform: translateY(-2px);
+        }
+        .guidance-metric {
+            font-size: 0.8rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .guidance-target {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #00d4aa;
+            margin-bottom: 6px;
+        }
+        .guidance-period {
+            font-size: 0.85rem;
+            color: #e0e0e0;
+            margin-bottom: 8px;
+        }
+        .guidance-vs-prior {
+            display: inline-block;
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        .guidance-vs-prior.raised {
+            background: rgba(0, 212, 170, 0.15);
+            color: #00d4aa;
+        }
+        .guidance-vs-prior.lowered {
+            background: rgba(255, 107, 107, 0.15);
+            color: #ff6b6b;
+        }
+        .guidance-vs-prior.maintained {
+            background: rgba(255, 255, 255, 0.1);
+            color: #888;
+        }
+        .guidance-notes {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 8px;
+            line-height: 1.4;
+        }
+        .guidance-commentary {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+            padding: 16px 20px;
+            border-left: 3px solid #00d4aa;
+            font-style: italic;
+            color: #b0b0b0;
+            line-height: 1.6;
+        }
+        .guidance-commentary::before {
+            content: '"';
+            font-size: 1.5rem;
+            color: #00d4aa;
+            margin-right: 4px;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            color: #fff;
+            margin: 40px auto 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(0, 212, 170, 0.3);
+            max-width: 1400px;
+        }
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 25px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .chart-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .chart-card.full-width {
+            grid-column: 1 / -1;
+        }
+        .chart-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .chart-header h3 {
+            color: #fff;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .chart-header h3::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, #00d4aa, #00b894);
+            border-radius: 2px;
+        }
+        .help-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(0, 212, 170, 0.2);
+            border: 1px solid #00d4aa;
+            color: #00d4aa;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        .help-btn:hover {
+            background: #00d4aa;
+            color: #1a1a2e;
+        }
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+        }
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%);
+            border-radius: 16px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid rgba(0, 212, 170, 0.3);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+        .modal-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h3 {
+            color: #00d4aa;
+            font-size: 1.4rem;
+            margin: 0;
+        }
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(255, 107, 107, 0.2);
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-close:hover {
+            background: #ff6b6b;
+            color: #fff;
+        }
+        .modal-body {
+            padding: 25px;
+            line-height: 1.7;
+        }
+        .modal-body p { margin-bottom: 15px; }
+        .modal-body strong { color: #00d4aa; }
+        .modal-body ul { margin: 15px 0; padding-left: 20px; }
+        .modal-body li { margin-bottom: 8px; }
+        .metric-highlight {
+            background: rgba(0, 212, 170, 0.1);
+            border-left: 3px solid #00d4aa;
+            padding: 12px 15px;
+            margin: 15px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        @media (max-width: 768px) {
+            .charts-container { grid-template-columns: 1fr; }
+            .overview-grid { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.8rem; }
+        }
+
+        /* DCF Valuation Section */
+        .dcf-section {
+            max-width: 1400px;
+            margin: 0 auto 40px;
+        }
+        .dcf-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .dcf-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease;
+        }
+        .dcf-card:hover { transform: translateY(-3px); }
+        .dcf-card.highlight {
+            background: rgba(0, 212, 170, 0.1);
+            border-color: rgba(0, 212, 170, 0.3);
+        }
+        .dcf-label {
+            font-size: 0.85rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        .dcf-value { font-size: 2.2rem; font-weight: bold; color: #00d4aa; }
+        .dcf-card:not(.highlight) .dcf-value { color: #fff; }
+        .dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+        .dcf-change.positive { color: #00d4aa; }
+        .dcf-change.negative { color: #ff6b6b; }
+        .dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
+        .dcf-warning {
+            background: rgba(253, 203, 110, 0.15);
+            border: 1px solid rgba(253, 203, 110, 0.4);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #fdcb6e;
+        }
+        .warning-icon { font-size: 1.2rem; }
+        .dcf-inputs {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+        .dcf-inputs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .dcf-input-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #00d4aa; }
+        .dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
+        .fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
+        .fcf-projection-table {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .fcf-projection-item { text-align: center; }
+        .fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
+        .fcf-projection-item .year { font-size: 0.75rem; color: #888; margin-bottom: 2px; }
+        .fcf-projection-item .fcf-value { font-size: 1rem; color: #e0e0e0; font-weight: 500; }
+        .fcf-projection-item .growth-rate { font-size: 0.75rem; color: #00d4aa; margin-top: 2px; }
+        .dcf-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+            padding: 25px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .slider-group { display: flex; flex-direction: column; gap: 10px; }
+        .slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+        .slider-group label span { color: #00d4aa; font-weight: 600; }
+        .slider-group input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); outline: none; }
+        .slider-group input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #00d4aa; cursor: pointer; transition: transform 0.2s; }
+        .slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        .slider-hint { font-size: 0.8rem; color: #666; }
+        .scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .scenario-tab { padding: 10px 24px; border: 1px solid rgba(255, 255, 255, 0.2); background: transparent; color: #888; border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s; }
+        .scenario-tab:hover { border-color: rgba(0, 212, 170, 0.5); color: #e0e0e0; }
+        .scenario-tab.active { background: rgba(0, 212, 170, 0.15); border-color: #00d4aa; color: #00d4aa; }
+        .scenario-details { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; margin-bottom: 30px; border: 1px solid rgba(255, 255, 255, 0.08); }
+        .scenario-details h4 { color: #00d4aa; margin-bottom: 15px; }
+        .assumption-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+        .assumption-item { text-align: center; }
+        .assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+        .assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
+        .sensitivity-section { margin-bottom: 30px; }
+        .sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; }
+        .sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255, 255, 255, 0.03); border-radius: 8px; overflow: hidden; }
+        .sensitivity-table th, .sensitivity-table td { padding: 12px 16px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); }
+        .sensitivity-table th { background: rgba(0, 212, 170, 0.1); color: #00d4aa; font-weight: 600; }
+        .sensitivity-table td { color: #e0e0e0; }
+        .sensitivity-table td.highlight { background: rgba(0, 212, 170, 0.15); color: #00d4aa; font-weight: 600; }
+        .sensitivity-table td.below-current { color: #ff6b6b; }
+        .sensitivity-table td.above-current { color: #00d4aa; }
+        .historical-growth { margin-bottom: 30px; }
+        .historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
+        .growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
+        .growth-item { background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 15px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); }
+        .growth-item .metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
+        .growth-item .rate { font-size: 1.2rem; font-weight: 600; }
+        .growth-item .rate.positive { color: #00d4aa; }
+        .growth-item .rate.negative { color: #ff6b6b; }
+        .growth-item.selected { border-color: #00d4aa; background: rgba(0, 212, 170, 0.1); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>NetEase, Inc. (9999.HK)</h1>
+        <p>Chinese Gaming & Internet Leader</p>
+        <div class="subtitle">All figures in RMB millions | Last Updated: January 29, 2026</div>
+    </div>
+
+    <!-- Investment Overview Section -->
+    <div class="overview-section">
+        <button class="overview-toggle" onclick="toggleOverview()">
+            <span>Investment Overview & Analysis</span>
+            <span class="arrow">▼</span>
+        </button>
+        <div class="overview-content" id="overviewContent">
+            <div class="overview-grid">
+                <!-- Company Overview -->
+                <div class="overview-card">
+                    <h3>Company Overview</h3>
+                    <p>NetEase is a leading Chinese internet and gaming company headquartered in Hangzhou, known primarily for its self-developed online games, which account for over 90% of gaming revenue. The company also operates NetEase Cloud Music (a leading music streaming platform), Youdao (AI-powered educational services), and innovative businesses including Yanxuan e-commerce. NetEase operates primarily in China with growing global ambitions, recently achieving major success with Marvel Rivals (40 million players) and Where Winds Meet (50 million players).</p>
+                </div>
+
+                <!-- Business Model -->
+                <div class="overview-card">
+                    <h3>Business Model</h3>
+                    <p>Gaming-focused business model with 80-85% of revenue from games and related services, featuring high 70%+ gross margins on gaming. Company generates revenue through in-game purchases, subscriptions, and advertising across its digital ecosystem. Strategy emphasizes self-developed 'evergreen' titles that generate recurring revenue for years rather than hit-driven publishing.</p>
+                    <ul>
+                        <li class="revenue-stream"><span>Gaming and Related Services</span> <span class="percent trend-growing">82% ▲</span></li>
+                        <li class="revenue-stream"><span>Youdao (Education)</span> <span class="percent trend-stable">6% →</span></li>
+                        <li class="revenue-stream"><span>NetEase Cloud Music</span> <span class="percent trend-declining">7% ▼</span></li>
+                        <li class="revenue-stream"><span>Innovative Businesses</span> <span class="percent trend-declining">5% ▼</span></li>
+                    </ul>
+                    <p style="margin-top: 15px;"><strong>Geographic Mix:</strong> China 70-80%, International 20-30% (growing via PC game launches)</p>
+                </div>
+
+                <!-- Competitive Position -->
+                <div class="overview-card">
+                    <h3>Competitive Position</h3>
+                    <p><strong>Market Position:</strong> Second largest gaming company in China behind Tencent, with estimated $11.5B gaming revenue in 2025 vs. Tencent's $27.1B. Together control over 60% of China's gaming market.</p>
+                    <p><strong>Main Competitors:</strong> Tencent Holdings, miHoYo, Lilith Games, Game Science, Perfect World, XD Inc.</p>
+                    <p><strong>Key Strengths:</strong></p>
+                    <ul>
+                        <li><strong>Evergreen IP:</strong> Fantasy Westward Journey (2003) hit record 3.58M concurrent users in 2025 after 22 years</li>
+                        <li><strong>AI Advantage:</strong> Five-year head start in AI integration enables 69.3% gross margins and faster development</li>
+                        <li><strong>Financial Strength:</strong> RMB 153.2B net cash ($21B+) enables aggressive R&D and M&A</li>
+                        <li><strong>Global IP Partners:</strong> Marvel (Marvel Rivals), Bungie (Destiny: Rising), Blizzard partnerships</li>
+                    </ul>
+                    <p><strong>Weaknesses:</strong> 40% of Tencent's scale, non-gaming struggles, China revenue concentration (70-80%), Western studio management challenges</p>
+                </div>
+
+                <!-- Growth Drivers -->
+                <div class="overview-card">
+                    <h3>Growth Drivers</h3>
+                    <ul>
+                        <li><strong>Global Expansion:</strong> Marvel Rivals ($1.36B annual revenue potential), Where Winds Meet international launch 2025, Destiny: Rising partnership</li>
+                        <li><strong>PC Gaming Momentum:</strong> 85% YoY growth in Q1 2025, now 34% of gaming revenue vs. mobile saturation</li>
+                        <li><strong>AI-Powered Development:</strong> Reduces costs and accelerates content creation with structural competitive advantage</li>
+                        <li><strong>Strong Pipeline:</strong> Sea of Remnants (2026 launch), FragPunk recent success, evergreen franchise resilience</li>
+                        <li><strong>China Market Growth:</strong> 7.7% growth to RMB 350.8B ($49.8B) in 2025, favorable regulatory environment (1,416 licenses in 2024, up 25%)</li>
+                    </ul>
+                </div>
+
+                <!-- Key Risks -->
+                <div class="overview-card risks">
+                    <h3>Key Risks</h3>
+                    <ul>
+                        <li><span class="risk-high">High Risk:</span> Chinese gaming regulations - Dec 2023 draft crashed stock 28%; unpredictable government control</li>
+                        <li><span class="risk-high">High Risk:</span> Gaming revenue concentration (82%) - failed launches severely impact results</li>
+                        <li><span class="risk-high">High Risk:</span> US-China tensions - ADR delisting threats, investment flow restrictions</li>
+                        <li><span class="risk-high">High Risk:</span> Tencent competition - 2.4x larger scale with deeper pockets; emerging studios like miHoYo and Game Science</li>
+                        <li><span class="risk-moderate">Moderate Risk:</span> Non-gaming business struggles - Cloud Music -1.8% YoY, Innovative Businesses -18.9% YoY</li>
+                        <li><span class="risk-moderate">Moderate Risk:</span> International expansion execution - studio closures (Ouka, Jar of Sparks) show Western management challenges</li>
+                        <li><span class="risk-moderate">Moderate Risk:</span> Currency exposure - RMB depreciation reduces USD earnings</li>
+                    </ul>
+                </div>
+
+                <!-- Bull Case -->
+                <div class="overview-card bull">
+                    <h3>Bull Case</h3>
+                    <ul>
+                        <li>Marvel Rivals momentum validates global strategy; 40M players and $1.36B revenue potential opens international markets</li>
+                        <li>Attractive valuation: 17-19x P/E vs. Tencent 24-26x despite similar growth; Strong Buy consensus implies 20-25% upside</li>
+                        <li>AI competitive moat: Five-year lead creates sustainable 70%+ gaming margins; faster content creation than competitors</li>
+                        <li>Shareholder returns: $5B buyback (extended to 2029) + 2.2% dividend yield + 9.55% 5Y dividend CAGR; RMB 153.2B net cash</li>
+                        <li>Evergreen model: Fantasy Westward Journey record users after 22 years proves IP durability and recurring revenue</li>
+                        <li>Regulatory improvement: 1,416 licenses in 2024 (up 25%), most favorable environment in years</li>
+                        <li>PC gaming growth: 85% YoY expansion to 34% of revenue beyond mobile saturation</li>
+                    </ul>
+                </div>
+
+                <!-- Bear Case -->
+                <div class="overview-card bear">
+                    <h3>Bear Case</h3>
+                    <ul>
+                        <li>Regulatory uncertainty: Dec 2023 crash shows government can materially impact business overnight; unpredictable control</li>
+                        <li>International execution risk: Scaling back Western investments due to costs; studio closures show global management challenges</li>
+                        <li>Competition intensifying: Tencent 2.4x larger; miHoYo (Genshin) and Game Science (Black Myth) compete effectively</li>
+                        <li>Non-gaming failure: Cloud Music -1.8%, Innovative -18.9%, Youdao +3.6% - diversification not delivering; 82% gaming dependent</li>
+                        <li>Geopolitical risks: ADR delisting threats resurfaced Feb 2025; potential loss of US institutional investors ($370B in Chinese ADRs)</li>
+                        <li>Marvel Rivals dependency: Critical to global strategy; underperformance vs. $1.36B target would severely disappoint</li>
+                        <li>Market saturation: China mobile gaming mature with limited growth; PC only 34% and more competitive</li>
+                    </ul>
+                </div>
+
+                <!-- Recent Developments -->
+                <div class="overview-card">
+                    <h3>Recent Developments</h3>
+                    <ul>
+                        <li><strong>Q3 2025:</strong> Revenue up 8% YoY to RMB 28.4B; gaming +12% to RMB 23.3B; non-GAAP net income +27% to RMB 9.5B</li>
+                        <li><strong>Q2 2025:</strong> Marvel Rivals 40M players; Where Winds Meet 50M players; PC gaming 34% of total</li>
+                        <li><strong>Q1 2025:</strong> PC games +85% YoY to 34% of gaming revenue; total gaming +12.1% to RMB 24.0B</li>
+                        <li><strong>Jan 2025:</strong> FragPunk launched successfully; Jar of Sparks studio shut down amid restructuring</li>
+                        <li><strong>Dec 2024:</strong> Marvel Rivals launched - 10M players in 3 days; $136M first-month revenue</li>
+                        <li><strong>Nov 2024:</strong> Fantasy Westward Journey record 3.58M concurrent users (22-year-old game)</li>
+                        <li><strong>Oct 2024:</strong> Naraka Bladepoint Mobile launched - topped iOS charts with 50M users</li>
+                        <li><strong>Apr 2024:</strong> Renewed Blizzard partnership; announced Destiny: Rising with Bungie</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid" id="kpiGrid">
+        <!-- Populated by JavaScript -->
+    </div>
+
+    <!-- Guidance Section -->
+    <div class="guidance-section" id="guidanceSection">
+        <div class="guidance-header">
+            <h3>Management Guidance</h3>
+            <span class="guidance-meta">As of <span id="guidanceAsOf">Q3 2025 Earnings</span> | <span id="guidanceFY">2025-2026</span></span>
+        </div>
+        <div class="guidance-grid" id="guidanceGrid">
+            <!-- Populated by JavaScript -->
+        </div>
+        <div class="guidance-commentary" id="guidanceCommentary">
+            <!-- Populated by JavaScript -->
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <h2 class="section-title">Financial Performance</h2>
+    <div class="charts-container">
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>Revenue Trend (Annual)</h3>
+                <button class="help-btn" onclick="openModal('revenue')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="revenueChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>Net Income Trend (Annual)</h3>
+                <button class="help-btn" onclick="openModal('netIncome')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="netIncomeChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="section-title">Profitability Metrics</h2>
+    <div class="charts-container">
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>Gross Margin Trend</h3>
+                <button class="help-btn" onclick="openModal('grossMargin')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="grossMarginChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>Operating & Net Margins</h3>
+                <button class="help-btn" onclick="openModal('margins')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="marginsChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="section-title">Gaming Business (Core Segment)</h2>
+    <div class="charts-container">
+        <div class="chart-card full-width">
+            <div class="chart-header">
+                <h3>Gaming Revenue Growth</h3>
+                <button class="help-btn" onclick="openModal('gaming')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="gamingRevenueChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card full-width">
+            <div class="chart-header">
+                <h3>Revenue by Segment (Annual)</h3>
+                <button class="help-btn" onclick="openModal('segments')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="segmentChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="section-title">Cash Flow & Balance Sheet</h2>
+    <div class="charts-container">
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>Free Cash Flow (Annual)</h3>
+                <button class="help-btn" onclick="openModal('fcf')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="fcfChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>Cash vs. Debt (Annual)</h3>
+                <button class="help-btn" onclick="openModal('balance')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="balanceChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- DCF Valuation Section -->
+    <h2 class="section-title">DCF Valuation</h2>
+    <div class="dcf-section">
+        <div class="dcf-summary">
+            <div class="dcf-card highlight">
+                <div class="dcf-label">Intrinsic Value (HKD)</div>
+                <div class="dcf-value" id="dcfIV">HK$229</div>
+                <div class="dcf-change positive" id="dcfUpside">+11% upside</div>
+            </div>
+            <div class="dcf-card">
+                <div class="dcf-label">Entry Price (15% CAGR)</div>
+                <div class="dcf-value" id="dcfEntry">HK$125</div>
+                <div class="dcf-sublabel">Buy below for 15% annual return</div>
+            </div>
+            <div class="dcf-card">
+                <div class="dcf-label">Current Price</div>
+                <div class="dcf-value" id="dcfCurrent">HK$206.60</div>
+            </div>
+            <div class="dcf-card">
+                <div class="dcf-label">Prob-Weighted IV</div>
+                <div class="dcf-value" id="dcfWeighted">HK$229</div>
+                <div class="dcf-sublabel">20% Bull / 60% Base / 20% Bear</div>
+            </div>
+        </div>
+
+        <div class="dcf-warning" id="growthWarning" style="display: none;">
+            <span class="warning-icon">&#9888;</span>
+            <span id="warningText"></span>
+        </div>
+
+        <div class="dcf-inputs">
+            <h4>DCF Model Inputs</h4>
+            <div class="dcf-inputs-grid">
+                <div class="dcf-input-card">
+                    <div class="dcf-input-label">Base Year FCF</div>
+                    <div class="dcf-input-value" id="baseFCF">¥45.1B</div>
+                    <div class="dcf-input-note">FY2024 Free Cash Flow</div>
+                </div>
+                <div class="dcf-input-card">
+                    <div class="dcf-input-label">Shares Outstanding</div>
+                    <div class="dcf-input-value" id="sharesOut">3.20B</div>
+                </div>
+                <div class="dcf-input-card">
+                    <div class="dcf-input-label">Net Debt</div>
+                    <div class="dcf-input-value" id="netDebt">-¥39.2B</div>
+                    <div class="dcf-input-note">Negative = net cash</div>
+                </div>
+            </div>
+            <div class="fcf-projections">
+                <h5>Projected FCF (5-Year)</h5>
+                <div class="fcf-projection-table" id="fcfProjectionTable">
+                </div>
+            </div>
+        </div>
+
+        <div class="dcf-controls">
+            <div class="slider-group">
+                <label>Growth Rate: <span id="growthValue">6.2%</span></label>
+                <input type="range" id="growthSlider" min="0" max="30" value="6.2" step="0.5">
+                <div class="slider-hint" id="growthHint">Based on revenue 3yr CAGR</div>
+            </div>
+            <div class="slider-group">
+                <label>WACC: <span id="waccValue">11.0%</span></label>
+                <input type="range" id="waccSlider" min="6" max="18" value="11" step="0.5">
+            </div>
+            <div class="slider-group">
+                <label>Terminal Growth: <span id="terminalValue">3.0%</span></label>
+                <input type="range" id="terminalSlider" min="0" max="5" value="3" step="0.5">
+            </div>
+        </div>
+
+        <div class="scenario-tabs">
+            <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+            <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+            <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+        </div>
+
+        <div class="scenario-details" id="scenarioDetails">
+            <div class="scenario-assumptions">
+                <h4>Assumptions</h4>
+                <div class="assumption-grid" id="assumptionGrid">
+                </div>
+            </div>
+        </div>
+
+        <div class="sensitivity-section">
+            <h4>Sensitivity Analysis: Intrinsic Value (HKD) by WACC & Terminal Growth</h4>
+            <table class="sensitivity-table" id="sensitivityMatrix">
+            </table>
+        </div>
+
+        <div class="historical-growth">
+            <h4>Historical Growth Rates (CAGR)</h4>
+            <div class="growth-grid" id="growthGrid">
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modalTitle">Metric Information</h3>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Content populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // EMBEDDED CSV DATA
+        const csvData = `Period,Revenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,EBITDA,NetIncome,NetMargin,EPS,FreeCashFlow,ShareholdersEquity,TotalDebt,CashAndEquivalents,SharesOutstanding,GameRevenue,YoudaoRevenue,CloudMusicRevenue,InnovativeRevenue
+Q4 2014,3463.0,2485.4,71.8,,,,1271.3,36.7,1.56,,,,,2707.5,,,393.2
+FY2014,11716.7,8466.9,72.3,,,,4527.6,38.6,5.48,,,,,9300.0,,,1116.7
+Q1 2015,3660.2,2489.1,68.0,,,,1264.4,34.5,1.56,1925.1,24607.0,1228.3,3740.0,,2941.2,,,421.2
+Q2 2015,4567.9,2845.6,62.3,,,,1428.6,31.3,1.73,,,,,3657.1,,,483.0
+Q3 2015,6671.8,3849.3,57.7,,,,1932.9,29.0,2.21,,,,,5212.9,,,1004.0
+Q4 2015,7903.0,4219.7,53.4,,,,2163.4,27.4,2.54,,,,,5502.9,,,1791.1
+FY2015,22802.9,13403.7,58.8,,,,6789.3,29.8,7.76,,,,,17313.1,,,3699.8
+Q1 2016,9264.3,5192.9,56.1,,,,3244.3,35.0,3.82,,,,,6748.0,,,1606.8
+Q2 2016,10256.4,5668.3,55.3,,,,3594.9,35.0,4.25,,,,,7497.2,,,1643.3
+Q3 2016,10876.6,5988.7,55.1,,,,3848.5,35.4,4.56,,,,,7998.3,,,1601.8
+Q4 2016,11456.7,6192.6,54.0,,,,4087.3,35.7,4.86,,,,,8416.8,,,1766.7
+FY2016,41853.0,22842.5,54.6,,,,14775.0,35.3,17.50,,,,,30659.3,,,6618.6
+Q1 2017,11582.9,6322.4,54.6,,,,4270.1,36.9,5.16,,,,,8563.2,,,1535.8
+Q2 2017,13364.0,7209.2,53.9,,,,4950.1,37.0,6.00,,,,,9889.3,,,1695.7
+Q3 2017,12532.7,6832.0,54.5,,,,4423.1,35.3,5.37,,,,,9408.0,,,1456.7
+Q4 2017,14623.9,7733.3,52.9,,,,5372.1,36.7,6.54,,,,,10924.4,,,1909.5
+FY2017,52103.5,28096.9,53.9,,,,19015.4,36.5,23.08,,,,,38785.0,,,6536.7
+Q1 2018,14226.2,7650.1,53.8,,,,4991.6,35.1,6.10,,,,,10508.3,,,1631.2
+Q2 2018,16339.0,8755.3,53.6,,,,5806.2,35.5,7.12,,,,,12082.1,,,1896.9
+Q3 2018,16860.0,9099.4,54.0,,,,6184.5,36.7,7.60,,,,,12546.2,,,1781.8
+Q4 2018,18428.8,9796.9,53.2,,,,6542.0,35.5,8.06,,,,,13742.7,,,1892.1
+FY2018,65854.0,35301.7,53.6,,,,23524.3,35.7,28.88,,,,,48879.3,,,7190.0
+Q1 2019,14422.2,7737.7,53.6,3755.1,26.0,,2732.9,18.9,3.01,2625.9,,,,11850.2,225.7,,2346.3
+Q2 2019,15087.1,8024.7,53.2,3993.8,26.5,,2993.9,19.8,3.28,3688.5,,,,11953.8,305.2,,2828.1
+Q3 2019,15681.0,8003.3,51.0,2767.2,17.6,,2209.4,14.1,2.41,4016.5,,,,12221.0,327.6,,3132.4
+Q4 2019,15734.8,8210.4,52.2,2976.4,18.9,,3053.7,19.4,3.34,5510.7,102388.2,19668.2,21428.9,,11604.3,410.4,,3720.0
+FY2019,60925.1,31976.1,52.5,13492.5,22.1,,10989.9,18.0,12.04,15841.6,102388.2,19668.2,21428.9,,47629.3,1268.9,,12027.0
+Q1 2020,17062.4,9377.6,55.0,4486.4,26.3,,3551.0,20.8,3.88,6500.6,,,,13518.2,541.4,,3002.7
+Q2 2020,18148.9,9587.7,52.8,4676.0,25.8,,3558.0,19.6,3.88,5754.2,,,,14075.9,529.7,,3543.4
+Q3 2020,18658.2,9885.8,53.0,2869.5,15.4,,2998.2,16.1,3.34,6110.3,,,,13862.0,896.0,,3900.1
+Q4 2020,19761.7,9927.8,50.2,3012.0,15.2,,975.7,4.9,0.22,5741.6,118044.8,12233.0,22411.1,,13400.2,1106.8,,5254.8
+FY2020,73631.2,38778.9,52.7,15043.9,20.4,,12082.9,16.4,2.80,24106.7,118044.8,12233.0,22411.1,,54856.3,3074.0,,15700.9
+Q1 2021,20502.3,11178.5,54.5,4900.9,23.9,,3651.4,17.8,4.10,7438.8,,,,15080.0,669.3,,4753.0
+Q2 2021,20893.9,11308.1,54.1,5073.0,24.3,,4254.0,20.4,4.77,6852.6,,,,15383.0,876.0,,4634.9
+Q3 2021,22172.2,11998.9,54.1,5313.5,24.0,,4473.2,20.2,5.02,7787.5,,,,15871.0,1055.6,,5245.6
+Q4 2021,24419.2,13047.6,53.4,5982.8,24.5,,4896.1,20.1,5.49,10278.8,128766.8,11866.7,31893.0,,17528.0,1358.4,,5532.8
+FY2021,87987.6,47533.1,54.0,21270.2,24.2,,17274.7,19.6,19.38,32357.7,128766.8,11866.7,31893.0,,63862.0,3959.1,,20166.5
+Q1 2022,23488.7,12746.6,54.3,5729.5,24.4,,4769.6,20.3,5.35,8851.2,,,,17202.0,1049.5,,5237.2
+Q2 2022,24264.6,13063.7,53.8,5871.9,24.2,,5086.5,21.0,5.70,9013.1,,,,17747.0,1229.4,,5288.2
+Q3 2022,24529.5,13148.1,53.6,5835.5,23.8,,5028.7,20.5,5.64,9662.7,,,,18007.0,1415.4,,5107.1
+Q4 2022,27140.2,14518.0,53.5,7186.5,26.5,,6582.3,24.3,7.37,11808.3,120571.4,19667.4,22779.6,,20078.0,1389.0,,5673.2
+FY2022,99423.0,53476.4,53.8,24623.4,24.8,,21467.1,21.6,24.06,39335.3,120571.4,19667.4,22779.6,,73034.0,5083.3,,21305.7
+Q1 2023,24955.4,13440.5,53.9,6352.0,25.5,,5400.0,21.6,6.05,10114.3,,,,18493.0,1227.2,,5235.2
+Q2 2023,25132.2,13467.5,53.6,6233.6,24.8,,5440.7,21.7,6.09,10300.7,,,,18584.0,1227.1,,5321.1
+Q3 2023,26209.9,14090.8,53.8,6861.6,26.2,,6538.4,24.9,7.32,10575.6,,,,19353.0,1318.6,,5538.3
+Q4 2023,27140.2,14418.2,53.1,6868.5,25.3,,6582.3,24.3,7.37,11808.3,124285.8,19668.0,21428.9,,20921.4,1480.5,1985.5,2752.7
+FY2023,103437.7,55417.0,53.6,26315.7,25.4,,23961.4,23.2,22.83,42799.0,124285.8,19668.0,21428.9,,77351.4,5253.4,7866.9,20966.0
+Q1 2024,26900.0,14476.4,53.8,7350.0,27.3,,7073.3,26.3,7.93,9636.8,,,,21500.0,1364.0,2006.0,2030.0
+Q2 2024,25500.0,16036.7,62.9,6861.7,26.9,,6812.7,26.7,9.35,10575.6,,,,20100.0,1313.0,1999.0,2088.0
+Q3 2024,26209.9,16476.6,62.9,7146.7,27.3,,6538.4,24.9,9.20,10575.6,,,,20864.0,1572.5,1999.2,1774.1
+Q4 2024,26747.8,16272.3,60.8,7821.4,29.2,,8766.5,32.8,8.66,13012.2,138685.6,12233.0,51383.3,,21242.4,1339.8,1880.5,2285.1
+FY2024,105377.6,65807.1,62.4,29179.8,27.7,,29697.6,28.2,33.23,45095.1,138685.6,12233.0,51383.3,,83706.4,5625.9,7950.1,8096.5
+Q1 2025,28800.0,18464.0,64.1,8592.2,29.8,,10300.0,35.8,10.69,12100.0,,,,23950.0,1254.0,1854.0,1742.0
+Q2 2025,27943.3,18096.8,64.8,9066.1,32.4,,8589.5,30.7,9.40,10931.7,,,,22800.0,1398.0,1980.0,1765.3
+Q3 2025,28401.5,18173.4,64.0,8039.7,28.3,,8589.5,30.2,9.50,12872.0,156256.2,7350.0,31326.8,,23325.0,1620.0,1972.0,1484.5
+Q4 2025E,29200.0,18542.0,63.5,8760.0,30.0,,9198.0,31.5,9.80,13500.0,162000.0,7000.0,35000.0,,24000.0,1450.0,1900.0,1850.0
+FY2025E,114344.8,73276.2,64.1,34458.0,30.1,,36677.0,32.1,39.39,49403.7,162000.0,7000.0,35000.0,,94075.0,5722.0,7706.0,6841.8`;
+
+        // EMBEDDED ANALYSIS JSON
+        const analysis = {
+  "ticker": "9999.HK",
+  "company_name": "NetEase, Inc.",
+  "alternative_ticker": "NTES (NASDAQ)",
+  "analysis_date": "2026-01-29",
+  "overview": "NetEase is a leading Chinese internet and gaming company headquartered in Hangzhou, known primarily for its self-developed online games, which account for over 90% of gaming revenue. The company also operates NetEase Cloud Music (a leading music streaming platform), Youdao (AI-powered educational services), and innovative businesses including Yanxuan e-commerce. NetEase operates primarily in China with growing global ambitions, recently achieving major success with Marvel Rivals (40 million players) and Where Winds Meet (50 million players).",
+  "business_model": {
+    "summary": "Gaming-focused business model with 80-85% of revenue from games and related services, featuring high 70%+ gross margins on gaming. Company generates revenue through in-game purchases, subscriptions, and advertising across its digital ecosystem. Strategy emphasizes self-developed 'evergreen' titles that generate recurring revenue for years rather than hit-driven publishing.",
+    "revenue_streams": [
+      {"name": "Gaming and Related Value-Added Services", "percent": 82, "trend": "growing"},
+      {"name": "Youdao (Educational Services)", "percent": 6, "trend": "stable"},
+      {"name": "NetEase Cloud Music", "percent": 7, "trend": "declining"},
+      {"name": "Innovative Businesses (Yanxuan, Advertising)", "percent": 5, "trend": "declining"}
+    ],
+    "customer_type": "Primarily B2C gamers with B2C education and music subscribers, some B2B advertising",
+    "geographic_mix": "Predominantly China (70-80%), with growing international presence (20-30%) driven by PC game launches and mobile expansion"
+  },
+  "competitive_position": {
+    "main_competitors": ["Tencent Holdings", "miHoYo", "Lilith Games", "Game Science", "Perfect World", "XD Inc."],
+    "market_position": "Second largest gaming company in China behind Tencent, with estimated $11.5 billion gaming revenue in 2025 vs. Tencent's $27.1 billion and miHoYo's $4.7 billion. Tencent and NetEase together control over 60% of China's gaming market.",
+    "moat_factors": [
+      {"factor": "Proprietary IP and evergreen franchises", "strength": "strong", "description": "Fantasy Westward Journey (launched 2003) still generates significant revenue 22 years later, hitting record 3.58 million concurrent players in Nov 2025. Over 90% of gaming revenue from self-developed games."},
+      {"factor": "AI integration advantage", "strength": "strong", "description": "Five-year head start in AI integration across game development enables 69.3% gross margins, faster content updates, efficient monetization, and superior player retention that competitors cannot easily replicate."},
+      {"factor": "Development capabilities", "strength": "strong", "description": "Strong R&D organization with multiple global studios, proven ability to create high-quality games across multiple genres and platforms. PC games grew 85% YoY in Q1 2025."},
+      {"factor": "Global IP partnerships", "strength": "moderate", "description": "Strategic partnerships with Marvel (Marvel Rivals), Bungie (Destiny: Rising), and Blizzard (renewed 2024) provide access to premium Western IP for Chinese and global markets."},
+      {"factor": "Financial strength", "strength": "strong", "description": "Net cash position of RMB 153.2 billion ($21+ billion) as of Sept 2025 enables aggressive R&D investment, M&A, and shareholder returns without financial constraints."}
+    ],
+    "weaknesses": [
+      "Second place in China market with roughly 40% of Tencent's gaming scale",
+      "Limited success with non-gaming businesses (Cloud Music, Youdao, Yanxuan all showing revenue declines or weak growth)",
+      "Dependence on Chinese market for 70-80% of revenue creates regulatory and geopolitical concentration risk",
+      "International expansion challenged by high costs and inefficiencies, with reports of scaling back non-Chinese gaming investments in early 2025",
+      "Recent studio closures (Ouka, Jar of Sparks, Fantastic Pixel Castle, Bad Brain) suggest challenges in Western studio management"
+    ]
+  },
+  "growth_drivers": [
+    "Global expansion of self-developed titles with Marvel Rivals ($1.36 billion annual revenue potential), Where Winds Meet international launch planned 2025, and Destiny: Rising partnership with Bungie",
+    "PC gaming momentum with 85% YoY growth in Q1 2025, now representing 34% of gaming revenue and expanding addressable market beyond mobile",
+    "AI-powered game development reducing costs and accelerating content creation, providing structural competitive advantage",
+    "Strong new game pipeline for 2025-2026 including Sea of Remnants (2026 planned launch) and FragPunk recent success",
+    "China gaming market growing 7.7% to RMB 350.8 billion ($49.8 billion) in 2025 with favorable regulatory environment (1,416 licenses issued in 2024, up 25%)",
+    "Evergreen franchise model showing resilience with 22-year-old Fantasy Westward Journey achieving record concurrent users in 2025"
+  ],
+  "risks": {
+    "business": [
+      {"risk": "Gaming revenue concentration", "severity": "high", "description": "82% of revenue from gaming creates high dependence on single industry; failed launches or player churn would severely impact results"},
+      {"risk": "Competition from Tencent and emerging studios", "severity": "high", "description": "Tencent's 2.4x larger gaming revenue and rising competition from miHoYo (Genshin Impact, Honkai) and Game Science (Black Myth: Wukong) intensifying market rivalry"},
+      {"risk": "Non-gaming business struggles", "severity": "moderate", "description": "Cloud Music revenue down 1.8% YoY Q3 2025, Innovative Businesses down 18.9% YoY, Youdao up only 3.6% - diversification strategy not delivering growth"},
+      {"risk": "International expansion execution", "severity": "moderate", "description": "Reports of scaling back non-Chinese investments due to high costs; studio closures in 2024-2025 indicate challenges managing Western development teams"},
+      {"risk": "Changing player preferences", "severity": "moderate", "description": "Gaming industry hits-driven with rapid shifts in player tastes; must continuously innovate to maintain relevance"}
+    ],
+    "financial": [
+      {"risk": "ADR delisting risk", "severity": "moderate", "description": "Trump administration revived delisting threats in Feb 2025 under HFCAA; however, NetEase has dual listing on HKEX (9999.HK) which mitigates impact for investors with access to Hong Kong markets"},
+      {"risk": "Currency exposure", "severity": "moderate", "description": "Reports in USD but earns primarily in RMB; CNY depreciation would reduce USD-reported earnings and ADR value"}
+    ],
+    "regulatory": [
+      {"risk": "Chinese gaming regulations", "severity": "high", "description": "December 2023 draft regulations crashed stock 28% (record drop); government maintains tight control including minor spending caps (400 yuan monthly) and 3-hour weekly playtime limits. Regulatory environment improved in 2024-2025 but remains unpredictable."},
+      {"risk": "Gaming license approval dependency", "severity": "moderate", "description": "All new games require NPPA approval before monetization; delays or denials would impact pipeline. Environment improved with 1,416 licenses in 2024 (up 25%) but could reverse quickly."},
+      {"risk": "Data privacy and cybersecurity", "severity": "moderate", "description": "Chinese government data localization and security requirements increasing compliance costs and operational complexity"},
+      {"risk": "Antitrust and platform regulations", "severity": "moderate", "description": "Chinese government scrutiny of large internet platforms continues, though gaming companies less targeted than e-commerce and fintech"}
+    ],
+    "macro": [
+      {"risk": "China economic slowdown", "severity": "moderate", "description": "Weak consumer spending and property market crisis could reduce discretionary spending on gaming and entertainment"},
+      {"risk": "US-China tensions", "severity": "high", "description": "Geopolitical tensions affecting ADR listings, investment flows, and potentially restricting access to Western IP partnerships or global expansion"},
+      {"risk": "Consumer spending on gaming", "severity": "moderate", "description": "Gaming is discretionary spending vulnerable to macro weakness, though relatively resilient during economic downturns"}
+    ],
+    "execution": [
+      {"risk": "International game launches", "severity": "moderate", "description": "Success of Marvel Rivals critical to validating global strategy; failure would set back international ambitions significantly"},
+      {"risk": "Studio integration and management", "severity": "moderate", "description": "Multiple studio acquisitions (Quantic Dream, Grasshopper Manufacture, Skybox Labs) and recent closures show challenges managing global development operations"}
+    ]
+  },
+  "macro_factors": {
+    "industry_outlook": "China gaming market growing 7.7% in 2025 to RMB 350.8 billion ($49.8 billion) with favorable regulatory environment. Global gaming market expanding with mobile representing 73.3% of China revenue. AI integration and cloud infrastructure becoming key competitive factors. Industry consolidating around Tencent, NetEase, and emerging premium studios like miHoYo and Game Science.",
+    "cyclicality": "Moderately cyclical as discretionary consumer spending, but gaming shows resilience during economic downturns as low-cost entertainment. Free-to-play model with in-app purchases somewhat insulates from macro weakness.",
+    "interest_rate_sensitivity": "Low direct sensitivity (strong cash position, no debt); moderate indirect sensitivity through impact on consumer spending and tech stock valuations",
+    "currency_exposure": "High RMB exposure (70-80% of revenue in China); CNY depreciation vs. USD reduces reported dollar earnings for NASDAQ ADR investors",
+    "key_input_costs": ["Developer salaries and talent", "Server and cloud infrastructure", "Marketing and user acquisition", "IP licensing fees", "Payment processing fees"]
+  },
+  "recent_developments": [
+    {"date": "2025-Q3", "event": "Q3 2025 earnings: Total revenue up 8% YoY to RMB 28.4B, gaming revenue up 12% YoY to RMB 23.3B, non-GAAP net income up 27% YoY to RMB 9.5B"},
+    {"date": "2025-Q2", "event": "Marvel Rivals surpassed 40 million players globally; Where Winds Meet exceeded 50 million players; PC gaming revenue representing 34% of gaming total"},
+    {"date": "2025-Q1", "event": "PC games grew 85% YoY in Q1 2025, accounting for 34% of gaming revenue; total gaming revenue up 12.1% to RMB 24.0B"},
+    {"date": "2025-Jan", "event": "FragPunk launched successfully; Jar of Sparks studio shut down amid restructuring"},
+    {"date": "2024-Dec", "event": "Marvel Rivals officially launched December 2024, hitting 10 million players in first three days; generated estimated $136 million first-month revenue"},
+    {"date": "2024-Nov", "event": "Fantasy Westward Journey hit record 3.58 million concurrent players (game launched 2003); multiple studios closed including Fantastic Pixel Castle and Bad Brain Game Studios"},
+    {"date": "2024-Oct", "event": "Naraka Bladepoint Mobile launched, quickly topping iOS charts with 50 million new users"},
+    {"date": "2024-Sept", "event": "T-Minus Zero studio sold; continued restructuring of Western studio portfolio"},
+    {"date": "2024-Aug", "event": "Ouka Studios shut down as part of portfolio optimization"},
+    {"date": "2024-Apr", "event": "Renewed partnership agreement with Blizzard Activision after 14-year partnership ended November 2022; announced Destiny: Rising development with Bungie"},
+    {"date": "2024-Q1", "event": "China gaming regulator approved record 1,416 licenses in 2024 (up 25% vs 2023), signaling improved regulatory environment after Dec 2023 crisis"}
+  ],
+  "guidance": {
+    "as_of": "Q3 2025 Earnings (November 2025)",
+    "fiscal_year": "2025-2026",
+    "items": [
+      {
+        "metric": "Revenue growth",
+        "target": "Mid to high single digits YoY",
+        "period": "2025-2026",
+        "vs_prior": "maintained",
+        "notes": "Gaming segment projected 11% revenue CAGR based on analyst consensus; Q3 2025 total revenue up 8% YoY sets baseline"
+      },
+      {
+        "metric": "Gaming revenue",
+        "target": "Low double-digit growth",
+        "period": "2025-2026",
+        "vs_prior": "maintained",
+        "notes": "Q3 2025 gaming revenue up 12% YoY; Marvel Rivals success and new launches support continued momentum"
+      },
+      {
+        "metric": "Gross margin (Gaming)",
+        "target": "69-71%",
+        "period": "2025-2026",
+        "vs_prior": "maintained",
+        "notes": "Q2 2025 gaming gross margin was 70.2%; AI integration and self-developed focus support high margins"
+      },
+      {
+        "metric": "Operating margin",
+        "target": "Improving trend",
+        "period": "2025",
+        "vs_prior": "raised",
+        "notes": "Q1 2025 operating margin improved to 8.0% due to 21.3% R&D cost reduction and 21.5% marketing expense reduction through disciplined cost management"
+      },
+      {
+        "metric": "International revenue mix",
+        "target": "20-30% of total",
+        "period": "2025-2026",
+        "vs_prior": "maintained",
+        "notes": "Management previously stated goal to increase overseas development exposure from 20% to 40%; Marvel Rivals and Where Winds Meet international launches key to progress"
+      },
+      {
+        "metric": "Share buyback program",
+        "target": "$5 billion total authorization",
+        "period": "Through January 2029",
+        "vs_prior": "maintained",
+        "notes": "$2 billion spent to date on 22.1 million ADSs; approximately $3 billion remaining authorization"
+      }
+    ],
+    "management_commentary": "Management emphasized strong momentum in gaming with Marvel Rivals and Where Winds Meet exceeding expectations. PC gaming growing 85% YoY creates new growth vector beyond mobile. AI integration providing structural competitive advantages in development efficiency and player engagement. International expansion accelerating but with disciplined approach after restructuring Western studios. Non-gaming businesses (Cloud Music, Youdao, Innovative) remain challenged but not strategic focus. Strong RMB 153.2 billion net cash position supports ongoing R&D investment, M&A opportunities, and shareholder returns through buybacks and dividends."
+  },
+  "bull_case": [
+    "Marvel Rivals momentum: 40 million players and $1.36 billion annual revenue potential validates global expansion strategy; success attracts more premium Western IP partnerships and opens international markets",
+    "Attractive valuation: Trading at 17-19x P/E vs. Tencent at 24-26x P/E despite similar growth profile; Strong Buy consensus with $155-161 price target implies 20-25% upside from current levels",
+    "AI competitive moat: Five-year lead in AI integration creates sustainable cost and quality advantages with 70%+ gaming gross margins; enables faster content creation and superior player retention than competitors",
+    "Shareholder returns: $5 billion buyback program (extended to 2029) with $3 billion remaining authorization plus 2.2% dividend yield and 9.55% 5-year dividend CAGR; RMB 153.2 billion net cash supports aggressive capital returns",
+    "Evergreen franchise model: Fantasy Westward Journey achieving record concurrent users after 22 years proves durability of self-developed IP; reduces hit-driven risk and creates predictable recurring revenue streams",
+    "China regulatory improvement: 1,416 gaming licenses approved in 2024 (up 25%) with projections of 1,600+ in 2025; regulatory environment most favorable in years after Dec 2023 scare",
+    "PC gaming growth: 85% YoY growth and now 34% of gaming revenue expands addressable market beyond mobile saturation; Where Winds Meet and Sea of Remnants target premium PC segment"
+  ],
+  "bear_case": [
+    "Regulatory uncertainty: December 2023 draft regulations crashed stock 28%; Chinese government maintains unpredictable control over gaming industry with arbitrary powers that could materially impact business overnight",
+    "International execution risk: Reports of scaling back Western investments due to high costs; studio closures (Ouka, Jar of Sparks, Fantastic Pixel Castle) show challenges managing global operations; international revenue still only 20-30% despite years of investment",
+    "Competition intensifying: Tencent 2.4x larger with deeper pockets for IP licensing and user acquisition; miHoYo's Genshin Impact and Game Science's Black Myth: Wukong show emerging studios can compete effectively with innovative single-title focus",
+    "Non-gaming businesses failing: Cloud Music revenue down 1.8% YoY, Innovative Businesses down 18.9%, Youdao growing only 3.6% - diversification strategy not working and company remains 82% dependent on gaming industry",
+    "US-China geopolitical risks: ADR delisting threats resurfaced under Trump administration in Feb 2025; potential loss of US institutional investors ($370 billion total in Chinese ADRs) could pressure valuations despite Hong Kong dual listing",
+    "Marvel Rivals dependency: Success of Marvel Rivals critical to validating global strategy and high expectations already in stock price; underperformance vs. $1.36 billion revenue target would severely disappoint and question international thesis",
+    "Gaming market saturation: China mobile gaming market mature with limited growth; PC gaming only 34% of mix and more competitive; company must continuously launch successful new titles to maintain growth in saturated market"
+  ]
+};
+
+        // Parse CSV
+        function parseCSV(csv) {
+            const lines = csv.trim().split('\n');
+            const headers = lines[0].split(',');
+            return lines.slice(1).map(line => {
+                const values = line.split(',');
+                const obj = {};
+                headers.forEach((h, i) => obj[h.trim()] = values[i]?.trim());
+                return obj;
+            });
+        }
+
+        const data = parseCSV(csvData);
+
+        // Sort chronologically
+        data.sort((a, b) => {
+            const parseDate = (p) => {
+                const year = parseInt(p.match(/\d{4}/)?.[0] || '0');
+                const isQ1 = p.includes('Q1');
+                const isQ2 = p.includes('Q2');
+                const isQ3 = p.includes('Q3');
+                const isQ4 = p.includes('Q4');
+                const isFY = p.startsWith('FY');
+                const subOrder = isQ1 ? 1 : isQ2 ? 2 : isQ3 ? 3 : isQ4 ? 4 : isFY ? 5 : 0;
+                return year * 10 + subOrder;
+            };
+            return parseDate(a.Period) - parseDate(b.Period);
+        });
+
+        // Filter for annual data (FY periods)
+        const fyData = data.filter(d => d.Period.startsWith('FY'));
+
+        // Get latest quarterly data (Q3 2025 - last actual, not estimate)
+        const latestQ = data.filter(d => d.Period === 'Q3 2025')[0];
+
+        // Helper functions
+        function formatNumber(num, decimals = 0) {
+            if (!num || num === '') return 'N/A';
+            const n = parseFloat(num);
+            if (isNaN(n)) return 'N/A';
+            if (n >= 1000) return (n/1000).toFixed(1) + 'B';
+            return n.toFixed(decimals);
+        }
+
+        function calcYoYChange(current, previous) {
+            if (!previous || !current || previous === '' || current === '') return null;
+            const curr = parseFloat(current);
+            const prev = parseFloat(previous);
+            if (isNaN(curr) || isNaN(prev) || prev === 0) return null;
+            return ((curr - prev) / Math.abs(prev) * 100).toFixed(1);
+        }
+
+        // Render KPI cards
+        function renderKPIs() {
+            const q3_2024 = data.filter(d => d.Period === 'Q3 2024')[0];
+
+            const kpis = [
+                {
+                    label: 'Q3 2025 Revenue',
+                    value: 'RMB ' + formatNumber(latestQ.Revenue),
+                    change: calcYoYChange(latestQ.Revenue, q3_2024?.Revenue),
+                    prefix: ''
+                },
+                {
+                    label: 'Q3 2025 Gaming Revenue',
+                    value: 'RMB ' + formatNumber(latestQ.GameRevenue),
+                    change: calcYoYChange(latestQ.GameRevenue, q3_2024?.GameRevenue),
+                    prefix: ''
+                },
+                {
+                    label: 'Q3 2025 Net Income',
+                    value: 'RMB ' + formatNumber(latestQ.NetIncome),
+                    change: calcYoYChange(latestQ.NetIncome, q3_2024?.NetIncome),
+                    prefix: ''
+                },
+                {
+                    label: 'Q3 2025 Gross Margin',
+                    value: latestQ.GrossMargin + '%',
+                    change: (parseFloat(latestQ.GrossMargin) - parseFloat(q3_2024?.GrossMargin || 0)).toFixed(1),
+                    prefix: ''
+                },
+                {
+                    label: 'Q3 2025 Operating Margin',
+                    value: latestQ.OperatingMargin + '%',
+                    change: (parseFloat(latestQ.OperatingMargin) - parseFloat(q3_2024?.OperatingMargin || 0)).toFixed(1),
+                    prefix: ''
+                },
+                {
+                    label: 'Q3 2025 Free Cash Flow',
+                    value: 'RMB ' + formatNumber(latestQ.FreeCashFlow),
+                    change: calcYoYChange(latestQ.FreeCashFlow, q3_2024?.FreeCashFlow),
+                    prefix: ''
+                },
+                {
+                    label: 'Net Cash Position',
+                    value: 'RMB ' + formatNumber(parseFloat(latestQ.CashAndEquivalents) - parseFloat(latestQ.TotalDebt)),
+                    change: null,
+                    prefix: ''
+                },
+                {
+                    label: 'EPS (Q3 2025)',
+                    value: 'RMB ' + latestQ.EPS,
+                    change: calcYoYChange(latestQ.EPS, q3_2024?.EPS),
+                    prefix: ''
+                }
+            ];
+
+            const grid = document.getElementById('kpiGrid');
+            grid.innerHTML = kpis.map(kpi => {
+                let changeHTML = '';
+                if (kpi.change !== null && kpi.change !== 'N/A') {
+                    const changeClass = parseFloat(kpi.change) >= 0 ? 'positive' : 'negative';
+                    const sign = parseFloat(kpi.change) >= 0 ? '+' : '';
+                    const suffix = kpi.label.includes('Margin') ? 'pp' : '% YoY';
+                    changeHTML = `<div class="kpi-change ${changeClass}">${sign}${kpi.change}${suffix}</div>`;
+                }
+                return `
+                    <div class="kpi-card">
+                        <div class="kpi-value">${kpi.value}</div>
+                        <div class="kpi-label">${kpi.label}</div>
+                        ${changeHTML}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Render guidance section
+        function renderGuidance() {
+            const guidance = analysis.guidance;
+            if (!guidance || !guidance.items || guidance.items.length === 0) {
+                document.getElementById('guidanceSection').style.display = 'none';
+                return;
+            }
+
+            document.getElementById('guidanceAsOf').textContent = guidance.as_of || '';
+            document.getElementById('guidanceFY').textContent = guidance.fiscal_year || '';
+
+            const grid = document.getElementById('guidanceGrid');
+            grid.innerHTML = guidance.items.map(item => {
+                const vsClass = item.vs_prior ? item.vs_prior.toLowerCase() : 'maintained';
+                const vsLabel = item.vs_prior ? item.vs_prior.charAt(0).toUpperCase() + item.vs_prior.slice(1) : 'Maintained';
+                return `
+                    <div class="guidance-card">
+                        <div class="guidance-metric">${item.metric}</div>
+                        <div class="guidance-target">${item.target}</div>
+                        <div class="guidance-period">${item.period}</div>
+                        <span class="guidance-vs-prior ${vsClass}">${vsLabel}</span>
+                        ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+
+            const commentary = document.getElementById('guidanceCommentary');
+            if (guidance.management_commentary) {
+                commentary.textContent = guidance.management_commentary;
+                commentary.style.display = 'block';
+            } else {
+                commentary.style.display = 'none';
+            }
+        }
+
+        // Toggle overview
+        function toggleOverview() {
+            const btn = document.querySelector('.overview-toggle');
+            const content = document.getElementById('overviewContent');
+            btn.classList.toggle('active');
+            content.classList.toggle('active');
+        }
+
+        // Chart defaults
+        const chartDefaults = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#e0e0e0',
+                        font: { size: 11 }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            // Check if this is an estimate period
+                            const period = context.label || '';
+                            const isEstimate = period.includes('E');
+                            const estimateNote = isEstimate ? ' (E)' : '';
+                            label += context.formattedValue + estimateNote;
+                            return label;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#888' },
+                    grid: { color: 'rgba(255,255,255,0.05)' }
+                },
+                y: {
+                    ticks: { color: '#888' },
+                    grid: { color: 'rgba(255,255,255,0.05)' }
+                }
+            }
+        };
+
+        const colors = {
+            primary: '#00d4aa',
+            secondary: '#00b894',
+            tertiary: '#0984e3',
+            quaternary: '#6c5ce7',
+            warning: '#fdcb6e',
+            danger: '#ff6b6b'
+        };
+
+        // Helper to create dataset with estimate styling
+        function createDataset(label, data, color, periods) {
+            // Check which periods are estimates
+            const estimateIndices = periods.map((p, i) => p.includes('E') ? i : -1).filter(i => i >= 0);
+
+            return {
+                label: label,
+                data: data,
+                borderColor: color,
+                backgroundColor: color.replace(')', ', 0.1)').replace('rgb', 'rgba'),
+                tension: 0.4,
+                borderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                // Use segment styling to make estimates dashed
+                segment: {
+                    borderDash: ctx => {
+                        const currentIdx = ctx.p1DataIndex;
+                        return estimateIndices.includes(currentIdx) ? [5, 5] : undefined;
+                    }
+                }
+            };
+        }
+
+        // Revenue Chart (Annual with FY2025E marked as estimate)
+        const revenueLabels = fyData.map(d => d.Period);
+        const revenueValues = fyData.map(d => parseFloat(d.Revenue));
+
+        new Chart(document.getElementById('revenueChart'), {
+            type: 'line',
+            data: {
+                labels: revenueLabels,
+                datasets: [createDataset('Total Revenue (RMB M)', revenueValues, colors.primary, revenueLabels)]
+            },
+            options: {
+                ...chartDefaults,
+                plugins: {
+                    ...chartDefaults.plugins,
+                    title: {
+                        display: true,
+                        text: 'Note: FY2025E is an estimate (dashed line)',
+                        color: '#888',
+                        font: { size: 10 },
+                        padding: { bottom: 10 }
+                    }
+                }
+            }
+        });
+
+        // Net Income Chart (Annual)
+        const netIncomeLabels = fyData.map(d => d.Period);
+        const netIncomeValues = fyData.map(d => parseFloat(d.NetIncome));
+
+        new Chart(document.getElementById('netIncomeChart'), {
+            type: 'line',
+            data: {
+                labels: netIncomeLabels,
+                datasets: [createDataset('Net Income (RMB M)', netIncomeValues, colors.tertiary, netIncomeLabels)]
+            },
+            options: {
+                ...chartDefaults,
+                plugins: {
+                    ...chartDefaults.plugins,
+                    title: {
+                        display: true,
+                        text: 'Note: FY2025E is an estimate (dashed line)',
+                        color: '#888',
+                        font: { size: 10 },
+                        padding: { bottom: 10 }
+                    }
+                }
+            }
+        });
+
+        // Gross Margin Chart (Quarterly)
+        const quarterlyData = data.filter(d => d.Period.startsWith('Q'));
+        const gmLabels = quarterlyData.map(d => d.Period);
+        const gmValues = quarterlyData.map(d => parseFloat(d.GrossMargin));
+
+        new Chart(document.getElementById('grossMarginChart'), {
+            type: 'line',
+            data: {
+                labels: gmLabels,
+                datasets: [createDataset('Gross Margin (%)', gmValues, colors.secondary, gmLabels)]
+            },
+            options: {
+                ...chartDefaults,
+                plugins: {
+                    ...chartDefaults.plugins,
+                    title: {
+                        display: true,
+                        text: 'Note: Q4 2025E is an estimate (dashed line)',
+                        color: '#888',
+                        font: { size: 10 },
+                        padding: { bottom: 10 }
+                    }
+                }
+            }
+        });
+
+        // Margins Chart (Annual)
+        const marginLabels = fyData.map(d => d.Period);
+        const opMarginValues = fyData.map(d => parseFloat(d.OperatingMargin) || null);
+        const netMarginValues = fyData.map(d => parseFloat(d.NetMargin));
+
+        new Chart(document.getElementById('marginsChart'), {
+            type: 'line',
+            data: {
+                labels: marginLabels,
+                datasets: [
+                    createDataset('Operating Margin (%)', opMarginValues, colors.warning, marginLabels),
+                    createDataset('Net Margin (%)', netMarginValues, colors.tertiary, marginLabels)
+                ]
+            },
+            options: {
+                ...chartDefaults,
+                plugins: {
+                    ...chartDefaults.plugins,
+                    title: {
+                        display: true,
+                        text: 'Note: FY2025E is an estimate (dashed line)',
+                        color: '#888',
+                        font: { size: 10 },
+                        padding: { bottom: 10 }
+                    }
+                }
+            }
+        });
+
+        // Gaming Revenue Chart (Quarterly)
+        const gameLabels = quarterlyData.map(d => d.Period);
+        const gameValues = quarterlyData.map(d => parseFloat(d.GameRevenue) || null);
+
+        new Chart(document.getElementById('gamingRevenueChart'), {
+            type: 'bar',
+            data: {
+                labels: gameLabels,
+                datasets: [{
+                    label: 'Gaming Revenue (RMB M)',
+                    data: gameValues,
+                    backgroundColor: colors.primary,
+                    borderColor: colors.primary,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...chartDefaults,
+                plugins: {
+                    ...chartDefaults.plugins,
+                    title: {
+                        display: true,
+                        text: 'Note: Q4 2025E is an estimate',
+                        color: '#888',
+                        font: { size: 10 },
+                        padding: { bottom: 10 }
+                    }
+                }
+            }
+        });
+
+        // Segment Revenue Chart (Annual stacked)
+        const segmentLabels = fyData.filter(d => d.GameRevenue && d.GameRevenue !== '').map(d => d.Period);
+        const gameSegment = fyData.filter(d => d.GameRevenue && d.GameRevenue !== '').map(d => parseFloat(d.GameRevenue));
+        const youdaoSegment = fyData.filter(d => d.GameRevenue && d.GameRevenue !== '').map(d => parseFloat(d.YoudaoRevenue) || 0);
+        const musicSegment = fyData.filter(d => d.GameRevenue && d.GameRevenue !== '').map(d => parseFloat(d.CloudMusicRevenue) || 0);
+        const innovativeSegment = fyData.filter(d => d.GameRevenue && d.GameRevenue !== '').map(d => parseFloat(d.InnovativeRevenue) || 0);
+
+        new Chart(document.getElementById('segmentChart'), {
+            type: 'bar',
+            data: {
+                labels: segmentLabels,
+                datasets: [
+                    {
+                        label: 'Gaming',
+                        data: gameSegment,
+                        backgroundColor: colors.primary,
+                        borderWidth: 0
+                    },
+                    {
+                        label: 'Youdao',
+                        data: youdaoSegment,
+                        backgroundColor: colors.secondary,
+                        borderWidth: 0
+                    },
+                    {
+                        label: 'Cloud Music',
+                        data: musicSegment,
+                        backgroundColor: colors.tertiary,
+                        borderWidth: 0
+                    },
+                    {
+                        label: 'Innovative Businesses',
+                        data: innovativeSegment,
+                        backgroundColor: colors.quaternary,
+                        borderWidth: 0
+                    }
+                ]
+            },
+            options: {
+                ...chartDefaults,
+                scales: {
+                    x: {
+                        stacked: true,
+                        ticks: { color: '#888' },
+                        grid: { color: 'rgba(255,255,255,0.05)' }
+                    },
+                    y: {
+                        stacked: true,
+                        ticks: { color: '#888' },
+                        grid: { color: 'rgba(255,255,255,0.05)' }
+                    }
+                },
+                plugins: {
+                    ...chartDefaults.plugins,
+                    title: {
+                        display: true,
+                        text: 'Note: FY2025E is an estimate',
+                        color: '#888',
+                        font: { size: 10 },
+                        padding: { bottom: 10 }
+                    }
+                }
+            }
+        });
+
+        // FCF Chart (Annual)
+        const fcfLabels = fyData.filter(d => d.FreeCashFlow && d.FreeCashFlow !== '').map(d => d.Period);
+        const fcfValues = fyData.filter(d => d.FreeCashFlow && d.FreeCashFlow !== '').map(d => parseFloat(d.FreeCashFlow));
+
+        new Chart(document.getElementById('fcfChart'), {
+            type: 'bar',
+            data: {
+                labels: fcfLabels,
+                datasets: [{
+                    label: 'Free Cash Flow (RMB M)',
+                    data: fcfValues,
+                    backgroundColor: colors.secondary,
+                    borderColor: colors.secondary,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...chartDefaults,
+                plugins: {
+                    ...chartDefaults.plugins,
+                    title: {
+                        display: true,
+                        text: 'Note: FY2025E is an estimate',
+                        color: '#888',
+                        font: { size: 10 },
+                        padding: { bottom: 10 }
+                    }
+                }
+            }
+        });
+
+        // Balance Sheet Chart (Annual)
+        const balanceLabels = fyData.filter(d => d.CashAndEquivalents && d.CashAndEquivalents !== '').map(d => d.Period);
+        const cashValues = fyData.filter(d => d.CashAndEquivalents && d.CashAndEquivalents !== '').map(d => parseFloat(d.CashAndEquivalents));
+        const debtValues = fyData.filter(d => d.CashAndEquivalents && d.CashAndEquivalents !== '').map(d => parseFloat(d.TotalDebt));
+
+        new Chart(document.getElementById('balanceChart'), {
+            type: 'bar',
+            data: {
+                labels: balanceLabels,
+                datasets: [
+                    {
+                        label: 'Cash & Equivalents (RMB M)',
+                        data: cashValues,
+                        backgroundColor: colors.primary,
+                        borderWidth: 0
+                    },
+                    {
+                        label: 'Total Debt (RMB M)',
+                        data: debtValues,
+                        backgroundColor: colors.danger,
+                        borderWidth: 0
+                    }
+                ]
+            },
+            options: {
+                ...chartDefaults,
+                plugins: {
+                    ...chartDefaults.plugins,
+                    title: {
+                        display: true,
+                        text: 'Note: FY2025E is an estimate',
+                        color: '#888',
+                        font: { size: 10 },
+                        padding: { bottom: 10 }
+                    }
+                }
+            }
+        });
+
+        // Metric descriptions for help modals
+        const metricDescriptions = {
+            revenue: {
+                title: "Revenue",
+                content: `
+                    <p><strong>Revenue</strong> is NetEase's total income from all business segments including gaming, Youdao education, Cloud Music, and innovative businesses.</p>
+                    <div class="metric-highlight">
+                        <strong>For NetEase:</strong> Gaming represents 82% of total revenue (RMB 94.1B gaming out of RMB 114.3B total in FY2025E). The company generates revenue primarily through in-game purchases and subscriptions in self-developed titles like Fantasy Westward Journey, Marvel Rivals, and Where Winds Meet.
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li>Gaming revenue growth rate (target: low double-digit growth in 2025-2026)</li>
+                        <li>International revenue mix expanding from 20-30% toward 40% target</li>
+                        <li>PC gaming revenue growth (up 85% YoY in Q1 2025, now 34% of gaming total)</li>
+                        <li>New game launches (Marvel Rivals, Where Winds Meet, Sea of Remnants pipeline)</li>
+                        <li>Non-gaming segments underperforming (Cloud Music -1.8% YoY, Innovative -18.9% YoY)</li>
+                    </ul>
+                `
+            },
+            netIncome: {
+                title: "Net Income",
+                content: `
+                    <p><strong>Net Income</strong> is NetEase's bottom-line profit after all expenses, taxes, and costs.</p>
+                    <div class="metric-highlight">
+                        <strong>For NetEase:</strong> Net income has grown from RMB 12.1B (FY2020) to RMB 36.7B (FY2025E), driven by high gaming gross margins (69-71%), operating leverage, and AI-powered cost efficiencies. Net margin improved from 16.4% (FY2020) to 32.1% (FY2025E).
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li>Net margin expansion trend (Q3 2025 at 30.2%)</li>
+                        <li>Impact of R&D cost management (21.3% reduction in Q1 2025)</li>
+                        <li>Marketing efficiency improvements (21.5% expense reduction in Q1 2025)</li>
+                        <li>AI integration driving structural margin advantages</li>
+                        <li>One-time charges or regulatory fines that distort trends</li>
+                    </ul>
+                `
+            },
+            grossMargin: {
+                title: "Gross Margin",
+                content: `
+                    <p><strong>Gross Margin</strong> measures revenue minus direct costs (server infrastructure, payment fees, content costs) as a percentage of revenue.</p>
+                    <div class="metric-highlight">
+                        <strong>For NetEase:</strong> Gross margin jumped from 52-54% (2019-2023) to 62-64% (2024-2025) driven by higher gaming revenue mix and AI-powered development efficiencies. Gaming-specific gross margin is even higher at 69-71%, among the highest in the industry.
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li>Gaming gross margin stability in 69-71% range (Q2 2025 was 70.2%)</li>
+                        <li>Impact of international expansion on margins (higher user acquisition costs)</li>
+                        <li>Server and infrastructure costs as DAU/MAU scales</li>
+                        <li>Payment processing fees and platform commissions</li>
+                        <li>AI integration continuing to improve content creation costs</li>
+                    </ul>
+                `
+            },
+            margins: {
+                title: "Operating & Net Margins",
+                content: `
+                    <p><strong>Operating Margin</strong> shows profit from core operations before interest and taxes. <strong>Net Margin</strong> shows final profit after all expenses.</p>
+                    <div class="metric-highlight">
+                        <strong>For NetEase:</strong> Operating margin improved from 20.4% (FY2020) to 30.1% (FY2025E) due to disciplined cost management, R&D efficiency gains, and reduced marketing spend. Net margin expanded from 16.4% to 32.1% over the same period.
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li>Operating margin improvement trend (Q1 2025 showed 8.0% improvement)</li>
+                        <li>R&D spending efficiency (21.3% reduction in Q1 2025 while launching hits)</li>
+                        <li>Marketing ROI and user acquisition costs</li>
+                        <li>Impact of international expansion on margins</li>
+                        <li>Comparison to Tencent's margins (NetEase higher due to self-developed focus)</li>
+                    </ul>
+                `
+            },
+            gaming: {
+                title: "Gaming Revenue Growth",
+                content: `
+                    <p><strong>Gaming Revenue</strong> includes all revenue from NetEase's self-developed and licensed games across mobile and PC platforms.</p>
+                    <div class="metric-highlight">
+                        <strong>For NetEase:</strong> Gaming represents 82% of total revenue (RMB 94.1B in FY2025E). Over 90% of gaming revenue comes from self-developed titles, creating a portfolio of "evergreen" games that generate recurring revenue for years. Fantasy Westward Journey (launched 2003) still hit record 3.58M concurrent users in 2025.
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li>Gaming revenue growth rate (target: low double-digit growth; Q3 2025 up 12% YoY)</li>
+                        <li>PC gaming growth momentum (85% YoY in Q1 2025, now 34% of gaming total)</li>
+                        <li>Marvel Rivals performance ($1.36B annual revenue potential, 40M players)</li>
+                        <li>New game launches: Where Winds Meet international, Sea of Remnants (2026)</li>
+                        <li>Evergreen franchise resilience (Fantasy Westward Journey, Justice, Westward Journey)</li>
+                        <li>Player engagement metrics (DAU, MAU, ARPU, retention)</li>
+                    </ul>
+                `
+            },
+            segments: {
+                title: "Revenue by Segment",
+                content: `
+                    <p><strong>Revenue Segments</strong> break down NetEase's income by business line: Gaming, Youdao (education), Cloud Music, and Innovative Businesses.</p>
+                    <div class="metric-highlight">
+                        <strong>For NetEase:</strong> Gaming dominates at 82% of FY2025E revenue (RMB 94.1B), followed by Cloud Music 7% (RMB 7.7B), Youdao 6% (RMB 5.7B), and Innovative Businesses 5% (RMB 6.8B). Gaming is growing low double-digits while non-gaming segments struggle (Cloud Music -1.8% YoY, Innovative -18.9% YoY in Q3 2025).
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li>Gaming segment maintaining 80%+ revenue mix and double-digit growth</li>
+                        <li>Cloud Music stabilization (declining -1.8% YoY despite 200M+ users)</li>
+                        <li>Youdao education growth (only +3.6% YoY, challenged by regulatory caps)</li>
+                        <li>Innovative Businesses contraction (-18.9% YoY, includes Yanxuan e-commerce)</li>
+                        <li>International gaming mix expanding from 20-30% toward 40% target</li>
+                    </ul>
+                `
+            },
+            fcf: {
+                title: "Free Cash Flow",
+                content: `
+                    <p><strong>Free Cash Flow (FCF)</strong> is cash generated from operations minus capital expenditures, showing how much cash NetEase produces that can be returned to shareholders or reinvested.</p>
+                    <div class="metric-highlight">
+                        <strong>For NetEase:</strong> FCF has grown from RMB 24.1B (FY2020) to RMB 49.4B (FY2025E), representing 43% FCF margin (FCF/Revenue). This strong cash generation funds the $5 billion share buyback program (extended to 2029), dividends (2.2% yield, 9.55% 5-year CAGR), and aggressive R&D investment without financial constraints.
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li>FCF margin stability in 40-45% range (among highest in gaming industry)</li>
+                        <li>Conversion of net income to FCF (indicates asset-light business model)</li>
+                        <li>Capital allocation: buybacks ($3B remaining authorization), dividends, M&A</li>
+                        <li>Working capital efficiency and payment collection cycles</li>
+                        <li>Capex for server infrastructure, studio expansion, and game development</li>
+                    </ul>
+                `
+            },
+            balance: {
+                title: "Cash vs. Debt",
+                content: `
+                    <p><strong>Cash & Equivalents</strong> shows NetEase's liquid assets. <strong>Total Debt</strong> shows borrowings. The difference is the net cash position.</p>
+                    <div class="metric-highlight">
+                        <strong>For NetEase:</strong> NetEase has a massive net cash position of RMB 153.2B ($21+ billion) as of Q3 2025 (Cash RMB 31.3B + Equivalents minus Debt RMB 7.4B). This fortress balance sheet enables aggressive R&D spending, M&A opportunities (acquired Quantic Dream, Grasshopper Manufacture, Skybox Labs), and shareholder returns without financial risk.
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li>Net cash position growth trend (up from RMB 10.2B in FY2020 to RMB 153.2B in Q3 2025)</li>
+                        <li>Debt levels remaining minimal (RMB 7.0-7.4B range)</li>
+                        <li>Use of cash for buybacks ($2B spent of $5B authorization), dividends, M&A</li>
+                        <li>Financial flexibility for aggressive R&D and international expansion</li>
+                        <li>Protection against regulatory or geopolitical shocks</li>
+                    </ul>
+                `
+            }
+        };
+
+        // Modal functions
+        function openModal(key) {
+            document.getElementById('modalTitle').textContent = metricDescriptions[key].title;
+            document.getElementById('modalBody').innerHTML = metricDescriptions[key].content;
+            document.getElementById('modalOverlay').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal(event) {
+            if (event && event.target !== document.getElementById('modalOverlay')) return;
+            document.getElementById('modalOverlay').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        // EMBEDDED DCF JSON
+        const dcfData = {
+            "ticker": "9999.HK",
+            "valuation_date": "2026-01-29",
+            "current_price": 206.60,
+            "inputs": {
+                "shares_outstanding": 3200,
+                "net_debt": -39150.3,
+                "last_fcf": 45095.1,
+                "currency": "¥",
+                "currency_label": "HKD",
+                "units": "millions"
+            },
+            "historical_growth": {
+                "revenue_3yr_cagr": 6.2,
+                "revenue_5yr_cagr": 11.6,
+                "eps_3yr_cagr": 19.7,
+                "eps_5yr_cagr": 22.5,
+                "equity_3yr_cagr": 2.5,
+                "equity_5yr_cagr": 6.3,
+                "fcf_3yr_cagr": 11.6,
+                "fcf_5yr_cagr": 23.2,
+                "selected_growth_rate": 6.2,
+                "growth_rate_source": "revenue_3yr_cagr",
+                "growth_divergence_warning": "Equity CAGR significantly lower than FCF/EPS growth due to aggressive capital return program ($5B buyback + dividends). Revenue growth decelerated from 11.6% (5yr) to 6.2% (3yr) reflecting gaming market maturity. Using conservative revenue CAGR as base."
+            },
+            "assumptions": {
+                "base": {
+                    "growth_rates": [8, 7, 6, 5, 4],
+                    "fcf_margin": 40.0,
+                    "wacc": 11.0,
+                    "terminal_growth": 3.0,
+                    "rationale": "Modest acceleration from 6.2% driven by Marvel Rivals success, PC gaming momentum. Growth decelerates to 4% by Year 5. WACC 11% reflects China tech risk premium."
+                },
+                "bull": {
+                    "growth_rates": [12, 10, 9, 8, 6],
+                    "fcf_margin": 42.0,
+                    "wacc": 10.0,
+                    "terminal_growth": 3.5,
+                    "rationale": "Marvel Rivals achieves $1.36B potential, international revenue grows to 40%. AI moat drives margin expansion. Favorable China regulatory environment."
+                },
+                "bear": {
+                    "growth_rates": [3, 2, 1, 0, 0],
+                    "fcf_margin": 37.0,
+                    "wacc": 13.0,
+                    "terminal_growth": 2.0,
+                    "rationale": "Regulatory crackdown resumes, international expansion fails, Tencent competition intensifies. No growth by Year 5. Elevated WACC for geopolitical risk."
+                }
+            },
+            "valuation": {
+                "base": {
+                    "intrinsic_value_hkd": 228.63,
+                    "upside": 10.7
+                },
+                "bull": {
+                    "intrinsic_value_hkd": 330.57,
+                    "upside": 60.0
+                },
+                "bear": {
+                    "intrinsic_value_hkd": 144.15,
+                    "upside": -30.2
+                }
+            },
+            "entry_price": {
+                "base": { "entry_price_hkd": 125.44 },
+                "bull": { "entry_price_hkd": 192.11 },
+                "bear": { "entry_price_hkd": 73.53 }
+            },
+            "sensitivity": {
+                "wacc_range": [9, 10, 11, 12, 13],
+                "terminal_growth_range": [2.0, 2.5, 3.0, 3.5, 4.0],
+                "matrix": [
+                    [299.32, 321.94, 349.31, 383.17, 425.34],
+                    [264.05, 281.15, 301.70, 326.36, 356.97],
+                    [235.64, 249.44, 265.44, 284.51, 307.13],
+                    [212.60, 223.65, 236.24, 250.76, 267.59],
+                    [193.65, 202.66, 212.61, 223.71, 236.21]
+                ]
+            },
+            "probability_weighted": {
+                "weights": {"bull": 0.20, "base": 0.60, "bear": 0.20},
+                "weighted_iv_hkd": 228.88
+            }
+        };
+
+        // RMB to HKD conversion
+        const RMB_TO_HKD = 1.115;
+
+        // DCF Functions
+        let currentScenario = 'base';
+
+        function initDCF() {
+            if (!dcfData || !dcfData.valuation) return;
+
+            document.getElementById('dcfCurrent').textContent = 'HK$' + dcfData.current_price.toFixed(2);
+
+            if (dcfData.historical_growth.growth_divergence_warning) {
+                document.getElementById('growthWarning').style.display = 'flex';
+                document.getElementById('warningText').textContent = dcfData.historical_growth.growth_divergence_warning;
+            }
+
+            const base = dcfData.assumptions.base;
+            document.getElementById('growthSlider').value = dcfData.historical_growth.selected_growth_rate;
+            document.getElementById('waccSlider').value = base.wacc;
+            document.getElementById('terminalSlider').value = base.terminal_growth;
+
+            document.getElementById('growthValue').textContent = dcfData.historical_growth.selected_growth_rate + '%';
+            document.getElementById('waccValue').textContent = base.wacc + '%';
+            document.getElementById('terminalValue').textContent = base.terminal_growth + '%';
+
+            document.getElementById('growthHint').textContent =
+                'Based on ' + dcfData.historical_growth.growth_rate_source.replace(/_/g, ' ');
+
+            renderDCFInputs();
+            renderHistoricalGrowth();
+            renderSensitivityMatrix();
+            updateDCFDisplay();
+            switchScenario('base');
+        }
+
+        function renderDCFInputs() {
+            const inputs = dcfData.inputs;
+            const formatNum = (n) => {
+                if (Math.abs(n) >= 1000) return '¥' + (n/1000).toFixed(1) + 'B';
+                return '¥' + n.toFixed(0) + 'M';
+            };
+
+            document.getElementById('baseFCF').textContent = formatNum(inputs.last_fcf);
+
+            const shares = inputs.shares_outstanding;
+            document.getElementById('sharesOut').textContent = shares >= 1000 ? (shares/1000).toFixed(2) + 'B' : shares.toFixed(1) + 'M';
+
+            const netDebt = inputs.net_debt;
+            const netDebtEl = document.getElementById('netDebt');
+            netDebtEl.textContent = (netDebt < 0 ? '-' : '') + formatNum(Math.abs(netDebt));
+            if (netDebt < 0) netDebtEl.style.color = '#00d4aa';
+
+            renderFCFProjections();
+        }
+
+        function renderFCFProjections() {
+            const startGrowth = parseFloat(document.getElementById('growthSlider')?.value || dcfData.historical_growth.selected_growth_rate);
+            const baseFCF = dcfData.inputs.last_fcf;
+
+            const formatFCF = (n) => {
+                if (Math.abs(n) >= 1000) return '¥' + (n/1000).toFixed(1) + 'B';
+                return '¥' + n.toFixed(0) + 'M';
+            };
+
+            const endGrowth = Math.min(startGrowth, 4);
+            const growthRates = [];
+            for (let i = 0; i < 5; i++) {
+                const rate = startGrowth > endGrowth
+                    ? startGrowth - (startGrowth - endGrowth) * (i / 4)
+                    : startGrowth;
+                growthRates.push(rate);
+            }
+
+            let fcf = baseFCF;
+            const fcfValues = [baseFCF];
+            for (let i = 0; i < 5; i++) {
+                fcf = fcf * (1 + growthRates[i] / 100);
+                fcfValues.push(fcf);
+            }
+
+            let html = `
+                <div class="fcf-projection-item header">Base</div>
+                <div class="fcf-projection-item header">Year 1</div>
+                <div class="fcf-projection-item header">Year 2</div>
+                <div class="fcf-projection-item header">Year 3</div>
+                <div class="fcf-projection-item header">Year 4</div>
+                <div class="fcf-projection-item header">Year 5</div>
+            `;
+
+            html += `<div class="fcf-projection-item">
+                <div class="fcf-value">${formatFCF(fcfValues[0])}</div>
+                <div class="growth-rate">-</div>
+            </div>`;
+
+            for (let i = 1; i <= 5; i++) {
+                html += `<div class="fcf-projection-item">
+                    <div class="fcf-value">${formatFCF(fcfValues[i])}</div>
+                    <div class="growth-rate">+${growthRates[i-1].toFixed(0)}%</div>
+                </div>`;
+            }
+
+            document.getElementById('fcfProjectionTable').innerHTML = html;
+        }
+
+        function calculateDCF(startGrowth, wacc, terminalGrowth) {
+            const years = 5;
+            const fcf = dcfData.inputs.last_fcf;
+            let pvFCF = 0;
+            let projectedFCF = fcf;
+
+            const endGrowth = Math.min(startGrowth, 4);
+
+            for (let i = 0; i < years; i++) {
+                const yearGrowth = startGrowth > endGrowth
+                    ? startGrowth - (startGrowth - endGrowth) * (i / 4)
+                    : startGrowth;
+                projectedFCF *= (1 + yearGrowth / 100);
+                pvFCF += projectedFCF / Math.pow(1 + wacc/100, i + 1);
+            }
+
+            const terminalFCF = projectedFCF * (1 + terminalGrowth/100);
+            const terminalValue = terminalFCF / (wacc/100 - terminalGrowth/100);
+            const pvTerminal = terminalValue / Math.pow(1 + wacc/100, years);
+
+            const enterpriseValue = pvFCF + pvTerminal;
+            const equityValue = enterpriseValue - dcfData.inputs.net_debt;
+            const ivRMB = equityValue / dcfData.inputs.shares_outstanding;
+            const ivHKD = ivRMB * RMB_TO_HKD;
+
+            const terminalPerShare = terminalValue / dcfData.inputs.shares_outstanding * RMB_TO_HKD;
+            const entryPrice = terminalPerShare / Math.pow(1.15, years);
+
+            return { iv: ivHKD, entryPrice: entryPrice, terminalPerShare: terminalPerShare, pvFCF: pvFCF, pvTerminal: pvTerminal, enterpriseValue: enterpriseValue };
+        }
+
+        window.updateDCFDisplay = function() {
+            const growth = parseFloat(document.getElementById('growthSlider').value);
+            const wacc = parseFloat(document.getElementById('waccSlider').value);
+            const terminal = parseFloat(document.getElementById('terminalSlider').value);
+
+            document.getElementById('growthValue').textContent = growth + '%';
+            document.getElementById('waccValue').textContent = wacc + '%';
+            document.getElementById('terminalValue').textContent = terminal + '%';
+
+            renderFCFProjections();
+
+            const result = calculateDCF(growth, wacc, terminal);
+
+            document.getElementById('dcfIV').textContent = 'HK$' + result.iv.toFixed(0);
+            document.getElementById('dcfEntry').textContent = 'HK$' + result.entryPrice.toFixed(0);
+
+            const upside = ((result.iv - dcfData.current_price) / dcfData.current_price * 100);
+            const upsideEl = document.getElementById('dcfUpside');
+            upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(0) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+            upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+            document.getElementById('dcfWeighted').textContent = 'HK$' + dcfData.probability_weighted.weighted_iv_hkd.toFixed(0);
+
+            const grid = document.getElementById('assumptionGrid');
+            if (grid) {
+                grid.innerHTML = `
+                    <div class="assumption-item"><div class="label">Growth Rate</div><div class="value">${growth}%</div></div>
+                    <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc}%</div></div>
+                    <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${terminal}%</div></div>
+                    <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color: #00d4aa;">HK$${result.iv.toFixed(0)}</div></div>
+                    <div class="assumption-item"><div class="label">Entry Price</div><div class="value" style="color: #00d4aa;">HK$${result.entryPrice.toFixed(0)}</div></div>
+                `;
+            }
+        };
+
+        window.switchScenario = function(scenario) {
+            currentScenario = scenario;
+
+            document.querySelectorAll('.scenario-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.scenario === scenario);
+            });
+
+            const assumptions = dcfData.assumptions[scenario];
+            const valuation = dcfData.valuation[scenario];
+
+            document.getElementById('growthSlider').value = assumptions.growth_rates[0];
+            document.getElementById('waccSlider').value = assumptions.wacc;
+            document.getElementById('terminalSlider').value = assumptions.terminal_growth;
+
+            const grid = document.getElementById('assumptionGrid');
+            grid.innerHTML = `
+                <div class="assumption-item"><div class="label">Year 1 Growth</div><div class="value">${assumptions.growth_rates[0]}%</div></div>
+                <div class="assumption-item"><div class="label">Year 5 Growth</div><div class="value">${assumptions.growth_rates[4]}%</div></div>
+                <div class="assumption-item"><div class="label">FCF Margin</div><div class="value">${assumptions.fcf_margin}%</div></div>
+                <div class="assumption-item"><div class="label">WACC</div><div class="value">${assumptions.wacc}%</div></div>
+                <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${assumptions.terminal_growth}%</div></div>
+                <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color: #00d4aa;">HK$${valuation.intrinsic_value_hkd.toFixed(0)}</div></div>
+            `;
+
+            renderFCFProjections();
+            updateDCFDisplay();
+        };
+
+        function renderHistoricalGrowth() {
+            const growth = dcfData.historical_growth;
+            const selectedSource = growth.growth_rate_source;
+            const grid = document.getElementById('growthGrid');
+
+            const metrics = [
+                { key: 'revenue_3yr_cagr', label: 'Revenue 3Y' },
+                { key: 'revenue_5yr_cagr', label: 'Revenue 5Y' },
+                { key: 'eps_3yr_cagr', label: 'EPS 3Y' },
+                { key: 'eps_5yr_cagr', label: 'EPS 5Y' },
+                { key: 'equity_3yr_cagr', label: 'Equity 3Y' },
+                { key: 'equity_5yr_cagr', label: 'Equity 5Y' },
+                { key: 'fcf_3yr_cagr', label: 'FCF 3Y' },
+                { key: 'fcf_5yr_cagr', label: 'FCF 5Y' }
+            ];
+
+            grid.innerHTML = metrics.map(m => {
+                const rate = growth[m.key];
+                if (rate === null) return '';
+                const isSelected = m.key === selectedSource;
+                const colorClass = rate >= 0 ? 'positive' : 'negative';
+                return `
+                    <div class="growth-item ${isSelected ? 'selected' : ''}">
+                        <div class="metric">${m.label}</div>
+                        <div class="rate ${colorClass}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div>
+                    </div>
+                `;
+            }).filter(s => s !== '').join('');
+        }
+
+        function renderSensitivityMatrix() {
+            const sens = dcfData.sensitivity;
+            const table = document.getElementById('sensitivityMatrix');
+            const currentPrice = dcfData.current_price;
+
+            let html = '<tr><th>WACC \\ Term G</th>';
+            sens.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+            html += '</tr>';
+
+            sens.wacc_range.forEach((wacc, i) => {
+                html += `<tr><th>${wacc}%</th>`;
+                sens.matrix[i].forEach((val, j) => {
+                    const isHighlight = wacc === dcfData.assumptions.base.wacc &&
+                                       sens.terminal_growth_range[j] === dcfData.assumptions.base.terminal_growth;
+                    const colorClass = val >= currentPrice ? 'above-current' : 'below-current';
+                    html += `<td class="${isHighlight ? 'highlight' : colorClass}">HK$${val.toFixed(0)}</td>`;
+                });
+                html += '</tr>';
+            });
+
+            table.innerHTML = html;
+        }
+
+        // Initialize dashboard
+        renderKPIs();
+        renderGuidance();
+        initDCF();
+
+        // Wire up slider events
+        document.getElementById('growthSlider').oninput = window.updateDCFDisplay;
+        document.getElementById('growthSlider').onchange = window.updateDCFDisplay;
+        document.getElementById('waccSlider').oninput = window.updateDCFDisplay;
+        document.getElementById('waccSlider').onchange = window.updateDCFDisplay;
+        document.getElementById('terminalSlider').oninput = window.updateDCFDisplay;
+        document.getElementById('terminalSlider').onchange = window.updateDCFDisplay;
+    </script>
+</body>
+</html>
