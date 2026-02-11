@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Research Index</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4aa, #00b894);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #888;
+            font-size: 1.1rem;
+        }
+        .controls {
+            max-width: 1200px;
+            margin: 0 auto 20px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 16px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.05);
+            color: #e0e0e0;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .search-box::placeholder { color: #666; }
+        .search-box:focus { border-color: #00d4aa; }
+        .filter-btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.05);
+            color: #aaa;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .filter-btn:hover { border-color: #00d4aa; color: #e0e0e0; }
+        .filter-btn.active {
+            background: rgba(0, 212, 170, 0.15);
+            border-color: #00d4aa;
+            color: #00d4aa;
+        }
+        .count {
+            color: #666;
+            font-size: 0.9rem;
+            margin-left: auto;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 16px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        .card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 212, 170, 0.15);
+            border-color: rgba(0, 212, 170, 0.3);
+        }
+        .card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+        .ticker {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #00d4aa;
+        }
+        .sector-badge {
+            font-size: 0.7rem;
+            padding: 3px 8px;
+            border-radius: 6px;
+            background: rgba(0, 212, 170, 0.1);
+            color: #00b894;
+            white-space: nowrap;
+            max-width: 160px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .company-name {
+            font-size: 1rem;
+            color: #ccc;
+            margin-bottom: 12px;
+        }
+        .report-links {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .report-link {
+            font-size: 0.78rem;
+            padding: 4px 10px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.07);
+            color: #aaa;
+            text-decoration: none;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+        .report-link:hover {
+            background: rgba(0, 212, 170, 0.15);
+            color: #00d4aa;
+            border-color: rgba(0, 212, 170, 0.3);
+        }
+        .report-link.dashboard { color: #00d4aa; }
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+            font-size: 1.1rem;
+            grid-column: 1 / -1;
+        }
+        @media (max-width: 600px) {
+            .header h1 { font-size: 1.8rem; }
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Stock Research</h1>
+        <p id="subtitle"></p>
+    </div>
+    <div class="controls">
+        <input type="text" class="search-box" id="search" placeholder="Search by ticker, company, or sector..." autofocus>
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="dashboard">Has Dashboard</button>
+        <button class="filter-btn" data-filter="dcf">Has DCF</button>
+        <span class="count" id="count"></span>
+    </div>
+    <div class="grid" id="grid"></div>
+
+    <script>
+    const stocks = [
+        { ticker: "0285.HK", name: "BYD Electronic (International) Company Limited", sector: "Electronics Manufacturing", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "9626.HK", name: "Bilibili Inc.", sector: "Video / Entertainment", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "9999.HK", name: "NetEase, Inc.", sector: "Gaming / Entertainment", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "ASML", name: "ASML Holding N.V.", sector: "Semiconductor Equipment", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "BABA", name: "Alibaba Group Holding Limited", sector: "E-commerce / Cloud", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "DCBO", name: "Docebo Inc.", sector: "SaaS / EdTech", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "DUOL", name: "Duolingo, Inc.", sector: "EdTech", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "EBO.NZ", name: "EBOS Group Limited", sector: "Healthcare / Distribution", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "ENSG", name: "The Ensign Group, Inc.", sector: "Healthcare / Senior Living", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "FIG", name: "Figma, Inc.", sector: "Design Platform / SaaS", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "FISV", name: "Fiserv, Inc.", sector: "Fintech / Payments", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "FLOW.AS", name: "Flow Traders Ltd.", sector: "Market Making", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "GOOGL", name: "Alphabet Inc.", sector: "Technology / Advertising", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "IFT.NZ", name: "Infratil Limited", sector: "Infrastructure Investment", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "LBTYA", name: "Liberty Global Ltd.", sector: "Telecommunications", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "MA", name: "Mastercard Incorporated", sector: "Payment Networks", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "MELI", name: "MercadoLibre, Inc.", sector: "E-commerce / Fintech", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "META", name: "Meta Platforms, Inc.", sector: "Social Media / Advertising", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "MSFT", name: "Microsoft Corporation", sector: "Software / Cloud", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "NFLX", name: "Netflix, Inc.", sector: "Streaming Entertainment", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "NVDA", name: "NVIDIA Corporation", sector: "Semiconductors / AI", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "PINS", name: "Pinterest, Inc.", sector: "Social Media / Advertising", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "PNG.V", name: "Kraken Robotics Inc.", sector: "Marine Technology", dashboard: true, metrics: true, analysis: true, dcf: false },
+        { ticker: "PYPL", name: "PayPal Holdings, Inc.", sector: "Digital Payments", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "RKLB", name: "Rocket Lab USA, Inc.", sector: "Space / Aerospace", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "SEK.NZ", name: "Seeka Limited", sector: "Agriculture / Kiwifruit", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "SFM", name: "Sprouts Farmers Market, Inc.", sector: "Specialty Grocery", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "SHOP", name: "Shopify Inc.", sector: "E-commerce SaaS", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "SPK.NZ", name: "Spark New Zealand Limited", sector: "Telecommunications", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "SPOT", name: "Spotify Technology S.A.", sector: "Audio Streaming", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "TSM", name: "Taiwan Semiconductor Manufacturing", sector: "Semiconductor Foundry", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "UBER", name: "Uber Technologies, Inc.", sector: "Ride-sharing / Delivery", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "V", name: "Visa Inc.", sector: "Payment Networks", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "WISE.L", name: "Wise plc", sector: "Fintech / Payments", dashboard: true, metrics: true, analysis: true, dcf: true },
+        { ticker: "XYZ", name: "Block, Inc.", sector: "Fintech / Payments", dashboard: true, metrics: true, analysis: true, dcf: true }
+    ];
+
+    const grid = document.getElementById('grid');
+    const search = document.getElementById('search');
+    const countEl = document.getElementById('count');
+    const subtitle = document.getElementById('subtitle');
+    let activeFilter = 'all';
+
+    subtitle.textContent = `${stocks.length} companies tracked`;
+
+    function render() {
+        const q = search.value.toLowerCase().trim();
+        const filtered = stocks.filter(s => {
+            const matchesSearch = !q ||
+                s.ticker.toLowerCase().includes(q) ||
+                s.name.toLowerCase().includes(q) ||
+                s.sector.toLowerCase().includes(q);
+            const matchesFilter =
+                activeFilter === 'all' ||
+                (activeFilter === 'dashboard' && s.dashboard) ||
+                (activeFilter === 'dcf' && s.dcf);
+            return matchesSearch && matchesFilter;
+        });
+
+        countEl.textContent = `${filtered.length} of ${stocks.length}`;
+
+        if (filtered.length === 0) {
+            grid.innerHTML = '<div class="no-results">No matching stocks found.</div>';
+            return;
+        }
+
+        grid.innerHTML = filtered.map(s => {
+            const base = `${s.ticker}/Reports`;
+            const links = [];
+            if (s.dashboard) links.push(`<a class="report-link dashboard" href="${base}/${s.ticker}_Dashboard.html" onclick="event.stopPropagation()">Dashboard</a>`);
+            if (s.metrics) links.push(`<a class="report-link" href="${base}/${s.ticker}_Metrics.csv" onclick="event.stopPropagation()">Metrics CSV</a>`);
+            if (s.analysis) links.push(`<a class="report-link" href="${base}/${s.ticker}_Analysis.json" onclick="event.stopPropagation()">Analysis</a>`);
+            if (s.dcf) links.push(`<a class="report-link" href="${base}/${s.ticker}_DCF_Model.xlsx" onclick="event.stopPropagation()">DCF Model</a>`);
+
+            return `<a class="card" href="${s.dashboard ? base + '/' + s.ticker + '_Dashboard.html' : '#'}">
+                <div class="card-top">
+                    <span class="ticker">${s.ticker}</span>
+                    <span class="sector-badge">${s.sector}</span>
+                </div>
+                <div class="company-name">${s.name}</div>
+                <div class="report-links">${links.join('')}</div>
+            </a>`;
+        }).join('');
+    }
+
+    search.addEventListener('input', render);
+
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            activeFilter = btn.dataset.filter;
+            render();
+        });
+    });
+
+    render();
+    </script>
+</body>
+</html>

@@ -227,6 +227,26 @@ The dashboard generator will embed the DCF JSON and add an interactive valuation
 - Sensitivity matrix
 - Download Excel button
 
+## Step 9: Update Index Page
+
+**Always run after dashboard generation.**
+
+Update the stock index at `./index.html` to include this ticker. The index contains a JavaScript `stocks` array with entries like:
+
+```js
+{ ticker: "AAPL", name: "Apple Inc.", sector: "Technology", dashboard: true, metrics: true, analysis: true, dcf: true }
+```
+
+1. Read `./index.html` and check if `$ARGUMENTS` already exists in the `stocks` array
+2. If not present, add a new entry with:
+   - `ticker`: `$ARGUMENTS`
+   - `name`: Company name from the Analysis JSON
+   - `sector`: Short sector label from the Analysis JSON
+   - `dashboard`, `metrics`, `analysis`, `dcf`: `true`/`false` based on which report files exist
+3. Insert the entry in **alphabetical order by ticker** (numbers before letters, e.g. "0285.HK" before "ASML")
+4. Update the subtitle count: find `${stocks.length} companies tracked` - the template literal auto-updates, so no change needed
+5. If already present, update the `name` and `sector` fields in case they changed
+
 ## Final Checklist
 
 **Data Collection (cached - only download new reports):**
@@ -252,6 +272,10 @@ The dashboard generator will embed the DCF JSON and add an interactive valuation
 - [ ] Dashboard is self-contained (no references to other tickers)
 - [ ] Dashboard metrics are tailored to this company's business model
 - [ ] Dashboard works when opened as local file (file:// URL)
+
+**Index Page:**
+- [ ] index.html updated with new/updated ticker entry
+- [ ] Entry is in correct alphabetical position in the stocks array
 
 **Note:** To force re-download of ALL reports (not just new ones), delete the PDFs folder:
 ```bash
