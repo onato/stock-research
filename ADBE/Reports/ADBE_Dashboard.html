@@ -1,0 +1,1489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adobe Inc. (ADBE) Financial Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4aa, #00b894);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        .header p { color: #888; font-size: 1.1rem; }
+        .header-meta { display: flex; justify-content: center; gap: 30px; margin-top: 12px; flex-wrap: wrap; }
+        .header-meta span { font-size: 0.9rem; color: #aaa; }
+        .header-meta strong { color: #00d4aa; }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .kpi-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0,212,170,0.2); }
+        .kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+        .kpi-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        .kpi-change { font-size: 0.9rem; margin-top: 5px; }
+        .kpi-change.positive { color: #00d4aa; }
+        .kpi-change.negative { color: #ff6b6b; }
+        .guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+        .guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .guidance-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+        .guidance-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg,#00d4aa,#00b894); border-radius: 2px; }
+        .guidance-meta { font-size: 0.85rem; color: #888; }
+        .guidance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .guidance-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 18px; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s ease; }
+        .guidance-card:hover { transform: translateY(-2px); }
+        .guidance-metric { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+        .guidance-target { font-size: 1.4rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; }
+        .guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
+        .guidance-vs-prior { display: inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+        .guidance-vs-prior.raised { background: rgba(0,212,170,0.15); color: #00d4aa; }
+        .guidance-vs-prior.lowered { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+        .guidance-vs-prior.maintained, .guidance-vs-prior.stable { background: rgba(255,255,255,0.1); color: #888; }
+        .guidance-vs-prior.new { background: rgba(99,102,241,0.15); color: #818cf8; }
+        .guidance-vs-prior.changed { background: rgba(253,203,110,0.15); color: #fdcb6e; }
+        .guidance-notes { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
+        .guidance-commentary { background: rgba(255,255,255,0.03); border-radius: 10px; padding: 16px 20px; border-left: 3px solid #00d4aa; font-style: italic; color: #b0b0b0; line-height: 1.6; }
+        .guidance-commentary::before { content: '"'; font-size: 1.5rem; color: #00d4aa; margin-right: 4px; }
+        .section-title { font-size: 1.5rem; color: #fff; margin: 40px auto 20px; padding-bottom: 10px; border-bottom: 2px solid rgba(0,212,170,0.3); max-width: 1400px; }
+        .charts-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 25px; max-width: 1400px; margin: 0 auto; }
+        .chart-card { background: rgba(255,255,255,0.05); border-radius: 15px; padding: 25px; border: 1px solid rgba(255,255,255,0.1); }
+        .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+        .chart-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+        .chart-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg,#00d4aa,#00b894); border-radius: 2px; }
+        .help-btn { width: 24px; height: 24px; border-radius: 50%; background: rgba(0,212,170,0.2); border: 1px solid #00d4aa; color: #00d4aa; font-size: 14px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; }
+        .help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+        .chart-wrapper { position: relative; height: 300px; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: linear-gradient(135deg,#1e2a4a 0%,#16213e 100%); border-radius: 16px; max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto; border: 1px solid rgba(0,212,170,0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+        .modal-header { padding: 20px 25px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h3 { color: #00d4aa; font-size: 1.4rem; margin: 0; }
+        .modal-close { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,107,107,0.2); border: 1px solid #ff6b6b; color: #ff6b6b; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .modal-close:hover { background: #ff6b6b; color: #fff; }
+        .modal-body { padding: 25px; line-height: 1.7; }
+        .modal-body p { margin-bottom: 15px; }
+        .modal-body strong { color: #00d4aa; }
+        .modal-body ul { margin: 15px 0; padding-left: 20px; }
+        .modal-body li { margin-bottom: 8px; }
+        .metric-highlight { background: rgba(0,212,170,0.1); border-left: 3px solid #00d4aa; padding: 12px 15px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+        .overview-section { max-width: 1400px; margin: 0 auto 30px; }
+        .overview-toggle { width: 100%; background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.3); border-radius: 12px; padding: 16px 24px; color: #00d4aa; font-size: 1.1rem; font-weight: 600; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease; }
+        .overview-toggle:hover { background: rgba(0,212,170,0.2); }
+        .overview-toggle .arrow { transition: transform 0.3s ease; }
+        .overview-toggle.active .arrow { transform: rotate(180deg); }
+        .overview-content { display: none; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-top: none; border-radius: 0 0 12px 12px; padding: 30px; margin-top: -12px; }
+        .overview-content.active { display: block; }
+        .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+        .overview-card { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; border: 1px solid rgba(255,255,255,0.08); }
+        .overview-card h3 { color: #00d4aa; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .overview-card p { margin-bottom: 12px; line-height: 1.6; }
+        .overview-card ul { list-style: none; padding: 0; margin: 0; }
+        .overview-card li { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); line-height: 1.5; }
+        .overview-card li:last-child { border-bottom: none; }
+        .overview-card.bull h3 { color: #00d4aa; }
+        .overview-card.bear h3 { color: #ff6b6b; }
+        .overview-card.risks h3 { color: #fdcb6e; }
+        .risk-high { color: #ff6b6b; }
+        .risk-moderate { color: #fdcb6e; }
+        .risk-low { color: #00d4aa; }
+        .revenue-stream { display: flex; justify-content: space-between; align-items: center; }
+        .revenue-stream .percent { color: #00d4aa; font-weight: 600; }
+        .trend-growing { color: #00d4aa; }
+        .trend-stable { color: #888; }
+        .trend-declining { color: #ff6b6b; }
+        /* DCF Section */
+        .dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+        .dcf-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .dcf-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 24px; text-align: center; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s ease; }
+        .dcf-card:hover { transform: translateY(-3px); }
+        .dcf-card.highlight { background: rgba(0,212,170,0.1); border-color: rgba(0,212,170,0.3); }
+        .dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .dcf-value { font-size: 2.2rem; font-weight: bold; color: #00d4aa; }
+        .dcf-card:not(.highlight) .dcf-value { color: #fff; }
+        .dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+        .dcf-change.positive { color: #00d4aa; }
+        .dcf-change.negative { color: #ff6b6b; }
+        .dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
+        .dcf-warning { background: rgba(253,203,110,0.15); border: 1px solid rgba(253,203,110,0.4); border-radius: 8px; padding: 12px 16px; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; color: #fdcb6e; }
+        .warning-icon { font-size: 1.2rem; }
+        .dcf-inputs { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.08); }
+        .dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+        .dcf-inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .dcf-input-card { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
+        .dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #00d4aa; }
+        .dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
+        .fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
+        .fcf-projection-table { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 12px; }
+        .fcf-projection-item { text-align: center; }
+        .fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
+        .fcf-projection-item .fcf-value { font-size: 1rem; color: #e0e0e0; font-weight: 500; }
+        .fcf-projection-item .growth-rate { font-size: 0.75rem; color: #00d4aa; margin-top: 2px; }
+        .dcf-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; margin-bottom: 30px; padding: 25px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
+        .slider-group { display: flex; flex-direction: column; gap: 10px; }
+        .slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+        .slider-group label span { color: #00d4aa; font-weight: 600; }
+        .slider-group input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); outline: none; }
+        .slider-group input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #00d4aa; cursor: pointer; transition: transform 0.2s; }
+        .slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        .slider-hint { font-size: 0.8rem; color: #666; }
+        .scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .scenario-tab { padding: 10px 24px; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: #888; border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s; }
+        .scenario-tab:hover { border-color: rgba(0,212,170,0.5); color: #e0e0e0; }
+        .scenario-tab.active { background: rgba(0,212,170,0.15); border-color: #00d4aa; color: #00d4aa; }
+        .scenario-details { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.08); }
+        .scenario-details h4 { color: #00d4aa; margin-bottom: 15px; }
+        .assumption-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+        .assumption-item { text-align: center; }
+        .assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+        .assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
+        .sensitivity-section { margin-bottom: 30px; }
+        .sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; }
+        .sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.03); border-radius: 8px; overflow: hidden; }
+        .sensitivity-table th, .sensitivity-table td { padding: 12px 16px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+        .sensitivity-table th { background: rgba(0,212,170,0.1); color: #00d4aa; font-weight: 600; }
+        .sensitivity-table td { color: #e0e0e0; }
+        .sensitivity-table td.highlight { background: rgba(0,212,170,0.15); color: #00d4aa; font-weight: 600; }
+        .sensitivity-table td.below-current { color: #ff6b6b; }
+        .sensitivity-table td.above-current { color: #00d4aa; }
+        .historical-growth { margin-bottom: 30px; }
+        .historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
+        .growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
+        .growth-item { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 15px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+        .growth-item .metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
+        .growth-item .rate { font-size: 1.2rem; font-weight: 600; }
+        .growth-item .rate.positive { color: #00d4aa; }
+        .growth-item .rate.negative { color: #ff6b6b; }
+        .growth-item.selected { border-color: #00d4aa; background: rgba(0,212,170,0.1); }
+        .dcf-download { text-align: center; margin-top: 30px; }
+        .download-btn { display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; background: rgba(0,212,170,0.15); border: 1px solid #00d4aa; border-radius: 8px; color: #00d4aa; text-decoration: none; font-weight: 600; transition: all 0.2s; }
+        .download-btn:hover { background: #00d4aa; color: #1a1a2e; }
+        .download-icon { font-size: 1.2rem; }
+        @media (max-width: 768px) {
+            .charts-container { grid-template-columns: 1fr; }
+            .overview-grid { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.8rem; }
+            .fcf-projection-table { grid-template-columns: repeat(3,1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Adobe Inc. (ADBE)</h1>
+    <p>Creative &amp; Digital Experience Software | NASDAQ: ADBE</p>
+    <div class="header-meta">
+        <span>FY2025 Revenue: <strong>$23.77B</strong></span>
+        <span>Total ARR: <strong>$19.20B</strong></span>
+        <span>FCF: <strong>$9.85B</strong></span>
+        <span>Data Range: <strong>FY2017 - FY2025</strong></span>
+        <span>As of: <strong>February 17, 2026</strong></span>
+    </div>
+</div>
+
+<!-- Investment Overview -->
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid" id="overviewGrid"></div>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<!-- Guidance Section -->
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf"></span> | <span id="guidanceFY"></span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<!-- Revenue & Growth -->
+<h2 class="section-title">Revenue &amp; Growth</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Annual Revenue</h3>
+            <button class="help-btn" onclick="openModal('revenue')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="revenueChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Revenue Growth Rate (YoY)</h3>
+            <button class="help-btn" onclick="openModal('revenueGrowth')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="revenueGrowthChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Quarterly Revenue Trend</h3>
+            <button class="help-btn" onclick="openModal('quarterlyRevenue')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="quarterlyRevenueChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Segment Revenue Mix</h3>
+            <button class="help-btn" onclick="openModal('segmentMix')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="segmentMixChart"></canvas></div>
+    </div>
+</div>
+
+<!-- Profitability -->
+<h2 class="section-title">Profitability</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Margin Trends (Annual)</h3>
+            <button class="help-btn" onclick="openModal('margins')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="marginsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Operating Income</h3>
+            <button class="help-btn" onclick="openModal('operatingIncome')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="operatingIncomeChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>EPS Trend (Annual)</h3>
+            <button class="help-btn" onclick="openModal('eps')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="epsChart"></canvas></div>
+    </div>
+</div>
+
+<!-- Cash Flow -->
+<h2 class="section-title">Cash Flow</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Free Cash Flow (Annual)</h3>
+            <button class="help-btn" onclick="openModal('fcf')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="fcfChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>FCF Margin</h3>
+            <button class="help-btn" onclick="openModal('fcfMargin')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="fcfMarginChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Cash Flow Components</h3>
+            <button class="help-btn" onclick="openModal('cashFlowComponents')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="cashFlowChart"></canvas></div>
+    </div>
+</div>
+
+<!-- Subscription & KPI -->
+<h2 class="section-title">Subscription &amp; KPI Metrics</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Annual Recurring Revenue (ARR)</h3>
+            <button class="help-btn" onclick="openModal('arr')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="arrChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Subscription vs. Total Revenue</h3>
+            <button class="help-btn" onclick="openModal('subscriptionRevenue')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="subscriptionChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Digital Media vs. Digital Experience</h3>
+            <button class="help-btn" onclick="openModal('segmentRevenue')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="segmentRevenueChart"></canvas></div>
+    </div>
+</div>
+
+<!-- DCF Section -->
+<h2 class="section-title">DCF Valuation</h2>
+<div class="dcf-section">
+    <div class="dcf-summary">
+        <div class="dcf-card highlight">
+            <div class="dcf-label">Intrinsic Value (Base)</div>
+            <div class="dcf-value" id="dcfIV">$434</div>
+            <div class="dcf-change positive" id="dcfUpside">+4.5% upside</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Entry Price (15% CAGR)</div>
+            <div class="dcf-value" id="dcfEntry">$256</div>
+            <div class="dcf-sublabel">Buy below for 15% annual return</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Current Price</div>
+            <div class="dcf-value" id="dcfCurrent">$264</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Prob-Weighted IV</div>
+            <div class="dcf-value" id="dcfWeighted">$451</div>
+            <div class="dcf-sublabel">25% Bull / 50% Base / 25% Bear</div>
+        </div>
+    </div>
+
+    <div class="dcf-warning" id="growthWarning" style="display:none;">
+        <span class="warning-icon">&#9888;</span>
+        <span id="warningText"></span>
+    </div>
+
+    <div class="dcf-inputs">
+        <h4>DCF Model Inputs</h4>
+        <div class="dcf-inputs-grid">
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Base Year FCF</div>
+                <div class="dcf-input-value" id="baseFCF">$9.85B</div>
+                <div class="dcf-input-note">Starting point for projections</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Shares Outstanding</div>
+                <div class="dcf-input-value" id="sharesOut">427M</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Net Debt / (Cash)</div>
+                <div class="dcf-input-value" id="netDebt" style="color:#00d4aa;">-$385M</div>
+                <div class="dcf-input-note">Negative = net cash</div>
+            </div>
+        </div>
+        <div class="fcf-projections">
+            <h5>Projected FCF (5-Year)</h5>
+            <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+        </div>
+    </div>
+
+    <div class="dcf-controls">
+        <div class="slider-group">
+            <label>Growth Rate: <span id="growthValue">10%</span></label>
+            <input type="range" id="growthSlider" min="0" max="30" value="10" step="1">
+            <div class="slider-hint" id="growthHint">Based on FCF 3yr CAGR</div>
+        </div>
+        <div class="slider-group">
+            <label>WACC: <span id="waccValue">10%</span></label>
+            <input type="range" id="waccSlider" min="6" max="18" value="10" step="0.5">
+        </div>
+        <div class="slider-group">
+            <label>Terminal Growth: <span id="terminalValue">3%</span></label>
+            <input type="range" id="terminalSlider" min="0" max="5" value="3" step="0.5">
+        </div>
+    </div>
+
+    <div class="scenario-tabs">
+        <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+        <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+        <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+    </div>
+
+    <div class="scenario-details" id="scenarioDetails">
+        <h4>Assumptions</h4>
+        <div class="assumption-grid" id="assumptionGrid"></div>
+    </div>
+
+    <div class="sensitivity-section">
+        <h4>Sensitivity Analysis: Intrinsic Value by WACC &amp; Terminal Growth</h4>
+        <table class="sensitivity-table" id="sensitivityMatrix"></table>
+    </div>
+
+    <div class="historical-growth">
+        <h4>Historical Growth Rates (CAGR)</h4>
+        <div class="growth-grid" id="growthGrid"></div>
+    </div>
+
+    <div class="dcf-download">
+        <a href="ADBE_DCF_Model.xlsx" class="download-btn" download>
+            <span class="download-icon">&#8681;</span> Download Excel Model
+        </a>
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&#x2715;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// EMBEDDED CSV DATA
+// ============================================================
+const csvData = `Period,Revenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,NetIncome,NetMargin,EPS,FreeCashFlow,OperatingCashFlow,CapEx,ShareholdersEquity,TotalDebt,CashAndEquivalents,SharesOutstanding,DigitalMediaRevenue,DigitalExperienceRevenue,SubscriptionRevenue,ARR
+Q3 2017,1841.1,1578.2,85.7,545.7,29.6,419.6,22.8,0.84,650.2,704.4,54.2,8170.4,1889.2,5368.5,500.4,1270.2,529.5,,4870
+FY2017,7301.5,6291.0,86.2,2168.1,29.7,1694.0,23.2,3.38,2734.8,2912.9,178.1,8459.9,1881.4,5819.8,501.1,5010.6,2120.0,,5230
+Q1 2018,2079.0,1820.1,87.6,702.7,33.8,583.1,28.0,1.17,894.5,989.6,95.1,8634.0,1874.8,6147.9,499.4,1460.6,554.1,,5720
+Q2 2018,2195.4,1914.0,87.2,698.5,31.8,663.2,30.2,1.33,931.1,976.4,45.3,8705.6,1874.1,6334.1,498.3,1546.4,586.0,,6060
+Q3 2018,2291.1,1995.6,87.1,718.6,31.4,666.3,29.1,1.34,891.7,955.3,63.6,8861.9,1874.7,4944.5,496.9,1608.9,614.0,,6620
+FY2018,9030.0,7835.0,86.8,2840.4,31.5,2590.8,28.7,5.20,3762.7,4029.3,266.6,9362.1,4124.8,3229.0,497.8,6325.3,2443.7,,6710
+Q1 2019,2601.0,2203.7,84.7,694.8,26.7,674.2,25.9,1.36,948.2,1013.4,65.3,9871.5,4129.6,3226.2,494.2,1776.6,743.3,,7070
+Q2 2019,2744.3,2336.8,85.1,749.5,27.3,632.6,23.0,1.29,963.8,1109.3,145.5,9931.7,4133.7,3479.0,491.8,1890.2,783.5,,7590
+Q3 2019,2834.1,2418.2,85.3,853.8,30.1,792.8,28.0,1.61,832.9,922.6,89.6,10242.8,4137.0,3650.8,491.5,1962.2,821.0,,8030
+FY2019,11171.3,9498.6,85.0,3268.1,29.3,2951.5,26.4,6.00,4027.3,4421.8,394.5,10530.2,4138.3,4177.0,491.6,7707.0,3206.2,,8400
+Q1 2020,3091.0,2639.0,85.4,937.0,30.3,955.0,30.9,1.96,1231.0,1325.0,94.0,10465.0,4113.0,4171.0,488.0,2169.0,858.0,,
+Q2 2020,3128.0,2713.0,86.7,1016.0,32.5,1100.0,35.2,2.27,1088.0,1184.0,96.0,10881.0,4114.0,4351.0,487.0,2232.0,826.0,,
+Q3 2020,3225.0,2798.0,86.8,1069.0,33.1,955.0,29.6,1.97,1310.0,1436.0,126.0,11713.0,4116.0,5265.0,485.0,2337.0,838.0,,
+FY2020,12868.0,11146.0,86.6,4237.0,32.9,5260.0,40.9,10.83,5308.0,5727.0,419.0,13264.0,4117.0,5992.0,485.5,9233.0,3125.0,11626.0,10260
+Q1 2021,3905.0,3458.0,88.6,1454.0,37.2,1261.0,32.3,2.61,1713.0,1772.0,59.0,13546.0,4119.0,4963.0,483.0,2859.0,934.0,,
+Q2 2021,3835.0,3391.0,88.4,1406.0,36.7,1116.0,29.1,2.32,1893.0,1988.0,95.0,13852.0,4120.0,5768.0,481.0,2787.0,938.0,,
+Q3 2021,3935.0,3468.0,88.1,1441.0,36.6,1212.0,30.8,2.52,1309.0,1404.0,95.0,14414.0,4122.0,6164.0,481.0,2865.0,985.0,,
+FY2021,15785.0,13920.0,88.2,5802.0,36.7,4822.0,30.5,10.02,6882.0,7230.0,348.0,14797.0,4123.0,5798.0,481.0,11520.0,3867.0,14573.0,12240
+Q1 2022,4262.0,3750.0,88.0,1580.0,37.1,1266.0,29.7,2.66,1669.0,1769.0,100.0,13775.0,4125.0,4701.0,475.0,3110.0,1057.0,,
+Q2 2022,4386.0,3847.0,87.7,1529.0,34.9,1178.0,26.9,2.49,1914.0,2040.0,126.0,13985.0,4126.0,5299.0,473.0,3200.0,1095.0,,
+Q3 2022,4433.0,3887.0,87.7,1484.0,33.5,1136.0,25.6,2.42,1579.0,1704.0,125.0,14373.0,4126.0,5764.0,469.0,3232.0,1120.0,,
+FY2022,17606.0,15441.0,87.7,6098.0,34.6,4756.0,27.0,10.10,7396.0,7838.0,442.0,14051.0,4129.0,6096.0,471.0,12842.0,4422.0,16388.0,13970
+Q1 2023,4655.0,4087.0,87.8,1586.0,34.1,1247.0,26.8,2.71,1592.0,1693.0,101.0,14206.0,3630.0,5653.0,460.0,3395.0,1176.0,,
+Q2 2023,4816.0,4244.0,88.1,1624.0,33.7,1295.0,26.9,2.82,2018.0,2139.0,121.0,14838.0,3631.0,6601.0,459.0,3511.0,1222.0,,
+Q3 2023,4890.0,4310.0,88.1,1697.0,34.7,1403.0,28.7,3.05,1782.0,1873.0,91.0,15776.0,3633.0,7516.0,459.0,3594.0,1229.0,,
+FY2023,19409.0,17055.0,87.9,6650.0,34.3,5428.0,28.0,11.82,6942.0,7302.0,360.0,16518.0,3634.0,7842.0,459.0,14216.0,4893.0,18284.0,15170
+Q1 2024,5182.0,4592.0,88.6,907.0,17.5,620.0,12.0,1.36,1137.0,1174.0,37.0,15460.0,3635.0,6820.0,456.0,3816.0,1289.0,,
+Q2 2024,5309.0,4711.0,88.7,1885.0,35.5,1573.0,29.6,3.49,1899.0,1940.0,41.0,14843.0,5625.0,8065.0,451.0,3908.0,1327.0,,
+Q3 2024,5408.0,4854.0,89.8,1992.0,36.8,1684.0,31.1,3.76,1964.0,2021.0,57.0,14545.0,5627.0,7515.0,448.0,3995.0,1354.0,,
+FY2024,21505.0,19147.0,89.0,6741.0,31.3,5560.0,25.9,12.36,7873.0,8056.0,183.0,14105.0,5628.0,7886.0,450.0,15864.0,5366.0,20521.0,17330
+Q1 2025,5714.0,5092.0,89.1,2163.0,37.9,1811.0,31.7,4.14,2456.0,2482.0,26.0,13095.0,6155.0,7435.0,438.0,4227.0,1414.0,,
+Q2 2025,5873.0,5235.0,89.1,2109.0,35.9,1691.0,28.8,3.94,2144.0,2191.0,47.0,11448.0,6166.0,5713.0,429.0,4345.0,1457.0,,
+Q3 2025,5988.0,5346.0,89.3,2173.0,36.3,1772.0,29.6,4.18,2126.0,2198.0,72.0,11770.0,6200.0,5940.0,424.0,4459.0,1476.0,,
+FY2025,23769.0,21218.0,89.3,8706.0,36.6,7130.0,30.0,16.70,9852.0,10031.0,179.0,11623.0,6210.0,6595.0,427.0,17649.0,5864.0,22904.0,19200`;
+
+// ============================================================
+// EMBEDDED ANALYSIS JSON
+// ============================================================
+const analysis = {
+  "ticker": "ADBE",
+  "company_name": "Adobe Inc.",
+  "analysis_date": "2026-02-17",
+  "overview": "Adobe Inc. is a global software company that provides creative, productivity, and digital experience solutions to individuals, teams, and enterprises. Its portfolio spans Creative Cloud (Photoshop, Illustrator, Premiere Pro, Firefly), Document Cloud (Acrobat), and Experience Cloud (marketing analytics, campaign management, commerce), all increasingly infused with generative and agentic AI. Adobe operates across three business segments—Digital Media, Digital Experience, and Publishing & Advertising—serving customers from individual consumers to large enterprise marketing departments worldwide.",
+  "business_model": {
+    "summary": "Adobe operates an overwhelmingly subscription-based business model (96% of FY2025 revenue), generating highly predictable recurring revenue through tiered SaaS plans across its Creative Cloud, Document Cloud, and Experience Cloud product families. The company monetizes AI through its Firefly credit system and enterprise contracts, with AI book of business contributing an estimated ~$250 million per quarter by Q3 FY2025. Effective Q1 FY2026, Adobe collapsed its three reportable segments into a single segment.",
+    "revenue_streams": [
+      {"name": "Digital Media (Creative Cloud + Document Cloud)", "percent": 74, "trend": "growing"},
+      {"name": "Digital Experience (Experience Cloud)", "percent": 25, "trend": "growing"},
+      {"name": "Publishing & Advertising (legacy)", "percent": 1, "trend": "declining"}
+    ]
+  },
+  "competitive_position": {
+    "main_competitors": ["Canva", "Figma", "Microsoft (365 / Copilot)", "Salesforce", "Google (Workspace + AI tools)", "OpenAI / ChatGPT", "Midjourney", "Corel"],
+    "moat_factors": [
+      {"factor": "Ecosystem and workflow lock-in", "strength": "strong", "description": "Creative Cloud's deeply integrated suite and shared libraries create high switching costs for professionals."},
+      {"factor": "Brand and professional trust", "strength": "strong", "description": "Adobe's brand is synonymous with creative professionalism; Photoshop is a verb. Enterprise buyers trust Adobe for IP-indemnified, commercially safe AI."},
+      {"factor": "Proprietary AI (Firefly)", "strength": "moderate", "description": "Trained exclusively on licensed content, providing commercial IP safety. 24B+ assets generated since March 2023; ~29% AI design tool market share."},
+      {"factor": "Data assets and CDP", "strength": "moderate", "description": "Adobe Experience Platform aggregates first-party customer data, creating switching costs for enterprise customers."},
+      {"factor": "Distribution and installed base", "strength": "strong", "description": "32.5M Creative Cloud subscribers and billions of Acrobat Reader installs provide a vast base for AI upsell."}
+    ],
+    "weaknesses": [
+      "Consumer/SMB segments face aggressive price competition from Canva (freemium) and Microsoft (bundled into 365).",
+      "Figma's failed acquisition left a gap in collaborative web-based design; Figma remains dominant in UI/UX.",
+      "Digital Experience competes against Salesforce, Microsoft, and Google with deeper CRM relationships.",
+      "AI monetization nascent (~4% of revenue) relative to the scale of AI investment.",
+      "Growth deceleration concerns: does AI democratize design in ways that erode premium subscription demand?"
+    ]
+  },
+  "growth_drivers": [
+    "Adobe Firefly and generative AI: embedded across Photoshop, Illustrator, Premiere Pro, Acrobat; enterprise Firefly Services APIs create new high-margin revenue.",
+    "Acrobat / Document Cloud expansion: Acrobat Studio and AI Assistant expand TAM to billions of knowledge workers; Business Professionals & Consumers subscription revenue +15% in FY2025.",
+    "Adobe GenStudio and content supply chain: addresses enterprise need to scale on-brand content, bridging creative production and marketing activation.",
+    "Semrush acquisition (pending close H1 2026): $1.9B deal adds SEO analytics, keyword research, and competitive intelligence to Experience Cloud.",
+    "Agentic AI and automation: Adobe Experience Platform Agent Orchestrator automates marketing workflows, expanding Experience Cloud use cases.",
+    "Geographic expansion: EMEA grew 13% in FY2025, outpacing Americas (10%) and APAC (10%)."
+  ],
+  "risks": {
+    "business": [
+      {"risk": "AI disintermediation of creative tools", "severity": "high", "description": "Generative AI tools from OpenAI, Midjourney, Canva AI allow non-professionals to create content without Creative Cloud, potentially reducing demand for professional-tier subscriptions."},
+      {"risk": "Canva competitive threat in consumer/SMB", "severity": "high", "description": "Canva (200M+ users, freemium model, acquired Leonardo.AI) directly threatens Adobe Express and entry-level Creative Cloud tiers."},
+      {"risk": "Figma competitive threat in web design", "severity": "moderate", "description": "Figma dominates collaborative UI/UX design; Adobe's failed acquisition attempt left the space open."},
+      {"risk": "AI monetization uncertainty", "severity": "moderate", "description": "Firefly credit system and AI add-ons are early-stage; unclear if AI will be a meaningful new revenue layer or if competitors will offer AI free."},
+      {"risk": "Digital Experience growth slowdown", "severity": "moderate", "description": "Experience Cloud grew 9% in FY2025 vs. 11% for Digital Media, amid competition from Salesforce, HubSpot, and Google."}
+    ],
+    "financial": [
+      {"risk": "Currency exposure", "severity": "low", "description": "~41% of FY2025 revenue is international; dollar strength creates headwinds partially offset by hedging."},
+      {"risk": "Semrush integration risk", "severity": "moderate", "description": "The $1.9B all-cash acquisition increases leverage; integration complexity could disappoint."},
+      {"risk": "Debt load", "severity": "low", "description": "Adobe had $6.15B in senior notes outstanding; manageable given ~$10B annual operating cash flow."}
+    ],
+    "regulatory": [
+      {"risk": "EU AI Act compliance", "severity": "moderate", "description": "EU AI Act obligations phasing in through 2026-2030; Firefly subject to transparency, copyright, and IP compliance requirements."},
+      {"risk": "Data privacy (GDPR/CCPA/PIPL)", "severity": "moderate", "description": "Ongoing compliance investments required; EU data transfer mechanisms face continued legal challenge."},
+      {"risk": "Antitrust scrutiny on M&A", "severity": "moderate", "description": "Failed Figma acquisition demonstrated significant regulatory risk; Semrush deal smaller ($1.9B) and less likely to be blocked."}
+    ],
+    "macro": [
+      {"risk": "Enterprise IT spending slowdown", "severity": "moderate", "description": "Digital Experience weighted toward large enterprise deals with extended sales cycles; macro slowdowns can delay purchases."},
+      {"risk": "AI infrastructure cost escalation", "severity": "moderate", "description": "AI inferencing costs grew as component of cost of revenue in FY2025; if AI adoption accelerates faster than monetization, margin pressure could emerge."}
+    ]
+  },
+  "recent_developments": [
+    {"date": "2026-02", "event": "Semrush stockholders approved Adobe acquisition at February 3, 2026 special meeting; deal expected to close H1 2026 pending regulatory approval."},
+    {"date": "2025-12", "event": "Record Q4 and FY2025 results: FY2025 revenue $23.77B (+11% YoY); Total ARR $25.20B (+11.5% YoY); GAAP net income $7.13B (+28% YoY). Stock rose ~2%."},
+    {"date": "2025-12", "event": "FY2026 guidance: revenue $25.90-26.10B (>10% ARR growth), non-GAAP EPS $23.30-$23.50, non-GAAP operating margin ~45%."},
+    {"date": "2025-11", "event": "Adobe announced definitive agreement to acquire Semrush for $1.9B ($12/share all-cash), adding SEO analytics to Experience Cloud."},
+    {"date": "2025-09", "event": "Adobe Board authorized new $15B share repurchase program through September 2028, supplementing existing $25B authorization."},
+    {"date": "2025-08", "event": "Adobe launched Acrobat Studio, combining Acrobat, Adobe Express, and AI agents into integrated productivity and creativity destination."},
+    {"date": "2025-02", "event": "Piper Sandler downgraded ADBE to Neutral ($330 PT), citing AI competition concerns. Broader analyst consensus remains Buy (~$414-432 mean target)."}
+  ],
+  "guidance": {
+    "as_of": "Q4 FY2025 Earnings (December 10, 2025)",
+    "fiscal_year": "FY2026",
+    "items": [
+      {"metric": "Revenue", "target": "$25.90B - $26.10B", "period": "FY2026", "vs_prior": "new", "notes": "Implies ~9-10% YoY growth vs. FY2025's $23.77B; excludes any Semrush contribution."},
+      {"metric": "Total Adobe ARR Growth", "target": ">10% (~$2.6B net new ARR)", "period": "FY2026", "vs_prior": "new", "notes": "Starting ARR of $25.66B (FX-revalued); >10% growth implies exiting FY2026 at approximately $27.8B+."},
+      {"metric": "Non-GAAP EPS", "target": "$23.30 - $23.50", "period": "FY2026", "vs_prior": "new", "notes": "GAAP EPS guidance $17.90-$18.10 for FY2026."},
+      {"metric": "Non-GAAP Operating Margin", "target": "~45%", "period": "FY2026", "vs_prior": "stable", "notes": "Consistent with FY2025 non-GAAP operating margin; AI investment costs offset by subscription revenue scaling."},
+      {"metric": "Q1 FY2026 Revenue", "target": "$6.25B - $6.30B", "period": "Q1 FY2026", "vs_prior": "new", "notes": "Implies ~9% YoY growth; sequentially up from Q4 FY2025's $6.19B."},
+      {"metric": "Q1 FY2026 Non-GAAP EPS", "target": "$5.85 - $5.90", "period": "Q1 FY2026", "vs_prior": "new", "notes": "Non-GAAP operating margin targeted at approximately 47% for Q1."},
+      {"metric": "ARR Segment Reporting", "target": "Single segment effective Q1 FY2026", "period": "FY2026", "vs_prior": "changed", "notes": "Adobe collapsed three reportable segments into one. Total Adobe ARR remains the key KPI."}
+    ],
+    "management_commentary": "CEO Shantanu Narayen highlighted strong AI adoption across the portfolio, Firefly's commercial traction with enterprises, and confidence in double-digit ARR growth in FY2026. Management emphasized the Acrobat Studio platform as a new growth vector for Business Professionals & Consumers. The Semrush acquisition was described as extending Adobe's reach into generative engine optimization (GEO) and brand visibility in AI-powered search. CFO Dan Durn noted FY2026 guidance does not include Semrush contributions and that FX revaluation added ~$460M to reported ARR entering FY2026."
+  },
+  "bull_case": [
+    "Firefly as a durable monetization engine: commercially safe AI moat (IP-indemnified, licensed training data) is uniquely valuable to enterprises; credit/usage-based model creates new high-margin revenue on top of subscriptions.",
+    "Document Cloud as underappreciated growth driver: Acrobat Studio expands TAM from ~500M paid creative users to billions of knowledge workers; Business Professionals & Consumers subscription revenue +15% in FY2025.",
+    "Durable recurring revenue and cash flow: 96% subscription revenue, $22.52B remaining performance obligations (+13% YoY), and $10B+ annual operating cash flow fuel $25B+ in share repurchase authority through 2028.",
+    "Experience Cloud and GenStudio as enterprise AI platform: integrated content supply chain via GenStudio, Experience Platform, and agentic AI positions Adobe for multi-billion-dollar enterprise marketing tech budgets.",
+    "Semrush acquisition unlocks search intelligence: adds 100K+ paying customers and leading SEO/competitive analytics platform; at $1.9B, execution risk is manageable."
+  ],
+  "bear_case": [
+    "AI commoditizes design and undercuts Creative Cloud pricing power: Canva, OpenAI, Google, and Microsoft embed generative AI into free or low-cost products, reducing perceived value of $55+/month CC subscriptions.",
+    "Figma acquisition failure created lasting competitive gap: Without Figma, Adobe lacks a credible answer to browser-native, collaborative, real-time design; Figma has ~70% of UI/UX tool market.",
+    "AI monetization far behind scale of investment: AI book of business (~$250M/quarter, ~4% of revenue) is nascent relative to ambitions; if AI revenue does not accelerate in FY2026, the multiple could re-rate lower.",
+    "Valuation premium limits upside: At ~35-40x forward non-GAAP earnings, Adobe trades at a premium, implying execution perfection; any growth miss or margin pressure could trigger significant multiple compression.",
+    "Digital Experience competes against larger, better-entrenched platforms: Salesforce, Microsoft, and Google have deeper CRM relationships and can bundle marketing analytics with sales/service tools."
+  ]
+};
+
+// ============================================================
+// EMBEDDED DCF JSON
+// ============================================================
+const dcfData = {
+  "ticker": "ADBE",
+  "valuation_date": "2026-02-17",
+  "current_price": 263.93,
+  "inputs": {
+    "shares_outstanding": 427,
+    "net_debt": -385,
+    "cash": 6595,
+    "total_debt": 6210,
+    "last_fcf": 9852,
+    "currency": "USD",
+    "units": "millions"
+  },
+  "historical_growth": {
+    "revenue_3yr_cagr": 10.54,
+    "revenue_5yr_cagr": 13.07,
+    "eps_3yr_cagr": 18.30,
+    "eps_5yr_cagr": 9.05,
+    "equity_3yr_cagr": -6.17,
+    "equity_5yr_cagr": -2.60,
+    "fcf_3yr_cagr": 10.12,
+    "fcf_5yr_cagr": 13.16,
+    "selected_growth_rate": 10.12,
+    "growth_rate_source": "fcf_3yr_cagr",
+    "growth_divergence_warning": "Equity CAGR is deeply negative (-2.60% over 5yr, -6.17% over 3yr) due to $25B+ in share buybacks reducing book value, not fundamental business deterioration. Equity CAGR diverges more than 30% from Revenue CAGR (13.07%) and EPS CAGR (9.05%). Using FCF 3yr CAGR (10.12%) as primary growth rate, consistent with FY2026 guidance of 9-10% revenue growth and management's ARR growth target of >10%."
+  },
+  "assumptions": {
+    "base": {"growth_rates": [10.0, 9.5, 9.0, 8.0, 7.0], "fcf_margin": 42.0, "wacc": 10.0, "terminal_growth": 3.0, "notes": "Anchored to FY2026 guidance of 9-10% revenue growth. Growth decelerates from 10% toward terminal as AI monetization normalizes."},
+    "bull": {"growth_rates": [15.0, 14.0, 13.0, 11.0, 9.0], "fcf_margin": 45.0, "wacc": 9.0, "terminal_growth": 3.5, "notes": "Firefly AI monetization accelerates, Acrobat Studio captures business productivity market, Semrush adds incremental growth."},
+    "bear": {"growth_rates": [7.0, 6.0, 5.0, 4.0, 3.5], "fcf_margin": 39.0, "wacc": 11.0, "terminal_growth": 2.0, "notes": "AI commoditizes design tools faster than Adobe can monetize, Canva and Microsoft capture SMB share, Digital Experience growth stalls."}
+  },
+  "valuation": {
+    "base": {"sum_pv_fcf": 48199.7, "terminal_value": 219940.3, "pv_terminal": 136565.6, "enterprise_value": 184765.4, "equity_value": 185150.4, "intrinsic_value": 433.61, "upside": 64.25},
+    "bull": {"sum_pv_fcf": 55489.1, "terminal_value": 332300.9, "pv_terminal": 215972.8, "enterprise_value": 271461.9, "equity_value": 271846.9, "intrinsic_value": 636.64, "upside": 141.20},
+    "bear": {"sum_pv_fcf": 42677.8, "terminal_value": 143130.9, "pv_terminal": 84941.2, "enterprise_value": 127619.0, "equity_value": 128004.0, "intrinsic_value": 299.78, "upside": 13.58}
+  },
+  "entry_price": {
+    "base": {"terminal_value_per_share": 515.08, "years_to_terminal": 5, "entry_price": 256.09, "entry_discount_from_current": -2.97},
+    "bull": {"terminal_value_per_share": 778.22, "years_to_terminal": 5, "entry_price": 386.91, "entry_discount_from_current": 46.60},
+    "bear": {"terminal_value_per_share": 335.20, "years_to_terminal": 5, "entry_price": 166.65, "entry_discount_from_current": -36.86}
+  },
+  "sensitivity": {
+    "wacc_range": [8, 9, 10, 11, 12],
+    "terminal_growth_range": [2.0, 2.5, 3.0, 3.5, 4.0],
+    "matrix": [
+      [525.16, 564.14, 610.92, 668.10, 739.58],
+      [448.41, 475.67, 507.46, 545.03, 590.12],
+      [390.91, 410.84, 433.61, 459.88, 490.53],
+      [346.24, 361.31, 378.26, 397.48, 419.44],
+      [310.54, 322.25, 335.26, 349.80, 366.15]
+    ]
+  },
+  "probability_weighted": {
+    "weights": {"bull": 0.25, "base": 0.50, "bear": 0.25},
+    "weighted_iv": 450.91
+  }
+};
+
+// ============================================================
+// CSV PARSING
+// ============================================================
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => obj[h.trim()] = values[i] ? values[i].trim() : '');
+        return obj;
+    });
+}
+
+const allData = parseCSV(csvData);
+
+// Sort chronologically
+allData.sort((a, b) => {
+    const parseDate = (p) => {
+        const year = parseInt(p.match(/\d{4}/)?.[0] || '0');
+        const isQ1 = p.includes('Q1'), isQ2 = p.includes('Q2'), isQ3 = p.includes('Q3'), isQ4 = p.includes('Q4');
+        const isH1 = p.includes('H1'), isH2 = p.includes('H2'), isFY = p.startsWith('FY');
+        const subOrder = isQ1 ? 1 : isQ2 ? 2 : isH1 ? 3 : isQ3 ? 4 : isQ4 ? 5 : isH2 ? 6 : isFY ? 7 : 0;
+        return year * 10 + subOrder;
+    };
+    return parseDate(a.Period) - parseDate(b.Period);
+});
+
+const fyData = allData.filter(d => d.Period.startsWith('FY'));
+const qData = allData.filter(d => !d.Period.startsWith('FY') && (d.Period.includes('Q') || d.Period.includes('H')));
+
+const n = (v) => parseFloat(v) || 0;
+const fmt = (v, decimals=1) => isNaN(v) ? 'N/A' : v.toFixed(decimals);
+const fmtB = (v) => '$' + (v/1000).toFixed(2) + 'B';
+const fmtPct = (v) => v.toFixed(1) + '%';
+
+// ============================================================
+// CHART COLORS
+// ============================================================
+const colors = {
+    primary: '#00d4aa',
+    secondary: '#00b894',
+    tertiary: '#0984e3',
+    quaternary: '#6c5ce7',
+    warning: '#fdcb6e',
+    danger: '#ff6b6b'
+};
+
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } } },
+    scales: {
+        x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+
+// ============================================================
+// INVESTMENT OVERVIEW
+// ============================================================
+function renderOverview() {
+    const a = analysis;
+    const grid = document.getElementById('overviewGrid');
+
+    const moatHTML = a.competitive_position.moat_factors.map(m =>
+        `<li><strong class="${m.strength === 'strong' ? 'trend-growing' : 'trend-stable'}">[${m.strength.toUpperCase()}]</strong> ${m.factor}: ${m.description}</li>`
+    ).join('');
+
+    const weakHTML = a.competitive_position.weaknesses.map(w => `<li>${w}</li>`).join('');
+
+    const streamsHTML = a.business_model.revenue_streams.map(s =>
+        `<li class="revenue-stream"><span>${s.name}</span><span class="percent trend-${s.trend}">${s.percent}%</span></li>`
+    ).join('');
+
+    const riskCategories = ['business', 'financial', 'regulatory', 'macro'];
+    const allRisks = riskCategories.flatMap(cat => (a.risks[cat] || []).map(r => ({...r, cat})));
+    const riskHTML = allRisks.map(r =>
+        `<li><span class="risk-${r.severity}">[${r.severity.toUpperCase()}]</span> <strong>${r.risk}</strong>: ${r.description}</li>`
+    ).join('');
+
+    const bullHTML = a.bull_case.map(b => `<li>${b}</li>`).join('');
+    const bearHTML = a.bear_case.map(b => `<li>${b}</li>`).join('');
+    const devHTML = a.recent_developments.map(d => `<li><strong>${d.date}:</strong> ${d.event}</li>`).join('');
+    const growthHTML = a.growth_drivers.map(g => `<li>${g}</li>`).join('');
+
+    grid.innerHTML = `
+        <div class="overview-card">
+            <h3>Company Overview</h3>
+            <p>${a.overview}</p>
+        </div>
+        <div class="overview-card">
+            <h3>Business Model</h3>
+            <p>${a.business_model.summary}</p>
+            <ul>${streamsHTML}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Competitive Position</h3>
+            <p><strong>Competitors:</strong> ${a.competitive_position.main_competitors.join(', ')}</p>
+            <p><strong>Moat Factors:</strong></p>
+            <ul>${moatHTML}</ul>
+            <p style="margin-top:12px;"><strong>Weaknesses:</strong></p>
+            <ul>${weakHTML}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Growth Drivers</h3>
+            <ul>${growthHTML}</ul>
+        </div>
+        <div class="overview-card risks">
+            <h3>Key Risks</h3>
+            <ul>${riskHTML}</ul>
+        </div>
+        <div class="overview-card bull">
+            <h3>Bull Case</h3>
+            <ul>${bullHTML}</ul>
+        </div>
+        <div class="overview-card bear">
+            <h3>Bear Case</h3>
+            <ul>${bearHTML}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Recent Developments</h3>
+            <ul>${devHTML}</ul>
+        </div>
+    `;
+}
+
+function toggleOverview() {
+    const btn = document.querySelector('.overview-toggle');
+    const content = document.getElementById('overviewContent');
+    btn.classList.toggle('active');
+    content.classList.toggle('active');
+}
+
+// ============================================================
+// KPI CARDS
+// ============================================================
+function renderKPIs() {
+    const latest = fyData[fyData.length - 1];   // FY2025
+    const prev = fyData[fyData.length - 2];     // FY2024
+
+    const yoy = (curr, prior) => {
+        const c = n(curr), p = n(prior);
+        if (!p) return null;
+        return ((c - p) / Math.abs(p) * 100);
+    };
+
+    const kpis = [
+        { label: 'Revenue (FY2025)', value: fmtB(n(latest.Revenue)), change: yoy(latest.Revenue, prev.Revenue), suffix: '%' },
+        { label: 'Total ARR', value: '$' + (n(latest.ARR)/1000).toFixed(2) + 'B', change: yoy(latest.ARR, prev.ARR), suffix: '%' },
+        { label: 'Gross Margin', value: fmtPct(n(latest.GrossMargin)), change: n(latest.GrossMargin) - n(prev.GrossMargin), suffix: 'pp', isAbsolute: true },
+        { label: 'Operating Margin', value: fmtPct(n(latest.OperatingMargin)), change: n(latest.OperatingMargin) - n(prev.OperatingMargin), suffix: 'pp', isAbsolute: true },
+        { label: 'Free Cash Flow', value: fmtB(n(latest.FreeCashFlow)), change: yoy(latest.FreeCashFlow, prev.FreeCashFlow), suffix: '%' },
+        { label: 'EPS (GAAP)', value: '$' + n(latest.EPS).toFixed(2), change: yoy(latest.EPS, prev.EPS), suffix: '%' },
+        { label: 'Net Income', value: fmtB(n(latest.NetIncome)), change: yoy(latest.NetIncome, prev.NetIncome), suffix: '%' },
+        { label: 'Digital Media ARR', value: '$' + (n(latest.DigitalMediaRevenue)/1000).toFixed(2) + 'B', change: yoy(latest.DigitalMediaRevenue, prev.DigitalMediaRevenue), suffix: '%' }
+    ];
+
+    const grid = document.getElementById('kpiGrid');
+    grid.innerHTML = kpis.map(k => {
+        const chg = k.change;
+        const isPos = chg >= 0;
+        const chgStr = k.isAbsolute
+            ? (isPos ? '+' : '') + chg.toFixed(2) + k.suffix
+            : (isPos ? '+' : '') + chg.toFixed(1) + k.suffix;
+        return `
+            <div class="kpi-card">
+                <div class="kpi-value">${k.value}</div>
+                <div class="kpi-label">${k.label}</div>
+                ${chg !== null ? `<div class="kpi-change ${isPos ? 'positive' : 'negative'}">${chgStr} YoY</div>` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+// ============================================================
+// GUIDANCE
+// ============================================================
+function renderGuidance() {
+    const g = analysis.guidance;
+    if (!g || !g.items || !g.items.length) {
+        document.getElementById('guidanceSection').style.display = 'none';
+        return;
+    }
+    document.getElementById('guidanceAsOf').textContent = g.as_of || '';
+    document.getElementById('guidanceFY').textContent = g.fiscal_year || '';
+
+    const grid = document.getElementById('guidanceGrid');
+    grid.innerHTML = g.items.map(item => {
+        const cls = item.vs_prior ? item.vs_prior.toLowerCase() : 'new';
+        const lbl = cls.charAt(0).toUpperCase() + cls.slice(1);
+        return `
+            <div class="guidance-card">
+                <div class="guidance-metric">${item.metric}</div>
+                <div class="guidance-target">${item.target}</div>
+                <div class="guidance-period">${item.period}</div>
+                <span class="guidance-vs-prior ${cls}">${lbl}</span>
+                ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+
+    const commentary = document.getElementById('guidanceCommentary');
+    if (g.management_commentary) {
+        commentary.textContent = g.management_commentary;
+        commentary.style.display = 'block';
+    } else {
+        commentary.style.display = 'none';
+    }
+}
+
+// ============================================================
+// METRIC DESCRIPTIONS
+// ============================================================
+const metricDescriptions = {
+    revenue: {
+        title: 'Revenue',
+        content: `<p><strong>Revenue</strong> is the total income from Adobe's SaaS subscriptions, product licenses, and services.</p>
+        <div class="metric-highlight"><strong>For Adobe:</strong> 96% of FY2025 revenue comes from subscriptions across Creative Cloud, Document Cloud, and Experience Cloud. Revenue has grown from $7.3B (FY2017) to $23.8B (FY2025), a ~15% 8-year CAGR.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Sustained double-digit growth rate (management targets 9-10% in FY2026)</li>
+            <li>Subscription revenue as a percentage of total (96% is exceptional for predictability)</li>
+            <li>Geographic revenue diversification (Americas 59%, EMEA 27%, APAC 14%)</li>
+            <li>Whether AI features (Firefly) are driving meaningful top-line acceleration</li>
+        </ul>`
+    },
+    revenueGrowth: {
+        title: 'Revenue Growth Rate (YoY)',
+        content: `<p><strong>Year-over-year revenue growth</strong> shows the pace at which Adobe is expanding its top line.</p>
+        <div class="metric-highlight"><strong>For Adobe:</strong> Growth has moderated from the 20%+ era (FY2018-FY2021) toward the 10-11% range as Adobe's base has grown to nearly $24B. Management is guiding for 9-10% in FY2026.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Whether AI monetization can re-accelerate growth above 10%</li>
+            <li>Any deceleration below 8% would suggest competitive pressure from Canva, Microsoft, or open-source AI tools</li>
+            <li>Semrush acquisition (expected H1 2026) could add incremental growth points</li>
+        </ul>`
+    },
+    quarterlyRevenue: {
+        title: 'Quarterly Revenue Trend',
+        content: `<p><strong>Quarterly revenue</strong> shows Adobe's sequential growth trajectory and seasonal patterns.</p>
+        <div class="metric-highlight"><strong>For Adobe:</strong> Adobe's fiscal year ends in late November/early December (Q4 ends Nov 30). Q4 is typically the strongest quarter due to enterprise budget cycles. Revenue has grown sequentially in nearly every quarter since FY2018.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Sequential quarterly growth consistency (any deceleration is a red flag)</li>
+            <li>Q1 FY2026 guidance: $6.25-6.30B (vs Q3 FY2025's $5.99B)</li>
+            <li>Acceleration in the back half of FY2026 would indicate AI monetization gaining traction</li>
+        </ul>`
+    },
+    segmentMix: {
+        title: 'Segment Revenue Mix',
+        content: `<p><strong>Segment revenue mix</strong> shows the revenue split between Adobe's two major business segments.</p>
+        <div class="metric-highlight"><strong>For Adobe:</strong> Digital Media (Creative Cloud + Document Cloud) generates ~74% of revenue; Digital Experience (Experience Cloud) generates ~25%. The remaining ~1% is Publishing & Advertising (legacy, declining).</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Digital Experience share gradually expanding (higher-margin enterprise SaaS)</li>
+            <li>Document Cloud (within Digital Media) growing faster than Creative Cloud as Acrobat AI captures business professionals</li>
+            <li>Any compression in Digital Media share could signal Creative Cloud competitive pressure</li>
+        </ul>`
+    },
+    margins: {
+        title: 'Margin Trends',
+        content: `<p><strong>Margin trends</strong> show Adobe's operational efficiency across gross, operating, and net profit margins.</p>
+        <div class="metric-highlight"><strong>For Adobe:</strong> Gross margin is exceptionally high (~89%) reflecting the software-only business model. GAAP operating margin of 36.6% in FY2025 reflects significant stock-based compensation; non-GAAP operating margin is approximately 45%.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Gross margin stability (89%+): declining could signal rising AI inferencing costs</li>
+            <li>GAAP operating margin dip in FY2024 (31.3%) was due to Figma termination-related charges; FY2025 recovery to 36.6% is healthy</li>
+            <li>Management targets non-GAAP operating margin ~45% in FY2026, implying continued investment discipline</li>
+        </ul>`
+    },
+    operatingIncome: {
+        title: 'Operating Income',
+        content: `<p><strong>Operating income</strong> measures profit after operating costs but before interest and taxes.</p>
+        <div class="metric-highlight"><strong>For Adobe:</strong> GAAP operating income grew from $2.2B (FY2017) to $8.7B (FY2025). The FY2024 dip in operating margin (31.3%) was due to a $1B Figma termination fee recorded in Q1 FY2024.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Operating leverage: revenue growing faster than operating expenses signals scalability</li>
+            <li>Stock-based compensation (large at Adobe) creates the gap between GAAP and non-GAAP operating income</li>
+            <li>R&D spend growing as Adobe invests in Firefly and agentic AI features</li>
+        </ul>`
+    },
+    eps: {
+        title: 'Earnings Per Share (EPS)',
+        content: `<p><strong>GAAP EPS</strong> reflects profitability on a per-share basis, benefiting from both net income growth and share buybacks.</p>
+        <div class="metric-highlight"><strong>For Adobe:</strong> GAAP EPS grew from $3.38 (FY2017) to $16.70 (FY2025), a ~22% CAGR. Adobe's aggressive buyback program (reducing shares from 501M to 427M) has meaningfully amplified per-share earnings growth.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Non-GAAP EPS (guidance $23.30-$23.50 for FY2026) is the metric management and analysts focus on</li>
+            <li>Share count reduction via buybacks (~$10-15B annually authorized): accelerates EPS growth</li>
+            <li>The FY2020 EPS spike ($10.83) included a large one-time tax benefit</li>
+        </ul>`
+    },
+    fcf: {
+        title: 'Free Cash Flow',
+        content: `<p><strong>Free cash flow</strong> is operating cash flow minus capital expenditure, representing true cash generation available to shareholders.</p>
+        <div class="metric-highlight"><strong>For Adobe:</strong> Adobe generated $9.85B in FCF in FY2025 (FCF margin ~41%), making it one of the most cash-generative software businesses globally. CapEx is minimal ($179M in FY2025) as Adobe runs a software-only model.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>FCF conversion (FCF / Net Income): Adobe consistently converts >150% of net income to FCF due to non-cash D&A and SBC</li>
+            <li>AI infrastructure costs (GPU compute) could pressure FCF margin if AI adoption outpaces monetization</li>
+            <li>DCF analysis uses $9.85B as the base year FCF; FY2026 guidance implies ~$10.5-11B FCF</li>
+        </ul>`
+    },
+    fcfMargin: {
+        title: 'FCF Margin',
+        content: `<p><strong>FCF margin</strong> (Free Cash Flow / Revenue) measures how efficiently Adobe converts revenue to free cash flow.</p>
+        <div class="metric-highlight"><strong>For Adobe:</strong> FCF margin has expanded from ~37% (FY2017-FY2019) to ~41% (FY2025), reflecting operating leverage in the subscription model. This is among the highest FCF margins in enterprise software.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Target: maintain 40%+ FCF margin as AI investment scales</li>
+            <li>Any compression below 38% would suggest AI costs are outpacing monetization</li>
+            <li>Bull case DCF assumes FCF margin expands to 45%; bear case contracts to 39%</li>
+        </ul>`
+    },
+    cashFlowComponents: {
+        title: 'Cash Flow Components',
+        content: `<p><strong>Cash flow components</strong> shows Operating Cash Flow versus Capital Expenditure, explaining the FCF calculation.</p>
+        <div class="metric-highlight"><strong>For Adobe:</strong> CapEx is extremely low (~1% of revenue) because Adobe is a pure software company with minimal physical infrastructure needs. Most capital goes to cloud infrastructure costs (included in COGS, not CapEx).</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Any step-up in CapEx could indicate Adobe building proprietary AI infrastructure</li>
+            <li>Operating cash flow growing consistently in line with net income</li>
+            <li>FY2024 CapEx was unusually low ($183M) due to deferred hardware purchases; FY2025 also low at $179M</li>
+        </ul>`
+    },
+    arr: {
+        title: 'Annual Recurring Revenue (ARR)',
+        content: `<p><strong>ARR</strong> is the annualized value of subscription contracts, representing Adobe's recurring revenue base.</p>
+        <div class="metric-highlight"><strong>For Adobe:</strong> Total ARR reached $19.20B at end of FY2025 (reported metric; differs from revenue as it is a forward-looking measure of subscription value). FX-revalued starting ARR for FY2026 is $25.66B, reflecting the segment structure change. Management targets >10% ARR growth in FY2026.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Net new ARR per quarter (management targets ~$2.6B net new in FY2026)</li>
+            <li>ARR growth rate vs. revenue growth rate: ARR leads revenue by 1-2 quarters</li>
+            <li>Segment split: Digital Media ARR vs. Digital Experience ARR (Digital Media dominates at ~73%)</li>
+        </ul>`
+    },
+    subscriptionRevenue: {
+        title: 'Subscription Revenue',
+        content: `<p><strong>Subscription revenue</strong> versus total revenue shows Adobe's transition to and maintenance of a near-pure subscription model.</p>
+        <div class="metric-highlight"><strong>For Adobe:</strong> Subscription revenue was 96% of FY2025 total revenue ($22.90B of $23.77B). This is up from ~80% a decade ago when Adobe still had significant perpetual license revenue.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Subscription % approaching 100% (any decline would be unusual)</li>
+            <li>Remaining performance obligations (RPO) of $22.52B (+13% YoY) indicate future revenue visibility</li>
+            <li>Deferred revenue growth is a leading indicator of subscriber momentum</li>
+        </ul>`
+    },
+    segmentRevenue: {
+        title: 'Digital Media vs. Digital Experience Revenue',
+        content: `<p><strong>Segment revenue</strong> compares Adobe's two primary business units over time.</p>
+        <div class="metric-highlight"><strong>For Adobe:</strong> Digital Media (Creative Cloud + Document Cloud) grew 11% in FY2025 to $17.65B. Digital Experience (Experience Cloud) grew 9% to $5.86B. Note: effective Q1 FY2026, Adobe reports as a single segment, so this comparison will no longer be available.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Digital Experience re-acceleration above 10% (currently 9%) would signal enterprise AI traction</li>
+            <li>Digital Media maintaining double-digit growth despite Canva/AI competition is critical</li>
+            <li>Document Cloud contribution within Digital Media growing as Acrobat Studio gains traction</li>
+        </ul>`
+    }
+};
+
+// ============================================================
+// MODAL SYSTEM
+// ============================================================
+function openModal(key) {
+    const desc = metricDescriptions[key];
+    if (!desc) return;
+    document.getElementById('modalTitle').textContent = desc.title;
+    document.getElementById('modalBody').innerHTML = desc.content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('modalOverlay').classList.remove('active'); document.body.style.overflow = ''; } });
+
+// ============================================================
+// CHARTS
+// ============================================================
+function buildCharts() {
+    const fyLabels = fyData.map(d => d.Period);
+    // Recent quarterly labels - last 12 quarters
+    const recentQ = qData.slice(-12);
+    const qLabels = recentQ.map(d => d.Period);
+
+    // 1. Annual Revenue
+    new Chart(document.getElementById('revenueChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'Revenue ($M)',
+                data: fyData.map(d => n(d.Revenue)),
+                backgroundColor: colors.primary + 'aa',
+                borderColor: colors.primary,
+                borderWidth: 2,
+                borderRadius: 4
+            }]
+        },
+        options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: ctx => fmtB(ctx.raw) } } } }
+    });
+
+    // 2. Revenue Growth Rate
+    const fyGrowth = fyData.map((d, i) => {
+        if (i === 0) return null;
+        const prev = n(fyData[i-1].Revenue);
+        return prev ? ((n(d.Revenue) - prev) / prev * 100) : null;
+    });
+    new Chart(document.getElementById('revenueGrowthChart'), {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'YoY Growth (%)',
+                data: fyGrowth,
+                borderColor: colors.warning,
+                backgroundColor: colors.warning + '22',
+                pointBackgroundColor: colors.warning,
+                tension: 0.3,
+                fill: true,
+                borderWidth: 2
+            }]
+        },
+        options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: ctx => ctx.raw ? fmtPct(ctx.raw) : 'N/A' } } }, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, ticks: { color: '#888', callback: v => v + '%' } } } }
+    });
+
+    // 3. Quarterly Revenue
+    new Chart(document.getElementById('quarterlyRevenueChart'), {
+        type: 'bar',
+        data: {
+            labels: qLabels,
+            datasets: [{
+                label: 'Revenue ($M)',
+                data: recentQ.map(d => n(d.Revenue)),
+                backgroundColor: colors.tertiary + 'aa',
+                borderColor: colors.tertiary,
+                borderWidth: 2,
+                borderRadius: 4
+            }]
+        },
+        options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: ctx => fmtB(ctx.raw) } } } }
+    });
+
+    // 4. Segment Revenue Mix (stacked)
+    const fyWithSegments = fyData.filter(d => n(d.DigitalMediaRevenue) > 0 && n(d.DigitalExperienceRevenue) > 0);
+    new Chart(document.getElementById('segmentMixChart'), {
+        type: 'bar',
+        data: {
+            labels: fyWithSegments.map(d => d.Period),
+            datasets: [
+                {
+                    label: 'Digital Media',
+                    data: fyWithSegments.map(d => n(d.DigitalMediaRevenue)),
+                    backgroundColor: colors.primary + 'cc',
+                    borderColor: colors.primary,
+                    borderWidth: 1
+                },
+                {
+                    label: 'Digital Experience',
+                    data: fyWithSegments.map(d => n(d.DigitalExperienceRevenue)),
+                    backgroundColor: colors.tertiary + 'cc',
+                    borderColor: colors.tertiary,
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtB(ctx.raw) } } },
+            scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, stacked: true }, y: { ...chartDefaults.scales.y, stacked: true } }
+        }
+    });
+
+    // 5. Margin Trends
+    new Chart(document.getElementById('marginsChart'), {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'Gross Margin %', data: fyData.map(d => n(d.GrossMargin)), borderColor: colors.primary, backgroundColor: 'transparent', tension: 0.3, borderWidth: 2, pointBackgroundColor: colors.primary },
+                { label: 'Operating Margin %', data: fyData.map(d => n(d.OperatingMargin)), borderColor: colors.tertiary, backgroundColor: 'transparent', tension: 0.3, borderWidth: 2, pointBackgroundColor: colors.tertiary },
+                { label: 'Net Margin %', data: fyData.map(d => n(d.NetMargin)), borderColor: colors.quaternary, backgroundColor: 'transparent', tension: 0.3, borderWidth: 2, pointBackgroundColor: colors.quaternary }
+            ]
+        },
+        options: { ...chartDefaults, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, ticks: { color: '#888', callback: v => v + '%' } } }, plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtPct(ctx.raw) } } } }
+    });
+
+    // 6. Operating Income
+    new Chart(document.getElementById('operatingIncomeChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'Operating Income ($M)',
+                data: fyData.map(d => n(d.OperatingIncome)),
+                backgroundColor: colors.quaternary + 'aa',
+                borderColor: colors.quaternary,
+                borderWidth: 2,
+                borderRadius: 4
+            }]
+        },
+        options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: ctx => fmtB(ctx.raw) } } } }
+    });
+
+    // 7. EPS Trend
+    new Chart(document.getElementById('epsChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                {
+                    label: 'EPS ($)',
+                    data: fyData.map(d => n(d.EPS)),
+                    backgroundColor: colors.warning + 'aa',
+                    borderColor: colors.warning,
+                    borderWidth: 2,
+                    borderRadius: 4,
+                    type: 'bar'
+                }
+            ]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: ctx => '$' + ctx.raw.toFixed(2) } } },
+            scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, ticks: { color: '#888', callback: v => '$' + v } } }
+        }
+    });
+
+    // 8. FCF
+    new Chart(document.getElementById('fcfChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'Free Cash Flow ($M)',
+                data: fyData.map(d => n(d.FreeCashFlow)),
+                backgroundColor: colors.secondary + 'aa',
+                borderColor: colors.secondary,
+                borderWidth: 2,
+                borderRadius: 4
+            }]
+        },
+        options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: ctx => fmtB(ctx.raw) } } } }
+    });
+
+    // 9. FCF Margin
+    const fcfMargins = fyData.map(d => {
+        const rev = n(d.Revenue), fcf = n(d.FreeCashFlow);
+        return rev ? (fcf / rev * 100) : null;
+    });
+    new Chart(document.getElementById('fcfMarginChart'), {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'FCF Margin %',
+                data: fcfMargins,
+                borderColor: colors.secondary,
+                backgroundColor: colors.secondary + '22',
+                pointBackgroundColor: colors.secondary,
+                tension: 0.3,
+                fill: true,
+                borderWidth: 2
+            }]
+        },
+        options: { ...chartDefaults, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, ticks: { color: '#888', callback: v => v + '%' } } }, plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: ctx => fmtPct(ctx.raw) } } } }
+    });
+
+    // 10. Cash Flow Components
+    new Chart(document.getElementById('cashFlowChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'Operating Cash Flow', data: fyData.map(d => n(d.OperatingCashFlow)), backgroundColor: colors.primary + 'cc', borderColor: colors.primary, borderWidth: 1 },
+                { label: 'CapEx (negative)', data: fyData.map(d => -n(d.CapEx)), backgroundColor: colors.danger + 'cc', borderColor: colors.danger, borderWidth: 1 }
+            ]
+        },
+        options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtB(Math.abs(ctx.raw)) } } } }
+    });
+
+    // 11. ARR Growth
+    const fyWithARR = fyData.filter(d => n(d.ARR) > 0);
+    new Chart(document.getElementById('arrChart'), {
+        type: 'bar',
+        data: {
+            labels: fyWithARR.map(d => d.Period),
+            datasets: [{
+                label: 'ARR ($M)',
+                data: fyWithARR.map(d => n(d.ARR)),
+                backgroundColor: colors.primary + 'aa',
+                borderColor: colors.primary,
+                borderWidth: 2,
+                borderRadius: 4
+            }]
+        },
+        options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: ctx => fmtB(ctx.raw) } } } }
+    });
+
+    // 12. Subscription vs Total Revenue
+    const fyWithSub = fyData.filter(d => n(d.SubscriptionRevenue) > 0);
+    new Chart(document.getElementById('subscriptionChart'), {
+        type: 'bar',
+        data: {
+            labels: fyWithSub.map(d => d.Period),
+            datasets: [
+                { label: 'Subscription Revenue', data: fyWithSub.map(d => n(d.SubscriptionRevenue)), backgroundColor: colors.primary + 'cc', borderColor: colors.primary, borderWidth: 1 },
+                { label: 'Other Revenue', data: fyWithSub.map(d => n(d.Revenue) - n(d.SubscriptionRevenue)), backgroundColor: colors.warning + 'cc', borderColor: colors.warning, borderWidth: 1 }
+            ]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtB(ctx.raw) } } },
+            scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, stacked: true }, y: { ...chartDefaults.scales.y, stacked: true } }
+        }
+    });
+
+    // 13. Digital Media vs Digital Experience (grouped)
+    new Chart(document.getElementById('segmentRevenueChart'), {
+        type: 'bar',
+        data: {
+            labels: fyWithSegments.map(d => d.Period),
+            datasets: [
+                { label: 'Digital Media', data: fyWithSegments.map(d => n(d.DigitalMediaRevenue)), backgroundColor: colors.primary + 'cc', borderColor: colors.primary, borderWidth: 1 },
+                { label: 'Digital Experience', data: fyWithSegments.map(d => n(d.DigitalExperienceRevenue)), backgroundColor: colors.tertiary + 'cc', borderColor: colors.tertiary, borderWidth: 1 }
+            ]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmtB(ctx.raw) } } }
+        }
+    });
+}
+
+// ============================================================
+// DCF SECTION
+// ============================================================
+let currentScenario = 'base';
+
+function renderFCFProjections() {
+    const startGrowth = parseFloat(document.getElementById('growthSlider').value);
+    const baseFCF = dcfData.inputs.last_fcf;
+    const endGrowth = 10;
+    const growthRates = [];
+    for (let i = 0; i < 5; i++) {
+        const rate = startGrowth > endGrowth
+            ? startGrowth - (startGrowth - endGrowth) * (i / 4)
+            : startGrowth;
+        growthRates.push(rate);
+    }
+    let fcf = baseFCF;
+    const fcfValues = [baseFCF];
+    for (let i = 0; i < 5; i++) {
+        fcf = fcf * (1 + growthRates[i] / 100);
+        fcfValues.push(fcf);
+    }
+    let html = `<div class="fcf-projection-item header">Base</div>
+        <div class="fcf-projection-item header">Year 1</div>
+        <div class="fcf-projection-item header">Year 2</div>
+        <div class="fcf-projection-item header">Year 3</div>
+        <div class="fcf-projection-item header">Year 4</div>
+        <div class="fcf-projection-item header">Year 5</div>`;
+    html += `<div class="fcf-projection-item"><div class="fcf-value">${fmtB(fcfValues[0])}</div><div class="growth-rate">-</div></div>`;
+    for (let i = 1; i <= 5; i++) {
+        html += `<div class="fcf-projection-item"><div class="fcf-value">${fmtB(fcfValues[i])}</div><div class="growth-rate">+${growthRates[i-1].toFixed(0)}%</div></div>`;
+    }
+    document.getElementById('fcfProjectionTable').innerHTML = html;
+}
+
+function calculateDCF(startGrowth, wacc, terminalGrowth) {
+    const years = 5;
+    const fcf = dcfData.inputs.last_fcf;
+    let pvFCF = 0;
+    let projectedFCF = fcf;
+    const endGrowth = 10;
+    for (let i = 0; i < years; i++) {
+        const yearGrowth = startGrowth > endGrowth ? startGrowth - (startGrowth - endGrowth) * (i / 4) : startGrowth;
+        projectedFCF *= (1 + yearGrowth / 100);
+        pvFCF += projectedFCF / Math.pow(1 + wacc / 100, i + 1);
+    }
+    const terminalFCF = projectedFCF * (1 + terminalGrowth / 100);
+    const terminalValue = terminalFCF / (wacc / 100 - terminalGrowth / 100);
+    const pvTerminal = terminalValue / Math.pow(1 + wacc / 100, years);
+    const enterpriseValue = pvFCF + pvTerminal;
+    const equityValue = enterpriseValue - dcfData.inputs.net_debt;
+    const iv = equityValue / dcfData.inputs.shares_outstanding;
+    const terminalPerShare = terminalValue / dcfData.inputs.shares_outstanding;
+    const entryPrice = terminalPerShare / Math.pow(1.15, years);
+    return { iv, entryPrice };
+}
+
+window.updateDCFDisplay = function() {
+    const growth = parseFloat(document.getElementById('growthSlider').value);
+    const wacc = parseFloat(document.getElementById('waccSlider').value);
+    const terminal = parseFloat(document.getElementById('terminalSlider').value);
+    document.getElementById('growthValue').textContent = growth + '%';
+    document.getElementById('waccValue').textContent = wacc + '%';
+    document.getElementById('terminalValue').textContent = terminal + '%';
+    renderFCFProjections();
+    const result = calculateDCF(growth, wacc, terminal);
+    document.getElementById('dcfIV').textContent = '$' + result.iv.toFixed(0);
+    document.getElementById('dcfEntry').textContent = '$' + result.entryPrice.toFixed(0);
+    const upside = (result.iv - dcfData.current_price) / dcfData.current_price * 100;
+    const upsideEl = document.getElementById('dcfUpside');
+    upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(0) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+    upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+    document.getElementById('dcfWeighted').textContent = '$' + dcfData.probability_weighted.weighted_iv.toFixed(0);
+    const grid = document.getElementById('assumptionGrid');
+    if (grid) {
+        grid.innerHTML = `
+            <div class="assumption-item"><div class="label">Growth Rate</div><div class="value">${growth}%</div></div>
+            <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc}%</div></div>
+            <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${terminal}%</div></div>
+            <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa;">$${result.iv.toFixed(0)}</div></div>
+            <div class="assumption-item"><div class="label">Entry Price (15% CAGR)</div><div class="value" style="color:#00d4aa;">$${result.entryPrice.toFixed(0)}</div></div>
+        `;
+    }
+};
+
+window.switchScenario = function(scenario) {
+    currentScenario = scenario;
+    document.querySelectorAll('.scenario-tab').forEach(t => t.classList.toggle('active', t.dataset.scenario === scenario));
+    const assumptions = dcfData.assumptions[scenario];
+    const valuation = dcfData.valuation[scenario];
+    const entryPrice = dcfData.entry_price[scenario];
+    document.getElementById('growthSlider').value = assumptions.growth_rates[0];
+    document.getElementById('waccSlider').value = assumptions.wacc;
+    document.getElementById('terminalSlider').value = assumptions.terminal_growth;
+    const grid = document.getElementById('assumptionGrid');
+    grid.innerHTML = `
+        <div class="assumption-item"><div class="label">Year 1 Growth</div><div class="value">${assumptions.growth_rates[0]}%</div></div>
+        <div class="assumption-item"><div class="label">Year 5 Growth</div><div class="value">${assumptions.growth_rates[4]}%</div></div>
+        <div class="assumption-item"><div class="label">FCF Margin</div><div class="value">${assumptions.fcf_margin}%</div></div>
+        <div class="assumption-item"><div class="label">WACC</div><div class="value">${assumptions.wacc}%</div></div>
+        <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${assumptions.terminal_growth}%</div></div>
+        <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa;">$${valuation.intrinsic_value.toFixed(0)}</div></div>
+        <div class="assumption-item"><div class="label">Entry Price (15%)</div><div class="value" style="color:#00d4aa;">$${entryPrice.entry_price.toFixed(0)}</div></div>
+    `;
+    updateDCFDisplay();
+};
+
+function renderHistoricalGrowth() {
+    const growth = dcfData.historical_growth;
+    const selectedSource = growth.growth_rate_source;
+    const metrics = [
+        { key: 'revenue_3yr_cagr', label: 'Revenue 3Y' },
+        { key: 'revenue_5yr_cagr', label: 'Revenue 5Y' },
+        { key: 'eps_3yr_cagr', label: 'EPS 3Y' },
+        { key: 'eps_5yr_cagr', label: 'EPS 5Y' },
+        { key: 'equity_3yr_cagr', label: 'Equity 3Y' },
+        { key: 'equity_5yr_cagr', label: 'Equity 5Y' },
+        { key: 'fcf_3yr_cagr', label: 'FCF 3Y' },
+        { key: 'fcf_5yr_cagr', label: 'FCF 5Y' }
+    ];
+    document.getElementById('growthGrid').innerHTML = metrics.map(m => {
+        const rate = growth[m.key];
+        const isSelected = m.key === selectedSource;
+        const colorClass = rate >= 0 ? 'positive' : 'negative';
+        return `<div class="growth-item ${isSelected ? 'selected' : ''}">
+            <div class="metric">${m.label}</div>
+            <div class="rate ${colorClass}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div>
+        </div>`;
+    }).join('');
+}
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const currentPrice = dcfData.current_price;
+    let html = '<tr><th>WACC \\ Term G</th>';
+    sens.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+    html += '</tr>';
+    sens.wacc_range.forEach((wacc, i) => {
+        html += `<tr><th>${wacc}%</th>`;
+        sens.matrix[i].forEach((val, j) => {
+            const isHighlight = wacc === dcfData.assumptions.base.wacc && sens.terminal_growth_range[j] === dcfData.assumptions.base.terminal_growth;
+            const colorClass = val >= currentPrice ? 'above-current' : 'below-current';
+            html += `<td class="${isHighlight ? 'highlight' : colorClass}">$${val}</td>`;
+        });
+        html += '</tr>';
+    });
+    document.getElementById('sensitivityMatrix').innerHTML = html;
+}
+
+function initDCF() {
+    document.getElementById('dcfCurrent').textContent = '$' + dcfData.current_price.toFixed(0);
+    if (dcfData.historical_growth.growth_divergence_warning) {
+        document.getElementById('growthWarning').style.display = 'flex';
+        document.getElementById('warningText').textContent = dcfData.historical_growth.growth_divergence_warning;
+    }
+    document.getElementById('growthSlider').value = dcfData.historical_growth.selected_growth_rate;
+    document.getElementById('waccSlider').value = dcfData.assumptions.base.wacc;
+    document.getElementById('terminalSlider').value = dcfData.assumptions.base.terminal_growth;
+    document.getElementById('growthValue').textContent = dcfData.historical_growth.selected_growth_rate + '%';
+    document.getElementById('waccValue').textContent = dcfData.assumptions.base.wacc + '%';
+    document.getElementById('terminalValue').textContent = dcfData.assumptions.base.terminal_growth + '%';
+    document.getElementById('growthHint').textContent = 'Based on ' + dcfData.historical_growth.growth_rate_source.replace(/_/g, ' ');
+    renderFCFProjections();
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    switchScenario('base');
+    updateDCFDisplay();
+}
+
+// Bind slider events
+(function() {
+    ['growthSlider','waccSlider','terminalSlider'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.oninput = window.updateDCFDisplay; el.onchange = window.updateDCFDisplay; }
+    });
+})();
+
+// ============================================================
+// INIT
+// ============================================================
+renderOverview();
+renderKPIs();
+renderGuidance();
+buildCharts();
+initDCF();
+</script>
+</body>
+</html>
