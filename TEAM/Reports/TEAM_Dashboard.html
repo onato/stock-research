@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atlassian Corporation (TEAM) Financial Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: #e0e0e0; min-height: 100vh; padding: 20px; }
+        .header { text-align: center; margin-bottom: 30px; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 15px; backdrop-filter: blur(10px); }
+        .header h1 { font-size: 2.5rem; background: linear-gradient(90deg, #00d4aa, #00b894); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 10px; }
+        .header p { color: #888; font-size: 1.1rem; }
+        .header-meta { display: flex; justify-content: center; gap: 30px; margin-top: 12px; flex-wrap: wrap; }
+        .header-meta span { font-size: 0.9rem; color: #aaa; }
+        .header-meta strong { color: #00d4aa; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px; max-width: 1400px; margin-left: auto; margin-right: auto; }
+        .kpi-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; text-align: center; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s ease, box-shadow 0.3s ease; }
+        .kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0,212,170,0.2); }
+        .kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+        .kpi-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        .kpi-change { font-size: 0.9rem; margin-top: 5px; }
+        .kpi-change.positive { color: #00d4aa; }
+        .kpi-change.negative { color: #ff6b6b; }
+        .guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+        .guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .guidance-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+        .guidance-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg,#00d4aa,#00b894); border-radius: 2px; }
+        .guidance-meta { font-size: 0.85rem; color: #888; }
+        .guidance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .guidance-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 18px; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s ease; }
+        .guidance-card:hover { transform: translateY(-2px); }
+        .guidance-metric { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+        .guidance-target { font-size: 1.4rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; }
+        .guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
+        .guidance-vs-prior { display: inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+        .guidance-vs-prior.raised { background: rgba(0,212,170,0.15); color: #00d4aa; }
+        .guidance-vs-prior.lowered { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+        .guidance-vs-prior.maintained { background: rgba(255,255,255,0.1); color: #888; }
+        .guidance-vs-prior.improved { background: rgba(0,212,170,0.1); color: #00b894; }
+        .guidance-vs-prior.new { background: rgba(99,102,241,0.15); color: #818cf8; }
+        .guidance-vs-prior.raised-slightly { background: rgba(0,212,170,0.1); color: #00b894; }
+        .guidance-notes { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
+        .guidance-commentary { background: rgba(255,255,255,0.03); border-radius: 10px; padding: 16px 20px; border-left: 3px solid #00d4aa; font-style: italic; color: #b0b0b0; line-height: 1.6; }
+        .guidance-commentary::before { content: '"'; font-size: 1.5rem; color: #00d4aa; margin-right: 4px; }
+        .section-title { font-size: 1.5rem; color: #fff; margin: 40px auto 20px; padding-bottom: 10px; border-bottom: 2px solid rgba(0,212,170,0.3); max-width: 1400px; }
+        .charts-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 25px; max-width: 1400px; margin: 0 auto; }
+        .chart-card { background: rgba(255,255,255,0.05); border-radius: 15px; padding: 25px; border: 1px solid rgba(255,255,255,0.1); }
+        .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+        .chart-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+        .chart-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg,#00d4aa,#00b894); border-radius: 2px; }
+        .help-btn { width: 24px; height: 24px; border-radius: 50%; background: rgba(0,212,170,0.2); border: 1px solid #00d4aa; color: #00d4aa; font-size: 14px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; flex-shrink: 0; }
+        .help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+        .chart-wrapper { position: relative; height: 300px; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: linear-gradient(135deg,#1e2a4a 0%,#16213e 100%); border-radius: 16px; max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto; border: 1px solid rgba(0,212,170,0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+        .modal-header { padding: 20px 25px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h3 { color: #00d4aa; font-size: 1.4rem; margin: 0; }
+        .modal-close { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,107,107,0.2); border: 1px solid #ff6b6b; color: #ff6b6b; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .modal-close:hover { background: #ff6b6b; color: #fff; }
+        .modal-body { padding: 25px; line-height: 1.7; }
+        .modal-body p { margin-bottom: 15px; }
+        .modal-body strong { color: #00d4aa; }
+        .modal-body ul { margin: 15px 0; padding-left: 20px; }
+        .modal-body li { margin-bottom: 8px; }
+        .metric-highlight { background: rgba(0,212,170,0.1); border-left: 3px solid #00d4aa; padding: 12px 15px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+        .overview-section { max-width: 1400px; margin: 0 auto 30px; }
+        .overview-toggle { width: 100%; background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.3); border-radius: 12px; padding: 16px 24px; color: #00d4aa; font-size: 1.1rem; font-weight: 600; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease; }
+        .overview-toggle:hover { background: rgba(0,212,170,0.2); }
+        .overview-toggle .arrow { transition: transform 0.3s ease; }
+        .overview-toggle.active .arrow { transform: rotate(180deg); }
+        .overview-content { display: none; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-top: none; border-radius: 0 0 12px 12px; padding: 30px; margin-top: -12px; }
+        .overview-content.active { display: block; }
+        .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+        .overview-card { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; border: 1px solid rgba(255,255,255,0.08); }
+        .overview-card h3 { color: #00d4aa; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .overview-card p { margin-bottom: 12px; line-height: 1.6; }
+        .overview-card ul { list-style: none; padding: 0; margin: 0; }
+        .overview-card li { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); line-height: 1.5; }
+        .overview-card li:last-child { border-bottom: none; }
+        .overview-card.bull h3 { color: #00d4aa; }
+        .overview-card.bear h3 { color: #ff6b6b; }
+        .overview-card.risks h3 { color: #fdcb6e; }
+        .risk-high { color: #ff6b6b; }
+        .risk-moderate { color: #fdcb6e; }
+        .risk-low { color: #00d4aa; }
+        .revenue-stream { display: flex; justify-content: space-between; align-items: center; }
+        .revenue-stream .percent { color: #00d4aa; font-weight: 600; }
+        .trend-growing { color: #00d4aa; }
+        .trend-stable { color: #888; }
+        .trend-peaking { color: #fdcb6e; }
+        .trend-declining { color: #ff6b6b; }
+        /* DCF Styles */
+        .dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+        .dcf-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .dcf-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 24px; text-align: center; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s ease; }
+        .dcf-card:hover { transform: translateY(-3px); }
+        .dcf-card.highlight { background: rgba(0,212,170,0.1); border-color: rgba(0,212,170,0.3); }
+        .dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .dcf-value { font-size: 2.2rem; font-weight: bold; color: #00d4aa; }
+        .dcf-card:not(.highlight) .dcf-value { color: #fff; }
+        .dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+        .dcf-change.positive { color: #00d4aa; }
+        .dcf-change.negative { color: #ff6b6b; }
+        .dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
+        .dcf-warning { background: rgba(253,203,110,0.15); border: 1px solid rgba(253,203,110,0.4); border-radius: 8px; padding: 12px 16px; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; color: #fdcb6e; }
+        .warning-icon { font-size: 1.2rem; }
+        .dcf-inputs { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.08); }
+        .dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+        .dcf-inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .dcf-input-card { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
+        .dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #00d4aa; }
+        .dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
+        .fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
+        .fcf-projection-table { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 12px; }
+        .fcf-projection-item { text-align: center; }
+        .fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
+        .fcf-projection-item .fcf-value { font-size: 1rem; color: #e0e0e0; font-weight: 500; }
+        .fcf-projection-item .growth-rate { font-size: 0.75rem; color: #00d4aa; margin-top: 2px; }
+        .dcf-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; margin-bottom: 30px; padding: 25px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
+        .slider-group { display: flex; flex-direction: column; gap: 10px; }
+        .slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+        .slider-group label span { color: #00d4aa; font-weight: 600; }
+        .slider-group input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); outline: none; }
+        .slider-group input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #00d4aa; cursor: pointer; transition: transform 0.2s; }
+        .slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        .slider-hint { font-size: 0.8rem; color: #666; }
+        .scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .scenario-tab { padding: 10px 24px; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: #888; border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s; }
+        .scenario-tab:hover { border-color: rgba(0,212,170,0.5); color: #e0e0e0; }
+        .scenario-tab.active { background: rgba(0,212,170,0.15); border-color: #00d4aa; color: #00d4aa; }
+        .scenario-details { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.08); }
+        .scenario-details h4 { color: #00d4aa; margin-bottom: 15px; }
+        .assumption-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+        .assumption-item { text-align: center; }
+        .assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+        .assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
+        .sensitivity-section { margin-bottom: 30px; }
+        .sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; }
+        .sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.03); border-radius: 8px; overflow: hidden; }
+        .sensitivity-table th, .sensitivity-table td { padding: 12px 16px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+        .sensitivity-table th { background: rgba(0,212,170,0.1); color: #00d4aa; font-weight: 600; }
+        .sensitivity-table td { color: #e0e0e0; }
+        .sensitivity-table td.highlight { background: rgba(0,212,170,0.15); color: #00d4aa; font-weight: 600; }
+        .sensitivity-table td.below-current { color: #ff6b6b; }
+        .sensitivity-table td.above-current { color: #00d4aa; }
+        .historical-growth { margin-bottom: 30px; }
+        .historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
+        .growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
+        .growth-item { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 15px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+        .growth-item .metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
+        .growth-item .rate { font-size: 1.2rem; font-weight: 600; }
+        .growth-item .rate.positive { color: #00d4aa; }
+        .growth-item .rate.negative { color: #ff6b6b; }
+        .growth-item .rate.na { color: #666; font-size: 0.95rem; }
+        .growth-item.selected { border-color: #00d4aa; background: rgba(0,212,170,0.1); }
+        .dcf-download { text-align: center; margin-top: 30px; }
+        .download-btn { display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; background: rgba(0,212,170,0.15); border: 1px solid #00d4aa; border-radius: 8px; color: #00d4aa; text-decoration: none; font-weight: 600; transition: all 0.2s; }
+        .download-btn:hover { background: #00d4aa; color: #1a1a2e; }
+        .download-icon { font-size: 1.2rem; }
+        @media (max-width: 768px) { .charts-container { grid-template-columns: 1fr; } .overview-grid { grid-template-columns: 1fr; } .header h1 { font-size: 1.8rem; } .fcf-projection-table { grid-template-columns: repeat(3,1fr); } }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Atlassian Corporation (TEAM)</h1>
+    <p>Enterprise SaaS - Team Collaboration & Developer Tooling</p>
+    <div class="header-meta">
+        <span>Jira | Confluence | JSM | Loom | Rovo</span>
+        <span>FY ends June 30</span>
+        <span>Dashboard as of <strong>February 2026</strong></span>
+        <span>Price: <strong>$68.81</strong></span>
+        <span>350K+ customers | Cloud NRR 120%+</span>
+    </div>
+</div>
+
+<!-- Investment Overview -->
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid" id="overviewGrid"></div>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<!-- Management Guidance -->
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf"></span> | <span id="guidanceFY"></span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<!-- Revenue & Growth -->
+<h2 class="section-title">Revenue &amp; Growth</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header"><h3>Total Revenue (Annual)</h3><button class="help-btn" onclick="openModal('revenue')">?</button></div>
+        <div class="chart-wrapper"><canvas id="revenueChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header"><h3>Revenue Composition (Annual)</h3><button class="help-btn" onclick="openModal('revenueComposition')">?</button></div>
+        <div class="chart-wrapper"><canvas id="revenueCompositionChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header"><h3>Cloud Revenue Growth (Quarterly)</h3><button class="help-btn" onclick="openModal('cloudGrowth')">?</button></div>
+        <div class="chart-wrapper"><canvas id="cloudGrowthChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header"><h3>Revenue YoY Growth Rate (Annual)</h3><button class="help-btn" onclick="openModal('revenueGrowthRate')">?</button></div>
+        <div class="chart-wrapper"><canvas id="revenueGrowthChart"></canvas></div>
+    </div>
+</div>
+
+<!-- Profitability & Cash Flow -->
+<h2 class="section-title">Profitability &amp; Cash Flow</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header"><h3>Gross Margin Trend (Annual)</h3><button class="help-btn" onclick="openModal('grossMargin')">?</button></div>
+        <div class="chart-wrapper"><canvas id="grossMarginChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header"><h3>Free Cash Flow (Annual)</h3><button class="help-btn" onclick="openModal('fcf')">?</button></div>
+        <div class="chart-wrapper"><canvas id="fcfChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header"><h3>FCF Margin (Annual)</h3><button class="help-btn" onclick="openModal('fcfMargin')">?</button></div>
+        <div class="chart-wrapper"><canvas id="fcfMarginChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header"><h3>OpEx as % of Revenue (Annual)</h3><button class="help-btn" onclick="openModal('opex')">?</button></div>
+        <div class="chart-wrapper"><canvas id="opexChart"></canvas></div>
+    </div>
+</div>
+
+<!-- Balance Sheet -->
+<h2 class="section-title">Balance Sheet</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header"><h3>Cash &amp; Investments vs Debt (Annual)</h3><button class="help-btn" onclick="openModal('cashDebt')">?</button></div>
+        <div class="chart-wrapper"><canvas id="cashDebtChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header"><h3>Shareholders' Equity (Annual)</h3><button class="help-btn" onclick="openModal('equity')">?</button></div>
+        <div class="chart-wrapper"><canvas id="equityChart"></canvas></div>
+    </div>
+</div>
+
+<!-- Quarterly Trends -->
+<h2 class="section-title">Quarterly Trends</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header"><h3>Quarterly Revenue</h3><button class="help-btn" onclick="openModal('qRevenue')">?</button></div>
+        <div class="chart-wrapper"><canvas id="qRevenueChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header"><h3>Quarterly Cloud vs Data Center Revenue</h3><button class="help-btn" onclick="openModal('qCloudDC')">?</button></div>
+        <div class="chart-wrapper"><canvas id="qCloudDCChart"></canvas></div>
+    </div>
+</div>
+
+<!-- DCF Valuation -->
+<h2 class="section-title">DCF Valuation</h2>
+<div class="dcf-section">
+    <div class="dcf-summary">
+        <div class="dcf-card highlight">
+            <div class="dcf-label">Intrinsic Value (Base)</div>
+            <div class="dcf-value" id="dcfIV">$138</div>
+            <div class="dcf-change positive" id="dcfUpside">+100% upside</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Entry Price (15% CAGR)</div>
+            <div class="dcf-value" id="dcfEntry">$82</div>
+            <div class="dcf-sublabel">Buy below for 15% annual return</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Current Price</div>
+            <div class="dcf-value" id="dcfCurrent">$68.81</div>
+            <div class="dcf-sublabel">As of Feb 24, 2026</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Prob-Weighted IV</div>
+            <div class="dcf-value" id="dcfWeighted">$142</div>
+            <div class="dcf-sublabel">25% Bull / 50% Base / 25% Bear</div>
+        </div>
+    </div>
+
+    <div class="dcf-warning" id="growthWarning" style="display:none;">
+        <span class="warning-icon">&#9888;</span>
+        <span id="warningText"></span>
+    </div>
+
+    <div class="dcf-inputs">
+        <h4>DCF Model Inputs</h4>
+        <div class="dcf-inputs-grid">
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Base Year FCF</div>
+                <div class="dcf-input-value" id="baseFCF">$1,416M</div>
+                <div class="dcf-input-note">FY2025 Free Cash Flow</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Shares Outstanding</div>
+                <div class="dcf-input-value" id="sharesOut">263.8M</div>
+                <div class="dcf-input-note">Diluted, Q2 FY26</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Net Debt / (Cash)</div>
+                <div class="dcf-input-value" id="netDebt" style="color:#00d4aa;">-$577M</div>
+                <div class="dcf-input-note">Net cash position</div>
+            </div>
+        </div>
+        <div class="fcf-projections">
+            <h5>Projected FCF (5-Year, based on slider)</h5>
+            <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+        </div>
+    </div>
+
+    <div class="dcf-controls">
+        <div class="slider-group">
+            <label>Growth Rate (Year 1): <span id="growthValue">23.6%</span></label>
+            <input type="range" id="growthSlider" min="0" max="40" value="23.6" step="0.5">
+            <div class="slider-hint" id="growthHint">Based on FCF 3-year CAGR</div>
+        </div>
+        <div class="slider-group">
+            <label>WACC: <span id="waccValue">10%</span></label>
+            <input type="range" id="waccSlider" min="6" max="18" value="10" step="0.5">
+        </div>
+        <div class="slider-group">
+            <label>Terminal Growth: <span id="terminalValue">3%</span></label>
+            <input type="range" id="terminalSlider" min="0" max="5" value="3" step="0.5">
+        </div>
+    </div>
+
+    <div class="scenario-tabs">
+        <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+        <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+        <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+    </div>
+
+    <div class="scenario-details" id="scenarioDetails">
+        <h4>Assumptions</h4>
+        <div class="assumption-grid" id="assumptionGrid"></div>
+    </div>
+
+    <div class="sensitivity-section">
+        <h4>Sensitivity Analysis: Intrinsic Value by WACC &amp; Terminal Growth</h4>
+        <table class="sensitivity-table" id="sensitivityMatrix"></table>
+    </div>
+
+    <div class="historical-growth">
+        <h4>Historical Growth Rates (CAGR)</h4>
+        <div class="growth-grid" id="growthGrid"></div>
+    </div>
+
+    <div class="dcf-download">
+        <a href="TEAM_DCF_Model.xlsx" class="download-btn" download>
+            <span class="download-icon">&#8681;</span> Download Excel Model
+        </a>
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&#10005;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// EMBEDDED CSV DATA
+// ============================================================
+const csvData = `Period,Revenue,SubscriptionRevenue,MaintenanceRevenue,OtherRevenue,CloudRevenue,DataCenterRevenue,ServerRevenue,MarketplaceAndServices,CostOfRevenue,GrossProfit,GrossMargin,RnDExpense,SalesAndMarketing,GnAExpense,OperatingIncome,OperatingMargin,NetIncome,EPSDiluted,OperatingCashFlow,CapEx,FreeCashFlow,CashAndInvestments,TotalDebt,ShareholdersEquity,SharesOutstanding,Notes
+Q1 FY2022,614.0,435.3,130.6,48.1,317.9,111.2,139.5,45.4,96.3,517.8,84.3,272.1,99.3,89.8,56.5,9.2,-411.2,-1.63,,,,,,,,255.2,
+Q2 FY2022,688.5,509.0,127.1,52.5,,,,,,,,,,,,,,,,,,,,,,255.9,
+Q3 FY2022,740.5,,,,,,,,,,,,,,,,,,,,,,,,234.6,
+Q4 FY2022,759.8,597.3,117.1,45.4,,,,,130.4,629.4,82.9,367.0,173.1,131.7,-42.3,-5.6,-90.6,-0.36,,,,1458.6,999.4,327.4,253.3,
+Q1 FY2023,807.4,651.0,113.6,42.8,475.0,171.2,113.8,47.3,139.4,668.0,82.7,399.0,160.1,142.9,-34.0,-4.2,-13.7,-0.05,92.4,16.5,75.9,1523.1,999.5,480.6,255.2,
+Q2 FY2023,872.7,711.2,106.0,55.5,512.3,194.3,106.2,60.0,155.9,716.8,82.1,473.7,186.2,156.1,-99.2,-11.4,-205.0,-0.80,150.5,4.0,146.5,1672.7,999.5,577.5,255.9,
+Q3 FY2023,915.5,760.7,94.2,60.5,534.9,221.6,94.4,64.6,168.7,746.8,81.6,522.3,220.9,165.1,-161.6,-17.6,-209.0,-0.81,352.4,2.7,349.7,1982.2,999.6,582.3,256.8,
+Q4 FY2023,939.1,799.7,85.9,53.5,563.2,232.2,86.1,57.5,169.8,769.3,81.9,474.9,202.6,142.2,-50.4,-5.4,-59.0,-0.23,272.8,2.4,270.4,2112.6,999.6,654.7,257.4,
+Q1 FY2024,977.8,852.0,78.6,47.2,604.6,242.9,78.8,51.4,178.0,799.7,81.8,481.7,193.6,143.3,-18.9,-1.9,-31.9,-0.12,167.0,3.7,163.3,2237.8,999.6,774.6,257.9,
+Q2 FY2024,1060.1,932.2,69.1,58.8,653.2,274.8,69.2,63.0,194.5,865.6,81.7,536.8,220.5,157.3,-49.1,-4.6,-84.5,-0.33,289.6,5.3,284.3,1611.3,987.2,904.9,258.6,
+Q3 FY2024,1189.1,1071.4,29.5,88.2,703.0,364.1,29.7,92.2,213.4,975.7,82.1,576.5,223.8,157.6,17.8,1.5,12.8,0.05,565.4,10.5,554.9,2112.3,974.7,1134.2,261.8,
+Q4 FY2024,1131.6,1068.9,0.0,62.7,738.0,326.7,0.0,66.9,217.5,914.1,80.8,589.1,239.6,152.3,-67.0,-5.9,-196.9,-0.76,426.2,13.1,413.2,2338.9,985.9,1032.9,260.3,
+Q1 FY2025,1187.8,1131.9,0.0,55.8,792.3,335.6,0.0,59.9,217.6,970.2,81.7,603.1,252.4,146.6,-32.0,-2.7,-123.8,-0.48,80.5,6.2,74.3,2217.0,986.3,1028.8,260.5,
+Q2 FY2025,1286.5,1213.2,0.0,73.2,847.0,362.3,0.0,77.2,223.1,1063.3,82.7,680.2,271.9,168.7,-57.5,-4.5,-38.2,-0.15,351.9,9.3,342.6,2469.2,986.8,1219.6,261.1,
+Q3 FY2025,1356.7,1272.9,0.0,83.8,880.4,388.5,0.0,87.8,219.7,1137.0,83.8,685.3,295.8,168.3,-12.5,-0.9,-70.8,-0.27,652.7,14.4,638.3,2974.5,987.2,1368.9,262.7,
+Q4 FY2025,1384.3,1312.5,0.0,71.8,927.7,380.8,0.0,75.8,234.4,1149.9,83.1,700.7,314.4,163.3,-28.5,-2.1,-23.9,-0.09,375.3,15.0,360.3,2937.2,987.7,1345.7,262.9,
+Q1 FY2026,1432.6,1374.5,0.0,58.1,997.7,372.6,0.0,62.2,257.9,1174.6,82.0,756.0,336.4,178.5,-96.3,-6.7,-51.9,-0.20,128.7,14.1,114.6,2778.4,988.1,1379.0,263.0,
+Q2 FY2026,1586.3,1507.7,0.0,78.7,1067.0,435.6,0.0,83.7,237.7,1348.6,85.0,826.5,376.4,193.4,-47.7,-3.0,-42.6,-0.16,177.8,9.3,168.5,1566.0,988.6,1590.8,263.8,
+FY2016,457.1,146.7,218.8,26.1,,,,,75.8,381.3,83.4,208.3,93.4,85.5,-5.9,-1.3,4.4,0.02,129.5,34.2,95.3,743.1,0.0,731.7,193.5,
+FY2017,619.9,242.1,265.5,37.7,,,,,119.2,500.8,80.8,310.2,134.9,118.8,-63.1,-10.2,-42.5,-0.19,199.4,16.1,183.3,549.9,0.0,894.0,222.2,
+FY2018,881.0,410.7,325.9,60.6,,,,,172.7,708.3,80.4,415.8,187.3,151.2,-46.0,-5.2,-113.4,-0.49,311.5,30.2,281.2,1733.5,819.6,907.3,231.2,
+FY2019,1210.1,634.0,394.5,88.1,,,,,210.3,999.8,82.6,579.1,268.4,215.7,-63.4,-5.2,-637.6,-2.67,466.3,44.2,422.2,1713.5,853.6,565.5,238.6,
+FY2020,1614.2,931.5,469.4,118.2,,,,,268.8,1345.4,83.3,763.2,299.7,268.4,14.1,0.9,-350.7,-1.43,574.2,35.7,500.4,2156.1,889.2,575.3,244.8,
+FY2021,2089.1,1324.1,523.0,157.3,967.8,336.3,607.8,177.2,336.0,1753.1,83.9,963.3,372.9,315.2,101.6,4.9,-696.3,-2.79,841.3,31.5,809.8,1232.2,348.8,294.9,249.7,
+FY2022,2802.9,2096.7,495.1,211.1,1515.4,560.3,525.0,202.1,452.9,2349.9,83.8,1291.9,535.8,452.2,70.1,2.5,-519.5,-2.05,821.0,70.6,750.4,1458.6,999.4,327.4,253.3,
+FY2023,3534.6,2922.6,399.7,212.3,2085.5,819.3,400.5,229.4,633.8,2900.9,82.1,1869.9,769.9,606.4,-345.2,-9.8,-486.8,-1.90,868.1,25.7,842.5,2112.6,999.6,654.7,256.3,
+FY2024,4358.6,3908.7,177.6,273.6,2698.9,1208.5,177.6,273.6,803.5,3555.1,81.6,2184.0,877.2,610.5,-117.1,-2.7,-300.5,-1.16,1448.2,32.6,1415.6,2338.9,985.9,1032.9,259.1,
+FY2025,5215.3,4914.6,0.0,300.7,3447.4,1467.2,0.0,300.7,894.8,4320.5,82.8,2669.3,1134.5,646.7,-130.4,-2.5,-256.7,-0.98,1460.4,44.9,1415.5,2937.2,987.7,1345.7,261.8`;
+
+// ============================================================
+// EMBEDDED ANALYSIS JSON
+// ============================================================
+const analysis = {
+  "ticker": "TEAM",
+  "company_name": "Atlassian Corporation",
+  "analysis_date": "2026-02-24",
+  "overview": "Atlassian Corporation is an enterprise software company that develops team collaboration and productivity tools, including Jira (project and issue tracking), Confluence (knowledge base and wiki), Jira Service Management (ITSM), Loom (async video), and Rovo (AI-powered search and agents). The company serves over 350,000 customers globally, including 80% of the Fortune 500, through a cloud-first subscription model with no traditional direct sales force. Atlassian's products span three growing markets: software development, work management, and service management, with a combined addressable market of approximately $67 billion.",
+  "business_model": {
+    "summary": "Atlassian generates revenue almost entirely from subscriptions, split across Cloud (67%), Data Center on-premise (27%), and Marketplace/other (5%). The company pioneered a low-cost, product-led growth (PLG) model where software is sold via self-service with no enterprise sales team, relying on viral adoption within organizations and a land-and-expand strategy. Cloud NRR of 120%+ reflects strong customer expansion driven by seat growth, edition upgrades, and cross-sell of additional products.",
+    "revenue_streams": [
+      {"name": "Cloud", "percent": 67, "trend": "growing", "notes": "Q2 FY26 run-rate: $4.3B annualized; grew 26% YoY; first $1B+ cloud quarter in Q2 FY26"},
+      {"name": "Data Center", "percent": 27, "trend": "peaking", "notes": "Growing now (20% YoY in FY26) due to EOL-driven revenue recognition pull-forward; will decelerate materially in FY27"},
+      {"name": "Marketplace and other", "percent": 5, "trend": "stable", "notes": "Third-party app sales; lower take rate on cloud apps vs. Data Center"}
+    ]
+  },
+  "competitive_position": {
+    "main_competitors": ["Microsoft (Azure DevOps, GitHub, Teams, Planner, Loop)","ServiceNow (ITSM, workflow automation)","Monday.com (work management)","Asana (project management)","GitLab (DevOps platform)","Zendesk (customer service management)","Notion (knowledge management)","Linear (developer project tracking)"],
+    "moat_factors": [
+      {"factor": "Switching costs and deep workflow integration","strength": "strong","description": "Jira and Confluence are deeply embedded in daily engineering and business workflows. Years of accumulated data, customized workflows, and integrations make migration expensive and disruptive."},
+      {"factor": "Teamwork Graph and proprietary AI data","strength": "strong","description": "Atlassian's Teamwork Graph now tracks 100B+ objects and connections across all products, creating a proprietary contextual data layer that powers Rovo AI."},
+      {"factor": "Platform ecosystem and Marketplace","strength": "strong","description": "The Atlassian Marketplace has thousands of third-party apps, creating network effects and increasing stickiness."},
+      {"factor": "Brand recognition in developer/technical community","strength": "strong","description": "Jira and Confluence are near-universal standards in software development."},
+      {"factor": "No traditional sales force (PLG efficiency)","strength": "moderate","description": "Historically a competitive advantage, now evolving as Atlassian builds enterprise sales capacity."},
+      {"factor": "Cross-product platform value","strength": "moderate","description": "The System of Work vision connects technical and business teams via Collections on a single platform."}
+    ],
+    "weaknesses": ["Microsoft's scale and bundling can undercut pricing and leverage existing enterprise relationships","Historically weak in pure enterprise sales motion; only recently investing heavily in enterprise GTM","Data Center customers may migrate to competitors rather than Atlassian Cloud during EOL transition","Rovo AI capabilities are nascent and must prove ROI vs. Microsoft Copilot","Customer support quality issues historically; restructured support org in Q1 FY26"]
+  },
+  "growth_drivers": ["Data Center to Cloud migration: ~350K Data Center customers being moved to cloud by 2029 EOL deadline; migrations accelerating 2x+ YoY","AI monetization via Rovo and Collections: Teamwork Collection passed 1M seats; 5M+ Rovo MAU growing rapidly; consumption-based pricing creates new revenue vector","Enterprise upmarket: Record $1M+ ACV deals, up nearly 2x YoY; 600+ customers with $1M+ ARR, up 40% YoY; RPO +44% YoY to $3.8B","Service Management expansion: JSM growing across technical IT and business teams; 65K+ customers including 50% of Fortune 500","Expansion of non-technical user base: 50% of core product users now from business (non-technical) teams, expanding TAM significantly","Geographic expansion: EMEA at 41% of revenue; Government Cloud and Isolated Cloud open regulated-industry markets","Acquisitions: DX engineering intelligence ($1B, Nov 2025) and The Browser Company/Dia AI browser (~$610M, Oct 2025)","AI as demand catalyst: Customers using AI code generation expand Jira seats 5% faster; AI capabilities only on cloud accelerate DC-to-cloud migration"],
+  "risks": {
+    "business": [
+      {"risk": "Microsoft competitive threat","severity": "high","description": "Microsoft bundles Azure DevOps, GitHub (100M+ developers), Teams, Planner, Loop, and Copilot into M365/Azure agreements. Enterprise CFOs consolidating vendors may displace Atlassian."},
+      {"risk": "AI commoditization and disintermediation","severity": "high","description": "AI-native project management and coding tools could reduce reliance on Jira for software teams."},
+      {"risk": "Data Center-to-Cloud migration execution","severity": "high","description": "Large enterprise customers face complex, multi-year migrations with risk of churn to competitors."},
+      {"risk": "Customer concentration and SMB exposure","severity": "moderate","description": "High volume of SMB/mid-market customers means economic downturns can pressure net seat expansion rates."},
+      {"risk": "Acquisition integration risk","severity": "moderate","description": "Atlassian spent ~$1.6B in FY26 H1 on DX and The Browser Company acquisitions."}
+    ],
+    "financial": [
+      {"risk": "Data Center revenue cliff in FY27","severity": "high","description": "Management explicitly warned Data Center revenue growth will meaningfully decelerate in FY27 as the EOL revenue recognition pull-forward benefit unwinds."},
+      {"risk": "GAAP profitability and high SBC","severity": "moderate","description": "Atlassian remains GAAP operating-loss negative due to high SBC (~26-27% of revenue). Diluted share count growing less than 1% in FY26 as buybacks accelerate."},
+      {"risk": "Currency exposure","severity": "moderate","description": "With 52% of revenue from outside the Americas, USD strength creates headwinds to reported revenue."},
+      {"risk": "AI infrastructure cost pressure","severity": "moderate","description": "Growing Rovo usage (5M MAU+) creates increasing AI compute costs that could pressure gross margins at scale."}
+    ],
+    "regulatory": [
+      {"risk": "Data sovereignty and residency requirements","severity": "moderate","description": "Enterprise and government customers increasingly require data residency in specific jurisdictions."},
+      {"risk": "AI regulation","severity": "low","description": "Evolving AI regulations could impose compliance costs or restrict certain AI capabilities."}
+    ],
+    "macro": [
+      {"risk": "IT spending slowdown","severity": "moderate","description": "Enterprise software spending is correlated with developer headcount and overall IT budgets."},
+      {"risk": "AI disruption to developer workflows","severity": "moderate","description": "A scenario where AI dramatically reduces the number of software engineers could structurally reduce demand for developer tooling."}
+    ]
+  },
+  "recent_developments": [
+    {"date": "2026-02-05","event": "Q2 FY26 results: Revenue $1.59B (+23% YoY), first-ever $1B+ cloud quarter ($1.07B, +26% YoY). RPO +44% YoY to $3.8B. Rovo passed 5M MAU. Raised FY26 revenue growth outlook to ~22%."},
+    {"date": "2025-11-10","event": "Completed acquisition of DX (engineering intelligence/developer productivity platform) for approximately $1 billion."},
+    {"date": "2025-10-30","event": "Q1 FY26 results: Revenue $1.43B (+21% YoY). Announced accelerating Data Center to Cloud migrations (up 2x+ YoY). Restructuring charges of $56M."},
+    {"date": "2025-10-20","event": "Completed acquisition of The Browser Company of New York (maker of Arc and Dia AI browsers) for approximately $610M."},
+    {"date": "2025-09-08","event": "Announced end-of-life for Data Center products by March 28, 2029. Launched Atlassian Ascend migration program."},
+    {"date": "2025-08-07","event": "Q4 FY25 / FY25 annual results: FY25 revenue $5.23B (+21% YoY). $1.4B free cash flow. Cloud NRR ~120%. Record $1M+ ACV deals in Q4, up 2x+ YoY."},
+    {"date": "2025-06-30","event": "Founder CEOs pause selling programs; share buyback program expanded to $4B total ($2.5B new + $1.5B existing)."},
+    {"date": "2025-Q4","event": "Announced President Anu Bharadwaj stepping down effective December 31, 2025. CFO Joe Binz also announced retirement effective June 30, 2026."}
+  ],
+  "guidance": {
+    "as_of": "Q2 FY26 Earnings (February 5, 2026)",
+    "fiscal_year": "FY26 (ending June 30, 2026)",
+    "items": [
+      {"metric": "Total Revenue Growth (FY26)","target": "~22.0% YoY","period": "FY26","vs_prior": "raised","notes": "Raised from 20.8% (after Q1) and original 18.0%. Implies FY26 total revenue of approximately $6.35B."},
+      {"metric": "Cloud Revenue Growth (FY26)","target": "~24.3% YoY","period": "FY26","vs_prior": "raised","notes": "Raised from 22.5% (after Q1). DX contributing ~1pp. Migrations contributing mid-to-high single-digit points."},
+      {"metric": "Data Center Revenue Growth (FY26)","target": "~20.0% YoY","period": "FY26","vs_prior": "maintained","notes": "Driven by EOL revenue recognition impact and price increases. Management warned FY27 Data Center growth will meaningfully decelerate."},
+      {"metric": "GAAP Gross Margin (FY26)","target": "~84.0%","period": "FY26","vs_prior": "maintained","notes": "AI compute cost increases for Rovo offset by cloud infrastructure optimization."},
+      {"metric": "Non-GAAP Operating Margin (FY26)","target": "~25.5%","period": "FY26","vs_prior": "maintained","notes": "FY27 non-GAAP operating margin target of 25%+ also maintained."},
+      {"metric": "GAAP Operating Margin (FY26)","target": "~(3.0%)","period": "FY26","vs_prior": "lowered","notes": "Lowered from (2.0%) to reflect DX acquisition dilution and restructuring charges. High SBC (~26% of revenue) is primary GAAP drag."},
+      {"metric": "Q3 FY26 Total Revenue","target": "$1,689M to $1,697M","period": "Q3 FY26","vs_prior": "new","notes": "Implies ~22% YoY growth. Data Center revenue expected to grow ~33.5% in Q3 due to large expiry base."},
+      {"metric": "Diluted Share Count Growth (FY26)","target": "<1% growth","period": "FY26","vs_prior": "improved","notes": "Improved from <2% initially guided. Buyback acceleration in H2 (plans for 2-3x H1 pace). Founders paused selling plans."},
+      {"metric": "Long-term Revenue Growth","target": "20%+ CAGR through FY27","period": "FY25-FY27","vs_prior": "maintained","notes": "Confirmed at investor day and reiterated through FY26. FY27 non-GAAP operating margin target of 25%+ also maintained."}
+    ],
+    "management_commentary": "CEO Mike Cannon-Brookes: 'I'm convinced AI is great for Atlassian. Others think software is dead.' Emphasized conviction in shares being undervalued, accelerating buybacks. CFO Joe Binz highlighted RPO acceleration (+44% YoY) as evidence of increasing enterprise commitment. Both flagged macro uncertainty and ongoing GTM evolution as risks to guidance."
+  },
+  "bull_case": [
+    "Cloud migration tailwind is multi-year and structural: The 2029 Data Center EOL deadline creates a guaranteed pipeline of migrations. 65K+ DC customers must transition, creating a durable 5-10pp contribution to Cloud revenue growth through FY27/FY28.",
+    "AI reinforces Atlassian's competitive moat: The Teamwork Graph (100B+ objects/connections) and 20 years of workflow data give Atlassian a proprietary AI training advantage. Data shows AI code-gen tool users expand Jira seats 5% faster. Rovo's 5M MAU growing 50%+ QoQ.",
+    "Enterprise momentum is accelerating and durable: RPO growing 44% YoY to $3.8B. $1M+ ACV deals doubled YoY. 600+ customers with >$1M ARR growing 40% YoY. Enterprise deals are sticky with high CLV.",
+    "Significant operating leverage ahead: Non-GAAP operating margin expanded from ~20% in FY24 to ~25% in FY26 with 25%+ target in FY27. FCF generation ($1.4B in FY25) supports both M&A and buybacks.",
+    "Market opportunity remains largely untapped: 350K+ customers but 50% of users are now from non-technical business teams, validating System of Work expansion. $67B combined SAM with significant penetration runway."
+  ],
+  "bear_case": [
+    "Data Center revenue cliff creates near-term earnings headwind: FY26 Data Center growth artificially inflated (+20%) by EOL revenue recognition pull-forward. In FY27, management warned of 'meaningful deceleration', potentially causing total revenue growth to disappoint.",
+    "Microsoft's bundling threat is intensifying: Microsoft has GitHub (100M+ developers), Azure DevOps, Teams, Planner, Copilot all increasingly integrated. Enterprise CFOs consolidating vendors may displace Atlassian at discounts it cannot match.",
+    "GTM transition risk amid leadership turnover: Simultaneously managing PLG-to-enterprise-direct-sales transition while losing President (Anu Bharadwaj), CFO (Joe Binz), and building an entirely new enterprise sales organization.",
+    "AI remains a cost center, not yet a meaningful revenue driver: Despite 5M Rovo MAU, AI has not yet generated distinct, measurable revenue. The Browser Company/Dia ($610M) is speculative and unproven in enterprise markets.",
+    "Valuation requires sustained execution at scale: TEAM trades at elevated multiples even after decline. Any stumble in cloud migration, enterprise sales, or AI adoption could trigger multiple compression."
+  ]
+};
+
+// ============================================================
+// EMBEDDED DCF JSON
+// ============================================================
+const dcfData = {
+  "ticker": "TEAM",
+  "company_name": "Atlassian Corporation",
+  "valuation_date": "2026-02-24",
+  "current_price": 68.81,
+  "inputs": {
+    "shares_outstanding": 263.8,
+    "cash": 1566.0,
+    "total_debt": 988.6,
+    "net_debt": -577.4,
+    "last_fcf": 1415.5,
+    "currency": "USD",
+    "units": "millions"
+  },
+  "historical_growth": {
+    "revenue_3yr_cagr": 23.0,
+    "revenue_5yr_cagr": 26.4,
+    "eps_3yr_cagr": null,
+    "eps_5yr_cagr": null,
+    "equity_3yr_cagr": 60.2,
+    "equity_5yr_cagr": 18.5,
+    "fcf_3yr_cagr": 23.6,
+    "fcf_5yr_cagr": 23.1,
+    "selected_growth_rate": 23.6,
+    "growth_rate_source": "fcf_3yr_cagr",
+    "growth_divergence_warning": "Equity 3Y CAGR (60.2%) diverges significantly from Revenue 3Y CAGR (23.0%) due to the artificially depressed FY2022 equity base from GAAP net losses. Equity CAGR is not used for DCF; FCF CAGR is the selected primary metric."
+  },
+  "assumptions": {
+    "base": {"description": "~20% FCF growth in Year 1 decelerating to 12% by Year 5","fcf_growth_rates": [20,18,16,14,12],"fcf_margin": 27,"wacc": 10,"terminal_growth": 3},
+    "bull": {"description": "Cloud migration accelerates, AI monetization via Rovo drives incremental revenue","fcf_growth_rates": [27,25,22,19,16],"fcf_margin": 30,"wacc": 9,"terminal_growth": 3.5},
+    "bear": {"description": "Data Center revenue cliff, Microsoft bundling pressure, enterprise GTM stumbles","fcf_growth_rates": [13,10,8,6,4],"fcf_margin": 25,"wacc": 12,"terminal_growth": 2.5}
+  },
+  "valuation": {
+    "base": {"intrinsic_value": 137.60,"upside": 100.0},
+    "bull": {"intrinsic_value": 217.16,"upside": 215.6},
+    "bear": {"intrinsic_value": 76.02,"upside": 10.5}
+  },
+  "entry_price": {
+    "base": {"entry_price": 82.32},
+    "bull": {"entry_price": 134.21},
+    "bear": {"entry_price": 42.60}
+  },
+  "sensitivity": {
+    "wacc_range": [8,9,10,11,12],
+    "terminal_growth_range": [2,2.5,3,3.5,4],
+    "matrix": [
+      [166.90,179.44,194.48,212.86,235.83],
+      [142.30,151.06,161.28,173.36,187.86],
+      [123.88,130.29,137.61,146.05,155.91],
+      [109.58,114.43,119.88,126.06,133.12],
+      [98.17,101.93,106.12,110.79,116.05]
+    ]
+  },
+  "probability_weighted": {"weights": {"bull": 0.25,"base": 0.50,"bear": 0.25},"weighted_iv": 142.09,"vs_current": 106.5}
+};
+
+// ============================================================
+// CSV PARSER
+// ============================================================
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        // Split only first 26 commas; everything after is Notes
+        const parts = [];
+        let idx = 0;
+        for (let c = 0; c < 26; c++) {
+            const next = line.indexOf(',', idx);
+            if (next === -1) { parts.push(line.slice(idx)); idx = line.length; break; }
+            parts.push(line.slice(idx, next));
+            idx = next + 1;
+        }
+        parts.push(line.slice(idx)); // Notes remainder
+        const obj = {};
+        headers.forEach((h, i) => obj[h.trim()] = (parts[i] || '').trim());
+        return obj;
+    });
+}
+
+const allData = parseCSV(csvData);
+
+// Sort chronologically
+function periodSort(p) {
+    const year = parseInt(p.match(/\d{4}/)?.[0] || '0');
+    const isQ1 = p.includes('Q1'), isQ2 = p.includes('Q2'), isQ3 = p.includes('Q3'), isQ4 = p.includes('Q4');
+    const isH1 = p.includes('H1'), isH2 = p.includes('H2'), isFY = p.startsWith('FY');
+    const sub = isQ1?1:isQ2?2:isH1?3:isQ3?4:isQ4?5:isH2?6:isFY?7:0;
+    return year*10+sub;
+}
+allData.sort((a,b) => periodSort(a.Period) - periodSort(b.Period));
+
+const fyData = allData.filter(d => d.Period.startsWith('FY'));
+const qData  = allData.filter(d => !d.Period.startsWith('FY'));
+
+// Helper: parse float or null
+function pf(v) { const n = parseFloat(v); return isNaN(n) ? null : n; }
+
+// ============================================================
+// KPI CARDS
+// ============================================================
+const fy25 = fyData.find(d => d.Period === 'FY2025');
+const fy24 = fyData.find(d => d.Period === 'FY2024');
+
+function yoy(cur, prev, field) {
+    const c = pf(cur[field]), p = pf(prev[field]);
+    if (!c || !p) return null;
+    return ((c - p) / Math.abs(p) * 100).toFixed(1);
+}
+
+const kpis = [
+    { label: 'FY2025 Revenue', value: '$5.22B', change: yoy(fy25,fy24,'Revenue'), suffix:'%', positive: true },
+    { label: 'Cloud Revenue', value: '$3.45B', change: yoy(fy25,fy24,'CloudRevenue'), suffix:'%', positive: true },
+    { label: 'Data Center Revenue', value: '$1.47B', change: yoy(fy25,fy24,'DataCenterRevenue'), suffix:'%', positive: true },
+    { label: 'Gross Margin', value: pf(fy25.GrossMargin).toFixed(1)+'%', change: (pf(fy25.GrossMargin)-pf(fy24.GrossMargin)).toFixed(1), suffix:'pp', positive: true },
+    { label: 'Free Cash Flow', value: '$1.42B', change: yoy(fy25,fy24,'FreeCashFlow'), suffix:'%', positive: true },
+    { label: 'FCF Margin', value: (pf(fy25.FreeCashFlow)/pf(fy25.Revenue)*100).toFixed(1)+'%',
+      change: ((pf(fy25.FreeCashFlow)/pf(fy25.Revenue) - pf(fy24.FreeCashFlow)/pf(fy24.Revenue))*100).toFixed(1), suffix:'pp', positive: true },
+    { label: 'Operating Cash Flow', value: '$1.46B', change: yoy(fy25,fy24,'OperatingCashFlow'), suffix:'%', positive: true },
+    { label: 'Cash & Investments', value: '$2.94B', change: yoy(fy25,fy24,'CashAndInvestments'), suffix:'%', positive: true }
+];
+
+const kpiGrid = document.getElementById('kpiGrid');
+kpis.forEach(k => {
+    const chg = parseFloat(k.change);
+    const pos = !isNaN(chg) && chg >= 0;
+    const sign = !isNaN(chg) ? (chg >= 0 ? '+' : '') : '';
+    kpiGrid.innerHTML += `
+        <div class="kpi-card">
+            <div class="kpi-value">${k.value}</div>
+            <div class="kpi-label">${k.label}</div>
+            ${!isNaN(chg) ? `<div class="kpi-change ${pos?'positive':'negative'}">${sign}${k.change}${k.suffix} YoY</div>` : ''}
+        </div>`;
+});
+
+// ============================================================
+// INVESTMENT OVERVIEW
+// ============================================================
+function toggleOverview() {
+    const btn = document.querySelector('.overview-toggle');
+    const content = document.getElementById('overviewContent');
+    btn.classList.toggle('active');
+    content.classList.toggle('active');
+}
+
+function renderOverview() {
+    const a = analysis;
+    const streams = a.business_model.revenue_streams.map(s =>
+        `<li><div class="revenue-stream"><span>${s.name}</span><span class="percent trend-${s.trend}">${s.percent}% <span class="trend-${s.trend}">(${s.trend})</span></span></div><small style="color:#666">${s.notes}</small></li>`
+    ).join('');
+    const moat = a.competitive_position.moat_factors.map(m =>
+        `<li><strong>${m.factor}</strong> <span class="risk-${m.strength==='strong'?'low':'moderate'}">[${m.strength}]</span> - ${m.description}</li>`
+    ).join('');
+    const drivers = a.growth_drivers.map(g => `<li>${g}</li>`).join('');
+    const allRisks = [...(a.risks.business||[]), ...(a.risks.financial||[]), ...(a.risks.regulatory||[]), ...(a.risks.macro||[])];
+    const risks = allRisks.map(r => `<li><span class="risk-${r.severity}">[${r.severity.toUpperCase()}]</span> <strong>${r.risk}</strong>: ${r.description}</li>`).join('');
+    const bull = a.bull_case.map(b => `<li>${b}</li>`).join('');
+    const bear = a.bear_case.map(b => `<li>${b}</li>`).join('');
+    const devs = a.recent_developments.map(d => `<li><strong>${d.date}</strong>: ${d.event}</li>`).join('');
+
+    document.getElementById('overviewGrid').innerHTML = `
+        <div class="overview-card">
+            <h3>Company Overview</h3>
+            <p>${a.overview}</p>
+        </div>
+        <div class="overview-card">
+            <h3>Business Model</h3>
+            <p>${a.business_model.summary}</p>
+            <ul>${streams}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Competitive Position</h3>
+            <p><strong>Competitors:</strong> ${a.competitive_position.main_competitors.join(', ')}</p>
+            <p><strong>Moat Factors:</strong></p>
+            <ul>${moat}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Growth Drivers</h3>
+            <ul>${drivers}</ul>
+        </div>
+        <div class="overview-card risks">
+            <h3>Key Risks</h3>
+            <ul>${risks}</ul>
+        </div>
+        <div class="overview-card bull">
+            <h3>Bull Case</h3>
+            <ul>${bull}</ul>
+        </div>
+        <div class="overview-card bear">
+            <h3>Bear Case</h3>
+            <ul>${bear}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Recent Developments</h3>
+            <ul>${devs}</ul>
+        </div>`;
+}
+renderOverview();
+
+// ============================================================
+// GUIDANCE
+// ============================================================
+function renderGuidance() {
+    const g = analysis.guidance;
+    if (!g || !g.items || !g.items.length) { document.getElementById('guidanceSection').style.display='none'; return; }
+    document.getElementById('guidanceAsOf').textContent = g.as_of || '';
+    document.getElementById('guidanceFY').textContent = g.fiscal_year || '';
+    const grid = document.getElementById('guidanceGrid');
+    grid.innerHTML = g.items.map(item => {
+        const vp = (item.vs_prior||'new').toLowerCase().replace(' ','-');
+        const vpLabel = item.vs_prior ? item.vs_prior.charAt(0).toUpperCase()+item.vs_prior.slice(1) : 'New';
+        return `<div class="guidance-card">
+            <div class="guidance-metric">${item.metric}</div>
+            <div class="guidance-target">${item.target}</div>
+            <div class="guidance-period">${item.period}</div>
+            <span class="guidance-vs-prior ${vp}">${vpLabel}</span>
+            ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+        </div>`;
+    }).join('');
+    const commentary = document.getElementById('guidanceCommentary');
+    if (g.management_commentary) { commentary.textContent = g.management_commentary; commentary.style.display='block'; }
+    else { commentary.style.display='none'; }
+}
+renderGuidance();
+
+// ============================================================
+// CHART DEFAULTS
+// ============================================================
+const colors = { primary:'#00d4aa', secondary:'#00b894', tertiary:'#0984e3', quaternary:'#6c5ce7', warning:'#fdcb6e', danger:'#ff6b6b' };
+
+const chartDefaults = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { color:'#e0e0e0', font:{size:11} } } },
+    scales: {
+        x: { ticks:{color:'#888'}, grid:{color:'rgba(255,255,255,0.05)'} },
+        y: { ticks:{color:'#888'}, grid:{color:'rgba(255,255,255,0.05)'} }
+    }
+};
+
+function mergeDeep(target, source) {
+    const out = Object.assign({}, target);
+    for (const key of Object.keys(source)) {
+        if (source[key] instanceof Object && key in target) out[key] = mergeDeep(target[key], source[key]);
+        else out[key] = source[key];
+    }
+    return out;
+}
+
+// ============================================================
+// CHART 1: ANNUAL REVENUE
+// ============================================================
+(function() {
+    const labels = fyData.map(d => d.Period.replace('FY',''));
+    const values = fyData.map(d => pf(d.Revenue));
+    new Chart(document.getElementById('revenueChart'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Total Revenue ($M)',
+                data: values,
+                backgroundColor: values.map((_,i) => i >= fyData.findIndex(d=>d.Period==='FY2025') ? colors.primary : 'rgba(0,212,170,0.5)'),
+                borderColor: colors.primary,
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: mergeDeep(chartDefaults, {
+            plugins: { legend:{display:false}, tooltip:{ callbacks:{ label: ctx => `$${ctx.parsed.y.toFixed(0)}M` } } },
+            scales: { y: { ticks:{ callback: v => '$'+v+'M' } } }
+        })
+    });
+})();
+
+// ============================================================
+// CHART 2: REVENUE COMPOSITION (stacked bar, annual)
+// ============================================================
+(function() {
+    const fySub = fyData.filter(d => parseInt(d.Period.replace('FY','')) >= 2021);
+    const labels = fySub.map(d => d.Period.replace('FY',''));
+    new Chart(document.getElementById('revenueCompositionChart'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                { label:'Cloud', data: fySub.map(d=>pf(d.CloudRevenue)), backgroundColor:'rgba(0,212,170,0.8)', borderRadius:0 },
+                { label:'Data Center', data: fySub.map(d=>pf(d.DataCenterRevenue)), backgroundColor:'rgba(9,132,227,0.8)', borderRadius:0 },
+                { label:'Server', data: fySub.map(d=>pf(d.ServerRevenue)), backgroundColor:'rgba(108,92,231,0.8)', borderRadius:0 },
+                { label:'Marketplace & Other', data: fySub.map(d=>pf(d.MarketplaceAndServices)), backgroundColor:'rgba(253,203,110,0.8)', borderRadius:0 }
+            ]
+        },
+        options: mergeDeep(chartDefaults, {
+            plugins: { tooltip:{ callbacks:{ label: ctx => `${ctx.dataset.label}: $${(ctx.parsed.y||0).toFixed(0)}M` } } },
+            scales: { x:{stacked:true}, y:{stacked:true, ticks:{callback:v=>'$'+v+'M'}} }
+        })
+    });
+})();
+
+// ============================================================
+// CHART 3: CLOUD REVENUE GROWTH (quarterly line)
+// ============================================================
+(function() {
+    // Quarterly data with cloud revenue
+    const qCloud = qData.filter(d => pf(d.CloudRevenue) !== null && pf(d.CloudRevenue) > 0);
+    const labels = qCloud.map(d => d.Period);
+    // Calculate YoY for cloud: compare same quarter different year
+    const cloudVals = qCloud.map(d => pf(d.CloudRevenue));
+    // Find YoY growth where possible
+    const yoyArr = qCloud.map((d, i) => {
+        const yr = parseInt(d.Period.match(/\d{4}/)[0]);
+        const qtr = d.Period.split(' ')[0];
+        const prevPeriod = `${qtr} FY${yr-1}`;
+        const prev = qCloud.find(x => x.Period === prevPeriod);
+        if (!prev) return null;
+        const c = pf(d.CloudRevenue), p = pf(prev.CloudRevenue);
+        return c && p ? +((c-p)/p*100).toFixed(1) : null;
+    });
+    new Chart(document.getElementById('cloudGrowthChart'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                { label:'Cloud Revenue ($M)', data: cloudVals, borderColor:colors.primary, backgroundColor:'rgba(0,212,170,0.1)', fill:true, tension:0.3, yAxisID:'y' },
+                { label:'YoY Growth (%)', data: yoyArr, borderColor:colors.warning, backgroundColor:'transparent', tension:0.3, yAxisID:'y1', borderDash:[5,5] }
+            ]
+        },
+        options: mergeDeep(chartDefaults, {
+            scales: {
+                y:  { ticks:{callback:v=>'$'+v+'M'}, position:'left' },
+                y1: { ticks:{callback:v=>v+'%'}, position:'right', grid:{display:false} }
+            }
+        })
+    });
+})();
+
+// ============================================================
+// CHART 4: ANNUAL REVENUE GROWTH RATE
+// ============================================================
+(function() {
+    const labels = [], rates = [];
+    for (let i = 1; i < fyData.length; i++) {
+        const c = pf(fyData[i].Revenue), p = pf(fyData[i-1].Revenue);
+        if (c && p) { labels.push(fyData[i].Period.replace('FY','')); rates.push(+((c-p)/p*100).toFixed(1)); }
+    }
+    new Chart(document.getElementById('revenueGrowthChart'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label:'Revenue YoY Growth (%)',
+                data: rates,
+                borderColor: colors.primary,
+                backgroundColor: 'rgba(0,212,170,0.1)',
+                fill: true, tension: 0.3,
+                pointBackgroundColor: rates.map(r => r >= 20 ? colors.primary : colors.warning)
+            }]
+        },
+        options: mergeDeep(chartDefaults, {
+            plugins: { legend:{display:false} },
+            scales: { y: { ticks:{callback:v=>v+'%'} } }
+        })
+    });
+})();
+
+// ============================================================
+// CHART 5: GROSS MARGIN (annual)
+// ============================================================
+(function() {
+    const labels = fyData.map(d => d.Period.replace('FY',''));
+    const vals = fyData.map(d => pf(d.GrossMargin));
+    new Chart(document.getElementById('grossMarginChart'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label:'Gross Margin (%)',
+                data: vals,
+                borderColor: colors.secondary,
+                backgroundColor: 'rgba(0,184,148,0.1)',
+                fill: true, tension: 0.3,
+                pointBackgroundColor: colors.secondary
+            }]
+        },
+        options: mergeDeep(chartDefaults, {
+            plugins: { legend:{display:false} },
+            scales: { y: { min:76, max:87, ticks:{callback:v=>v+'%'} } }
+        })
+    });
+})();
+
+// ============================================================
+// CHART 6: FREE CASH FLOW (annual)
+// ============================================================
+(function() {
+    const labels = fyData.map(d => d.Period.replace('FY',''));
+    const vals = fyData.map(d => pf(d.FreeCashFlow));
+    new Chart(document.getElementById('fcfChart'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label:'Free Cash Flow ($M)',
+                data: vals,
+                backgroundColor: vals.map(v => v !== null && v >= 0 ? 'rgba(0,212,170,0.7)' : 'rgba(255,107,107,0.7)'),
+                borderColor: vals.map(v => v !== null && v >= 0 ? colors.primary : colors.danger),
+                borderWidth: 1, borderRadius: 4
+            }]
+        },
+        options: mergeDeep(chartDefaults, {
+            plugins: { legend:{display:false} },
+            scales: { y: { ticks:{callback:v=>'$'+v+'M'} } }
+        })
+    });
+})();
+
+// ============================================================
+// CHART 7: FCF MARGIN (annual)
+// ============================================================
+(function() {
+    const labels = [], vals = [];
+    fyData.forEach(d => {
+        const r = pf(d.Revenue), f = pf(d.FreeCashFlow);
+        if (r && f !== null) { labels.push(d.Period.replace('FY','')); vals.push(+(f/r*100).toFixed(1)); }
+    });
+    new Chart(document.getElementById('fcfMarginChart'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label:'FCF Margin (%)',
+                data: vals,
+                borderColor: colors.tertiary,
+                backgroundColor: 'rgba(9,132,227,0.1)',
+                fill: true, tension: 0.3,
+                pointBackgroundColor: vals.map(v => v > 0 ? colors.tertiary : colors.danger)
+            }]
+        },
+        options: mergeDeep(chartDefaults, {
+            plugins: { legend:{display:false} },
+            scales: { y: { ticks:{callback:v=>v+'%'} } }
+        })
+    });
+})();
+
+// ============================================================
+// CHART 8: OPEX AS % OF REVENUE (stacked bar, annual)
+// ============================================================
+(function() {
+    const labels = fyData.map(d => d.Period.replace('FY',''));
+    const rnd = fyData.map(d => { const r=pf(d.Revenue),v=pf(d.RnDExpense); return r&&v?+(v/r*100).toFixed(1):null; });
+    const snm = fyData.map(d => { const r=pf(d.Revenue),v=pf(d.SalesAndMarketing); return r&&v?+(v/r*100).toFixed(1):null; });
+    const gna = fyData.map(d => { const r=pf(d.Revenue),v=pf(d.GnAExpense); return r&&v?+(v/r*100).toFixed(1):null; });
+    new Chart(document.getElementById('opexChart'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                { label:'R&D', data:rnd, backgroundColor:'rgba(108,92,231,0.8)', borderRadius:0 },
+                { label:'S&M', data:snm, backgroundColor:'rgba(9,132,227,0.8)', borderRadius:0 },
+                { label:'G&A', data:gna, backgroundColor:'rgba(253,203,110,0.8)', borderRadius:0 }
+            ]
+        },
+        options: mergeDeep(chartDefaults, {
+            scales: { x:{stacked:true}, y:{stacked:true, ticks:{callback:v=>v+'%'}} }
+        })
+    });
+})();
+
+// ============================================================
+// CHART 9: CASH & DEBT (annual grouped bar)
+// ============================================================
+(function() {
+    const labels = fyData.map(d => d.Period.replace('FY',''));
+    const cash = fyData.map(d => pf(d.CashAndInvestments));
+    const debt = fyData.map(d => pf(d.TotalDebt));
+    new Chart(document.getElementById('cashDebtChart'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                { label:'Cash & Investments ($M)', data:cash, backgroundColor:'rgba(0,212,170,0.7)', borderColor:colors.primary, borderWidth:1, borderRadius:4 },
+                { label:'Total Debt ($M)', data:debt, backgroundColor:'rgba(255,107,107,0.5)', borderColor:colors.danger, borderWidth:1, borderRadius:4 }
+            ]
+        },
+        options: mergeDeep(chartDefaults, {
+            scales: { y: { ticks:{callback:v=>'$'+v+'M'} } }
+        })
+    });
+})();
+
+// ============================================================
+// CHART 10: SHAREHOLDERS' EQUITY (annual)
+// ============================================================
+(function() {
+    const labels = fyData.map(d => d.Period.replace('FY',''));
+    const vals = fyData.map(d => pf(d.ShareholdersEquity));
+    new Chart(document.getElementById('equityChart'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label:"Shareholders' Equity ($M)",
+                data: vals,
+                backgroundColor: vals.map(v => v !== null && v >= 0 ? 'rgba(9,132,227,0.7)' : 'rgba(255,107,107,0.7)'),
+                borderColor: colors.tertiary, borderWidth:1, borderRadius:4
+            }]
+        },
+        options: mergeDeep(chartDefaults, {
+            plugins: { legend:{display:false} },
+            scales: { y: { ticks:{callback:v=>'$'+v+'M'} } }
+        })
+    });
+})();
+
+// ============================================================
+// CHART 11: QUARTERLY REVENUE
+// ============================================================
+(function() {
+    const recent = qData.slice(-12);
+    const labels = recent.map(d => d.Period);
+    const vals = recent.map(d => pf(d.Revenue));
+    new Chart(document.getElementById('qRevenueChart'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label:'Revenue ($M)',
+                data: vals,
+                backgroundColor: vals.map((_,i) => i >= vals.length-4 ? colors.primary : 'rgba(0,212,170,0.45)'),
+                borderColor: colors.primary, borderWidth:1, borderRadius:4
+            }]
+        },
+        options: mergeDeep(chartDefaults, {
+            plugins: { legend:{display:false} },
+            scales: { x:{ticks:{maxRotation:45}}, y:{ticks:{callback:v=>'$'+v+'M'}} }
+        })
+    });
+})();
+
+// ============================================================
+// CHART 12: QUARTERLY CLOUD vs DATA CENTER (stacked)
+// ============================================================
+(function() {
+    const qSub = qData.filter(d => pf(d.CloudRevenue) !== null && pf(d.CloudRevenue) > 0).slice(-12);
+    const labels = qSub.map(d => d.Period);
+    new Chart(document.getElementById('qCloudDCChart'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                { label:'Cloud', data: qSub.map(d=>pf(d.CloudRevenue)), backgroundColor:'rgba(0,212,170,0.8)', borderRadius:0 },
+                { label:'Data Center', data: qSub.map(d=>pf(d.DataCenterRevenue)), backgroundColor:'rgba(9,132,227,0.8)', borderRadius:0 },
+                { label:'Marketplace & Other', data: qSub.map(d=>pf(d.MarketplaceAndServices)), backgroundColor:'rgba(253,203,110,0.7)', borderRadius:0 }
+            ]
+        },
+        options: mergeDeep(chartDefaults, {
+            scales: { x:{stacked:true,ticks:{maxRotation:45}}, y:{stacked:true,ticks:{callback:v=>'$'+v+'M'}} }
+        })
+    });
+})();
+
+// ============================================================
+// METRIC DESCRIPTIONS (Help Modals)
+// ============================================================
+const metricDescriptions = {
+    revenue: {
+        title: 'Total Revenue',
+        content: `<p><strong>Total Revenue</strong> is Atlassian's consolidated income from all subscription products, marketplace sales, and services.</p>
+        <div class="metric-highlight"><strong>For Atlassian:</strong> Revenue is almost entirely subscription-based (Cloud + Data Center). Server revenue ended Feb 2024 (EOL). FY2025 revenue was $5.22B, up 21% YoY, driven by Cloud growth of 28% and Data Center growth of 21%.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>Overall revenue growth rate sustained at 20%+ as guided through FY27</li><li>Mix shift toward Cloud (currently 67%), which carries higher long-term value and gross margins</li><li>The FY27 Data Center deceleration could create a perception headwind even if Cloud accelerates</li></ul>`
+    },
+    revenueComposition: {
+        title: 'Revenue Composition',
+        content: `<p>Shows the breakdown of Atlassian's revenue by deployment model across fiscal years.</p>
+        <div class="metric-highlight"><strong>Key story:</strong> Server (purple) went to zero after February 2024 EOL. Data Center (blue) grew rapidly 2021-2026 as customers migrated from Server. Cloud (green) is THE growth engine, now 67%+ of revenue and targeting 80%+ by FY27/FY28.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>Cloud bar growing as a proportion of total revenue each year</li><li>Data Center bar starting to shrink after FY26 as migrations accelerate toward 2029 EOL</li><li>Any stagnation in Cloud growth vs Data Center would signal migration risk</li></ul>`
+    },
+    cloudGrowth: {
+        title: 'Cloud Revenue Growth',
+        content: `<p>Quarterly Cloud subscription revenue and YoY growth rate — the most important metric for Atlassian's long-term value.</p>
+        <div class="metric-highlight"><strong>Milestone:</strong> Q2 FY2026 was Atlassian's first ever $1 billion cloud quarter ($1.07B). Cloud NRR has been 120%+ for three consecutive quarters, meaning existing cloud customers expand their spend 20%+ per year on average.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>Quarterly cloud revenue growth rate ideally sustained at 25%+ through FY26</li><li>Cloud NRR staying at 120%+ indicates healthy seat expansion, edition upgrades, and cross-sell</li><li>DX acquisition adding ~75 bps to Cloud revenue growth in Q2 FY26</li><li>Migration contributions: management guided mid-to-high single digit points from migrations in FY26</li></ul>`
+    },
+    revenueGrowthRate: {
+        title: 'Revenue Growth Rate',
+        content: `<p>Year-over-year percentage revenue growth on an annual basis.</p>
+        <div class="metric-highlight"><strong>For Atlassian:</strong> Management has committed to 20%+ revenue CAGR through FY2027. FY2025 came in at 21%, and FY2026 guidance was raised to 22% after Q2 outperformance.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>Sustained 20%+ growth rate validating the management long-term target</li><li>Any deceleration below 18% would be a negative signal given current valuation</li><li>FY2027 growth could appear to decelerate due to Data Center revenue recognition headwind even if Cloud accelerates</li></ul>`
+    },
+    grossMargin: {
+        title: 'Gross Margin',
+        content: `<p>Gross profit as a percentage of revenue — measures the efficiency of Atlassian's service delivery and infrastructure costs.</p>
+        <div class="metric-highlight"><strong>For Atlassian:</strong> GAAP gross margin has been consistently 80-84%. Management guided ~84% for FY26. Non-GAAP gross margin is ~87%, guided to stay at ~87% in FY26. Cloud gross margins are higher than Data Center on a non-GAAP basis (~88% vs ~82%).</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>GAAP gross margin staying at or above 82% even as Rovo AI compute costs grow</li><li>Margin expansion as Cloud (higher-margin) becomes a larger revenue mix</li><li>Any compression below 80% would signal unexpected AI infrastructure cost pressure</li></ul>`
+    },
+    fcf: {
+        title: 'Free Cash Flow',
+        content: `<p>Operating cash flow minus capital expenditures. For Atlassian, FCF is the primary profitability metric investors should focus on — NOT GAAP net income.</p>
+        <div class="metric-highlight"><strong>Why FCF matters for TEAM:</strong> GAAP net income is negative due to ~$1.35B/year of stock-based compensation (a real dilution cost, but non-cash). FCF shows the true cash generation of the business. FY2025 FCF was $1.42B (27% FCF margin) — a profitable, cash-generative business.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>FCF sustained above $1.4B and growing toward $2B+ over 3-5 years</li><li>FCF margin stable or expanding from the 27% FY2025 level toward 30%+</li><li>Watch for CapEx creep if AI infrastructure investment accelerates</li></ul>`
+    },
+    fcfMargin: {
+        title: 'FCF Margin',
+        content: `<p>Free Cash Flow as a percentage of revenue. This is Atlassian's key profitability measure given GAAP losses from SBC.</p>
+        <div class="metric-highlight"><strong>For Atlassian:</strong> FCF margin has expanded from ~21% (FY2022) to ~27% (FY2025) despite heavy investment in Cloud infrastructure, R&D, and enterprise GTM. This expansion happened while revenue nearly doubled.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>FCF margin sustaining or expanding above 27% toward 30%+ target</li><li>Non-GAAP operating margin (25.5% FY26 target) as a proxy for underlying business profitability</li><li>Any compression below 22% would be a red flag indicating cost structure deterioration</li></ul>`
+    },
+    opex: {
+        title: 'Operating Expenses as % of Revenue',
+        content: `<p>Shows R&D, Sales & Marketing, and G&A expenses as a share of revenue — key to understanding Atlassian's investment priorities and operating leverage.</p>
+        <div class="metric-highlight"><strong>For Atlassian:</strong> R&D (~51% of revenue) is the largest expense, reflecting continued heavy investment in product innovation, AI (Rovo), and platform development. S&M (~22%) reflects the build-out of enterprise GTM. G&A (~12%) is relatively lean. Total opex % should decline over time as revenue scales.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>Total opex % declining as revenue scales — this is the operating leverage story</li><li>R&D % stabilizing or declining as platform matures, while maintaining innovation</li><li>S&M % potentially rising as Atlassian invests more in enterprise direct sales</li></ul>`
+    },
+    cashDebt: {
+        title: 'Cash & Investments vs Debt',
+        content: `<p>Atlassian's balance sheet liquidity — cash and short-term investments versus total debt outstanding.</p>
+        <div class="metric-highlight"><strong>For Atlassian:</strong> Net cash position of ~$577M as of Q2 FY2026 ($1.57B cash/investments vs $989M debt). Debt consists of $500M 5.25% senior notes due 2029 and $500M 5.5% senior notes due 2034. Company spent ~$1.6B on acquisitions (DX and The Browser Company) in FY26 H1.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>Net cash position being maintained or growing as FCF generation continues</li><li>Acquisition spending putting pressure on the balance sheet in FY26</li><li>Buyback program ($4B total authorized) competing with M&A for capital</li></ul>`
+    },
+    equity: {
+        title: "Shareholders' Equity",
+        content: `<p>Book value of equity (assets minus liabilities). For Atlassian, this metric is distorted and less meaningful than for most companies.</p>
+        <div class="metric-highlight"><strong>Why equity is distorted:</strong> Atlassian has accumulated GAAP net losses of $2B+ due to SBC expenses. The FY2022 equity of only $327M reflects these accumulated losses. The subsequent recovery in equity as losses moderate is partly an accounting artifact. Do not use equity CAGR as a proxy for business growth — use FCF CAGR instead.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>Not a primary valuation metric for TEAM — focus on FCF instead</li><li>Equity growth tracking improvements in GAAP profitability over time</li><li>Net cash position and FCF generation are better measures of financial health</li></ul>`
+    },
+    qRevenue: {
+        title: 'Quarterly Revenue',
+        content: `<p>Atlassian's revenue on a quarterly basis, showing the sequential and year-over-year growth trajectory.</p>
+        <div class="metric-highlight"><strong>Seasonality:</strong> Atlassian's revenue is relatively linear with modest seasonality. Q2 (Oct-Dec) tends to be the strongest quarter due to enterprise budget cycles. Q1 (Jul-Sep) can be softer. FY26 H1 showed strong performance: Q1 $1.43B (+21% YoY), Q2 $1.59B (+23% YoY).</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>Consistent 20%+ YoY growth in each quarter validating annual guidance</li><li>Sequential acceleration or deceleration as a signal of business momentum</li><li>Q2 FY2026 was the first-ever $1B+ cloud quarter — watch for this to become the norm</li></ul>`
+    },
+    qCloudDC: {
+        title: 'Quarterly Cloud vs Data Center',
+        content: `<p>Quarterly breakdown of the two primary revenue segments — Cloud (subscription hosted by Atlassian) and Data Center (subscription hosted by the customer on-premise).</p>
+        <div class="metric-highlight"><strong>The migration story:</strong> Cloud should be growing as a share of the stack (currently ~67% of total). Data Center growing in FY26 (20% YoY) due to EOL pull-forward accounting, but will decelerate sharply in FY27. Management expects migrations (currently running 2x+ YoY) to contribute mid-to-high single digits to Cloud revenue growth in FY26.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>Cloud surpassing Data Center by an increasing margin each quarter</li><li>Data Center growth decelerating in FY27 as EOL pull-forward unwinds</li><li>Cloud growth rate staying above 24% as guided for FY26 full year</li><li>Marketplace/Other (yellow) as a steady 5% contributor</li></ul>`
+    }
+};
+
+function openModal(key) {
+    if (!metricDescriptions[key]) return;
+    document.getElementById('modalTitle').textContent = metricDescriptions[key].title;
+    document.getElementById('modalBody').innerHTML = metricDescriptions[key].content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay') && event.target.id !== 'modalOverlay') return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('modalOverlay').classList.remove('active'); document.body.style.overflow=''; } });
+
+// ============================================================
+// DCF SECTION
+// ============================================================
+function initDCF() {
+    if (!dcfData || !dcfData.valuation) return;
+    document.getElementById('dcfCurrent').textContent = '$' + dcfData.current_price.toFixed(2);
+    if (dcfData.historical_growth.growth_divergence_warning) {
+        document.getElementById('growthWarning').style.display = 'flex';
+        document.getElementById('warningText').textContent = dcfData.historical_growth.growth_divergence_warning;
+    }
+    const base = dcfData.assumptions.base;
+    document.getElementById('growthSlider').value = dcfData.historical_growth.selected_growth_rate;
+    document.getElementById('waccSlider').value = base.wacc;
+    document.getElementById('terminalSlider').value = base.terminal_growth;
+    document.getElementById('growthValue').textContent = dcfData.historical_growth.selected_growth_rate + '%';
+    document.getElementById('waccValue').textContent = base.wacc + '%';
+    document.getElementById('terminalValue').textContent = base.terminal_growth + '%';
+    document.getElementById('growthHint').textContent = 'Based on ' + dcfData.historical_growth.growth_rate_source.replace(/_/g,' ');
+    document.getElementById('baseFCF').textContent = '$' + dcfData.inputs.last_fcf.toFixed(0) + 'M';
+    const sh = dcfData.inputs.shares_outstanding;
+    document.getElementById('sharesOut').textContent = sh.toFixed(1) + 'M';
+    const nd = dcfData.inputs.net_debt;
+    document.getElementById('netDebt').textContent = (nd < 0 ? '-' : '') + '$' + Math.abs(nd).toFixed(0) + 'M';
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    renderFCFProjections();
+    updateDCFDisplay();
+    switchScenario('base');
+}
+
+function renderFCFProjections() {
+    const startGrowth = parseFloat(document.getElementById('growthSlider').value);
+    const baseFCF = dcfData.inputs.last_fcf;
+    const endGrowth = 10;
+    const growthRates = [];
+    for (let i = 0; i < 5; i++) {
+        const rate = startGrowth > endGrowth ? startGrowth - (startGrowth - endGrowth) * (i / 4) : startGrowth;
+        growthRates.push(rate);
+    }
+    let fcf = baseFCF;
+    const fcfValues = [baseFCF];
+    for (let i = 0; i < 5; i++) { fcf = fcf * (1 + growthRates[i] / 100); fcfValues.push(fcf); }
+    const fmt = n => n >= 1000 ? '$' + (n/1000).toFixed(2) + 'B' : '$' + n.toFixed(0) + 'M';
+    let html = `<div class="fcf-projection-item header">Base</div><div class="fcf-projection-item header">Year 1</div><div class="fcf-projection-item header">Year 2</div><div class="fcf-projection-item header">Year 3</div><div class="fcf-projection-item header">Year 4</div><div class="fcf-projection-item header">Year 5</div>`;
+    html += `<div class="fcf-projection-item"><div class="fcf-value">${fmt(fcfValues[0])}</div><div class="growth-rate">-</div></div>`;
+    for (let i = 1; i <= 5; i++) {
+        html += `<div class="fcf-projection-item"><div class="fcf-value">${fmt(fcfValues[i])}</div><div class="growth-rate">+${growthRates[i-1].toFixed(0)}%</div></div>`;
+    }
+    document.getElementById('fcfProjectionTable').innerHTML = html;
+}
+
+function calculateDCF(startGrowth, wacc, terminalGrowth) {
+    const years = 5, fcf = dcfData.inputs.last_fcf;
+    let pvFCF = 0, projectedFCF = fcf;
+    const endGrowth = 10;
+    for (let i = 0; i < years; i++) {
+        const yr = startGrowth > endGrowth ? startGrowth - (startGrowth - endGrowth) * (i / 4) : startGrowth;
+        projectedFCF *= (1 + yr / 100);
+        pvFCF += projectedFCF / Math.pow(1 + wacc/100, i + 1);
+    }
+    const terminalFCF = projectedFCF * (1 + terminalGrowth/100);
+    const terminalValue = terminalFCF / (wacc/100 - terminalGrowth/100);
+    const pvTerminal = terminalValue / Math.pow(1 + wacc/100, years);
+    const enterpriseValue = pvFCF + pvTerminal;
+    const equityValue = enterpriseValue - dcfData.inputs.net_debt;
+    const iv = equityValue / dcfData.inputs.shares_outstanding;
+    const entryPrice = (pvTerminal / dcfData.inputs.shares_outstanding) / Math.pow(1.15, years);
+    return { iv, entryPrice };
+}
+
+window.updateDCFDisplay = function() {
+    const growth = parseFloat(document.getElementById('growthSlider').value);
+    const wacc = parseFloat(document.getElementById('waccSlider').value);
+    const terminal = parseFloat(document.getElementById('terminalSlider').value);
+    document.getElementById('growthValue').textContent = growth + '%';
+    document.getElementById('waccValue').textContent = wacc + '%';
+    document.getElementById('terminalValue').textContent = terminal + '%';
+    renderFCFProjections();
+    const result = calculateDCF(growth, wacc, terminal);
+    document.getElementById('dcfIV').textContent = '$' + result.iv.toFixed(0);
+    document.getElementById('dcfEntry').textContent = '$' + result.entryPrice.toFixed(0);
+    const upside = ((result.iv - dcfData.current_price) / dcfData.current_price * 100);
+    const upsideEl = document.getElementById('dcfUpside');
+    upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(0) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+    upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+    document.getElementById('dcfWeighted').textContent = '$' + dcfData.probability_weighted.weighted_iv.toFixed(0);
+    const grid = document.getElementById('assumptionGrid');
+    if (grid) {
+        grid.innerHTML = `
+            <div class="assumption-item"><div class="label">Growth Rate</div><div class="value">${growth}%</div></div>
+            <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc}%</div></div>
+            <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${terminal}%</div></div>
+            <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa">$${result.iv.toFixed(0)}</div></div>
+            <div class="assumption-item"><div class="label">Entry Price (15% CAGR)</div><div class="value" style="color:#00d4aa">$${result.entryPrice.toFixed(0)}</div></div>`;
+    }
+};
+
+window.switchScenario = function(scenario) {
+    document.querySelectorAll('.scenario-tab').forEach(t => t.classList.toggle('active', t.dataset.scenario === scenario));
+    const a = dcfData.assumptions[scenario];
+    const v = dcfData.valuation[scenario];
+    const ep = dcfData.entry_price[scenario];
+    document.getElementById('growthSlider').value = a.fcf_growth_rates[0];
+    document.getElementById('waccSlider').value = a.wacc;
+    document.getElementById('terminalSlider').value = a.terminal_growth;
+    document.getElementById('assumptionGrid').innerHTML = `
+        <div class="assumption-item"><div class="label">Year 1 FCF Growth</div><div class="value">${a.fcf_growth_rates[0]}%</div></div>
+        <div class="assumption-item"><div class="label">Year 5 FCF Growth</div><div class="value">${a.fcf_growth_rates[4]}%</div></div>
+        <div class="assumption-item"><div class="label">FCF Margin</div><div class="value">${a.fcf_margin}%</div></div>
+        <div class="assumption-item"><div class="label">WACC</div><div class="value">${a.wacc}%</div></div>
+        <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${a.terminal_growth}%</div></div>
+        <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa">$${v.intrinsic_value.toFixed(0)}</div></div>
+        <div class="assumption-item"><div class="label">Upside</div><div class="value" style="color:#00d4aa">+${v.upside.toFixed(0)}%</div></div>
+        <div class="assumption-item"><div class="label">Entry Price</div><div class="value" style="color:#00d4aa">$${ep.entry_price.toFixed(0)}</div></div>`;
+    document.getElementById('growthValue').textContent = a.fcf_growth_rates[0] + '%';
+    document.getElementById('waccValue').textContent = a.wacc + '%';
+    document.getElementById('terminalValue').textContent = a.terminal_growth + '%';
+    renderFCFProjections();
+    const r = calculateDCF(a.fcf_growth_rates[0], a.wacc, a.terminal_growth);
+    document.getElementById('dcfIV').textContent = '$' + v.intrinsic_value.toFixed(0);
+    document.getElementById('dcfEntry').textContent = '$' + ep.entry_price.toFixed(0);
+    const upside = v.upside;
+    const upsideEl = document.getElementById('dcfUpside');
+    upsideEl.textContent = '+' + upside.toFixed(0) + '% upside';
+    upsideEl.className = 'dcf-change positive';
+};
+
+function renderHistoricalGrowth() {
+    const g = dcfData.historical_growth;
+    const sel = g.growth_rate_source;
+    const items = [
+        { key:'revenue_3yr_cagr', label:'Revenue 3Y', val:g.revenue_3yr_cagr },
+        { key:'revenue_5yr_cagr', label:'Revenue 5Y', val:g.revenue_5yr_cagr },
+        { key:'eps_3yr_cagr', label:'EPS 3Y', val:g.eps_3yr_cagr },
+        { key:'eps_5yr_cagr', label:'EPS 5Y', val:g.eps_5yr_cagr },
+        { key:'equity_3yr_cagr', label:'Equity 3Y', val:g.equity_3yr_cagr },
+        { key:'equity_5yr_cagr', label:'Equity 5Y', val:g.equity_5yr_cagr },
+        { key:'fcf_3yr_cagr', label:'FCF 3Y', val:g.fcf_3yr_cagr },
+        { key:'fcf_5yr_cagr', label:'FCF 5Y', val:g.fcf_5yr_cagr }
+    ];
+    document.getElementById('growthGrid').innerHTML = items.map(item => {
+        if (item.val === null) return `<div class="growth-item ${item.key===sel?'selected':''}"><div class="metric">${item.label}</div><div class="rate na">N/A</div></div>`;
+        const cls = item.val >= 0 ? 'positive' : 'negative';
+        return `<div class="growth-item ${item.key===sel?'selected':''}"><div class="metric">${item.label}</div><div class="rate ${cls}">${item.val>=0?'+':''}${item.val.toFixed(1)}%</div></div>`;
+    }).join('');
+}
+
+function renderSensitivityMatrix() {
+    const s = dcfData.sensitivity;
+    const cp = dcfData.current_price;
+    const bw = dcfData.assumptions.base.wacc;
+    const bt = dcfData.assumptions.base.terminal_growth;
+    let html = '<tr><th>WACC \\ Term G</th>';
+    s.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+    html += '</tr>';
+    s.wacc_range.forEach((wacc, i) => {
+        html += `<tr><th>${wacc}%</th>`;
+        s.matrix[i].forEach((val, j) => {
+            const isHL = wacc === bw && s.terminal_growth_range[j] === bt;
+            const cls = isHL ? 'highlight' : val >= cp ? 'above-current' : 'below-current';
+            html += `<td class="${cls}">$${val}</td>`;
+        });
+        html += '</tr>';
+    });
+    document.getElementById('sensitivityMatrix').innerHTML = html;
+}
+
+initDCF();
+
+(function() {
+    const gs = document.getElementById('growthSlider');
+    const ws = document.getElementById('waccSlider');
+    const ts = document.getElementById('terminalSlider');
+    if (gs) { gs.oninput = window.updateDCFDisplay; gs.onchange = window.updateDCFDisplay; }
+    if (ws) { ws.oninput = window.updateDCFDisplay; ws.onchange = window.updateDCFDisplay; }
+    if (ts) { ts.oninput = window.updateDCFDisplay; ts.onchange = window.updateDCFDisplay; }
+})();
+</script>
+</body>
+</html>
