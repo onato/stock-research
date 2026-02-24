@@ -227,6 +227,28 @@ The dashboard generator will embed the DCF JSON and add an interactive valuation
 - Sensitivity matrix
 - Download Excel button
 
+## Step 8b: Verify Stock Price in DCF
+
+After DCF generation, verify the stock price is accurate:
+
+1. Fetch the live price from Yahoo Finance:
+```bash
+curl -s "https://query1.finance.yahoo.com/v8/finance/chart/$ARGUMENTS?range=1d&interval=1d" \
+  -H "User-Agent: Mozilla/5.0" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['chart']['result'][0]['meta']['regularMarketPrice'])"
+```
+
+2. Read `current_price` from `./$ARGUMENTS/Reports/{TICKER}_DCF.json`
+
+3. If the prices differ by more than 5%, update the DCF JSON:
+   - Set `current_price` to the Yahoo Finance price
+   - Recalculate `upside` for all three scenarios: `((intrinsic_value / new_price) - 1) * 100`
+   - Recalculate `probability_weighted.weighted_iv` is unchanged (it's based on intrinsic values, not current price) — but verify the `entry_price.base.entry_discount_from_current` is updated: `((current_price - entry_price) / current_price) * -100`
+   - Write the updated JSON back to the file
+
+4. If the prices match within 5%, no changes needed — log that the price was verified.
+
+5. **If the DCF JSON was updated**, re-embed the updated DCF JSON into the dashboard HTML (`./$ARGUMENTS/Reports/{TICKER}_Dashboard.html`) by replacing the existing `const dcfData = {...};` block with the corrected data. This ensures the dashboard displays the verified price.
+
 ## Step 9: Update Index Page
 
 **Always run after dashboard generation.**

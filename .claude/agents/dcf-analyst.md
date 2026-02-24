@@ -9,6 +9,19 @@ You create DCF valuation models for stocks. Your output powers the interactive v
 
 ## Step 1: Gather Historical Data
 
+### Fetch Current Stock Price
+
+Before anything else, fetch the live market price from Yahoo Finance to use as `current_price` in the DCF JSON:
+
+```bash
+curl -s "https://query1.finance.yahoo.com/v8/finance/chart/{TICKER}?range=1d&interval=1d" \
+  -H "User-Agent: Mozilla/5.0" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['chart']['result'][0]['meta']['regularMarketPrice'])"
+```
+
+Use this value as `current_price` — do NOT rely on web search results for the stock price.
+
+### Read Historical Data
+
 Read from `./{ticker}/Reports/{TICKER}_Metrics.csv`:
 - Revenue (5-10 years)
 - Free Cash Flow
