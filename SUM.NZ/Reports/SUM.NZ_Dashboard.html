@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Summerset Group (SUM.NZ) Financial Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4aa, #00b894);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        .header p { color: #888; font-size: 1.1rem; }
+        .header .sub { color: #aaa; font-size: 0.95rem; margin-top: 6px; }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .kpi-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0,212,170,0.2); }
+        .kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+        .kpi-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        .kpi-change { font-size: 0.9rem; margin-top: 5px; }
+        .kpi-change.positive { color: #00d4aa; }
+        .kpi-change.negative { color: #ff6b6b; }
+        .kpi-sub { font-size: 0.78rem; color: #666; margin-top: 3px; }
+        /* Guidance */
+        .guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+        .guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .guidance-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+        .guidance-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg,#00d4aa,#00b894); border-radius: 2px; }
+        .guidance-meta { font-size: 0.85rem; color: #888; }
+        .guidance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .guidance-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 18px; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s ease; }
+        .guidance-card:hover { transform: translateY(-2px); }
+        .guidance-metric { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+        .guidance-target { font-size: 1.4rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; }
+        .guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
+        .guidance-vs-prior { display: inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+        .guidance-vs-prior.raised { background: rgba(0,212,170,0.15); color: #00d4aa; }
+        .guidance-vs-prior.lowered { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+        .guidance-vs-prior.maintained { background: rgba(255,255,255,0.1); color: #888; }
+        .guidance-vs-prior.new { background: rgba(99,102,241,0.15); color: #818cf8; }
+        .guidance-vs-prior.under_review { background: rgba(253,203,110,0.15); color: #fdcb6e; }
+        .guidance-notes { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
+        .guidance-commentary { background: rgba(255,255,255,0.03); border-radius: 10px; padding: 16px 20px; border-left: 3px solid #00d4aa; font-style: italic; color: #b0b0b0; line-height: 1.6; }
+        .guidance-commentary::before { content: '"'; font-size: 1.5rem; color: #00d4aa; margin-right: 4px; }
+        /* Overview */
+        .overview-section { max-width: 1400px; margin: 0 auto 30px; }
+        .overview-toggle { width: 100%; background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.3); border-radius: 12px; padding: 16px 24px; color: #00d4aa; font-size: 1.1rem; font-weight: 600; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease; }
+        .overview-toggle:hover { background: rgba(0,212,170,0.2); }
+        .overview-toggle .arrow { transition: transform 0.3s ease; }
+        .overview-toggle.active .arrow { transform: rotate(180deg); }
+        .overview-content { display: none; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-top: none; border-radius: 0 0 12px 12px; padding: 30px; margin-top: -12px; }
+        .overview-content.active { display: block; }
+        .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+        .overview-card { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; border: 1px solid rgba(255,255,255,0.08); }
+        .overview-card h3 { color: #00d4aa; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .overview-card p { margin-bottom: 12px; line-height: 1.6; }
+        .overview-card ul { list-style: none; padding: 0; margin: 0; }
+        .overview-card li { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); line-height: 1.5; }
+        .overview-card li:last-child { border-bottom: none; }
+        .overview-card.bull h3 { color: #00d4aa; }
+        .overview-card.bear h3 { color: #ff6b6b; }
+        .overview-card.risks h3 { color: #fdcb6e; }
+        .risk-high { color: #ff6b6b; }
+        .risk-moderate { color: #fdcb6e; }
+        .risk-low { color: #00d4aa; }
+        .revenue-stream { display: flex; justify-content: space-between; align-items: center; }
+        .revenue-stream .percent { color: #00d4aa; font-weight: 600; }
+        .trend-growing { color: #00d4aa; }
+        .trend-stable { color: #888; }
+        .trend-declining { color: #ff6b6b; }
+        /* Charts */
+        .section-title { font-size: 1.5rem; color: #fff; margin: 40px auto 20px; padding-bottom: 10px; border-bottom: 2px solid rgba(0,212,170,0.3); max-width: 1400px; }
+        .charts-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 25px; max-width: 1400px; margin: 0 auto; }
+        .chart-card { background: rgba(255,255,255,0.05); border-radius: 15px; padding: 25px; border: 1px solid rgba(255,255,255,0.1); }
+        .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+        .chart-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+        .chart-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg,#00d4aa,#00b894); border-radius: 2px; }
+        .help-btn { width: 24px; height: 24px; border-radius: 50%; background: rgba(0,212,170,0.2); border: 1px solid #00d4aa; color: #00d4aa; font-size: 14px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; }
+        .help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+        .chart-wrapper { position: relative; height: 300px; }
+        /* Modal */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: linear-gradient(135deg,#1e2a4a 0%,#16213e 100%); border-radius: 16px; max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto; border: 1px solid rgba(0,212,170,0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+        .modal-header { padding: 20px 25px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h3 { color: #00d4aa; font-size: 1.4rem; margin: 0; }
+        .modal-close { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,107,107,0.2); border: 1px solid #ff6b6b; color: #ff6b6b; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .modal-close:hover { background: #ff6b6b; color: #fff; }
+        .modal-body { padding: 25px; line-height: 1.7; }
+        .modal-body p { margin-bottom: 15px; }
+        .modal-body strong { color: #00d4aa; }
+        .modal-body ul { margin: 15px 0; padding-left: 20px; }
+        .modal-body li { margin-bottom: 8px; }
+        .metric-highlight { background: rgba(0,212,170,0.1); border-left: 3px solid #00d4aa; padding: 12px 15px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+        /* DCF */
+        .dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+        .dcf-methodology-note { background: rgba(253,203,110,0.08); border: 1px solid rgba(253,203,110,0.25); border-radius: 10px; padding: 14px 18px; margin-bottom: 25px; color: #c8a84b; font-size: 0.88rem; line-height: 1.6; }
+        .dcf-methodology-note strong { color: #fdcb6e; }
+        .dcf-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .dcf-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 24px; text-align: center; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s ease; }
+        .dcf-card:hover { transform: translateY(-3px); }
+        .dcf-card.highlight { background: rgba(0,212,170,0.1); border-color: rgba(0,212,170,0.3); }
+        .dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .dcf-value { font-size: 2.2rem; font-weight: bold; color: #00d4aa; }
+        .dcf-card:not(.highlight) .dcf-value { color: #fff; }
+        .dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+        .dcf-change.positive { color: #00d4aa; }
+        .dcf-change.negative { color: #ff6b6b; }
+        .dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
+        .dcf-warning { background: rgba(253,203,110,0.15); border: 1px solid rgba(253,203,110,0.4); border-radius: 8px; padding: 12px 16px; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; color: #fdcb6e; }
+        .warning-icon { font-size: 1.2rem; }
+        .dcf-inputs { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.08); }
+        .dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+        .dcf-inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .dcf-input-card { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
+        .dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #00d4aa; }
+        .dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
+        .fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
+        .fcf-projection-table { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 12px; }
+        .fcf-projection-item { text-align: center; }
+        .fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
+        .fcf-projection-item .year { font-size: 0.75rem; color: #888; margin-bottom: 2px; }
+        .fcf-projection-item .fcf-value { font-size: 1rem; color: #e0e0e0; font-weight: 500; }
+        .fcf-projection-item .growth-rate { font-size: 0.75rem; color: #00d4aa; margin-top: 2px; }
+        .dcf-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; margin-bottom: 30px; padding: 25px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
+        .slider-group { display: flex; flex-direction: column; gap: 10px; }
+        .slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+        .slider-group label span { color: #00d4aa; font-weight: 600; }
+        .slider-group input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); outline: none; }
+        .slider-group input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #00d4aa; cursor: pointer; transition: transform 0.2s; }
+        .slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        .slider-hint { font-size: 0.8rem; color: #666; }
+        .scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .scenario-tab { padding: 10px 24px; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: #888; border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s; }
+        .scenario-tab:hover { border-color: rgba(0,212,170,0.5); color: #e0e0e0; }
+        .scenario-tab.active { background: rgba(0,212,170,0.15); border-color: #00d4aa; color: #00d4aa; }
+        .scenario-details { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.08); }
+        .scenario-details h4 { color: #00d4aa; margin-bottom: 15px; }
+        .assumption-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+        .assumption-item { text-align: center; }
+        .assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+        .assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
+        .sensitivity-section { margin-bottom: 30px; }
+        .sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; }
+        .sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.03); border-radius: 8px; overflow: hidden; font-size: 0.9rem; }
+        .sensitivity-table th, .sensitivity-table td { padding: 12px 16px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+        .sensitivity-table th { background: rgba(0,212,170,0.1); color: #00d4aa; font-weight: 600; }
+        .sensitivity-table td { color: #e0e0e0; }
+        .sensitivity-table td.highlight { background: rgba(0,212,170,0.15); color: #00d4aa; font-weight: 600; }
+        .sensitivity-table td.below-current { color: #ff6b6b; }
+        .sensitivity-table td.above-current { color: #00d4aa; }
+        .historical-growth { margin-bottom: 30px; }
+        .historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
+        .growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
+        .growth-item { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 15px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+        .growth-item .metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
+        .growth-item .rate { font-size: 1.2rem; font-weight: 600; }
+        .growth-item .rate.positive { color: #00d4aa; }
+        .growth-item .rate.negative { color: #ff6b6b; }
+        .growth-item.selected { border-color: #00d4aa; background: rgba(0,212,170,0.1); }
+        .nta-crosscheck { background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.25); border-radius: 10px; padding: 16px 20px; margin-bottom: 25px; }
+        .nta-crosscheck h4 { color: #818cf8; margin-bottom: 10px; font-size: 0.95rem; }
+        .nta-crosscheck p { color: #b0b0b0; font-size: 0.88rem; line-height: 1.6; }
+        @media (max-width: 768px) {
+            .charts-container { grid-template-columns: 1fr; }
+            .overview-grid { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.8rem; }
+            .fcf-projection-table { grid-template-columns: repeat(3, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Summerset Group Holdings (SUM.NZ)</h1>
+    <p>NZ Retirement Village Developer &amp; Operator | ORA / DMF Model</p>
+    <div class="sub">NZX &amp; ASX (SNZ) Listed | FY ends 31 December | Currency: NZD millions | Data as at FY2025</div>
+</div>
+
+<!-- Investment Overview -->
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid">
+            <div class="overview-card">
+                <h3>Company Overview</h3>
+                <p>Summerset Group Holdings is one of New Zealand's largest retirement village developers and operators, developing, building, and operating a portfolio of 44 villages across New Zealand with an expanding presence in Victoria, Australia. Founded in 1997 and listed on the NZX in 2011, the company operates under the Occupation Right Agreement (ORA) model whereby residents pay an upfront licence fee for the right to occupy a unit, with Summerset earning a Deferred Management Fee (DMF) of 25% of the ORA price when they leave. At FY2025 year-end, total assets stood at NZ$9.2 billion with 8,673 total units in portfolio and 9,500+ residents.</p>
+            </div>
+            <div class="overview-card">
+                <h3>Business Model</h3>
+                <p>Capital-intensive ORA model: residents pay upfront for occupation rights, generating DMF income on exit (25% of ORA price over five years) plus recurring care fees and village services.</p>
+                <ul>
+                    <li class="revenue-stream"><span>Care fees and village services</span><span class="percent trend-growing">62% - Growing</span></li>
+                    <li class="revenue-stream"><span>Deferred Management Fees (DMF)</span><span class="percent trend-growing">37% - Growing</span></li>
+                    <li class="revenue-stream"><span>Other income</span><span class="percent trend-stable">1% - Stable</span></li>
+                </ul>
+                <p style="margin-top:12px; font-size:0.85rem; color:#888;">Geography: NZ ~94% (40 villages, 11 regions), Australia ~6% (4 villages in Victoria - Cranbourne North, Chirnside Park, Oakleigh South, Torquay)</p>
+            </div>
+            <div class="overview-card">
+                <h3>Competitive Position</h3>
+                <p><strong>Main competitors:</strong> Ryman Healthcare (RYM.NZ), Arvida (taken private), Metlifecare (private), Oceania Healthcare (OCA.NZ), Bupa NZ, RetireAustralia</p>
+                <p><strong>Moat factors:</strong></p>
+                <ul>
+                    <li><strong class="trend-growing">Strong</strong> - Largest NZ retirement village land bank (5,499 units) providing multi-decade development runway</li>
+                    <li><strong class="trend-growing">Strong</strong> - Fully integrated in-house development capability driving disciplined margins (27.8% in FY25)</li>
+                    <li><strong class="trend-growing">Strong</strong> - Brand: 91% resident satisfaction, 7 consecutive years Highly Commended Trusted Brand</li>
+                    <li><strong class="trend-stable">Moderate</strong> - ORA model creates inherent stickiness and switching costs</li>
+                    <li><strong class="trend-stable">Moderate</strong> - 44-village scale across 11 NZ regions reduces concentration risk</li>
+                    <li><strong class="trend-stable">Moderate</strong> - Continuum-of-care offering reduces churn; Care EBITDA surged from $2.7m to $18.8m in FY25</li>
+                </ul>
+            </div>
+            <div class="overview-card">
+                <h3>Growth Drivers</h3>
+                <ul>
+                    <li>Demographic tailwind: NZ 75+ population doubling by 2048; Victoria AU 75+ population more than doubling over 40 years</li>
+                    <li>Australia expansion: 4 villages in Victoria under construction, targeting ~300 units/year by end FY27</li>
+                    <li>Care ORA conversion programme: Care EBITDA $2.7m (FY24) to $18.8m (FY25), targeting $20-25k/bed</li>
+                    <li>Resale flywheel: 10 villages achieving 30+ resales, average $582k per unit; growing capital-light income</li>
+                    <li>Land bank monetisation: 5,499-unit pipeline to almost double portfolio size</li>
+                    <li>Interest rate cuts: RBNZ OCR cuts reduce finance costs and improve property market conditions</li>
+                    <li>Technology efficiency: Lumin platform rollout, remote nursing, AI tools, robotic maintenance</li>
+                </ul>
+            </div>
+            <div class="overview-card risks">
+                <h3>Key Risks</h3>
+                <ul>
+                    <li><span class="risk-high">HIGH</span> - NZ property market downturn reducing ORA pricing, DMF income, and NTA valuations</li>
+                    <li><span class="risk-high">HIGH</span> - Interest rate exposure on $1.97b debt; gearing 37.1% (near top of 30-40% target band)</li>
+                    <li><span class="risk-high">HIGH</span> - Australian expansion execution: scaling from 56 units (FY25) to 300/year by end FY27 is ambitious</li>
+                    <li><span class="risk-moderate">MOD</span> - NZ Retirement Villages Act amendment: mandatory 12-month buy-back could create liquidity pressure</li>
+                    <li><span class="risk-moderate">MOD</span> - Aged care funding inadequacy: govt subsidies lag wage cost inflation</li>
+                    <li><span class="risk-moderate">MOD</span> - Uncontracted stock: 541 new + 208 resale units available (9.7% of portfolio)</li>
+                    <li><span class="risk-moderate">MOD</span> - Construction cost inflation; village centre builds carry lower margins than villas</li>
+                </ul>
+            </div>
+            <div class="overview-card bull">
+                <h3>Bull Case</h3>
+                <ul>
+                    <li>Demographic tailwind is one of the most powerful structural growth drivers in NZ/AU investment universe - decades of compounding demand from a land bank assembled at historical cost</li>
+                    <li>Australia momentum is real: Cranbourne North village centre delivered, Chirnside Park 60% pre-sold, 4 villages simultaneously under construction - if Summerset replicates NZ model, it doubles TAM</li>
+                    <li>Resale gains are compounding, capital-light income: 32 villages generating resales, embedded value $1.9b of future DMF cash requiring no additional capital</li>
+                    <li>RBNZ rate cuts reduce finance costs AND improve NZ property conditions (dual tailwind) - Summerset is operationally leveraged to normalising rates</li>
+                    <li>Balance sheet discipline sharply differentiates from Ryman (required two ~$1b capital raises since 2023) - Summerset maintained 27.8% margins through the difficult 2022-2025 cycle</li>
+                </ul>
+            </div>
+            <div class="overview-card bear">
+                <h3>Bear Case</h3>
+                <ul>
+                    <li>Debt of $1.97b leaves limited headroom - any unexpected stress could require dilutive equity issuance or painful build rate reduction</li>
+                    <li>Australian execution risk is significant and often underestimated: scaling from 56 to 300 units/year by end FY27 is ambitious; cost overruns could impair returns</li>
+                    <li>Retirement Villages Act mandatory buy-back reform could create liquidity pressure in a weak market</li>
+                    <li>Care business structural headwind: 58% of opex is employee costs and government funding lags wage inflation persistently</li>
+                    <li>IFRS NPAT highly volatile (swung from $332m FY24 to $259m FY25) due to fair value movements - confuses investors and pressures stock when property market stalls</li>
+                </ul>
+            </div>
+            <div class="overview-card">
+                <h3>Recent Developments</h3>
+                <ul>
+                    <li><strong>Feb 2026:</strong> FY2025 results - record underlying profit $234.2m (+13%), record 1,560 ORA sales (+26%), NTA $13.75/share, total assets $9.2b</li>
+                    <li><strong>Dec 2025:</strong> NZ Govt announced Retirement Villages Act amendment plans (mandatory 12-month buy-back, cessation of weekly fees post-vacate)</li>
+                    <li><strong>Dec 2025:</strong> First villas at Chirnside Park (AU) delivered - 60% pre-sold. Cranbourne North village centre completed (AU's first continuum-of-care facility)</li>
+                    <li><strong>Nov 2025:</strong> Australian new Aged Care Act came into force; Summerset working toward first AU aged care at Cranbourne North in Q2 FY26</li>
+                    <li><strong>Sep 2025:</strong> Record H1 2025 results: underlying profit $106.6m (+19%), 692 ORA sales (record first half, +18% on H1 2024)</li>
+                    <li><strong>Feb 2025:</strong> New CFO Margaret Warrington joined. Boulcott care centre opened.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<!-- Guidance Section -->
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf"></span> | <span id="guidanceFY"></span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<!-- Revenue & Profitability -->
+<h2 class="section-title">Revenue &amp; Profitability</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Revenue Breakdown (Annual)</h3>
+            <button class="help-btn" onclick="openModal('revenueBreakdown')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="revenueBreakdownChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Underlying Profit</h3>
+            <button class="help-btn" onclick="openModal('underlyingProfit')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="underlyingProfitChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>IFRS Net Profit (NPAT)</h3>
+            <button class="help-btn" onclick="openModal('npat')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="npatChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Underlying Profit Margin</h3>
+            <button class="help-btn" onclick="openModal('profitMargin')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="profitMarginChart"></canvas></div>
+    </div>
+</div>
+
+<!-- Operations & Growth -->
+<h2 class="section-title">Operations &amp; Growth</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>ORA Sales: New vs Resale</h3>
+            <button class="help-btn" onclick="openModal('oraSales')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="oraSalesChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>New Units Delivered</h3>
+            <button class="help-btn" onclick="openModal('unitsDelivered')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="unitsDeliveredChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Retirement Units in Portfolio</h3>
+            <button class="help-btn" onclick="openModal('retirementUnits')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="retirementUnitsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Care Units in Portfolio</h3>
+            <button class="help-btn" onclick="openModal('careUnits')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="careUnitsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Development Margin % (Annual)</h3>
+            <button class="help-btn" onclick="openModal('devMargin')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="devMarginChart"></canvas></div>
+    </div>
+</div>
+
+<!-- Financial Position -->
+<h2 class="section-title">Financial Position</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Total Assets Growth</h3>
+            <button class="help-btn" onclick="openModal('totalAssets')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="totalAssetsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>NTA per Share (NZD)</h3>
+            <button class="help-btn" onclick="openModal('ntaPerShare')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="ntaChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Total Debt</h3>
+            <button class="help-btn" onclick="openModal('totalDebt')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="totalDebtChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Operating Cash Flow</h3>
+            <button class="help-btn" onclick="openModal('ocf')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="ocfChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Balance Sheet: Assets vs Debt vs Equity</h3>
+            <button class="help-btn" onclick="openModal('balanceSheet')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="balanceSheetChart"></canvas></div>
+    </div>
+</div>
+
+<!-- Per Share Metrics -->
+<h2 class="section-title">Per Share Metrics</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>EPS (Basic, cents) - Annual</h3>
+            <button class="help-btn" onclick="openModal('eps')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="epsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Dividends per Share (cents) - Annual</h3>
+            <button class="help-btn" onclick="openModal('dps')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="dpsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>NTA per Share vs Current Price</h3>
+            <button class="help-btn" onclick="openModal('ntaVsPrice')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="ntaVsPriceChart"></canvas></div>
+    </div>
+</div>
+
+<!-- DCF Valuation -->
+<h2 class="section-title">DCF Valuation</h2>
+<div class="dcf-section">
+    <div class="dcf-methodology-note">
+        <strong>Methodology Note:</strong> Operating Cash Flow is used as the FCF proxy for Summerset. For ORA/DMF retirement village operators, OCF includes resident ORA receipts which partly represent capital flows. This results in intrinsic values substantially above the current market price, reflecting the market's significant discount for debt risk, NZ property market uncertainty, and Australian execution risk. The DCF is mathematically correct; the gap to market price reflects non-DCF concerns the market is pricing in.
+    </div>
+    <div class="nta-crosscheck">
+        <h4>NTA Cross-Check</h4>
+        <p>Stock trades at <strong style="color:#818cf8;">NZD $10.66 vs NTA $13.75/share (P/NTA 0.775x)</strong> - a 22.5% discount to net tangible assets. NTA represents the book value of the physical retirement village portfolio and provides an asset-backed floor. DCF intrinsic values reflect the going-concern earnings power of the growing OCF-generating portfolio.</p>
+    </div>
+    <div class="dcf-summary">
+        <div class="dcf-card highlight">
+            <div class="dcf-label">Intrinsic Value (Base)</div>
+            <div class="dcf-value" id="dcfIV">NZD $38.69</div>
+            <div class="dcf-change positive" id="dcfUpside">+263% upside</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Entry Price (15% CAGR)</div>
+            <div class="dcf-value" id="dcfEntry">NZD $27.84</div>
+            <div class="dcf-sublabel">Buy below for 15% annual return</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Current Price</div>
+            <div class="dcf-value" id="dcfCurrent">NZD $10.66</div>
+            <div class="dcf-sublabel">P/NTA: 0.775x | Mkt Cap: $2.6b</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Prob-Weighted IV</div>
+            <div class="dcf-value" id="dcfWeighted">NZD $39.72</div>
+            <div class="dcf-sublabel">25% Bull / 50% Base / 25% Bear</div>
+        </div>
+    </div>
+
+    <div class="dcf-inputs">
+        <h4>DCF Model Inputs</h4>
+        <div class="dcf-inputs-grid">
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Base Year OCF (FCF Proxy)</div>
+                <div class="dcf-input-value" id="baseFCF">NZD $548.2m</div>
+                <div class="dcf-input-note">FY2025 Operating Cash Flow</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Shares Outstanding</div>
+                <div class="dcf-input-value" id="sharesOut">242.4M</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Total Debt</div>
+                <div class="dcf-input-value" id="totalDebtDCF">NZD $1,971m</div>
+                <div class="dcf-input-note">Interest-bearing debt</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Net Debt</div>
+                <div class="dcf-input-value" id="netDebt">NZD $1,965m</div>
+                <div class="dcf-input-note">After $6m cash</div>
+            </div>
+        </div>
+        <div class="fcf-projections">
+            <h5>Projected OCF - Base Case (NZD millions)</h5>
+            <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+        </div>
+    </div>
+
+    <div class="dcf-controls">
+        <div class="slider-group">
+            <label>Growth Rate: <span id="growthValue">15%</span></label>
+            <input type="range" id="growthSlider" min="0" max="30" value="15" step="1">
+            <div class="slider-hint" id="growthHint">Based on OCF 5-year CAGR (15.49%)</div>
+        </div>
+        <div class="slider-group">
+            <label>WACC: <span id="waccValue">10%</span></label>
+            <input type="range" id="waccSlider" min="6" max="18" value="10" step="0.5">
+        </div>
+        <div class="slider-group">
+            <label>Terminal Growth: <span id="terminalValue">3%</span></label>
+            <input type="range" id="terminalSlider" min="0" max="5" value="3" step="0.5">
+        </div>
+    </div>
+
+    <div class="scenario-tabs">
+        <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+        <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+        <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+    </div>
+
+    <div class="scenario-details" id="scenarioDetails">
+        <h4>Assumptions</h4>
+        <div class="assumption-grid" id="assumptionGrid"></div>
+    </div>
+
+    <div class="sensitivity-section">
+        <h4>Sensitivity Analysis: Intrinsic Value (NZD) by WACC &amp; Terminal Growth</h4>
+        <table class="sensitivity-table" id="sensitivityMatrix"></table>
+    </div>
+
+    <div class="historical-growth">
+        <h4>Historical Growth Rates (CAGR)</h4>
+        <div class="growth-grid" id="growthGrid"></div>
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&#10005;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// EMBEDDED DATA
+// ============================================================
+const csvData = `Period,TotalRevenue,CareFeesAndVillageServices,DeferredManagementFees,UnderlyingProfit,NPAT,BasicEPS,DividendPerShare,OperatingCashFlow,TotalAssets,NetAssets,TotalDebt,CashAndEquivalents,ShareholdersEquity,SharesOutstanding,NewSalesORA,ResalesORA,TotalSalesORA,DevelopmentMargin,NewUnitsDelivered,RetirementUnitsInPortfolio,CareUnitsInPortfolio,NTAPerShare
+H1-2016,40.0,26.9,13.0,24.7,50.6,23.30,2.6,84.4,1521.4,448.7,262.7,9.4,448.7,217.375,183,123,306,20.3,190,2609,485,206.06
+FY2016,86.1,57.8,28.0,56.6,145.5,66.9,7.7,192.6,1706.8,545.6,274.0,8.7,545.6,217.709,414,244,658,22.2,409,2828,748,249.90
+H1-2017,50.7,34.1,16.5,35.7,90.3,41.37,3.9,86.4,1932.1,627.6,315.3,13.1,627.6,218.396,179,144,323,28.0,171,2999,,285.72
+FY2017,110.5,74.5,35.8,81.7,239.9,109.8,11.0,207.7,2216.3,769.3,347.2,7.6,769.3,219.740,382,300,682,27.3,450,3278,806,347.56
+FY2018,137.0,91.2,45.6,98.6,214.5,97.1,13.2,217.8,2766.4,978.8,452.8,,978.8,221.734,339,301,640,33.2,454,3732,858,438.44
+FY2019,153.9,101.3,52.5,106.2,175.3,78.6,14.1,237.9,3337.9,1131.9,597.1,,1131.9,224.250,329,323,652,27.9,354,4086,858,502.01
+FY2020,172.4,111.6,60.8,98.3,230.8,102.3,13.0,266.8,3893.2,1354.8,687.1,15.8,1354.8,227.073,404,381,785,19.6,356,4442,915,594.14
+H1-2021,94.9,59.5,35.4,75.5,263.8,115.91,9.9,229.7,4375.2,1617.9,670.8,19.4,1617.9,227.998,302,243,545,,347,4669,1035,707.28
+FY2021,205.3,126.9,75.2,141.1,543.7,238.2,18.5,383.4,4923.7,1924.5,747.0,8.4,1924.5,229.427,540,438,978,23.1,619,4930,1098,835.93
+FY2022,238.7,144.6,92.3,141.1,543.7,238.2,18.5,383.4,5840.3,2193.0,1060.5,25.3,2193.0,231.560,537,470,1007,29.7,625,5518,1161,943.93
+H1-2023,128.2,77.5,49.8,87.2,133.1,57.31,7.0,146.7,6298.0,2306.6,1293.8,35.0,2306.6,232.684,241,242,483,,152,5670,1161,987.71
+FY2023,272.2,165.9,104.6,171.4,269.1,116.7,22.3,369.2,6941.7,2605.4,1393.5,12.6,2605.4,233.872,560,543,1103,31.6,643,6087,1284,1110.41
+H1-2024,151.6,93.1,57.9,89.9,100.6,42.87,9.5,191.6,7361.1,2691.9,1539.4,21.0,2691.9,235.208,290,298,588,,331,6364,1359,1141.02
+FY2024,319.9,197.2,121.4,206.4,332.0,141.3,24.5,443.2,8066.0,2969.5,1714.3,11.7,2969.5,236.825,588,650,1238,28.9,708,6671,1299,1242.52
+H1-2025,173.0,106.4,66.2,106.6,127.2,53.16,9.5,228.7,8679.3,3173.5,1866.8,17.7,3173.5,240.410,354,338,692,,334,6913,1391,1318.44
+FY2025,361.8,223.6,137.2,234.2,259.7,108.12,24.5,548.2,9234.9,3327.9,1971.4,6.0,3327.9,242.361,805,755,1560,27.8,693,7198,1475,1375.36`;
+
+const analysis = {
+    "ticker": "SUM.NZ",
+    "company_name": "Summerset Group Holdings Limited",
+    "guidance": {
+        "as_of": "FY2025 Annual Results (27 February 2026)",
+        "fiscal_year": "FY2026",
+        "items": [
+            {"metric": "NZ build rate (ORA homes delivered)", "target": "650-700 homes", "period": "FY2026", "vs_prior": "maintained", "notes": "Flat vs FY25 NZ delivery of 637 homes. Focus on managing stock and selling existing inventory at St Johns and Boulcott."},
+            {"metric": "Australia build rate (ORA homes delivered)", "target": "100-150 homes", "period": "FY2026", "vs_prior": "raised", "notes": "Up from FY25 AU delivery of 56 homes. Cranbourne North and Chirnside Park plus early Oakleigh South and Torquay."},
+            {"metric": "Total build rate (NZ + Australia)", "target": "750-850 homes", "period": "FY2026", "vs_prior": "raised", "notes": "Up from 693 total in FY25."},
+            {"metric": "Australia medium-term build rate", "target": "~300 units per annum", "period": "End of FY2027", "vs_prior": "maintained", "notes": "Strategic target reiterated. Requires scaling across 4+ simultaneous AU sites."},
+            {"metric": "Development margin", "target": "20-25%", "period": "Medium-term", "vs_prior": "maintained", "notes": "FY25 achieved 27.8% (above guidance). Expected to track within 20-25% as more care centres and apartments settle in FY26."},
+            {"metric": "Care EBITDA per bed", "target": "NZD $20,000-25,000", "period": "Medium-term", "vs_prior": "maintained", "notes": "Currently ~$13k. FY25 total Care EBITDA $18.8m, up from $2.7m in FY24."},
+            {"metric": "Gearing ratio", "target": "30-40%", "period": "Ongoing", "vs_prior": "maintained", "notes": "FY25 gearing 37.1% (within band). Debt growth expected to reduce in FY26 as village centre delivery pipeline completes."},
+            {"metric": "Dividend policy", "target": "20-50% of underlying profit", "period": "FY2026 onwards", "vs_prior": "under_review", "notes": "Board adopted formal three-year review cycle. Policy to be reviewed during FY26. FY25: 24.5 cps (25.3% of underlying profit)."}
+        ],
+        "management_commentary": "CEO Scott Scoullar: 'We continue to believe in our value proposition in both New Zealand and Australia going into FY26. Even in constrained trading conditions we have continued to see extremely high demand and record sales numbers.' Management is focused on operating cost management, Australian progress, and debt tracking. Operating expense growth was $10.2m in 2H25 (down from $14m in 1H25), demonstrating cost discipline is working. Management expressed optimism about improving NZ property market conditions."
+    }
+};
+
+const dcfData = {
+    "ticker": "SUM.NZ",
+    "current_price": 10.66,
+    "methodology_note": "OperatingCashFlow is used as the FCF proxy per company instruction.",
+    "inputs": {
+        "shares_outstanding": 242.361,
+        "total_debt": 1971.4,
+        "cash_and_equivalents": 6.0,
+        "net_debt": 1965.4,
+        "last_fcf": 548.2,
+        "last_fcf_year": "FY2025",
+        "currency": "NZD",
+        "units": "millions"
+    },
+    "historical_growth": {
+        "revenue_3yr_cagr": 14.87,
+        "revenue_5yr_cagr": 15.98,
+        "eps_3yr_cagr": 18.40,
+        "eps_5yr_cagr": 18.96,
+        "equity_3yr_cagr": 14.92,
+        "equity_5yr_cagr": 19.69,
+        "fcf_3yr_cagr": 12.66,
+        "fcf_5yr_cagr": 15.49,
+        "selected_growth_rate": 15.49,
+        "growth_rate_source": "fcf_5yr_cagr",
+        "growth_divergence_warning": null
+    },
+    "assumptions": {
+        "base": {"description": "Historical OCF growth decelerating toward terminal. Steady NZ operations, modest Australia contribution by Y5.", "growth_rates": [15, 13, 11, 9, 7], "wacc": 10, "terminal_growth": 3, "fcf_margin": 64},
+        "bull": {"description": "Strong NZ demographic tailwind, Australia scaling to 300 units/year by FY27, NZ property market recovery.", "growth_rates": [20, 18, 15, 12, 10], "wacc": 9, "terminal_growth": 3.5, "fcf_margin": 70},
+        "bear": {"description": "NZ property market stagnation, Australia delays, regulatory reform disruption, care funding shortfalls.", "growth_rates": [8, 7, 6, 5, 4], "wacc": 12, "terminal_growth": 2.5, "fcf_margin": 55}
+    },
+    "valuation": {
+        "base": {"intrinsic_value": 38.69, "upside": 262.9},
+        "bull": {"intrinsic_value": 61.29, "upside": 475.0},
+        "bear": {"intrinsic_value": 20.22, "upside": 89.7}
+    },
+    "entry_price": {
+        "base": {"entry_price": 27.84},
+        "bull": {"entry_price": 42.46},
+        "bear": {"entry_price": 16.23}
+    },
+    "sensitivity": {
+        "wacc_range": [8, 9, 10, 11, 12],
+        "terminal_growth_range": [2.0, 2.5, 3.0, 3.5, 4.0],
+        "matrix": [
+            [48.64, 52.88, 57.96, 64.18, 71.95],
+            [40.30, 43.26, 46.71, 50.80, 55.70],
+            [34.05, 36.22, 38.69, 41.55, 44.88],
+            [29.20, 30.84, 32.68, 34.77, 37.16],
+            [25.32, 26.59, 28.01, 29.59, 31.36]
+        ]
+    },
+    "probability_weighted": {"weights": {"bull": 0.25, "base": 0.50, "bear": 0.25}, "weighted_iv": 39.72},
+    "nta_cross_check": {"nta_per_share_fy2025": 13.75, "current_price_to_nta": 0.775}
+};
+
+// ============================================================
+// PARSE CSV
+// ============================================================
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => obj[h.trim()] = values[i] ? values[i].trim() : '');
+        return obj;
+    });
+}
+
+const data = parseCSV(csvData);
+
+// Sort chronologically
+function parseDate(p) {
+    const year = parseInt(p.match(/\d{4}/)?.[0] || '0');
+    const isH1 = p.includes('H1');
+    const isFY = p.startsWith('FY');
+    const subOrder = isH1 ? 1 : isFY ? 2 : 0;
+    return year * 10 + subOrder;
+}
+data.sort((a, b) => parseDate(a.Period) - parseDate(b.Period));
+
+const fyData = data.filter(d => d.Period.startsWith('FY'));
+const allData = data;
+
+// Helpers
+const n = (v) => v === '' || v === undefined || v === null ? null : parseFloat(v);
+const fmt = (v, dec=1) => v == null ? 'N/A' : v.toFixed(dec);
+const fmtM = (v) => v == null ? 'N/A' : `$${v.toFixed(1)}m`;
+
+// Colors
+const colors = {
+    primary: '#00d4aa',
+    secondary: '#00b894',
+    tertiary: '#0984e3',
+    quaternary: '#6c5ce7',
+    warning: '#fdcb6e',
+    danger: '#ff6b6b',
+    care: '#0984e3',
+    dmf: '#00d4aa',
+    other: '#6c5ce7'
+};
+
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: { labels: { color: '#e0e0e0', font: { size: 11 } } }
+    },
+    scales: {
+        x: { ticks: { color: '#888', maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+
+// ============================================================
+// KPI CARDS
+// ============================================================
+function renderKPIs() {
+    const fy25 = fyData.find(d => d.Period === 'FY2025');
+    const fy24 = fyData.find(d => d.Period === 'FY2024');
+
+    function pct(curr, prev) {
+        if (!curr || !prev || n(prev) === 0) return null;
+        return ((n(curr) - n(prev)) / Math.abs(n(prev)) * 100).toFixed(1);
+    }
+
+    const kpis = [
+        {
+            label: 'Total Revenue',
+            value: `NZD $${n(fy25.TotalRevenue).toFixed(1)}m`,
+            change: pct(fy25.TotalRevenue, fy24.TotalRevenue),
+            sub: `FY24: $${n(fy24.TotalRevenue).toFixed(1)}m`
+        },
+        {
+            label: 'Underlying Profit',
+            value: `NZD $${n(fy25.UnderlyingProfit).toFixed(1)}m`,
+            change: pct(fy25.UnderlyingProfit, fy24.UnderlyingProfit),
+            sub: `FY24: $${n(fy24.UnderlyingProfit).toFixed(1)}m`
+        },
+        {
+            label: 'NTA per Share',
+            value: `NZD $${(n(fy25.NTAPerShare)/100).toFixed(2)}`,
+            change: pct(fy25.NTAPerShare, fy24.NTAPerShare),
+            sub: `Price/NTA: ${(10.66/(n(fy25.NTAPerShare)/100)).toFixed(3)}x`
+        },
+        {
+            label: 'Total ORA Sales',
+            value: n(fy25.TotalSalesORA).toFixed(0),
+            change: pct(fy25.TotalSalesORA, fy24.TotalSalesORA),
+            sub: `FY24: ${n(fy24.TotalSalesORA).toFixed(0)} units`
+        },
+        {
+            label: 'Operating Cash Flow',
+            value: `NZD $${n(fy25.OperatingCashFlow).toFixed(1)}m`,
+            change: pct(fy25.OperatingCashFlow, fy24.OperatingCashFlow),
+            sub: `FY24: $${n(fy24.OperatingCashFlow).toFixed(1)}m`
+        },
+        {
+            label: 'Retirement Units',
+            value: n(fy25.RetirementUnitsInPortfolio).toFixed(0),
+            change: pct(fy25.RetirementUnitsInPortfolio, fy24.RetirementUnitsInPortfolio),
+            sub: `FY24: ${n(fy24.RetirementUnitsInPortfolio).toFixed(0)} units`
+        },
+        {
+            label: 'Development Margin',
+            value: `${n(fy25.DevelopmentMargin).toFixed(1)}%`,
+            change: (n(fy25.DevelopmentMargin) - n(fy24.DevelopmentMargin)).toFixed(1),
+            changeLabel: 'pp vs FY24',
+            sub: `FY24: ${n(fy24.DevelopmentMargin).toFixed(1)}%`
+        },
+        {
+            label: 'Current Share Price',
+            value: `NZD $10.66`,
+            change: null,
+            sub: `vs NTA $${(n(fy25.NTAPerShare)/100).toFixed(2)} (-22.5%)`
+        }
+    ];
+
+    const grid = document.getElementById('kpiGrid');
+    grid.innerHTML = kpis.map(k => {
+        let changeHtml = '';
+        if (k.change !== null && k.change !== undefined) {
+            const val = parseFloat(k.change);
+            const label = k.changeLabel || 'vs FY24';
+            const cls = val >= 0 ? 'positive' : 'negative';
+            const sign = val >= 0 ? '+' : '';
+            changeHtml = `<div class="kpi-change ${cls}">${sign}${k.change}% ${label}</div>`;
+        }
+        return `
+            <div class="kpi-card">
+                <div class="kpi-value">${k.value}</div>
+                <div class="kpi-label">${k.label}</div>
+                ${changeHtml}
+                <div class="kpi-sub">${k.sub}</div>
+            </div>`;
+    }).join('');
+}
+renderKPIs();
+
+// ============================================================
+// GUIDANCE
+// ============================================================
+function renderGuidance() {
+    const guidance = analysis.guidance;
+    if (!guidance || !guidance.items || guidance.items.length === 0) {
+        document.getElementById('guidanceSection').style.display = 'none';
+        return;
+    }
+    document.getElementById('guidanceAsOf').textContent = guidance.as_of || '';
+    document.getElementById('guidanceFY').textContent = guidance.fiscal_year || '';
+
+    const grid = document.getElementById('guidanceGrid');
+    grid.innerHTML = guidance.items.map(item => {
+        const vsClass = (item.vs_prior || 'new').replace('-','_');
+        const vsLabel = (item.vs_prior || 'New').charAt(0).toUpperCase() + (item.vs_prior || 'new').slice(1).replace('_', ' ');
+        return `
+            <div class="guidance-card">
+                <div class="guidance-metric">${item.metric}</div>
+                <div class="guidance-target">${item.target}</div>
+                <div class="guidance-period">${item.period}</div>
+                <span class="guidance-vs-prior ${vsClass}">${vsLabel}</span>
+                ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+            </div>`;
+    }).join('');
+
+    const comm = document.getElementById('guidanceCommentary');
+    if (guidance.management_commentary) {
+        comm.textContent = guidance.management_commentary;
+        comm.style.display = 'block';
+    } else {
+        comm.style.display = 'none';
+    }
+}
+renderGuidance();
+
+// ============================================================
+// OVERVIEW TOGGLE
+// ============================================================
+function toggleOverview() {
+    const btn = document.querySelector('.overview-toggle');
+    const content = document.getElementById('overviewContent');
+    btn.classList.toggle('active');
+    content.classList.toggle('active');
+}
+
+// ============================================================
+// METRIC DESCRIPTIONS
+// ============================================================
+const metricDescriptions = {
+    revenueBreakdown: {
+        title: "Revenue Breakdown",
+        content: `<p><strong>Revenue breakdown</strong> shows the two primary income streams that make up Summerset's reported revenue: Care Fees and Village Services plus Deferred Management Fees (DMF).</p>
+        <div class="metric-highlight"><strong>For Summerset:</strong> Revenue (~$362m in FY2025) represents only part of the earnings picture. Crucially, Summerset also earns a <strong>development margin</strong> on new ORA sales (not included in operating revenue) and records large <strong>fair value movements</strong> on its investment property portfolio each year.</div>
+        <p><strong>Care Fees and Village Services (~62%):</strong> Recurring weekly fees paid by all residents covering care, meals, and village amenities. Highly predictable and grows as the portfolio scales.</p>
+        <p><strong>DMF (~37%):</strong> The 25% deferred management fee recognised when residents leave. As more residents exit and ORA prices grow, DMF income compounds over time.</p>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>DMF growth accelerating as resale volumes increase and ORA prices rise</li><li>Care fees growing in line with unit portfolio growth</li><li>Revenue per unit improving as ORA prices increase</li></ul>`
+    },
+    underlyingProfit: {
+        title: "Underlying Profit",
+        content: `<p><strong>Underlying Profit</strong> is Summerset's preferred non-GAAP earnings metric, stripping out fair value movements on investment properties and other one-off items to show the core operating earnings power of the business.</p>
+        <div class="metric-highlight"><strong>For Summerset:</strong> This is THE key earnings metric. IFRS NPAT is heavily distorted by unrealised fair value movements (can swing hundreds of millions in either direction). Underlying profit gives investors a clear, consistent view of operational performance.</div>
+        <p><strong>Components include:</strong> DMF income + development margin on new ORA sales + care EBITDA + village services income - overhead costs - finance costs</p>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>Sustained growth toward and beyond $250m+</li><li>Increasing underlying profit margin (underlying profit as % of total revenue)</li><li>Care EBITDA contribution growing (from $2.7m in FY24 to $18.8m in FY25)</li><li>Development margin contribution maintaining above 20%</li></ul>`
+    },
+    npat: {
+        title: "IFRS Net Profit (NPAT)",
+        content: `<p><strong>IFRS Net Profit After Tax (NPAT)</strong> is the statutory reported profit including all items required under NZ GAAP / IFRS, including unrealised fair value movements on the investment property portfolio.</p>
+        <div class="metric-highlight"><strong>Warning for Summerset:</strong> NPAT is highly misleading as a standalone metric. FY2021 and FY2022 both show $543.7m NPAT - these numbers included massive unrealised fair value gains as NZ property prices surged. FY2025 NPAT of $259.7m is LOWER than FY2024 ($332m) not because the business deteriorated, but because fair value gains were smaller. Underlying Profit is the correct metric.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>Ignore NPAT volatility - focus on underlying profit instead</li><li>When NZ property prices fall, fair value gains can turn to losses, making NPAT look terrible even as the business performs well</li><li>Large fair value swings are non-cash and do not affect the company's ability to pay dividends or invest</li></ul>`
+    },
+    profitMargin: {
+        title: "Underlying Profit Margin",
+        content: `<p><strong>Underlying Profit Margin</strong> (Underlying Profit / Total Revenue) measures how much of each dollar of operating revenue flows through to underlying earnings.</p>
+        <div class="metric-highlight"><strong>For Summerset:</strong> This margin understates true profitability because revenue excludes the large development margin earned on new ORA sales (which flows directly to underlying profit). As such, the reported margin can appear to fall even as profitability improves, if ORA new sales mix shifts.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>Margin improvement as care EBITDA grows (Care ORA conversion programme)</li><li>Margin compression if operating expense growth outpaces revenue</li><li>Context: total revenue is only part of income; development margin on new sales is equally important</li></ul>`
+    },
+    oraSales: {
+        title: "ORA Sales: New vs Resale",
+        content: `<p><strong>ORA Sales</strong> (Occupation Right Agreement sales) are the number of ORA contracts signed in the period. Split between New Sales (first-time occupation of a new unit) and Resales (a unit being resold when a resident leaves).</p>
+        <div class="metric-highlight"><strong>For Summerset:</strong> This is the most important volume indicator. New ORA sales generate development margin income immediately. Resale ORA sales generate DMF income (25% of ORA price) - this is the "flywheel" of the retirement village model. As the portfolio ages, resale volumes grow organically without requiring new capital.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>Total ORA sales growth: record 1,560 in FY2025 (+26% on FY2024)</li><li>Resale growth as portfolio matures - currently 755 in FY2025; target growing naturally as more villages age</li><li>Average ORA price trends (drives DMF income and development margin dollar value)</li><li>Unsold stock levels (541 new + 208 resale units available at FY25 year-end is a watchpoint)</li></ul>`
+    },
+    unitsDelivered: {
+        title: "New Units Delivered",
+        content: `<p><strong>New Units Delivered</strong> is the number of new retirement village units built and handed over to first residents under ORA agreements in the period. This drives the New ORA Sales volume and grows the portfolio base for future resale DMF income.</p>
+        <div class="metric-highlight"><strong>For Summerset:</strong> Build rate is the primary growth lever. FY2026 guidance of 750-850 total homes (650-700 NZ + 100-150 Australia) represents an increase from FY2025's 693 total deliveries. The build rate must be managed carefully against market absorption rates - too many units delivered ahead of sales creates uncontracted stock risk.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>NZ build rate stable at ~650-700 homes in FY26 (managing stock at St Johns and Boulcott)</li><li>Australia build rate ramping from 56 (FY25) toward 300/year target by end FY27</li><li>Development margin per unit: villa heavy mix supports higher margins; care centres and apartments dilute margin</li></ul>`
+    },
+    retirementUnits: {
+        title: "Retirement Units in Portfolio",
+        content: `<p><strong>Retirement Units in Portfolio</strong> is the total number of independent living and serviced apartment units that Summerset has built and has under ORA arrangements. This is the primary driver of all future DMF income from resales.</p>
+        <div class="metric-highlight"><strong>For Summerset:</strong> Portfolio size drives the resale flywheel. With 7,198 retirement units at FY2025 year-end (plus 1,475 care units = 8,673 total), and a 5,499-unit land bank, Summerset can almost double its portfolio without acquiring new land. Each unit added today generates future DMF income for decades.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>Consistent growth trajectory toward doubling the portfolio</li><li>Australia units beginning to appear in portfolio from FY2025 (88 at Cranbourne North, 10 at Chirnside Park)</li><li>Average resale DMF per unit growing as ORA prices increase over time</li></ul>`
+    },
+    careUnits: {
+        title: "Care Units in Portfolio",
+        content: `<p><strong>Care Units in Portfolio</strong> is the number of certified care beds and serviced care apartments across Summerset's villages. Care units provide the continuum-of-care that differentiates Summerset from basic retirement communities.</p>
+        <div class="metric-highlight"><strong>For Summerset:</strong> Care is a significant strategic focus. The Care ORA conversion programme (converting standard funded care beds to ORA arrangements) transformed Care EBITDA from $2.7m (FY24) to $18.8m (FY25). The target is $20-25k Care EBITDA per bed (currently ~$13k). Care centre occupancy of 94% is above the ~90% industry average.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>Care EBITDA per bed trending toward $20-25k target</li><li>Care occupancy rates maintaining above 90%</li><li>Government funding adequacy for care - currently lagging wage cost inflation</li><li>Care ORA conversion progress: creates higher-margin income vs government-funded beds</li></ul>`
+    },
+    devMargin: {
+        title: "Development Margin",
+        content: `<p><strong>Development Margin</strong> is the profit made on the sale of new ORA units, expressed as a percentage of ORA proceeds. It represents the margin between the cost to build a new retirement village unit and the price received under the first ORA sale.</p>
+        <div class="metric-highlight"><strong>For Summerset:</strong> Development margin is one of the most important metrics alongside underlying profit. Summerset's medium-term guidance is 20-25%, but they have consistently exceeded this (FY25: 27.8%). This demonstrates the quality of their in-house development capability and land procurement discipline. FY2018 saw 33.2% margin - an exceptional year.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>Margin above 20% minimum sustainable threshold</li><li>FY2026 may see margin revert toward 20-25% as more care centres (lower margin) settle</li><li>Construction cost inflation impact - Summerset's procurement programme has largely offset this</li><li>Mix matters: villas carry higher margins than apartments or care suites</li></ul>`
+    },
+    totalAssets: {
+        title: "Total Assets Growth",
+        content: `<p><strong>Total Assets</strong> represents the total book value of Summerset's asset base, predominantly comprising its investment property portfolio of retirement villages (valued at fair value each year) plus development land, plant, and other assets.</p>
+        <div class="metric-highlight"><strong>For Summerset:</strong> The asset base has grown from $1.5b (H1 2016) to $9.2b (FY2025), driven by both new village construction and fair value revaluation of existing villages. NZ property price recovery is a key driver of future asset value growth. Total assets underpin the NTA per share metric.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>Consistent growth as new villages are built and existing villages are revalued</li><li>External valuer assumptions (growth rates, cap rates) embedded in fair value - rising rate assumptions lifted in FY25 valuations, supporting NTA</li><li>Australia assets starting to appear in balance sheet</li></ul>`
+    },
+    ntaPerShare: {
+        title: "NTA per Share",
+        content: `<p><strong>Net Tangible Assets (NTA) per Share</strong> is the book value per share of Summerset's net asset base (Total Assets minus Total Liabilities minus Intangibles / Shares Outstanding). It represents the theoretical liquidation value per share of the retirement village portfolio.</p>
+        <div class="metric-highlight"><strong>For Summerset:</strong> NTA is the primary valuation anchor. The stock currently trades at a 22.5% discount to NTA ($10.66 vs $13.75). Historically, NZ retirement village stocks have traded at premiums to NTA when market conditions are favourable (property market strong, low interest rates). The current discount reflects market concerns about property market, debt, and Australian execution risk.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>NTA growth from $13.75 in FY25 - should continue growing as portfolio expands and property values recover</li><li>Price/NTA discount narrowing as interest rate cycle turns and Australian execution risk reduces</li><li>Note: NTA is partly driven by fair value assumptions (optimistic assumptions = higher NTA)</li></ul>`
+    },
+    totalDebt: {
+        title: "Total Debt",
+        content: `<p><strong>Total Debt</strong> is Summerset's interest-bearing debt (bank facilities and bonds), used primarily to fund the construction of new retirement village units ahead of ORA receipts from residents.</p>
+        <div class="metric-highlight"><strong>For Summerset:</strong> Debt is a key watchpoint. Interest-bearing debt reached $1,971m at FY2025 year-end (37.1% gearing) - approaching the lower end of management's medium-term $2-2.5b target band. Management has committed that aggregate net debt growth will reduce in FY2026. As Australian construction ramps up, debt may continue to grow before reaching scale.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>Gearing ratio staying within the 30-40% target band</li><li>Interest cover ratio (underlying profit / finance costs: ~7.3x in FY25)</li><li>Debt growth decelerating in FY26 as guided - if it accelerates instead, this signals stress</li><li>Finance costs growing: $32m FY25 vs $26m FY24 (+22%) despite rate cuts beginning</li></ul>`
+    },
+    ocf: {
+        title: "Operating Cash Flow",
+        content: `<p><strong>Operating Cash Flow (OCF)</strong> is cash generated from Summerset's retirement village operations, including ORA receipts from new residents and resales, care fee collections, and village service revenues, minus operating costs.</p>
+        <div class="metric-highlight"><strong>For Summerset:</strong> OCF includes ORA receipts (upfront capital paid by incoming residents), which are partly capital in nature rather than pure operating income. This makes OCF higher than underlying profit but also more volatile. OCF is used as the DCF proxy here because it best represents cash-generative capacity. FY2025 OCF of $548.2m was a record.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>OCF growth trajectory (5-year CAGR: 15.5%)</li><li>OCF vs CapEx: FY25 CapEx was $722m (funded gap with debt); as build rate stabilises, free cash flow should improve</li><li>OCF seasonality: H2 typically stronger (more resales settle in calendar H2)</li></ul>`
+    },
+    balanceSheet: {
+        title: "Balance Sheet Overview",
+        content: `<p>This chart shows the relationship between <strong>Total Assets, Total Debt (interest-bearing), and Net Assets (shareholders equity)</strong> over time.</p>
+        <div class="metric-highlight"><strong>For Summerset:</strong> The balance sheet is asset-heavy (largely retirement village investment property valued at fair value). As assets grow, debt grows proportionally to fund construction, but net assets also grow as property values appreciate. The ratio of debt to total assets (gearing) is the critical metric management monitors.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>Net assets growing faster than debt (indicates value creation)</li><li>Gearing (Total Debt / Net Assets) within 30-40% target</li><li>Asset growth continues while debt growth moderates in FY26</li></ul>`
+    },
+    eps: {
+        title: "Basic EPS (cents)",
+        content: `<p><strong>Basic Earnings Per Share (EPS)</strong> is IFRS Net Profit After Tax divided by shares on issue, reported in New Zealand cents.</p>
+        <div class="metric-highlight"><strong>Warning:</strong> Basic EPS for Summerset is highly distorted by fair value movements. FY2021 and FY2022 both show 238.2c due to large fair value gains. FY2025 EPS of 108.1c reflects lower fair value gains, NOT a decline in business performance. For trend analysis, focus on Underlying Profit instead of EPS.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>Ignore EPS spikes from fair value movements (2021-2022)</li><li>Underlying profit per share is a better metric (not separately disclosed but derivable)</li><li>Dilution from share issuances is minimal (shares outstanding grew ~11% over 9 years)</li></ul>`
+    },
+    dps: {
+        title: "Dividends per Share (cents)",
+        content: `<p><strong>Dividends per Share (DPS)</strong> is the total cash dividend paid to shareholders per share, expressed in New Zealand cents. Summerset pays interim and final dividends.</p>
+        <div class="metric-highlight"><strong>For Summerset:</strong> Dividend policy targets 20-50% of underlying profit. FY2025 DPS was 24.5 cents (unchanged from FY2024), representing 25.3% of underlying profit. The board is conducting a formal review of dividend policy during FY2026. Given the significant development programme, higher payout may be constrained until the Australian operations reach scale.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>DPS growth resuming as underlying profit grows (24.5c flat in FY25 vs FY24)</li><li>Dividend policy review outcome during FY2026</li><li>Payout ratio staying within 20-50% of underlying profit target</li><li>At $10.66 share price, DPS of 24.5c represents a 2.3% yield</li></ul>`
+    },
+    ntaVsPrice: {
+        title: "NTA per Share vs Current Price",
+        content: `<p>This chart compares the <strong>historical NTA per share progression</strong> against the <strong>current share price of NZD $10.66</strong> to illustrate the valuation discount.</p>
+        <div class="metric-highlight"><strong>For Summerset:</strong> The stock currently trades at a 22.5% discount to NTA ($10.66 vs $13.75). During the NZ property boom years (2020-2022), NZ retirement village stocks traded at premiums to NTA. The current discount reflects post-2022 property market weakness, rising interest rates, and market scepticism about the Australian expansion. As rates fall and the property market recovers, a re-rating toward NTA (or above) is possible.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul><li>NTA continuing to grow each year (trajectory of ~$1+ per year in recent years)</li><li>Price/NTA discount narrowing as macro conditions improve</li><li>Historical precedent: stock traded at 1.2-1.5x NTA during favourable conditions</li></ul>`
+    }
+};
+
+// ============================================================
+// CHARTS
+// ============================================================
+
+// 1. Revenue Breakdown (FY only, stacked bar)
+new Chart(document.getElementById('revenueBreakdownChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: fyData.map(d => d.Period),
+        datasets: [
+            {
+                label: 'Care Fees & Village Services',
+                data: fyData.map(d => n(d.CareFeesAndVillageServices)),
+                backgroundColor: 'rgba(9,132,227,0.8)',
+                stack: 'revenue'
+            },
+            {
+                label: 'Deferred Management Fees',
+                data: fyData.map(d => n(d.DeferredManagementFees)),
+                backgroundColor: 'rgba(0,212,170,0.8)',
+                stack: 'revenue'
+            }
+        ]
+    },
+    options: {
+        ...chartDefaults,
+        plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: $${ctx.parsed.y?.toFixed(1)}m` } } },
+        scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, stacked: true }, y: { ...chartDefaults.scales.y, stacked: true, ticks: { ...chartDefaults.scales.y.ticks, callback: v => `$${v}m` } } }
+    }
+});
+
+// 2. Underlying Profit (all periods)
+new Chart(document.getElementById('underlyingProfitChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: allData.map(d => d.Period),
+        datasets: [{
+            label: 'Underlying Profit (NZDm)',
+            data: allData.map(d => n(d.UnderlyingProfit)),
+            backgroundColor: allData.map(d => d.Period.startsWith('H') ? 'rgba(0,212,170,0.5)' : 'rgba(0,212,170,0.85)'),
+            borderColor: '#00d4aa',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: (ctx) => `Underlying Profit: $${ctx.parsed.y?.toFixed(1)}m` } } },
+        scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => `$${v}m` } } }
+    }
+});
+
+// 3. NPAT (all periods)
+new Chart(document.getElementById('npatChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: allData.map(d => d.Period),
+        datasets: [{
+            label: 'IFRS NPAT (NZDm)',
+            data: allData.map(d => n(d.NPAT)),
+            backgroundColor: allData.map(d => {
+                const v = n(d.NPAT);
+                if (v > 400) return 'rgba(253,203,110,0.85)'; // large fair value years
+                return d.Period.startsWith('H') ? 'rgba(108,92,231,0.5)' : 'rgba(108,92,231,0.85)';
+            }),
+            borderColor: '#6c5ce7',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        plugins: {
+            ...chartDefaults.plugins,
+            tooltip: {
+                callbacks: {
+                    label: (ctx) => {
+                        const v = ctx.parsed.y;
+                        const note = v > 400 ? ' (includes large fair value gains)' : '';
+                        return `NPAT: $${v?.toFixed(1)}m${note}`;
+                    }
+                }
+            }
+        },
+        scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => `$${v}m` } } }
+    }
+});
+
+// 4. Underlying Profit Margin (all periods)
+new Chart(document.getElementById('profitMarginChart').getContext('2d'), {
+    type: 'line',
+    data: {
+        labels: allData.map(d => d.Period),
+        datasets: [{
+            label: 'Underlying Profit Margin %',
+            data: allData.map(d => {
+                const up = n(d.UnderlyingProfit);
+                const rev = n(d.TotalRevenue);
+                return up && rev ? parseFloat((up / rev * 100).toFixed(1)) : null;
+            }),
+            borderColor: '#00d4aa',
+            backgroundColor: 'rgba(0,212,170,0.1)',
+            fill: true,
+            tension: 0.3,
+            pointBackgroundColor: '#00d4aa',
+            pointRadius: 4
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => `${v}%` } } }
+    }
+});
+
+// 5. ORA Sales: New vs Resale (all periods)
+new Chart(document.getElementById('oraSalesChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: allData.map(d => d.Period),
+        datasets: [
+            {
+                label: 'New ORA Sales',
+                data: allData.map(d => n(d.NewSalesORA)),
+                backgroundColor: 'rgba(0,212,170,0.85)',
+                stack: 'ora'
+            },
+            {
+                label: 'Resale ORA Sales',
+                data: allData.map(d => n(d.ResalesORA)),
+                backgroundColor: 'rgba(9,132,227,0.85)',
+                stack: 'ora'
+            }
+        ]
+    },
+    options: {
+        ...chartDefaults,
+        plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(0)} units` } } },
+        scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, stacked: true }, y: { ...chartDefaults.scales.y, stacked: true } }
+    }
+});
+
+// 6. New Units Delivered (all periods)
+new Chart(document.getElementById('unitsDeliveredChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: allData.map(d => d.Period),
+        datasets: [{
+            label: 'New Units Delivered',
+            data: allData.map(d => n(d.NewUnitsDelivered)),
+            backgroundColor: allData.map(d => d.Period.startsWith('H') ? 'rgba(253,203,110,0.5)' : 'rgba(253,203,110,0.85)'),
+            borderColor: '#fdcb6e',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: (ctx) => `Delivered: ${ctx.parsed.y?.toFixed(0)} units` } } }
+    }
+});
+
+// 7. Retirement Units in Portfolio (all periods, area)
+new Chart(document.getElementById('retirementUnitsChart').getContext('2d'), {
+    type: 'line',
+    data: {
+        labels: allData.map(d => d.Period),
+        datasets: [{
+            label: 'Retirement Units in Portfolio',
+            data: allData.map(d => n(d.RetirementUnitsInPortfolio)),
+            borderColor: '#00d4aa',
+            backgroundColor: 'rgba(0,212,170,0.15)',
+            fill: true,
+            tension: 0.3,
+            pointBackgroundColor: '#00d4aa',
+            pointRadius: 4
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: (ctx) => `Portfolio: ${ctx.parsed.y?.toFixed(0)} units` } } }
+    }
+});
+
+// 8. Care Units in Portfolio (all periods)
+new Chart(document.getElementById('careUnitsChart').getContext('2d'), {
+    type: 'line',
+    data: {
+        labels: allData.filter(d => n(d.CareUnitsInPortfolio) !== null && n(d.CareUnitsInPortfolio) > 0).map(d => d.Period),
+        datasets: [{
+            label: 'Care Units in Portfolio',
+            data: allData.filter(d => n(d.CareUnitsInPortfolio) !== null && n(d.CareUnitsInPortfolio) > 0).map(d => n(d.CareUnitsInPortfolio)),
+            borderColor: '#0984e3',
+            backgroundColor: 'rgba(9,132,227,0.15)',
+            fill: true,
+            tension: 0.3,
+            pointBackgroundColor: '#0984e3',
+            pointRadius: 4
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: (ctx) => `Care Units: ${ctx.parsed.y?.toFixed(0)}` } } }
+    }
+});
+
+// 9. Development Margin (FY only)
+const devMarginData = fyData.filter(d => n(d.DevelopmentMargin) !== null && n(d.DevelopmentMargin) > 0);
+new Chart(document.getElementById('devMarginChart').getContext('2d'), {
+    type: 'line',
+    data: {
+        labels: devMarginData.map(d => d.Period),
+        datasets: [
+            {
+                label: 'Development Margin %',
+                data: devMarginData.map(d => n(d.DevelopmentMargin)),
+                borderColor: '#fdcb6e',
+                backgroundColor: 'rgba(253,203,110,0.15)',
+                fill: true,
+                tension: 0.3,
+                pointBackgroundColor: '#fdcb6e',
+                pointRadius: 5
+            },
+            {
+                label: 'Target Upper (25%)',
+                data: devMarginData.map(() => 25),
+                borderColor: 'rgba(255,107,107,0.5)',
+                borderDash: [6,3],
+                pointRadius: 0,
+                fill: false
+            },
+            {
+                label: 'Target Lower (20%)',
+                data: devMarginData.map(() => 20),
+                borderColor: 'rgba(255,107,107,0.3)',
+                borderDash: [3,3],
+                pointRadius: 0,
+                fill: false
+            }
+        ]
+    },
+    options: {
+        ...chartDefaults,
+        scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, min: 15, ticks: { ...chartDefaults.scales.y.ticks, callback: v => `${v}%` } } }
+    }
+});
+
+// 10. Total Assets (all periods)
+new Chart(document.getElementById('totalAssetsChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: allData.map(d => d.Period),
+        datasets: [{
+            label: 'Total Assets (NZDm)',
+            data: allData.map(d => n(d.TotalAssets)),
+            backgroundColor: allData.map(d => d.Period.startsWith('H') ? 'rgba(0,184,148,0.4)' : 'rgba(0,184,148,0.8)'),
+            borderColor: '#00b894',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: (ctx) => `Total Assets: $${(ctx.parsed.y/1000).toFixed(2)}b` } } },
+        scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => `$${(v/1000).toFixed(1)}b` } } }
+    }
+});
+
+// 11. NTA per Share (all periods, converted to dollars)
+new Chart(document.getElementById('ntaChart').getContext('2d'), {
+    type: 'line',
+    data: {
+        labels: allData.map(d => d.Period),
+        datasets: [{
+            label: 'NTA per Share (NZD)',
+            data: allData.map(d => n(d.NTAPerShare) ? parseFloat((n(d.NTAPerShare)/100).toFixed(4)) : null),
+            borderColor: '#00d4aa',
+            backgroundColor: 'rgba(0,212,170,0.12)',
+            fill: true,
+            tension: 0.3,
+            pointBackgroundColor: '#00d4aa',
+            pointRadius: 4
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: (ctx) => `NTA: NZD $${ctx.parsed.y?.toFixed(2)}/share` } } },
+        scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => `$${v.toFixed(2)}` } } }
+    }
+});
+
+// 12. Total Debt (all periods)
+new Chart(document.getElementById('totalDebtChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: allData.map(d => d.Period),
+        datasets: [{
+            label: 'Total Debt (NZDm)',
+            data: allData.map(d => n(d.TotalDebt)),
+            backgroundColor: allData.map(d => d.Period.startsWith('H') ? 'rgba(255,107,107,0.4)' : 'rgba(255,107,107,0.8)'),
+            borderColor: '#ff6b6b',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: (ctx) => `Debt: $${ctx.parsed.y?.toFixed(0)}m` } } },
+        scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => `$${v}m` } } }
+    }
+});
+
+// 13. Operating Cash Flow (all periods)
+new Chart(document.getElementById('ocfChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: allData.map(d => d.Period),
+        datasets: [{
+            label: 'Operating Cash Flow (NZDm)',
+            data: allData.map(d => n(d.OperatingCashFlow)),
+            backgroundColor: allData.map(d => d.Period.startsWith('H') ? 'rgba(108,92,231,0.4)' : 'rgba(108,92,231,0.85)'),
+            borderColor: '#6c5ce7',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: (ctx) => `OCF: $${ctx.parsed.y?.toFixed(1)}m` } } },
+        scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => `$${v}m` } } }
+    }
+});
+
+// 14. Balance Sheet (FY only)
+new Chart(document.getElementById('balanceSheetChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: fyData.map(d => d.Period),
+        datasets: [
+            {
+                label: 'Total Assets',
+                data: fyData.map(d => n(d.TotalAssets)),
+                backgroundColor: 'rgba(0,184,148,0.7)'
+            },
+            {
+                label: 'Total Debt',
+                data: fyData.map(d => n(d.TotalDebt)),
+                backgroundColor: 'rgba(255,107,107,0.7)'
+            },
+            {
+                label: 'Net Assets (Equity)',
+                data: fyData.map(d => n(d.NetAssets)),
+                backgroundColor: 'rgba(0,212,170,0.7)'
+            }
+        ]
+    },
+    options: {
+        ...chartDefaults,
+        plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: $${(ctx.parsed.y/1000).toFixed(2)}b` } } },
+        scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => `$${(v/1000).toFixed(1)}b` } } }
+    }
+});
+
+// 15. EPS Basic (FY only)
+new Chart(document.getElementById('epsChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: fyData.map(d => d.Period),
+        datasets: [{
+            label: 'Basic EPS (cents)',
+            data: fyData.map(d => n(d.BasicEPS)),
+            backgroundColor: fyData.map(d => n(d.BasicEPS) > 200 ? 'rgba(253,203,110,0.85)' : 'rgba(108,92,231,0.85)'),
+            borderWidth: 1
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: (ctx) => `EPS: ${ctx.parsed.y?.toFixed(1)}c (NZD)` } } },
+        scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => `${v}c` } } }
+    }
+});
+
+// 16. DPS (FY only)
+new Chart(document.getElementById('dpsChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: fyData.map(d => d.Period),
+        datasets: [{
+            label: 'Dividend per Share (cents)',
+            data: fyData.map(d => n(d.DividendPerShare)),
+            backgroundColor: 'rgba(0,212,170,0.85)',
+            borderColor: '#00d4aa',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: (ctx) => `DPS: ${ctx.parsed.y?.toFixed(1)}c (NZD)` } } },
+        scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => `${v}c` } } }
+    }
+});
+
+// 17. NTA vs Price
+const ntaVsLabels = allData.map(d => d.Period);
+const ntaVsValues = allData.map(d => n(d.NTAPerShare) ? parseFloat((n(d.NTAPerShare)/100).toFixed(4)) : null);
+const priceLineValues = allData.map(() => 10.66);
+new Chart(document.getElementById('ntaVsPriceChart').getContext('2d'), {
+    type: 'line',
+    data: {
+        labels: ntaVsLabels,
+        datasets: [
+            {
+                label: 'NTA per Share (NZD)',
+                data: ntaVsValues,
+                borderColor: '#00d4aa',
+                backgroundColor: 'rgba(0,212,170,0.1)',
+                fill: false,
+                tension: 0.3,
+                pointBackgroundColor: '#00d4aa',
+                pointRadius: 4
+            },
+            {
+                label: 'Current Share Price (NZD $10.66)',
+                data: priceLineValues,
+                borderColor: '#ff6b6b',
+                borderDash: [8, 4],
+                pointRadius: 0,
+                fill: false
+            }
+        ]
+    },
+    options: {
+        ...chartDefaults,
+        plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: NZD $${ctx.parsed.y?.toFixed(2)}` } } },
+        scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => `$${v.toFixed(2)}` } } }
+    }
+});
+
+// ============================================================
+// MODAL
+// ============================================================
+function openModal(key) {
+    if (!metricDescriptions[key]) return;
+    document.getElementById('modalTitle').textContent = metricDescriptions[key].title;
+    document.getElementById('modalBody').innerHTML = metricDescriptions[key].content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('modalOverlay').classList.remove('active'); document.body.style.overflow = ''; } });
+
+// ============================================================
+// DCF SECTION
+// ============================================================
+let currentScenario = 'base';
+
+function renderFCFProjections() {
+    const startGrowth = parseFloat(document.getElementById('growthSlider').value);
+    const baseFCF = dcfData.inputs.last_fcf;
+    const endGrowth = 10;
+    const growthRates = [];
+    for (let i = 0; i < 5; i++) {
+        const rate = startGrowth > endGrowth
+            ? startGrowth - (startGrowth - endGrowth) * (i / 4)
+            : startGrowth;
+        growthRates.push(rate);
+    }
+    let fcf = baseFCF;
+    const fcfValues = [baseFCF];
+    for (let i = 0; i < 5; i++) {
+        fcf = fcf * (1 + growthRates[i] / 100);
+        fcfValues.push(fcf);
+    }
+    let html = `<div class="fcf-projection-item header">Base</div>`;
+    for (let i = 1; i <= 5; i++) html += `<div class="fcf-projection-item header">Year ${i}</div>`;
+    html += `<div class="fcf-projection-item"><div class="fcf-value">NZD $${fcfValues[0].toFixed(0)}m</div><div class="growth-rate">-</div></div>`;
+    for (let i = 1; i <= 5; i++) {
+        html += `<div class="fcf-projection-item"><div class="fcf-value">NZD $${fcfValues[i].toFixed(0)}m</div><div class="growth-rate">+${growthRates[i-1].toFixed(0)}%</div></div>`;
+    }
+    document.getElementById('fcfProjectionTable').innerHTML = html;
+}
+
+function calculateDCF(startGrowth, wacc, terminalGrowth) {
+    const years = 5;
+    const fcf = dcfData.inputs.last_fcf;
+    let pvFCF = 0;
+    let projectedFCF = fcf;
+    const endGrowth = 10;
+    for (let i = 0; i < years; i++) {
+        const yearGrowth = startGrowth > endGrowth
+            ? startGrowth - (startGrowth - endGrowth) * (i / 4)
+            : startGrowth;
+        projectedFCF *= (1 + yearGrowth / 100);
+        pvFCF += projectedFCF / Math.pow(1 + wacc/100, i + 1);
+    }
+    const terminalFCF = projectedFCF * (1 + terminalGrowth/100);
+    const terminalValue = terminalFCF / (wacc/100 - terminalGrowth/100);
+    const pvTerminal = terminalValue / Math.pow(1 + wacc/100, years);
+    const enterpriseValue = pvFCF + pvTerminal;
+    const equityValue = enterpriseValue - dcfData.inputs.net_debt;
+    const iv = equityValue / dcfData.inputs.shares_outstanding;
+    const terminalPerShare = terminalValue / dcfData.inputs.shares_outstanding;
+    const entryPrice = terminalPerShare / Math.pow(1.15, years);
+    return { iv, entryPrice };
+}
+
+function updateDCFDisplay() {
+    const growth = parseFloat(document.getElementById('growthSlider').value);
+    const wacc = parseFloat(document.getElementById('waccSlider').value);
+    const terminal = parseFloat(document.getElementById('terminalSlider').value);
+    document.getElementById('growthValue').textContent = growth + '%';
+    document.getElementById('waccValue').textContent = wacc + '%';
+    document.getElementById('terminalValue').textContent = terminal + '%';
+    renderFCFProjections();
+    const result = calculateDCF(growth, wacc, terminal);
+    document.getElementById('dcfIV').textContent = 'NZD $' + result.iv.toFixed(2);
+    document.getElementById('dcfEntry').textContent = 'NZD $' + result.entryPrice.toFixed(2);
+    const upside = ((result.iv - dcfData.current_price) / dcfData.current_price * 100);
+    const upsideEl = document.getElementById('dcfUpside');
+    upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(0) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+    upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+    document.getElementById('dcfWeighted').textContent = 'NZD $' + dcfData.probability_weighted.weighted_iv.toFixed(2);
+    const grid = document.getElementById('assumptionGrid');
+    if (grid) {
+        grid.innerHTML = `
+            <div class="assumption-item"><div class="label">Growth Rate (Y1)</div><div class="value">${growth}%</div></div>
+            <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc}%</div></div>
+            <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${terminal}%</div></div>
+            <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa;">NZD $${result.iv.toFixed(2)}</div></div>
+            <div class="assumption-item"><div class="label">Entry Price</div><div class="value" style="color:#00d4aa;">NZD $${result.entryPrice.toFixed(2)}</div></div>`;
+    }
+}
+
+function switchScenario(scenario) {
+    currentScenario = scenario;
+    document.querySelectorAll('.scenario-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.scenario === scenario);
+    });
+    const assumptions = dcfData.assumptions[scenario];
+    const valuation = dcfData.valuation[scenario];
+    document.getElementById('growthSlider').value = assumptions.growth_rates[0];
+    document.getElementById('waccSlider').value = assumptions.wacc;
+    document.getElementById('terminalSlider').value = assumptions.terminal_growth;
+    renderFCFProjections();
+    const grid = document.getElementById('assumptionGrid');
+    grid.innerHTML = `
+        <div class="assumption-item"><div class="label">Year 1 Growth</div><div class="value">${assumptions.growth_rates[0]}%</div></div>
+        <div class="assumption-item"><div class="label">Year 5 Growth</div><div class="value">${assumptions.growth_rates[4]}%</div></div>
+        <div class="assumption-item"><div class="label">FCF Margin</div><div class="value">${assumptions.fcf_margin}%</div></div>
+        <div class="assumption-item"><div class="label">WACC</div><div class="value">${assumptions.wacc}%</div></div>
+        <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${assumptions.terminal_growth}%</div></div>
+        <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa;">NZD $${valuation.intrinsic_value.toFixed(2)}</div></div>`;
+    updateDCFDisplay();
+}
+
+function renderHistoricalGrowth() {
+    const growth = dcfData.historical_growth;
+    const selectedSource = growth.growth_rate_source;
+    const grid = document.getElementById('growthGrid');
+    const metrics = [
+        { key: 'revenue_3yr_cagr', label: 'Revenue 3Y CAGR' },
+        { key: 'revenue_5yr_cagr', label: 'Revenue 5Y CAGR' },
+        { key: 'eps_3yr_cagr', label: 'Underlying EPS 3Y' },
+        { key: 'eps_5yr_cagr', label: 'Underlying EPS 5Y' },
+        { key: 'equity_3yr_cagr', label: 'Equity 3Y CAGR' },
+        { key: 'equity_5yr_cagr', label: 'Equity 5Y CAGR' },
+        { key: 'fcf_3yr_cagr', label: 'OCF 3Y CAGR' },
+        { key: 'fcf_5yr_cagr', label: 'OCF 5Y CAGR' }
+    ];
+    grid.innerHTML = metrics.map(m => {
+        const rate = growth[m.key];
+        const isSelected = m.key === selectedSource;
+        const colorClass = rate >= 0 ? 'positive' : 'negative';
+        return `<div class="growth-item ${isSelected ? 'selected' : ''}">
+            <div class="metric">${m.label}${isSelected ? ' *' : ''}</div>
+            <div class="rate ${colorClass}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div>
+        </div>`;
+    }).join('') + `<div style="grid-column:1/-1;font-size:0.75rem;color:#666;margin-top:4px;">* Used as DCF base growth rate (OCF 5-year CAGR)</div>`;
+}
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const currentPrice = dcfData.current_price;
+    let html = '<tr><th>WACC \\ Term G</th>';
+    sens.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+    html += '</tr>';
+    sens.wacc_range.forEach((wacc, i) => {
+        html += `<tr><th>${wacc}%</th>`;
+        sens.matrix[i].forEach((val, j) => {
+            const isHighlight = wacc === dcfData.assumptions.base.wacc && sens.terminal_growth_range[j] === dcfData.assumptions.base.terminal_growth;
+            const colorClass = val >= currentPrice ? 'above-current' : 'below-current';
+            html += `<td class="${isHighlight ? 'highlight' : colorClass}">NZD $${val}</td>`;
+        });
+        html += '</tr>';
+    });
+    document.getElementById('sensitivityMatrix').innerHTML = html;
+}
+
+// Initialize DCF
+renderFCFProjections();
+renderHistoricalGrowth();
+renderSensitivityMatrix();
+switchScenario('base');
+
+// Bind sliders
+['growthSlider','waccSlider','terminalSlider'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.oninput = updateDCFDisplay; el.onchange = updateDCFDisplay; }
+});
+
+</script>
+</body>
+</html>

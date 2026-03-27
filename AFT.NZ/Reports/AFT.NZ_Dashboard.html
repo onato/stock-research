@@ -1,0 +1,1700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AFT Pharmaceuticals (AFT.NZ) Financial Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4aa, #00b894);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        .header p { color: #888; font-size: 1.1rem; }
+        .header .tag {
+            display: inline-block;
+            background: rgba(0,212,170,0.15);
+            border: 1px solid rgba(0,212,170,0.3);
+            border-radius: 20px;
+            padding: 4px 14px;
+            font-size: 0.85rem;
+            color: #00d4aa;
+            margin: 6px 4px 0;
+        }
+        /* KPI Grid */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .kpi-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0,212,170,0.2); }
+        .kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+        .kpi-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        .kpi-change { font-size: 0.9rem; margin-top: 5px; }
+        .kpi-change.positive { color: #00d4aa; }
+        .kpi-change.negative { color: #ff6b6b; }
+        .kpi-sub { font-size: 0.75rem; color: #666; margin-top: 3px; }
+        /* Guidance */
+        .guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+        .guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .guidance-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+        .guidance-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px; }
+        .guidance-meta { font-size: 0.85rem; color: #888; }
+        .guidance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .guidance-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 18px; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s ease; }
+        .guidance-card:hover { transform: translateY(-2px); }
+        .guidance-metric { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+        .guidance-target { font-size: 1.2rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; }
+        .guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
+        .guidance-vs-prior { display: inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+        .guidance-vs-prior.raised { background: rgba(0,212,170,0.15); color: #00d4aa; }
+        .guidance-vs-prior.lowered { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+        .guidance-vs-prior.maintained { background: rgba(255,255,255,0.1); color: #888; }
+        .guidance-vs-prior.increasing { background: rgba(253,203,110,0.15); color: #fdcb6e; }
+        .guidance-vs-prior.new { background: rgba(99,102,241,0.15); color: #818cf8; }
+        .guidance-notes { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
+        .guidance-commentary { background: rgba(255,255,255,0.03); border-radius: 10px; padding: 16px 20px; border-left: 3px solid #00d4aa; font-style: italic; color: #b0b0b0; line-height: 1.6; }
+        .guidance-commentary::before { content: '"'; font-size: 1.5rem; color: #00d4aa; margin-right: 4px; }
+        /* Section titles */
+        .section-title { font-size: 1.5rem; color: #fff; margin: 40px auto 20px; padding-bottom: 10px; border-bottom: 2px solid rgba(0,212,170,0.3); max-width: 1400px; }
+        /* Charts */
+        .charts-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 25px; max-width: 1400px; margin: 0 auto; }
+        .chart-card { background: rgba(255,255,255,0.05); border-radius: 15px; padding: 25px; border: 1px solid rgba(255,255,255,0.1); }
+        .chart-card.wide { grid-column: 1 / -1; }
+        .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+        .chart-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+        .chart-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px; }
+        .help-btn { width: 24px; height: 24px; border-radius: 50%; background: rgba(0,212,170,0.2); border: 1px solid #00d4aa; color: #00d4aa; font-size: 14px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; }
+        .help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+        .chart-wrapper { position: relative; height: 300px; }
+        /* Modal */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%); border-radius: 16px; max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto; border: 1px solid rgba(0,212,170,0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+        .modal-header { padding: 20px 25px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h3 { color: #00d4aa; font-size: 1.4rem; margin: 0; }
+        .modal-close { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,107,107,0.2); border: 1px solid #ff6b6b; color: #ff6b6b; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .modal-close:hover { background: #ff6b6b; color: #fff; }
+        .modal-body { padding: 25px; line-height: 1.7; }
+        .modal-body p { margin-bottom: 15px; }
+        .modal-body strong { color: #00d4aa; }
+        .modal-body ul { margin: 15px 0; padding-left: 20px; }
+        .modal-body li { margin-bottom: 8px; }
+        .metric-highlight { background: rgba(0,212,170,0.1); border-left: 3px solid #00d4aa; padding: 12px 15px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+        /* Overview */
+        .overview-section { max-width: 1400px; margin: 0 auto 30px; }
+        .overview-toggle { width: 100%; background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.3); border-radius: 12px; padding: 16px 24px; color: #00d4aa; font-size: 1.1rem; font-weight: 600; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease; }
+        .overview-toggle:hover { background: rgba(0,212,170,0.2); }
+        .overview-toggle .arrow { transition: transform 0.3s ease; }
+        .overview-toggle.active .arrow { transform: rotate(180deg); }
+        .overview-content { display: none; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-top: none; border-radius: 0 0 12px 12px; padding: 30px; margin-top: -12px; }
+        .overview-content.active { display: block; }
+        .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+        .overview-card { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; border: 1px solid rgba(255,255,255,0.08); }
+        .overview-card h3 { color: #00d4aa; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .overview-card p { margin-bottom: 12px; line-height: 1.6; }
+        .overview-card ul { list-style: none; padding: 0; margin: 0; }
+        .overview-card li { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); line-height: 1.5; }
+        .overview-card li:last-child { border-bottom: none; }
+        .overview-card.bull h3 { color: #00d4aa; }
+        .overview-card.bear h3 { color: #ff6b6b; }
+        .overview-card.risks h3 { color: #fdcb6e; }
+        .risk-high { color: #ff6b6b; }
+        .risk-moderate { color: #fdcb6e; }
+        .risk-low { color: #00d4aa; }
+        .revenue-stream { display: flex; justify-content: space-between; align-items: center; }
+        .revenue-stream .percent { color: #00d4aa; font-weight: 600; }
+        .trend-growing { color: #00d4aa; }
+        .trend-stable { color: #888; }
+        .trend-declining { color: #ff6b6b; }
+        /* DCF */
+        .dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+        .dcf-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .dcf-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 24px; text-align: center; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s ease; }
+        .dcf-card:hover { transform: translateY(-3px); }
+        .dcf-card.highlight { background: rgba(0,212,170,0.1); border-color: rgba(0,212,170,0.3); }
+        .dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .dcf-value { font-size: 2.2rem; font-weight: bold; color: #00d4aa; }
+        .dcf-card:not(.highlight) .dcf-value { color: #fff; }
+        .dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+        .dcf-change.positive { color: #00d4aa; }
+        .dcf-change.negative { color: #ff6b6b; }
+        .dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
+        .dcf-warning { background: rgba(253,203,110,0.15); border: 1px solid rgba(253,203,110,0.4); border-radius: 8px; padding: 12px 16px; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; color: #fdcb6e; }
+        .warning-icon { font-size: 1.2rem; }
+        .dcf-inputs { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.08); }
+        .dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+        .dcf-inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .dcf-input-card { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
+        .dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #00d4aa; }
+        .dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
+        .fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
+        .fcf-projection-table { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 12px; }
+        .fcf-projection-item { text-align: center; }
+        .fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
+        .fcf-projection-item .fcf-value { font-size: 1rem; color: #e0e0e0; font-weight: 500; }
+        .fcf-projection-item .growth-rate { font-size: 0.75rem; color: #00d4aa; margin-top: 2px; }
+        .dcf-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; margin-bottom: 30px; padding: 25px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
+        .slider-group { display: flex; flex-direction: column; gap: 10px; }
+        .slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+        .slider-group label span { color: #00d4aa; font-weight: 600; }
+        .slider-group input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); outline: none; }
+        .slider-group input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #00d4aa; cursor: pointer; transition: transform 0.2s; }
+        .slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        .slider-hint { font-size: 0.8rem; color: #666; }
+        .scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .scenario-tab { padding: 10px 24px; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: #888; border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s; }
+        .scenario-tab:hover { border-color: rgba(0,212,170,0.5); color: #e0e0e0; }
+        .scenario-tab.active { background: rgba(0,212,170,0.15); border-color: #00d4aa; color: #00d4aa; }
+        .scenario-details { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.08); }
+        .scenario-details h4 { color: #00d4aa; margin-bottom: 15px; }
+        .scenario-narrative { font-size: 0.9rem; color: #b0b0b0; line-height: 1.6; margin-bottom: 15px; font-style: italic; }
+        .assumption-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+        .assumption-item { text-align: center; }
+        .assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+        .assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
+        .sensitivity-section { margin-bottom: 30px; }
+        .sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; }
+        .sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.03); border-radius: 8px; overflow: hidden; }
+        .sensitivity-table th, .sensitivity-table td { padding: 12px 16px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+        .sensitivity-table th { background: rgba(0,212,170,0.1); color: #00d4aa; font-weight: 600; }
+        .sensitivity-table td { color: #e0e0e0; }
+        .sensitivity-table td.highlight { background: rgba(0,212,170,0.15); color: #00d4aa; font-weight: 600; }
+        .sensitivity-table td.below-current { color: #ff6b6b; }
+        .sensitivity-table td.above-current { color: #00d4aa; }
+        .historical-growth { margin-bottom: 30px; }
+        .historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
+        .growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
+        .growth-item { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 15px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+        .growth-item .metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
+        .growth-item .rate { font-size: 1.2rem; font-weight: 600; }
+        .growth-item .rate.positive { color: #00d4aa; }
+        .growth-item .rate.negative { color: #ff6b6b; }
+        .growth-item.selected { border-color: #00d4aa; background: rgba(0,212,170,0.1); }
+        .dcf-download { text-align: center; margin-top: 30px; }
+        .download-btn { display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; background: rgba(0,212,170,0.15); border: 1px solid #00d4aa; border-radius: 8px; color: #00d4aa; text-decoration: none; font-weight: 600; transition: all 0.2s; }
+        .download-btn:hover { background: #00d4aa; color: #1a1a2e; }
+        .download-icon { font-size: 1.2rem; }
+        .analyst-box { background: rgba(0,212,170,0.05); border: 1px solid rgba(0,212,170,0.2); border-radius: 10px; padding: 15px 20px; margin-bottom: 20px; display: flex; gap: 30px; flex-wrap: wrap; }
+        .analyst-item { text-align: center; }
+        .analyst-item .alabel { font-size: 0.8rem; color: #888; text-transform: uppercase; }
+        .analyst-item .aval { font-size: 1.2rem; font-weight: 600; color: #00d4aa; }
+        @media (max-width: 768px) {
+            .charts-container { grid-template-columns: 1fr; }
+            .overview-grid { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.8rem; }
+            .fcf-projection-table { grid-template-columns: repeat(3, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+    <h1>AFT Pharmaceuticals (AFT.NZ)</h1>
+    <p>NZX/ASX-Listed Specialty Pharmaceutical Company | Fiscal Year Ends March 31 | Reports in NZD</p>
+    <span class="tag">Pain</span>
+    <span class="tag">Maxigesic</span>
+    <span class="tag">Pharmaceuticals</span>
+    <span class="tag">Global Expansion</span>
+    <span class="tag">R&amp;D Pipeline</span>
+</div>
+
+<!-- INVESTMENT OVERVIEW -->
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid" id="overviewGrid"></div>
+    </div>
+</div>
+
+<!-- KPI CARDS -->
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<!-- GUIDANCE -->
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf"></span> | <span id="guidanceFY"></span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary" style="display:none;"></div>
+</div>
+
+<!-- CHARTS: REVENUE & GROWTH -->
+<h2 class="section-title">Revenue &amp; Profitability</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Revenue (NZD m)</h3>
+            <button class="help-btn" onclick="openModal('revenue')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartRevenue"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Gross Profit &amp; Gross Margin</h3>
+            <button class="help-btn" onclick="openModal('grossProfit')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartGrossProfit"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>EBITDA &amp; Operating Income (NZD m)</h3>
+            <button class="help-btn" onclick="openModal('ebitda')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartEBITDA"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Income &amp; Net Margin</h3>
+            <button class="help-btn" onclick="openModal('netIncome')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartNetIncome"></canvas></div>
+    </div>
+</div>
+
+<!-- CHARTS: PER SHARE & CASH -->
+<h2 class="section-title">Per Share Metrics &amp; Cash Flow</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Earnings Per Share (NZD)</h3>
+            <button class="help-btn" onclick="openModal('eps')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartEPS"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Free Cash Flow (NZD m)</h3>
+            <button class="help-btn" onclick="openModal('fcf')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartFCF"></canvas></div>
+    </div>
+</div>
+
+<!-- CHARTS: PHARMA-SPECIFIC -->
+<h2 class="section-title">Pharma-Specific Metrics</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>R&amp;D Expenses (NZD m)</h3>
+            <button class="help-btn" onclick="openModal('rnd')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartRnD"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Licensing Revenue (NZD m)</h3>
+            <button class="help-btn" onclick="openModal('licensing')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartLicensing"></canvas></div>
+    </div>
+    <div class="chart-card wide">
+        <div class="chart-header">
+            <h3>Margin Trends: Gross, Operating &amp; Net (%)</h3>
+            <button class="help-btn" onclick="openModal('margins')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartMargins"></canvas></div>
+    </div>
+</div>
+
+<!-- CHARTS: BALANCE SHEET -->
+<h2 class="section-title">Balance Sheet &amp; Capital Structure</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shareholders Equity &amp; Net Debt (NZD m)</h3>
+            <button class="help-btn" onclick="openModal('balanceSheet')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartBalanceSheet"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Cash &amp; Total Debt (NZD m)</h3>
+            <button class="help-btn" onclick="openModal('cashDebt')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartCashDebt"></canvas></div>
+    </div>
+</div>
+
+<!-- DCF VALUATION -->
+<h2 class="section-title">DCF Valuation</h2>
+<div class="dcf-section">
+    <div class="analyst-box">
+        <div class="analyst-item"><div class="alabel">Analyst Consensus</div><div class="aval">Buy</div></div>
+        <div class="analyst-item"><div class="alabel">Consensus Target</div><div class="aval">NZ$4.20</div></div>
+        <div class="analyst-item"><div class="alabel">Implied Upside</div><div class="aval" style="color:#00d4aa;">+23.5%</div></div>
+        <div class="analyst-item"><div class="alabel">Probability-Weighted IV</div><div class="aval">NZ$4.42</div></div>
+        <div class="analyst-item"><div class="alabel">Weighting</div><div class="aval" style="font-size:0.95rem; color:#888;">25% Bull / 50% Base / 25% Bear</div></div>
+    </div>
+
+    <div class="dcf-summary">
+        <div class="dcf-card highlight">
+            <div class="dcf-label">Intrinsic Value</div>
+            <div class="dcf-value" id="dcfIV">NZ$3.97</div>
+            <div class="dcf-change positive" id="dcfUpside">+16.8% upside</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Entry Price (15% CAGR)</div>
+            <div class="dcf-value" id="dcfEntry">NZ$2.72</div>
+            <div class="dcf-sublabel">Buy below for 15% annual return</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Current Price</div>
+            <div class="dcf-value" id="dcfCurrent">NZ$3.40</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Prob-Weighted IV</div>
+            <div class="dcf-value" id="dcfWeighted">NZ$4.42</div>
+            <div class="dcf-sublabel">25% Bull / 50% Base / 25% Bear</div>
+        </div>
+    </div>
+
+    <div class="dcf-warning" id="growthWarning" style="display:none;">
+        <span class="warning-icon">&#9888;</span>
+        <span id="warningText"></span>
+    </div>
+
+    <div class="dcf-inputs">
+        <h4>DCF Model Inputs</h4>
+        <div class="dcf-inputs-grid">
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Base Year FCF</div>
+                <div class="dcf-input-value" id="baseFCF">NZ$14M</div>
+                <div class="dcf-input-note">Normalised FY2026 estimate</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Shares Outstanding</div>
+                <div class="dcf-input-value" id="sharesOut">104.9M</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Net Debt</div>
+                <div class="dcf-input-value" id="netDebt">NZ$20.9M</div>
+                <div class="dcf-input-note">H1 FY2026 (Sep 2025)</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Last Revenue</div>
+                <div class="dcf-input-value">NZ$208M</div>
+                <div class="dcf-input-note">FY2025</div>
+            </div>
+        </div>
+        <div class="fcf-projections">
+            <h5>Projected FCF - 5 Year (NZD m)</h5>
+            <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+        </div>
+    </div>
+
+    <div class="dcf-controls">
+        <div class="slider-group">
+            <label>Growth Rate: <span id="growthValue">17%</span></label>
+            <input type="range" id="growthSlider" min="0" max="35" value="17" step="1">
+            <div class="slider-hint" id="growthHint">Based on revenue 3yr CAGR</div>
+        </div>
+        <div class="slider-group">
+            <label>WACC: <span id="waccValue">12%</span></label>
+            <input type="range" id="waccSlider" min="6" max="18" value="12" step="0.5">
+        </div>
+        <div class="slider-group">
+            <label>Terminal Growth: <span id="terminalValue">3%</span></label>
+            <input type="range" id="terminalSlider" min="0" max="5" value="3" step="0.5">
+        </div>
+    </div>
+
+    <div class="scenario-tabs">
+        <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+        <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+        <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+    </div>
+
+    <div class="scenario-details" id="scenarioDetails">
+        <h4 id="scenarioTitle">Base Case Assumptions</h4>
+        <div class="scenario-narrative" id="scenarioNarrative"></div>
+        <div class="assumption-grid" id="assumptionGrid"></div>
+    </div>
+
+    <div class="sensitivity-section">
+        <h4>Sensitivity Analysis: Intrinsic Value (NZD) by WACC &amp; Terminal Growth</h4>
+        <table class="sensitivity-table" id="sensitivityMatrix"></table>
+    </div>
+
+    <div class="historical-growth">
+        <h4>Historical Growth Rates (CAGR)</h4>
+        <div class="growth-grid" id="growthGrid"></div>
+    </div>
+
+    <div class="dcf-download">
+        <a href="AFT.NZ_DCF_Model.xlsx" class="download-btn" download>
+            <span class="download-icon">&#8681;</span> Download Excel Model
+        </a>
+    </div>
+</div>
+
+<!-- HELP MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&#215;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// EMBEDDED CSV DATA
+// ============================================================
+const csvData = `Period,Revenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,EBITDA,NetIncome,NetMargin,EPS,FreeCashFlow,ShareholdersEquity,TotalDebt,CashAndEquivalents,SharesOutstanding,DividendsPaid,RnDExpenses,LicensingRevenue
+FY2016,64.0,23.6,36.8,-9.0,-14.0,,,-13.3,-20.7,-0.48,,28.2,23.2,28.1,96834838,,,1.8
+H1 FY2017,29.8,10.8,36.1,-8.4,-28.2,,,-11.0,-36.9,-0.40,-10.3,18.1,22.0,16.1,96834838,,,,
+FY2017,69.2,26.0,37.6,-14.8,-21.4,,,-18.4,-26.6,-0.19,,19.5,23.4,16.0,96834838,,,,
+H1 FY2018,36.6,14.3,39.1,-6.7,-18.3,,,-6.9,-18.8,-0.07,-7.7,13.3,23.2,7.2,96834838,,,,
+FY2018,80.1,34.2,42.7,-10.1,-12.6,,,-12.7,-15.9,-0.13,,7.3,30.7,6.8,100164838,,,,
+H1 FY2019,38.0,17.8,46.7,-0.1,-0.3,,,-4.2,-11.0,,-2.2,3.0,41.9,7.4,100164838,,,,
+FY2019,85.1,40.7,47.8,6.1,7.2,,,-2.4,-2.9,-0.03,,5.1,41.8,6.9,100164838,,,1.2
+H1 FY2020,46.9,21.3,45.5,13.7,29.2,,,9.9,21.1,0.10,6.1,14.6,45.8,7.3,100164838,,,,
+FY2020,105.6,48.3,45.7,21.2,20.1,,,12.7,12.0,0.12,14.8,17.3,43.2,6.1,100164838,,,3.8
+H1 FY2021,48.8,20.3,41.6,2.4,5.0,,,1.2,2.4,0.01,-2.7,29.9,40.1,5.9,104697260,,,,
+FY2021,113.1,48.7,43.1,10.7,9.5,,,7.8,6.9,0.07,0.7,36.6,38.4,3.2,104697260,,,2.1
+H1 FY2022,55.5,26.7,48.1,5.5,9.9,,,4.2,7.6,0.04,6.6,41.1,38.5,5.9,104697260,,2.8,
+FY2022,130.3,61.8,47.4,20.4,15.6,21.5,19.8,15.2,0.19,13.8,62.3,37.2,7.9,104866260,,5.5,6.7
+H1 FY2023,65.8,28.7,43.6,3.5,5.3,4.5,1.5,2.4,0.01,5.9,64.0,38.2,8.8,104866260,,2.8,
+FY2023,156.6,73.0,46.6,19.7,12.6,21.4,10.7,6.8,0.10,11.4,73.3,34.7,4.7,104866260,0.0,5.6,1.2
+H1 FY2024,83.6,35.9,43.0,3.3,3.9,4.1,1.8,2.2,0.02,7.4,73.9,36.8,6.2,104866260,1.2,3.5,
+FY2024,195.4,88.3,45.2,24.2,12.4,26.2,15.6,8.0,0.15,28.7,87.8,28.2,12.0,104866260,1.2,8.1,8.5
+H1 FY2025,86.7,36.2,41.7,-1.8,-2.1,-0.7,-2.5,-2.8,-0.02,4.2,83.5,29.6,10.7,104866260,1.7,5.3,
+FY2025,208.0,91.7,44.1,17.6,8.5,20.9,11.4,5.5,0.11,12.9,97.1,25.6,11.1,104866260,1.7,11.5,
+H1 FY2026,114.9,49.7,43.2,4.7,4.1,6.6,2.7,2.4,0.03,0.4,98.0,33.0,12.1,104866260,1.9,6.1,`;
+
+// ============================================================
+// EMBEDDED ANALYSIS JSON
+// ============================================================
+const analysis = {
+  "ticker": "AFT.NZ",
+  "company_name": "AFT Pharmaceuticals Limited",
+  "overview": "AFT Pharmaceuticals is a New Zealand-based specialty pharmaceutical company that develops, in-licenses, and distributes a broad portfolio of over 150 pharmaceutical products across seven therapeutic categories: pain, eyecare, vitamins and minerals, allergy, gastrointestinal, dermatology, and hospital injectables. The company's flagship product is Maxigesic (a patented ibuprofen/paracetamol combination), which is licensed or sold in more than 100 countries, with Maxigesic IV representing a significant hospital-channel product. AFT operates direct sales forces in Australia and New Zealand, its core profit engines, and is building business hubs in the UK, Canada, US, South Africa, Singapore, and Hong Kong, while generating licensing and royalty income from its global out-licensing programme.",
+  "business_model": {
+    "summary": "AFT generates revenue through three channels: direct product sales in Australasia (its dominant and profitable base), product royalties and direct sales from international hubs, and milestone/royalty payments from out-licensing its intellectual property to global partners. The Australasian business funds the investment-phase international expansion and R&D pipeline.",
+    "revenue_streams": [
+      {"name": "Australia (direct product sales)", "percent": 61, "trend": "growing"},
+      {"name": "New Zealand (direct product sales)", "percent": 26, "trend": "stable"},
+      {"name": "International (hubs + licensing income)", "percent": 8, "trend": "growing"},
+      {"name": "Asia (distributors + e-commerce)", "percent": 5, "trend": "growing"}
+    ]
+  },
+  "competitive_position": {
+    "main_competitors": [
+      "Reckitt Benckiser (Nuromol - direct Maxigesic competitor)",
+      "Johnson & Johnson (Tylenol, Motrin)",
+      "GlaxoSmithKline (Panadol, Voltaren)",
+      "Bayer AG (Aspirin, Aleve)",
+      "Pfizer Consumer Healthcare (Advil)",
+      "Sigma Healthcare / Chemist Warehouse private label"
+    ],
+    "moat_factors": [
+      {"factor": "Proprietary patent portfolio", "strength": "strong", "description": "Maxigesic tablet and IV formulations are patent-protected (key patents extending to 2032-2044), providing exclusivity from generic competition and enabling global licensing."},
+      {"factor": "Global licensing network", "strength": "moderate", "description": "Maxigesic is licensed or sold in 100+ countries, creating a compounding royalty stream without capital deployment."},
+      {"factor": "Clinical evidence and regulatory approvals", "strength": "strong", "description": "Maxigesic IV holds approvals in US, UK, Australia, Canada, EU - obtaining these requires significant time and capital, creating high barriers."},
+      {"factor": "Founder-led management with ~69% insider ownership", "strength": "moderate", "description": "CEO Dr Hartley Atkinson holds significant equity and has built the company from startup to $208m revenue, creating strong alignment."},
+      {"factor": "Established Australasian distribution", "strength": "moderate", "description": "Long-term relationships with Chemist Warehouse and major hospital formularies create switching costs and shelf presence advantages."}
+    ],
+    "weaknesses": [
+      "Small scale relative to multinational competitors (J&J, Reckitt, GSK), limiting marketing spend",
+      "Revenue concentration in Australasia (~87% of FY2025) means growth depends heavily on two markets",
+      "International business hubs are loss-making, creating earnings drag",
+      "Licensing income is lumpy and unpredictable (FY2024: $8.5m vs FY2025: $0.7m)",
+      "Limited brand recognition outside Australia and New Zealand"
+    ]
+  },
+  "growth_drivers": [
+    "Maxigesic IV hospital channel expansion in UK NHS, Canada, and US (via Hikma) - multi-year global growth runway",
+    "International hub scaling: UK and South Africa expected to reach earnings breakeven in 2H FY2026",
+    "R&D pipeline: 13 projects including IV iron therapy (US$7.4B market by 2033) and novel antibiotic eyedrop",
+    "China market entry: Crystaderm and Maxigesic IV licensed into China with top-5 pharmaceutical partners",
+    "Out-licensing momentum: 20 licensing discussions underway as of FY2025 with signed term sheets",
+    "South Africa acceleration: Launch expanded from 4 to 18 products targeting private hospital market",
+    "Secular tailwinds: Self-medication trends and ageing populations driving OTC market 5-7% CAGR"
+  ],
+  "risks": {
+    "business": [
+      {"risk": "Licensing income lumpiness", "severity": "moderate", "description": "Licensing milestones are event-driven, causing significant earnings variability (FY2024: $8.5m vs FY2025: $0.7m)."},
+      {"risk": "Competition from OTC multinationals", "severity": "moderate", "description": "Reckitt's Nuromol directly competes with Maxigesic. Larger competitors have greater marketing resources."},
+      {"risk": "International hub execution risk", "severity": "moderate", "description": "UK, Canada, US, and South Africa are in investment phase. Extended losses would weigh on earnings."},
+      {"risk": "Customer concentration (Chemist Warehouse)", "severity": "moderate", "description": "Post-Sigma merger, Chemist Warehouse could exert greater pricing pressure on OTC suppliers."},
+      {"risk": "R&D pipeline failure", "severity": "moderate", "description": "Clinical-stage programmes could fail trials or not achieve regulatory approval."}
+    ],
+    "financial": [
+      {"risk": "Currency exposure (AUD/NZD)", "severity": "moderate", "description": "Australia contributes ~61% of revenue in AUD; a strengthening NZD would reduce reported earnings."},
+      {"risk": "Investment phase earnings pressure", "severity": "moderate", "description": "FY2025 operating profit fell as international hub costs and R&D investment increased."}
+    ],
+    "regulatory": [
+      {"risk": "Multi-jurisdictional approval delays", "severity": "moderate", "description": "Regulatory approvals in each new market can delay revenue recognition."}
+    ],
+    "macro": [
+      {"risk": "Supply chain disruption", "severity": "moderate", "description": "Sources products from manufacturers in Europe, North America, India, and Asia."}
+    ],
+    "execution": [
+      {"risk": "Key person dependency (Dr Hartley Atkinson)", "severity": "moderate", "description": "CEO/co-founder is central to strategy and deal-making."},
+      {"risk": "Scaling multiple geographies simultaneously", "severity": "moderate", "description": "Building UK, Canada, US, South Africa, China, Singapore/Hong Kong operations concurrently requires significant management bandwidth."}
+    ]
+  },
+  "bull_case": [
+    "Maxigesic IV hospital channel is only in early innings in the UK NHS, Canada, and US - each market represents multiples of current international revenue",
+    "International hub inflection approaching: UK and South Africa expected to turn profitable in 2H FY2026, demonstrating the Australasian model is replicable",
+    "R&D pipeline offers asymmetric upside: IV iron programme (US$7.4B market by 2033) and antibiotic eyedrop could generate milestone payments well in excess of current market cap",
+    "Strong insider alignment: ~69% insider ownership and recent CEO share purchases at NZ$2.73 indicate management conviction",
+    "Analyst consensus Buy with NZ$4.20 target vs current ~NZ$3.40 reflects underappreciation of international optionality and R&D pipeline value"
+  ],
+  "bear_case": [
+    "NZ$300m FY2027 revenue target requires ~44% growth from FY2025's $208m base in two years - high execution risk across multiple simultaneous geographies",
+    "Earnings quality risk: operating profit is heavily influenced by lumpy licensing income (FY2024 $8.5m vs FY2025 $0.7m); underlying profit is more modest",
+    "R&D and international hub investment consuming free cash flow; FY2026 H1 R&D was $9.5m and international losses were -$4.4m",
+    "Small cap illiquid NZX listing (~NZ$400m market cap) limits institutional participation and creates inefficient price discovery",
+    "Chemist Warehouse-Sigma merger creates more powerful retail player that could exert greater pricing pressure on OTC suppliers"
+  ],
+  "recent_developments": [
+    {"date": "2025-H2", "event": "H1-FY2026 results: Revenue +33% to record $114.9m; operating profit recovered to $4.7m; 10 consecutive half-years of first-half revenue growth since listing."},
+    {"date": "2025-H2", "event": "Combogesic expanded to 2,500 Boots and SuperDrug stores in UK; Combogesic IV added to London Northwest University Healthcare NHS Trust formulary."},
+    {"date": "2025-H2", "event": "South Africa product launches accelerated from 4 to 18 products in 2H FY2026; Combogesic IV launched in Canada."},
+    {"date": "2025-H2", "event": "IV iron therapy out-licensed for China to Grand Life Sciences Group (top-5 Chinese pharma by sales), including milestone payments and Phase III funding contribution."},
+    {"date": "2025-H2", "event": "Hikma Pharmaceuticals license extended in the US to cover both Combogesic IV and Combogesic Rapid tablets."},
+    {"date": "2025-H1", "event": "Phase III confirmatory study (~1,000 patients) planned for novel IV iron therapy following positive Phase 2b results; two additional patents filed."},
+    {"date": "2025-H1", "event": "Antibiotic eyedrop pre-IND application filed with US FDA; IND submission targeted for early FY2027."},
+    {"date": "2025-H1", "event": "CEO Dr Hartley Atkinson purchased additional AFT shares at ~NZ$2.73, signalling management confidence. Insider ownership ~69%."}
+  ],
+  "guidance": {
+    "as_of": "H1-FY2026 Results (November 2025)",
+    "fiscal_year": "FY2026 (year ending March 2026)",
+    "items": [
+      {
+        "metric": "Operating Profit",
+        "target": "NZ$20m - NZ$24m",
+        "period": "FY2026",
+        "vs_prior": "maintained",
+        "notes": "Reiterated at H1-FY2026 results in November 2025 and January 2026. Implies recovery from FY2025's $17.6m."
+      },
+      {
+        "metric": "Revenue (aspirational target)",
+        "target": "NZ$300 million",
+        "period": "FY2027",
+        "vs_prior": "maintained",
+        "notes": "FY2025 revenue was $208m; H1 FY2026 run rate implies ~$230m+ for FY2026. Requires ~$85m additional from international hubs and licensing."
+      },
+      {
+        "metric": "UK & South Africa Hubs",
+        "target": "Reach breakeven & contribute to earnings",
+        "period": "2H FY2026",
+        "vs_prior": "maintained",
+        "notes": "Both operations expected to contribute positively in the second half of FY2026, validating the international hub model."
+      },
+      {
+        "metric": "R&D Expenditure",
+        "target": "NZ$15-20 million annually",
+        "period": "FY2026 and beyond",
+        "vs_prior": "increasing",
+        "notes": "H1-FY2026 R&D was $9.5m vs $8.9m in 1H FY2025. Ongoing increases expected as Phase III studies advance."
+      },
+      {
+        "metric": "Net Debt",
+        "target": "Within 1x EBITDA",
+        "period": "Ongoing",
+        "vs_prior": "maintained",
+        "notes": "Net debt was NZ$20.9m at September 2025 (H1 FY2026). Banking facility renewal well advanced."
+      }
+    ],
+    "management_commentary": "AFT remains on track to deliver a FY26 operating profit within the previously outlined range of $20 million to $24 million. The company also reiterates its confidence in its pathway to $300 million annual revenue in FY27, supported by the launch schedule, our licensing programme, the scaling of international hubs and continued geographic expansion."
+  }
+};
+
+// ============================================================
+// EMBEDDED DCF DATA
+// ============================================================
+const dcfData = {
+  "ticker": "AFT.NZ",
+  "company_name": "AFT Pharmaceuticals Limited",
+  "valuation_date": "2026-03-26",
+  "current_price": 3.40,
+  "currency": "NZD",
+  "inputs": {
+    "shares_outstanding": 104.866,
+    "cash": 12.1,
+    "total_debt": 33.0,
+    "net_debt": 20.9,
+    "last_fcf": 14.0,
+    "last_revenue": 208.0,
+    "currency": "NZD",
+    "units": "millions"
+  },
+  "historical_growth": {
+    "revenue_3yr_cagr": 16.87,
+    "revenue_5yr_cagr": 14.52,
+    "eps_3yr_cagr": -16.65,
+    "eps_5yr_cagr": -1.73,
+    "equity_3yr_cagr": 15.94,
+    "equity_5yr_cagr": 41.20,
+    "fcf_3yr_cagr": -2.22,
+    "fcf_5yr_cagr": -2.71,
+    "selected_growth_rate": 16.87,
+    "growth_rate_source": "revenue_3yr_cagr",
+    "growth_divergence_warning": "Equity 5yr CAGR of 41.2% is not representative of sustainable growth - AFT only turned equity positive in FY2020 (recovering from negative equity). FCF CAGRs are negative due to deliberate R&D and international hub investment suppressing free cash flow. Revenue CAGR (3yr: 16.9%, 5yr: 14.5%) is the most reliable indicator and is used as the primary growth anchor."
+  },
+  "assumptions": {
+    "base": {
+      "growth_rates": [20, 18, 15, 12, 10],
+      "fcf_margin": 7.0,
+      "wacc": 12,
+      "terminal_growth": 3.0,
+      "narrative": "Base case assumes AFT continues strong Australasian growth and approaches but does not fully achieve the NZ$300m FY2027 revenue target. International hubs (UK, South Africa) turn profitable in 2H FY2026 as guided. FCF margins expand from the current depressed level as R&D investment stabilises. By Year 5, revenue reaches ~NZ$417m with a 12% FCF margin."
+    },
+    "bull": {
+      "growth_rates": [25, 22, 18, 15, 12],
+      "fcf_margin": 8.0,
+      "wacc": 10,
+      "terminal_growth": 3.5,
+      "narrative": "Bull case assumes the NZ$300m FY2027 revenue target is achieved and international hub scaling accelerates. Maxigesic IV gains strong hospital formulary traction in UK, Canada, and US. Licensing income recovers strongly including meaningful milestones from the IV iron programme. By Year 5, revenue reaches ~NZ$482m with a 15% FCF margin."
+    },
+    "bear": {
+      "growth_rates": [12, 10, 8, 6, 5],
+      "fcf_margin": 5.0,
+      "wacc": 14,
+      "terminal_growth": 2.0,
+      "narrative": "Bear case assumes international hub execution disappoints - UK and South Africa breakeven is delayed, Canada takes longer than guided. Licensing income remains low. Chemist Warehouse post-Sigma exerts pricing pressure. Revenue growth decelerates sharply by Year 3-4 as Australasian market matures. FCF margins recover slowly as investment costs persist."
+    }
+  },
+  "valuation": {
+    "base": {"sum_pv_fcf": 112.22, "terminal_fcf": 51.57, "terminal_value": 573.02, "pv_terminal": 325.15, "enterprise_value": 437.37, "less_net_debt": 20.90, "equity_value": 416.47, "intrinsic_value": 3.97, "upside": 16.8},
+    "bull": {"sum_pv_fcf": 164.93, "terminal_fcf": 74.85, "terminal_value": 1151.40, "pv_terminal": 714.93, "enterprise_value": 879.86, "less_net_debt": 20.90, "equity_value": 858.96, "intrinsic_value": 8.19, "upside": 140.9},
+    "bear": {"sum_pv_fcf": 63.42, "terminal_fcf": 28.27, "terminal_value": 235.62, "pv_terminal": 122.37, "enterprise_value": 185.79, "less_net_debt": 20.90, "equity_value": 164.89, "intrinsic_value": 1.57, "upside": -53.8}
+  },
+  "sensitivity": {
+    "wacc_range": [10, 11, 12, 13, 14],
+    "terminal_growth_range": [2.0, 2.5, 3.0, 3.5, 4.0],
+    "matrix": [
+      [4.72, 4.99, 5.30, 5.66, 6.08],
+      [4.11, 4.32, 4.55, 4.81, 5.11],
+      [3.63, 3.79, 3.97, 4.17, 4.39],
+      [3.24, 3.37, 3.51, 3.66, 3.83],
+      [2.92, 3.02, 3.13, 3.25, 3.39]
+    ]
+  },
+  "probability_weighted": {
+    "weights": {"bull": 0.25, "base": 0.50, "bear": 0.25},
+    "weighted_iv": 4.42
+  }
+};
+
+// ============================================================
+// CSV PARSE & SORT
+// ============================================================
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => { obj[h.trim()] = values[i] ? values[i].trim() : ''; });
+        return obj;
+    });
+}
+
+const data = parseCSV(csvData);
+
+data.sort((a, b) => {
+    const parseDate = (p) => {
+        const year = parseInt(p.match(/\d{4}/)?.[0] || '0');
+        const isH1 = p.includes('H1');
+        const isFY = p.startsWith('FY');
+        const subOrder = isH1 ? 1 : isFY ? 2 : 0;
+        return year * 10 + subOrder;
+    };
+    return parseDate(a.Period) - parseDate(b.Period);
+});
+
+const fyData = data.filter(d => d.Period.startsWith('FY'));
+const h1Data = data.filter(d => d.Period.startsWith('H1'));
+const allData = data;
+
+// Helper: get value or null
+function val(d, key) {
+    const v = parseFloat(d[key]);
+    return isNaN(v) ? null : v;
+}
+
+// YoY change
+function yoy(current, previous) {
+    if (previous === null || current === null || previous === 0) return null;
+    return ((current - previous) / Math.abs(previous) * 100).toFixed(1);
+}
+
+function fmtPct(v) { return v !== null ? (v >= 0 ? '+' : '') + v + '%' : 'N/A'; }
+function fmtM(v, dp=1) { return v !== null ? 'NZ$' + v.toFixed(dp) + 'm' : 'N/A'; }
+function fmtVal(v, dp=2) { return v !== null ? v.toFixed(dp) : 'N/A'; }
+
+// ============================================================
+// KPI CARDS
+// ============================================================
+function renderKPIs() {
+    const latest = fyData[fyData.length - 1]; // FY2025
+    const prev   = fyData[fyData.length - 2]; // FY2024
+    const h1Latest = h1Data[h1Data.length - 1]; // H1 FY2026
+
+    const kpis = [
+        {
+            label: 'Revenue (FY2025)',
+            value: 'NZ$208.0m',
+            change: yoy(val(latest,'Revenue'), val(prev,'Revenue')),
+            sub: 'H1 FY2026: NZ$114.9m (+33%)'
+        },
+        {
+            label: 'EBITDA (FY2025)',
+            value: 'NZ$20.9m',
+            change: yoy(val(latest,'EBITDA'), val(prev,'EBITDA')),
+            sub: 'H1 FY2026: NZ$6.6m'
+        },
+        {
+            label: 'Net Income (FY2025)',
+            value: 'NZ$11.4m',
+            change: yoy(val(latest,'NetIncome'), val(prev,'NetIncome')),
+            sub: 'H1 FY2026: NZ$2.7m'
+        },
+        {
+            label: 'EPS (FY2025)',
+            value: 'NZ$0.11',
+            change: yoy(val(latest,'EPS'), val(prev,'EPS')),
+            sub: 'H1 FY2026: NZ$0.03'
+        },
+        {
+            label: 'Free Cash Flow (FY2025)',
+            value: 'NZ$12.9m',
+            change: yoy(val(latest,'FreeCashFlow'), val(prev,'FreeCashFlow')),
+            sub: 'H1 FY2026: NZ$0.4m (investment phase)'
+        },
+        {
+            label: 'Gross Margin (FY2025)',
+            value: '44.1%',
+            change: yoy(val(latest,'GrossMargin'), val(prev,'GrossMargin')),
+            sub: 'H1 FY2026: 43.2%'
+        },
+        {
+            label: 'Operating Margin (FY2025)',
+            value: '8.5%',
+            change: yoy(val(latest,'OperatingMargin'), val(prev,'OperatingMargin')),
+            sub: 'H1 FY2026: 4.1%'
+        },
+        {
+            label: 'Net Debt (H1 FY2026)',
+            value: 'NZ$20.9m',
+            change: null,
+            sub: 'Within 1x EBITDA target'
+        }
+    ];
+
+    const grid = document.getElementById('kpiGrid');
+    grid.innerHTML = kpis.map(k => {
+        const chg = k.change !== null ? parseFloat(k.change) : null;
+        const chgClass = chg === null ? '' : (chg >= 0 ? 'positive' : 'negative');
+        return `
+            <div class="kpi-card">
+                <div class="kpi-value">${k.value}</div>
+                <div class="kpi-label">${k.label}</div>
+                ${chg !== null ? `<div class="kpi-change ${chgClass}">${chg >= 0 ? '+' : ''}${k.change}% YoY</div>` : '<div class="kpi-change" style="color:#666;">-</div>'}
+                <div class="kpi-sub">${k.sub}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+// ============================================================
+// OVERVIEW SECTION
+// ============================================================
+function toggleOverview() {
+    document.querySelector('.overview-toggle').classList.toggle('active');
+    document.getElementById('overviewContent').classList.toggle('active');
+}
+
+function renderOverview() {
+    const a = analysis;
+    const streams = a.business_model.revenue_streams.map(s =>
+        `<li><div class="revenue-stream"><span>${s.name}</span><span class="percent trend-${s.trend}">${s.percent}% <span class="trend-${s.trend}">(${s.trend})</span></span></div></li>`
+    ).join('');
+
+    const competitors = a.competitive_position.main_competitors.map(c => `<li>${c}</li>`).join('');
+    const moat = a.competitive_position.moat_factors.map(m =>
+        `<li><strong>${m.factor}</strong> (${m.strength}): ${m.description}</li>`
+    ).join('');
+    const weaknesses = a.competitive_position.weaknesses.map(w => `<li>${w}</li>`).join('');
+    const drivers = a.growth_drivers.map(d => `<li>${d}</li>`).join('');
+
+    const allRisks = [
+        ...(a.risks.business || []),
+        ...(a.risks.financial || []),
+        ...(a.risks.regulatory || []),
+        ...(a.risks.macro || []),
+        ...(a.risks.execution || [])
+    ];
+    const risks = allRisks.map(r =>
+        `<li><span class="risk-${r.severity}">[${r.severity.toUpperCase()}]</span> <strong>${r.risk}:</strong> ${r.description}</li>`
+    ).join('');
+
+    const bull = a.bull_case.map(b => `<li>${b}</li>`).join('');
+    const bear = a.bear_case.map(b => `<li>${b}</li>`).join('');
+    const devs = a.recent_developments.map(d => `<li><strong>${d.date}:</strong> ${d.event}</li>`).join('');
+
+    document.getElementById('overviewGrid').innerHTML = `
+        <div class="overview-card">
+            <h3>Company Overview</h3>
+            <p>${a.overview}</p>
+        </div>
+        <div class="overview-card">
+            <h3>Business Model</h3>
+            <p>${a.business_model.summary}</p>
+            <ul>${streams}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Competitive Position</h3>
+            <p><strong>Main Competitors:</strong></p>
+            <ul>${competitors}</ul>
+            <p style="margin-top:12px;"><strong>Moat Factors:</strong></p>
+            <ul>${moat}</ul>
+            <p style="margin-top:12px;"><strong>Weaknesses:</strong></p>
+            <ul>${weaknesses}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Growth Drivers</h3>
+            <ul>${drivers}</ul>
+        </div>
+        <div class="overview-card risks">
+            <h3>Key Risks</h3>
+            <ul>${risks}</ul>
+        </div>
+        <div class="overview-card bull">
+            <h3>Bull Case</h3>
+            <ul>${bull}</ul>
+        </div>
+        <div class="overview-card bear">
+            <h3>Bear Case</h3>
+            <ul>${bear}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Recent Developments</h3>
+            <ul>${devs}</ul>
+        </div>
+    `;
+}
+
+// ============================================================
+// GUIDANCE
+// ============================================================
+function renderGuidance() {
+    const g = analysis.guidance;
+    if (!g || !g.items || g.items.length === 0) {
+        document.getElementById('guidanceSection').style.display = 'none';
+        return;
+    }
+    document.getElementById('guidanceAsOf').textContent = g.as_of;
+    document.getElementById('guidanceFY').textContent = g.fiscal_year;
+
+    document.getElementById('guidanceGrid').innerHTML = g.items.map(item => {
+        const vsClass = item.vs_prior ? item.vs_prior.toLowerCase() : 'new';
+        const vsLabel = item.vs_prior ? item.vs_prior.charAt(0).toUpperCase() + item.vs_prior.slice(1) : 'New';
+        return `
+            <div class="guidance-card">
+                <div class="guidance-metric">${item.metric}</div>
+                <div class="guidance-target">${item.target}</div>
+                <div class="guidance-period">${item.period}</div>
+                <span class="guidance-vs-prior ${vsClass}">${vsLabel}</span>
+                ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+
+    const comm = document.getElementById('guidanceCommentary');
+    if (g.management_commentary) {
+        comm.textContent = g.management_commentary;
+        comm.style.display = 'block';
+    }
+}
+
+// ============================================================
+// CHART DEFAULTS & HELPERS
+// ============================================================
+const colors = {
+    primary: '#00d4aa',
+    secondary: '#0984e3',
+    tertiary: '#6c5ce7',
+    quaternary: '#fdcb6e',
+    danger: '#ff6b6b',
+    teal2: '#00b894',
+    pink: '#fd79a8'
+};
+
+function baseScales(yLabel='', y2Label='') {
+    const scales = {
+        x: { ticks: { color: '#888', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' }, title: yLabel ? { display: true, text: yLabel, color: '#888', font: { size: 11 } } : { display: false } }
+    };
+    if (y2Label) {
+        scales.y2 = { type: 'linear', display: true, position: 'right', ticks: { color: colors.quaternary }, grid: { drawOnChartArea: false }, title: { display: true, text: y2Label, color: colors.quaternary, font: { size: 11 } } };
+    }
+    return scales;
+}
+
+function chartOpts(yLabel='', y2Label='') {
+    return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } } },
+        scales: baseScales(yLabel, y2Label)
+    };
+}
+
+// ============================================================
+// CHARTS
+// ============================================================
+function renderCharts() {
+    // --- Revenue ---
+    // Show all FY + H1 FY2026 for context
+    const revData = [...fyData, h1Data[h1Data.length-1]];
+    revData.sort((a,b) => { const pa=(a.Period.startsWith('FY')?2:1), pb=(b.Period.startsWith('FY')?2:1); const ya=parseInt(a.Period.match(/\d{4}/)[0]), yb=parseInt(b.Period.match(/\d{4}/)[0]); return ya!==yb?ya-yb:pa-pb; });
+
+    new Chart(document.getElementById('chartRevenue'), {
+        type: 'bar',
+        data: {
+            labels: revData.map(d => d.Period),
+            datasets: [{
+                label: 'Revenue (NZD m)',
+                data: revData.map(d => val(d,'Revenue')),
+                backgroundColor: revData.map(d => d.Period.startsWith('H1') ? 'rgba(0,212,170,0.3)' : 'rgba(0,212,170,0.7)'),
+                borderColor: colors.primary,
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            ...chartOpts('NZD m'),
+            plugins: {
+                legend: { labels: { color: '#e0e0e0' } },
+                tooltip: {
+                    callbacks: {
+                        afterBody: (items) => {
+                            const idx = items[0].dataIndex;
+                            const d = revData[idx];
+                            return d.Period.startsWith('H1') ? ['(Half-year - not annualised)'] : [];
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // --- Gross Profit & Gross Margin ---
+    new Chart(document.getElementById('chartGrossProfit'), {
+        type: 'bar',
+        data: {
+            labels: fyData.map(d => d.Period),
+            datasets: [
+                {
+                    label: 'Gross Profit (NZD m)',
+                    data: fyData.map(d => val(d,'GrossProfit')),
+                    backgroundColor: 'rgba(0,212,170,0.6)',
+                    borderColor: colors.primary,
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Gross Margin (%)',
+                    data: fyData.map(d => val(d,'GrossMargin')),
+                    type: 'line',
+                    borderColor: colors.quaternary,
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    pointBackgroundColor: colors.quaternary,
+                    yAxisID: 'y2',
+                    tension: 0.3
+                }
+            ]
+        },
+        options: {
+            ...chartOpts('NZD m', 'Gross Margin %'),
+            scales: {
+                x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' }, title: { display: true, text: 'NZD m', color: '#888' } },
+                y2: { type: 'linear', display: true, position: 'right', ticks: { color: colors.quaternary }, grid: { drawOnChartArea: false }, min: 30, max: 60, title: { display: true, text: 'Gross Margin %', color: colors.quaternary } }
+            }
+        }
+    });
+
+    // --- EBITDA & Operating Income ---
+    const ebitdaFY = fyData.filter(d => val(d,'EBITDA') !== null);
+    new Chart(document.getElementById('chartEBITDA'), {
+        type: 'bar',
+        data: {
+            labels: fyData.map(d => d.Period),
+            datasets: [
+                {
+                    label: 'EBITDA (NZD m)',
+                    data: fyData.map(d => val(d,'EBITDA')),
+                    backgroundColor: 'rgba(9,132,227,0.6)',
+                    borderColor: colors.secondary,
+                    borderWidth: 1,
+                    borderRadius: 4
+                },
+                {
+                    label: 'Operating Income (NZD m)',
+                    data: fyData.map(d => val(d,'OperatingIncome')),
+                    backgroundColor: 'rgba(0,212,170,0.5)',
+                    borderColor: colors.primary,
+                    borderWidth: 1,
+                    borderRadius: 4
+                }
+            ]
+        },
+        options: chartOpts('NZD m')
+    });
+
+    // --- Net Income & Net Margin ---
+    new Chart(document.getElementById('chartNetIncome'), {
+        type: 'bar',
+        data: {
+            labels: fyData.map(d => d.Period),
+            datasets: [
+                {
+                    label: 'Net Income (NZD m)',
+                    data: fyData.map(d => val(d,'NetIncome')),
+                    backgroundColor: fyData.map(d => (val(d,'NetIncome') || 0) >= 0 ? 'rgba(0,212,170,0.6)' : 'rgba(255,107,107,0.6)'),
+                    borderColor: fyData.map(d => (val(d,'NetIncome') || 0) >= 0 ? colors.primary : colors.danger),
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Net Margin (%)',
+                    data: fyData.map(d => val(d,'NetMargin')),
+                    type: 'line',
+                    borderColor: colors.quaternary,
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    pointBackgroundColor: colors.quaternary,
+                    yAxisID: 'y2',
+                    tension: 0.3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#e0e0e0' } } },
+            scales: {
+                x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' }, title: { display: true, text: 'NZD m', color: '#888' } },
+                y2: { type: 'linear', display: true, position: 'right', ticks: { color: colors.quaternary }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Net Margin %', color: colors.quaternary } }
+            }
+        }
+    });
+
+    // --- EPS ---
+    new Chart(document.getElementById('chartEPS'), {
+        type: 'bar',
+        data: {
+            labels: fyData.map(d => d.Period),
+            datasets: [{
+                label: 'EPS (NZD)',
+                data: fyData.map(d => val(d,'EPS')),
+                backgroundColor: fyData.map(d => (val(d,'EPS') || 0) >= 0 ? 'rgba(0,212,170,0.65)' : 'rgba(255,107,107,0.65)'),
+                borderColor: fyData.map(d => (val(d,'EPS') || 0) >= 0 ? colors.primary : colors.danger),
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: chartOpts('NZD')
+    });
+
+    // --- Free Cash Flow ---
+    const fcfAllFY = [...fyData, h1Data[h1Data.length-1]];
+    fcfAllFY.sort((a,b) => { const ya=parseInt(a.Period.match(/\d{4}/)[0]), yb=parseInt(b.Period.match(/\d{4}/)[0]); if(ya!==yb)return ya-yb; return a.Period.startsWith('H1')?-1:1; });
+    new Chart(document.getElementById('chartFCF'), {
+        type: 'bar',
+        data: {
+            labels: fcfAllFY.map(d => d.Period),
+            datasets: [{
+                label: 'Free Cash Flow (NZD m)',
+                data: fcfAllFY.map(d => val(d,'FreeCashFlow')),
+                backgroundColor: fcfAllFY.map(d => {
+                    const v = val(d,'FreeCashFlow');
+                    if (v === null) return 'rgba(136,136,136,0.3)';
+                    return v >= 0 ? (d.Period.startsWith('H1') ? 'rgba(0,212,170,0.35)' : 'rgba(0,212,170,0.65)') : (d.Period.startsWith('H1') ? 'rgba(255,107,107,0.35)' : 'rgba(255,107,107,0.65)');
+                }),
+                borderColor: fcfAllFY.map(d => { const v = val(d,'FreeCashFlow'); return v === null ? '#888' : (v >= 0 ? colors.primary : colors.danger); }),
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: chartOpts('NZD m')
+    });
+
+    // --- R&D Expenses ---
+    const rndData = fyData.filter(d => val(d,'RnDExpenses') !== null);
+    new Chart(document.getElementById('chartRnD'), {
+        type: 'bar',
+        data: {
+            labels: rndData.map(d => d.Period),
+            datasets: [{
+                label: 'R&D Expenses (NZD m)',
+                data: rndData.map(d => val(d,'RnDExpenses')),
+                backgroundColor: 'rgba(108,92,231,0.65)',
+                borderColor: colors.tertiary,
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            ...chartOpts('NZD m'),
+            plugins: {
+                legend: { labels: { color: '#e0e0e0' } },
+                annotation: {}
+            }
+        }
+    });
+
+    // --- Licensing Revenue ---
+    const licData = fyData.filter(d => val(d,'LicensingRevenue') !== null);
+    new Chart(document.getElementById('chartLicensing'), {
+        type: 'bar',
+        data: {
+            labels: licData.map(d => d.Period),
+            datasets: [{
+                label: 'Licensing Revenue (NZD m)',
+                data: licData.map(d => val(d,'LicensingRevenue')),
+                backgroundColor: 'rgba(253,121,168,0.65)',
+                borderColor: colors.pink,
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: chartOpts('NZD m')
+    });
+
+    // --- Margin Trends ---
+    new Chart(document.getElementById('chartMargins'), {
+        type: 'line',
+        data: {
+            labels: fyData.map(d => d.Period),
+            datasets: [
+                {
+                    label: 'Gross Margin (%)',
+                    data: fyData.map(d => val(d,'GrossMargin')),
+                    borderColor: colors.primary,
+                    backgroundColor: 'rgba(0,212,170,0.1)',
+                    borderWidth: 2.5,
+                    pointRadius: 4,
+                    pointBackgroundColor: colors.primary,
+                    tension: 0.3,
+                    fill: false
+                },
+                {
+                    label: 'Operating Margin (%)',
+                    data: fyData.map(d => val(d,'OperatingMargin')),
+                    borderColor: colors.secondary,
+                    backgroundColor: 'rgba(9,132,227,0.1)',
+                    borderWidth: 2.5,
+                    pointRadius: 4,
+                    pointBackgroundColor: colors.secondary,
+                    tension: 0.3,
+                    fill: false
+                },
+                {
+                    label: 'Net Margin (%)',
+                    data: fyData.map(d => val(d,'NetMargin')),
+                    borderColor: colors.quaternary,
+                    backgroundColor: 'rgba(253,203,110,0.1)',
+                    borderWidth: 2.5,
+                    pointRadius: 4,
+                    pointBackgroundColor: colors.quaternary,
+                    tension: 0.3,
+                    fill: false
+                }
+            ]
+        },
+        options: chartOpts('%')
+    });
+
+    // --- Balance Sheet: Equity & Net Debt ---
+    new Chart(document.getElementById('chartBalanceSheet'), {
+        type: 'bar',
+        data: {
+            labels: fyData.map(d => d.Period),
+            datasets: [
+                {
+                    label: "Shareholders' Equity (NZD m)",
+                    data: fyData.map(d => val(d,'ShareholdersEquity')),
+                    backgroundColor: 'rgba(0,212,170,0.6)',
+                    borderColor: colors.primary,
+                    borderWidth: 1,
+                    borderRadius: 4
+                },
+                {
+                    label: 'Total Debt (NZD m)',
+                    data: fyData.map(d => val(d,'TotalDebt')),
+                    backgroundColor: 'rgba(255,107,107,0.5)',
+                    borderColor: colors.danger,
+                    borderWidth: 1,
+                    borderRadius: 4
+                }
+            ]
+        },
+        options: chartOpts('NZD m')
+    });
+
+    // --- Cash & Debt ---
+    new Chart(document.getElementById('chartCashDebt'), {
+        type: 'bar',
+        data: {
+            labels: fyData.map(d => d.Period),
+            datasets: [
+                {
+                    label: 'Cash & Equivalents (NZD m)',
+                    data: fyData.map(d => val(d,'CashAndEquivalents')),
+                    backgroundColor: 'rgba(0,184,148,0.65)',
+                    borderColor: colors.teal2,
+                    borderWidth: 1,
+                    borderRadius: 4
+                },
+                {
+                    label: 'Total Debt (NZD m)',
+                    data: fyData.map(d => val(d,'TotalDebt')),
+                    backgroundColor: 'rgba(255,107,107,0.45)',
+                    borderColor: colors.danger,
+                    borderWidth: 1,
+                    borderRadius: 4
+                }
+            ]
+        },
+        options: chartOpts('NZD m')
+    });
+}
+
+// ============================================================
+// METRIC DESCRIPTIONS
+// ============================================================
+const metricDescriptions = {
+    revenue: {
+        title: "Revenue",
+        content: `
+            <p><strong>Revenue</strong> is the total income from AFT's product sales, licensing arrangements, and royalties, reported in NZD millions.</p>
+            <div class="metric-highlight">
+                <strong>For AFT Pharmaceuticals:</strong> Revenue is primarily product sales in Australia (~61%) and New Zealand (~26%), with the remainder from international hubs and licensing income. FY2025 revenue was NZ$208m; H1 FY2026 was a record NZ$114.9m (+33% YoY), putting AFT on track toward the NZ$300m FY2027 aspirational target.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Australasian organic growth rate - the profitable core that funds international expansion</li>
+                <li>H1 vs H2 seasonality - FY is April-March so H2 includes the Australian summer cold/flu season</li>
+                <li>Licensing income contribution - this is lumpy and can swing reported revenue materially</li>
+                <li>International hub revenue ramp - UK, Canada, South Africa contributions signal the international model working</li>
+            </ul>
+        `
+    },
+    grossProfit: {
+        title: "Gross Profit & Gross Margin",
+        content: `
+            <p><strong>Gross Profit</strong> is revenue minus cost of goods sold (manufacturing and product costs). <strong>Gross Margin</strong> is gross profit as a percentage of revenue.</p>
+            <div class="metric-highlight">
+                <strong>For AFT Pharmaceuticals:</strong> Gross margins have expanded from ~37% in FY2016 to ~44-47% range from FY2019 onwards, reflecting the shift toward higher-margin branded products like Maxigesic and improved product mix. The gross margin range of 43-48% is typical for a branded OTC pharmaceutical company.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Margin stability in the 43-48% range - compression may indicate pricing pressure from Chemist Warehouse or generic competition</li>
+                <li>Product mix shifts: hospital injectables and Maxigesic IV tend to carry higher margins than standard OTC products</li>
+                <li>FX impact: Australian revenue in AUD; a rising NZD reduces margin on ~61% of revenue when converted</li>
+                <li>Licensing income contribution (when present) is very high-margin, lifting overall gross margin</li>
+            </ul>
+        `
+    },
+    ebitda: {
+        title: "EBITDA & Operating Income",
+        content: `
+            <p><strong>EBITDA</strong> (Earnings Before Interest, Tax, Depreciation & Amortisation) and <strong>Operating Income</strong> measure AFT's underlying operating profitability before capital structure and non-cash charges.</p>
+            <div class="metric-highlight">
+                <strong>For AFT Pharmaceuticals:</strong> EBITDA data is only available from FY2022. Management guidance for FY2026 targets operating profit of NZ$20-24m, up from FY2025's NZ$17.6m. The gap between EBITDA and operating income reflects depreciation/amortisation on AFT's right-of-use assets and intangibles.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Operating income is the primary metric management guides to (not EBITDA)</li>
+                <li>FY2025 operating profit declined from FY2024's NZ$24.2m as international hub investment increased - this is expected to reverse in FY2026</li>
+                <li>International hub losses drag on consolidated operating profit; their path to breakeven is critical</li>
+                <li>Licensing income contribution: FY2024's $8.5m in licensing income was a significant contributor to that year's strong operating profit</li>
+            </ul>
+        `
+    },
+    netIncome: {
+        title: "Net Income & Net Margin",
+        content: `
+            <p><strong>Net Income</strong> is the bottom-line profit after all costs including interest and tax. <strong>Net Margin</strong> is net income as a percentage of revenue.</p>
+            <div class="metric-highlight">
+                <strong>For AFT Pharmaceuticals:</strong> AFT only became consistently profitable at the net level from FY2020 onwards. Net margins remain modest (5-15%) due to ongoing investment in international hubs and R&D. Lumpy licensing income can cause significant year-on-year swings (e.g. FY2024 net income NZ$15.6m vs FY2025 NZ$11.4m).
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Trend improvement from the FY2025 trough as international hubs reach profitability</li>
+                <li>Tax rate normalisation - AFT has accumulated tax losses that have reduced effective tax rates historically</li>
+                <li>Interest expense on the ~NZ$33m total debt facility; net debt is within 1x EBITDA target</li>
+                <li>Licensing income timing - a single large licensing deal can add several cents to EPS</li>
+            </ul>
+        `
+    },
+    eps: {
+        title: "Earnings Per Share (EPS)",
+        content: `
+            <p><strong>EPS</strong> is net income divided by the weighted average number of shares outstanding, reported in NZD.</p>
+            <div class="metric-highlight">
+                <strong>For AFT Pharmaceuticals:</strong> Shares on issue are approximately 104.9 million and have been stable since FY2022. EPS has been volatile due to lumpy licensing income: FY2022 EPS was NZ$0.19 (high licensing year), FY2023 NZ$0.10, FY2024 NZ$0.15, FY2025 NZ$0.11. AFT paid its first dividend (NZ$0.012 per share) in FY2024 and again in FY2025.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Underlying EPS trend (excluding licensing income) as the cleaner measure of base business progress</li>
+                <li>Dividend initiation signals management confidence in FCF generation sustainability</li>
+                <li>EPS growth of 15-20% over the medium term is required to justify the current valuation</li>
+                <li>Share count stability - AFT has not been diluting through excessive equity issuance</li>
+            </ul>
+        `
+    },
+    fcf: {
+        title: "Free Cash Flow",
+        content: `
+            <p><strong>Free Cash Flow (FCF)</strong> is operating cash flow minus capital expenditure. It represents cash available to shareholders after maintaining and growing the business.</p>
+            <div class="metric-highlight">
+                <strong>For AFT Pharmaceuticals:</strong> FCF is deliberately suppressed in the current investment phase. FY2024's NZ$28.7m FCF included significant licensing cash receipts. FY2025 FCF of NZ$12.9m reflects R&D spend of NZ$15m and international hub operating losses. As hubs reach breakeven and R&D investment stabilises, FCF should expand meaningfully.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>FCF conversion rate (FCF/EBITDA) - should improve as investment phase winds down</li>
+                <li>Working capital: AFT carries significant inventory (buffer stock strategy) which ties up cash</li>
+                <li>Capex is relatively modest (asset-light model outsourcing manufacturing)</li>
+                <li>Licensing cash receipts timing - milestone payments can create lumpy FCF, as seen in FY2024</li>
+            </ul>
+        `
+    },
+    rnd: {
+        title: "R&D Expenses",
+        content: `
+            <p><strong>R&D Expenses</strong> are the costs of AFT's research and development activities, including clinical trials, regulatory submissions, and drug development.</p>
+            <div class="metric-highlight">
+                <strong>For AFT Pharmaceuticals:</strong> R&D has been increasing as the pipeline advances: FY2022 NZ$5.5m, FY2023 NZ$5.6m, FY2024 NZ$8.1m, FY2025 NZ$11.5m. Management targets NZ$15-20m annually as Phase III studies for IV iron and other pipeline assets advance. R&D is expensed, not capitalised, so it directly reduces reported profit.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>R&D intensity (R&D as % of revenue) - currently ~5.5% in FY2025; should plateau as pipeline matures</li>
+                <li>Phase III IV iron study commencement - this will be the largest single R&D investment</li>
+                <li>Grand Life Sciences contributing to IV iron Phase III costs - reduces AFT's R&D burden</li>
+                <li>R&D expense growth slowing relative to revenue growth signals pipeline maturation</li>
+                <li>Pre-IND and IND submissions for antibiotic eyedrop and strawberry birthmark treatment in FY2026-FY2027</li>
+            </ul>
+        `
+    },
+    licensing: {
+        title: "Licensing Revenue",
+        content: `
+            <p><strong>Licensing Revenue</strong> is income from milestone payments and royalties received when AFT out-licenses its intellectual property (primarily Maxigesic and pipeline products) to international partners.</p>
+            <div class="metric-highlight">
+                <strong>For AFT Pharmaceuticals:</strong> Licensing income is intentionally lumpy as milestone payments are event-driven (regulatory approvals, sales thresholds). Key data points: FY2016 NZ$1.8m, FY2019 NZ$1.2m, FY2020 NZ$3.8m, FY2021 NZ$2.1m, FY2022 NZ$6.7m, FY2023 NZ$1.2m, FY2024 NZ$8.5m, FY2025 NZ$0.7m. Management expects strong recovery in FY2026.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Deal flow: 20+ licensing discussions underway as of FY2025 with signed term sheets</li>
+                <li>Maxigesic IV milestones: Hikma (US), NHS hospital listings (UK), new market launches trigger payments</li>
+                <li>IV iron licensing: Grand Life Sciences China deal includes upfront payments and development milestones</li>
+                <li>Royalty stream: As licensed products reach commercial sales, recurring royalty income builds</li>
+                <li>Do not extrapolate any single year's licensing income - assess the structural growth in the royalty base instead</li>
+            </ul>
+        `
+    },
+    margins: {
+        title: "Margin Trends",
+        content: `
+            <p>This chart shows the trend in AFT's three key margin metrics over time: Gross Margin, Operating Margin, and Net Margin - all as a percentage of revenue.</p>
+            <div class="metric-highlight">
+                <strong>For AFT Pharmaceuticals:</strong> The gross margin has been structurally improving (37% in FY2016 to 44-47% range), reflecting a better product mix. Operating and net margins are more volatile, heavily influenced by the investment phase in international hubs, R&D expenditure growth, and lumpy licensing income.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Gross margin stability in the 43-48% band - a key indicator of pricing power and product mix</li>
+                <li>Operating margin trend: FY2026-FY2027 should see recovery as international hubs turn profitable</li>
+                <li>The spread between gross margin and operating margin (currently ~35-36 percentage points) reflects the heavy SG&A and R&D investment; this should narrow over time</li>
+                <li>Net margin in the 5-10% range is expected near-term; longer-term target should be 15%+ as the model matures</li>
+            </ul>
+        `
+    },
+    balanceSheet: {
+        title: "Shareholders Equity & Total Debt",
+        content: `
+            <p>This chart compares AFT's shareholders' equity (net assets) and total borrowings over time, illustrating the evolution of capital structure.</p>
+            <div class="metric-highlight">
+                <strong>For AFT Pharmaceuticals:</strong> AFT had negative equity until FY2018 (reflecting accumulated losses in the startup phase). Equity has grown strongly from NZ$7.3m in FY2018 to NZ$97.1m in FY2025 as the business became profitable. Total debt peaked at ~NZ$45.8m (FY2019) and has been reduced to NZ$25.6m in FY2025.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Equity growth trajectory - continuing to build equity from retained earnings signals financial strength</li>
+                <li>Debt reduction or stability - management targets net debt within 1x EBITDA</li>
+                <li>Banking facility renewal: Well advanced as of H1-FY2026; refinancing at comparable terms is important</li>
+                <li>No dilutive equity raises - AFT has been growing without significantly diluting existing shareholders</li>
+            </ul>
+        `
+    },
+    cashDebt: {
+        title: "Cash & Total Debt",
+        content: `
+            <p>This chart shows AFT's cash and cash equivalents alongside total debt, providing a picture of liquidity and gross leverage.</p>
+            <div class="metric-highlight">
+                <strong>For AFT Pharmaceuticals:</strong> Net debt (total debt minus cash) at H1-FY2026 was NZ$20.9m (NZ$33m debt, NZ$12.1m cash). This is within AFT's self-imposed 1x EBITDA leverage ceiling. Cash position has been maintained despite R&D and international hub investment, supported by operating cash generation from Australasia.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Net debt trajectory: should decline as FCF improves and licensing cash receipts normalise</li>
+                <li>Cash buffer adequacy: need sufficient liquidity to fund international hub investment and Phase III R&D trials</li>
+                <li>Debt maturity profile: banking facility terms and refinancing timing</li>
+                <li>Working capital: inventory buffer strategy means AFT holds significant stock, which is a cash outflow but reduces supply chain risk</li>
+            </ul>
+        `
+    }
+};
+
+// ============================================================
+// MODAL
+// ============================================================
+function openModal(key) {
+    document.getElementById('modalTitle').textContent = metricDescriptions[key].title;
+    document.getElementById('modalBody').innerHTML = metricDescriptions[key].content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay') && event.type !== 'click') return;
+    if (event && event.target !== document.getElementById('modalOverlay') && !event.target.classList.contains('modal-close')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('modalOverlay').classList.remove('active'); document.body.style.overflow = ''; } });
+
+// ============================================================
+// DCF SECTION
+// ============================================================
+let currentScenario = 'base';
+
+function renderDCFInputs() {
+    document.getElementById('baseFCF').textContent = 'NZ$' + dcfData.inputs.last_fcf.toFixed(0) + 'M';
+    document.getElementById('sharesOut').textContent = dcfData.inputs.shares_outstanding.toFixed(1) + 'M';
+    const nd = dcfData.inputs.net_debt;
+    const ndEl = document.getElementById('netDebt');
+    ndEl.textContent = 'NZ$' + nd.toFixed(1) + 'M';
+    ndEl.style.color = nd < 0 ? '#00d4aa' : '#ff6b6b';
+    renderFCFProjections();
+}
+
+function renderFCFProjections() {
+    const startGrowth = parseFloat(document.getElementById('growthSlider').value);
+    const baseFCF = dcfData.inputs.last_fcf;
+    const endGrowth = 10;
+    const growthRates = [];
+    for (let i = 0; i < 5; i++) {
+        const rate = startGrowth > endGrowth ? startGrowth - (startGrowth - endGrowth) * (i / 4) : startGrowth;
+        growthRates.push(rate);
+    }
+    let fcf = baseFCF;
+    const fcfValues = [baseFCF];
+    for (let i = 0; i < 5; i++) { fcf = fcf * (1 + growthRates[i] / 100); fcfValues.push(fcf); }
+
+    let html = '<div class="fcf-projection-item header">Base</div><div class="fcf-projection-item header">Year 1</div><div class="fcf-projection-item header">Year 2</div><div class="fcf-projection-item header">Year 3</div><div class="fcf-projection-item header">Year 4</div><div class="fcf-projection-item header">Year 5</div>';
+    html += `<div class="fcf-projection-item"><div class="fcf-value">NZ$${fcfValues[0].toFixed(1)}M</div><div class="growth-rate">-</div></div>`;
+    for (let i = 1; i <= 5; i++) {
+        html += `<div class="fcf-projection-item"><div class="fcf-value">NZ$${fcfValues[i].toFixed(1)}M</div><div class="growth-rate">+${growthRates[i-1].toFixed(0)}%</div></div>`;
+    }
+    document.getElementById('fcfProjectionTable').innerHTML = html;
+}
+
+function calculateDCF(startGrowth, wacc, terminalGrowth) {
+    const years = 5;
+    const fcf = dcfData.inputs.last_fcf;
+    let pvFCF = 0, projectedFCF = fcf;
+    const endGrowth = 10;
+    for (let i = 0; i < years; i++) {
+        const yearGrowth = startGrowth > endGrowth ? startGrowth - (startGrowth - endGrowth) * (i / 4) : startGrowth;
+        projectedFCF *= (1 + yearGrowth / 100);
+        pvFCF += projectedFCF / Math.pow(1 + wacc / 100, i + 1);
+    }
+    const terminalFCF = projectedFCF * (1 + terminalGrowth / 100);
+    const terminalValue = terminalFCF / (wacc / 100 - terminalGrowth / 100);
+    const pvTerminal = terminalValue / Math.pow(1 + wacc / 100, years);
+    const enterpriseValue = pvFCF + pvTerminal;
+    const equityValue = enterpriseValue - dcfData.inputs.net_debt;
+    const iv = equityValue / dcfData.inputs.shares_outstanding;
+    const terminalPerShare = terminalValue / dcfData.inputs.shares_outstanding;
+    const entryPrice = terminalPerShare / Math.pow(1.15, years);
+    return { iv, entryPrice, terminalPerShare, pvFCF, pvTerminal, enterpriseValue };
+}
+
+window.updateDCFDisplay = function() {
+    const growth = parseFloat(document.getElementById('growthSlider').value);
+    const wacc = parseFloat(document.getElementById('waccSlider').value);
+    const terminal = parseFloat(document.getElementById('terminalSlider').value);
+    document.getElementById('growthValue').textContent = growth + '%';
+    document.getElementById('waccValue').textContent = wacc + '%';
+    document.getElementById('terminalValue').textContent = terminal + '%';
+    renderFCFProjections();
+    const result = calculateDCF(growth, wacc, terminal);
+    document.getElementById('dcfIV').textContent = 'NZ$' + result.iv.toFixed(2);
+    document.getElementById('dcfEntry').textContent = 'NZ$' + result.entryPrice.toFixed(2);
+    const upside = ((result.iv - dcfData.current_price) / dcfData.current_price * 100);
+    const upsideEl = document.getElementById('dcfUpside');
+    upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(1) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+    upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+    document.getElementById('dcfWeighted').textContent = 'NZ$' + dcfData.probability_weighted.weighted_iv.toFixed(2);
+    const grid = document.getElementById('assumptionGrid');
+    if (grid) {
+        grid.innerHTML = `
+            <div class="assumption-item"><div class="label">Growth Rate (Y1)</div><div class="value">${growth}%</div></div>
+            <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc}%</div></div>
+            <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${terminal}%</div></div>
+            <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa;">NZ$${result.iv.toFixed(2)}</div></div>
+            <div class="assumption-item"><div class="label">Entry Price (15%)</div><div class="value" style="color:#00d4aa;">NZ$${result.entryPrice.toFixed(2)}</div></div>
+        `;
+    }
+};
+
+window.switchScenario = function(scenario) {
+    currentScenario = scenario;
+    document.querySelectorAll('.scenario-tab').forEach(tab => tab.classList.toggle('active', tab.dataset.scenario === scenario));
+    const assumptions = dcfData.assumptions[scenario];
+    const valuation = dcfData.valuation[scenario];
+    document.getElementById('growthSlider').value = assumptions.growth_rates[0];
+    document.getElementById('waccSlider').value = assumptions.wacc;
+    document.getElementById('terminalSlider').value = assumptions.terminal_growth;
+    document.getElementById('scenarioTitle').textContent = scenario.charAt(0).toUpperCase() + scenario.slice(1) + ' Case Assumptions';
+    document.getElementById('scenarioNarrative').textContent = assumptions.narrative;
+    renderFCFProjections();
+    const grid = document.getElementById('assumptionGrid');
+    grid.innerHTML = `
+        <div class="assumption-item"><div class="label">Year 1 Growth</div><div class="value">${assumptions.growth_rates[0]}%</div></div>
+        <div class="assumption-item"><div class="label">Year 5 Growth</div><div class="value">${assumptions.growth_rates[4]}%</div></div>
+        <div class="assumption-item"><div class="label">FCF Margin (Y1)</div><div class="value">${assumptions.fcf_margin}%</div></div>
+        <div class="assumption-item"><div class="label">WACC</div><div class="value">${assumptions.wacc}%</div></div>
+        <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${assumptions.terminal_growth}%</div></div>
+        <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa;">NZ$${valuation.intrinsic_value.toFixed(2)}</div></div>
+        <div class="assumption-item"><div class="label">Upside/Downside</div><div class="value" style="color:${valuation.upside >= 0 ? '#00d4aa' : '#ff6b6b'};">${valuation.upside >= 0 ? '+' : ''}${valuation.upside.toFixed(1)}%</div></div>
+    `;
+    updateDCFDisplay();
+};
+
+function renderHistoricalGrowth() {
+    const growth = dcfData.historical_growth;
+    const selectedSource = growth.growth_rate_source;
+    const metrics = [
+        { key: 'revenue_3yr_cagr', label: 'Revenue 3Y' },
+        { key: 'revenue_5yr_cagr', label: 'Revenue 5Y' },
+        { key: 'eps_3yr_cagr', label: 'EPS 3Y' },
+        { key: 'eps_5yr_cagr', label: 'EPS 5Y' },
+        { key: 'equity_3yr_cagr', label: 'Equity 3Y' },
+        { key: 'equity_5yr_cagr', label: 'Equity 5Y' },
+        { key: 'fcf_3yr_cagr', label: 'FCF 3Y' },
+        { key: 'fcf_5yr_cagr', label: 'FCF 5Y' }
+    ];
+    document.getElementById('growthGrid').innerHTML = metrics.map(m => {
+        const rate = growth[m.key];
+        const isSelected = m.key === selectedSource;
+        const colorClass = rate >= 0 ? 'positive' : 'negative';
+        return `<div class="growth-item ${isSelected ? 'selected' : ''}"><div class="metric">${m.label}</div><div class="rate ${colorClass}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div></div>`;
+    }).join('');
+}
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const currentPrice = dcfData.current_price;
+    let html = '<tr><th>WACC \\ Term G</th>';
+    sens.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+    html += '</tr>';
+    sens.wacc_range.forEach((wacc, i) => {
+        html += `<tr><th>${wacc}%</th>`;
+        sens.matrix[i].forEach((v, j) => {
+            const isHighlight = wacc === dcfData.assumptions.base.wacc && sens.terminal_growth_range[j] === dcfData.assumptions.base.terminal_growth;
+            const colorClass = v >= currentPrice ? 'above-current' : 'below-current';
+            html += `<td class="${isHighlight ? 'highlight' : colorClass}">NZ$${v.toFixed(2)}</td>`;
+        });
+        html += '</tr>';
+    });
+    document.getElementById('sensitivityMatrix').innerHTML = html;
+}
+
+function initDCF() {
+    document.getElementById('dcfCurrent').textContent = 'NZ$' + dcfData.current_price.toFixed(2);
+    if (dcfData.historical_growth.growth_divergence_warning) {
+        document.getElementById('growthWarning').style.display = 'flex';
+        document.getElementById('warningText').textContent = dcfData.historical_growth.growth_divergence_warning;
+    }
+    document.getElementById('growthSlider').value = dcfData.historical_growth.selected_growth_rate;
+    document.getElementById('waccSlider').value = dcfData.assumptions.base.wacc;
+    document.getElementById('terminalSlider').value = dcfData.assumptions.base.terminal_growth;
+    document.getElementById('growthHint').textContent = 'Based on ' + dcfData.historical_growth.growth_rate_source.replace(/_/g, ' ');
+    renderDCFInputs();
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    switchScenario('base');
+}
+
+// Bind sliders
+(function() {
+    ['growthSlider','waccSlider','terminalSlider'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.oninput = window.updateDCFDisplay; el.onchange = window.updateDCFDisplay; }
+    });
+})();
+
+// ============================================================
+// INIT
+// ============================================================
+renderKPIs();
+renderOverview();
+renderGuidance();
+renderCharts();
+initDCF();
+
+</script>
+</body>
+</html>
