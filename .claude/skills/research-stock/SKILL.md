@@ -249,6 +249,112 @@ curl -s "https://query1.finance.yahoo.com/v8/finance/chart/$ARGUMENTS?range=1d&i
 
 5. **If the DCF JSON was updated**, re-embed the updated DCF JSON into the dashboard HTML (`./$ARGUMENTS/Reports/{TICKER}_Dashboard.html`) by replacing the existing `const dcfData = {...};` block with the corrected data. This ensures the dashboard displays the verified price.
 
+## Step 8c: DCF Sanity Check (Implied Multiples vs History)
+
+**Always run after Step 8b.** This step exists because DCF models can produce intrinsic values implying multiples the market has never paid. SEK.NZ (Seeka) was the canonical failure: a peak-FCF DCF produced IV $22.75 implying 30x P/E and 3.4x P/B, despite Seeka never trading above 0.99x P/B or 7.8x EV/EBITDA in 10 years.
+
+### Step 8c.1: Compute historical multiples from local data
+
+Fetch 10 years of monthly closing prices from Yahoo Finance and align FY-end prices with FY metrics in `{TICKER}_Metrics.csv`:
+
+```bash
+curl -s "https://query1.finance.yahoo.com/v8/finance/chart/$ARGUMENTS?range=10y&interval=1mo" \
+  -H "User-Agent: Mozilla/5.0" | python3 -c "
+import sys, json
+from datetime import datetime
+d = json.load(sys.stdin)
+r = d['chart']['result'][0]
+for t, c in zip(r['timestamp'], r['indicators']['quote'][0]['close']):
+    if c: print(datetime.fromtimestamp(t).strftime('%Y-%m'), round(c, 2))
+"
+```
+
+For each FY row in the metrics CSV, match the FY-end month's closing price (use Dec for calendar-year FYs, Jun for June FYs, etc. — check the company's reporting calendar). For each year compute:
+
+- **P/E** = price / EPS (skip years with negative EPS)
+- **P/B** = (price × shares_outstanding) / total_equity
+- **EV/EBITDA** = (market_cap + net_debt) / EBITDA
+- **P/Sales** = market_cap / revenue
+
+Exclude any clear outlier years (cyclone, COVID write-down, one-off impairment) from the averages — but keep them in the table for visibility.
+
+### Step 8c.2: Compute implied multiples from base case IV
+
+From the base case `intrinsic_value` in the DCF JSON, compute what multiples that IV would imply on the most recent FY actuals:
+
+- **Implied P/E** = base_IV / latest_EPS
+- **Implied P/B** = base_IV / (latest_equity / shares_outstanding)
+- **Implied EV/EBITDA** = (base_IV × shares + net_debt) / latest_EBITDA
+
+### Step 8c.3: Trip detection
+
+Sanity check **fails** if ANY of:
+- Implied P/E > 2.0× the 10yr average (excluding outlier years)
+- Implied P/B > 1.5× the 10yr maximum
+- Implied EV/EBITDA > 1.5× the 10yr maximum
+- Base case upside > 100% AND current price is in the upper half of the 10yr price range (suggests the market already incorporates the good news)
+
+### Step 8c.4: Auto-diagnose root cause
+
+If sanity check fails, identify which assumption is producing the over-valuation. Check in order:
+
+1. **Peak-earnings extrapolation**: Is `last_fcf` near the highest value in the company's FCF history? Compute the 5-8 year FCF mean and median. If `last_fcf` > 1.5× the historical median, the base year is a peak.
+2. **WACC too low for the risk profile**: Are there structural risks not in the WACC? Look at the qualitative analysis for: single-customer concentration, small-cap illiquidity (market cap < $500m), extreme cyclicality (EBITDA range > 3× in 5 years), regulatory single-point-of-failure. Each unaccounted structural risk should add 1.5-2.5% to WACC.
+3. **Growth rate too aggressive**: Are projected growth rates above the historical revenue/EBITDA CAGRs through-the-cycle (not the recent recovery CAGR)? Through-cycle growth should reflect industry volume growth, not cyclical bounce-back.
+4. **Terminal growth too high**: Is `terminal_growth` near or above long-run GDP growth for a mature business? For cyclical/agricultural businesses it should be 1.5-2.5% maximum.
+
+### Step 8c.5: Auto-apply the fix
+
+Pick the most defensible fix and apply it without prompting. Apply in priority order:
+
+1. **If peak-earnings extrapolation is the cause** (most common): rebuild with mid-cycle FCF. Set base case `fcf_base_year` to the mid-point of (historical median FCF, latest FCF). Add `mid_cycle_fcf` field documenting the choice. Bull case can use latest FCF × 0.85. Bear case can use historical median × 0.75.
+
+2. **If structural WACC understatement is the cause**: add explicit premium components to the base WACC. Use this template (additive, on top of standard 11-12% NZ/AU small-cap WACC):
+   - Single-customer concentration (>40% of revenue from one customer): +1.5-2.5%
+   - Small-cap illiquidity (market cap < $300m): +1.5-2.5%
+   - Extreme cyclicality (EBITDA range > 3× peak-to-trough): +1.0-2.0%
+   - Regulatory single-point-of-failure: +1.0-2.0%
+   - Concentrated geographic risk (one growing region, one country): +0.5-1.5%
+   
+   Document each premium added in `wacc_rationale`.
+
+3. **If aggressive growth is the cause**: cap projected growth at the through-cycle revenue CAGR (compute from first-to-last year of available data, NOT the cyclical recovery window).
+
+4. **Add exit-multiple cap**: regardless of root cause, add an `exit_multiple_cap` (in EV/EBITDA terms) per scenario equal to the historical-range multiple: bear case = 10yr min, base case = 10yr average, bull case = 10yr maximum. In the DCF calc, use `min(gordon_growth_tv, exit_multiple_cap × terminal_ebitda)`.
+
+After the fix, recompute and verify the implied multiples are within sanity bounds. If not, iterate once more (e.g., further reduce mid-cycle FCF, raise WACC).
+
+### Step 8c.6: Surface the change with a warning banner
+
+In the dashboard, add a yellow warning banner above the DCF section explaining what was changed and why. Use this template:
+
+```html
+<div style="max-width:1400px;margin:0 auto 20px;padding:16px 20px;background:rgba(253,203,110,0.08);border:1px solid rgba(253,203,110,0.3);border-radius:10px;font-size:0.9rem;line-height:1.6;color:#d0d0d0">
+<strong style="color:#fdcb6e">Model approach:</strong> [One-paragraph explanation of which sanity check tripped, what was changed, and the resulting implied multiples vs historical averages. Conclude with the investment framing — multi-bagger thesis vs income+modest-growth, etc.]
+</div>
+```
+
+Also populate a `valuation_philosophy` block in the DCF JSON capturing the same explanation.
+
+### Step 8c.7: Record the sanity check in the DCF JSON
+
+Add a `sanity_check` block to the DCF JSON regardless of pass/fail:
+
+```json
+"sanity_check": {
+  "ran": true,
+  "passed": false,
+  "implied_multiples": {"pe": 29.9, "pb": 3.36, "ev_ebitda": 11.5},
+  "historical_averages_ex_outliers": {"pe_avg": 13.1, "pb_avg": 0.72, "pb_max": 0.99, "ev_ebitda_avg": 5.6, "ev_ebitda_max": 7.8},
+  "trip_reasons": ["Implied P/B 3.36x exceeds 1.5x historical max 0.99x", "Base case upside 354% with price in upper half of 10yr range"],
+  "diagnosis": "Peak-FCF extrapolation: base year FCF $79m is 2.4x historical median $32m",
+  "fix_applied": "Switched to mid-cycle FCF $50m; added structural WACC premiums totalling +5.5% (Zespri concentration +2%, NZX illiquidity +2%, weather +1.5%)",
+  "implied_multiples_after_fix": {"pe": 10.4, "pb": 1.17, "ev_ebitda": 6.4}
+}
+```
+
+This makes the fix auditable and surfaces in future runs whether assumptions have drifted back into unrealistic territory.
+
 ## Step 9: Update Index Page
 
 **Always run after dashboard generation.**
@@ -283,6 +389,8 @@ Update the stock index at `./index.html` to include this ticker. The index conta
 - [ ] Qualitative analysis JSON refreshed with current market context and recent developments
 - [ ] DCF valuation JSON refreshed with current stock price and updated projections
 - [ ] DCF Excel model regenerated
+- [ ] DCF sanity check ran (Step 8c) and `sanity_check` block populated in DCF JSON
+- [ ] If sanity check tripped: fix applied, warning banner present in dashboard, `valuation_philosophy` block populated
 
 **Dashboard (regenerate each run):**
 - [ ] Dashboard embeds CSV data, analysis JSON, AND DCF JSON directly
