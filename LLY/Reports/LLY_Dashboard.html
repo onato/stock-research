@@ -1,0 +1,1834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eli Lilly (LLY) Financial Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4aa, #00b894);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        .header p { color: #888; font-size: 1.1rem; }
+        .header-meta { display: flex; justify-content: center; gap: 30px; margin-top: 12px; flex-wrap: wrap; }
+        .header-meta span { font-size: 0.9rem; color: #aaa; }
+        .header-meta strong { color: #00d4aa; }
+
+        /* Overview Section */
+        .overview-section { max-width: 1400px; margin: 0 auto 30px; }
+        .overview-toggle {
+            width: 100%;
+            background: rgba(0,212,170,0.1);
+            border: 1px solid rgba(0,212,170,0.3);
+            border-radius: 12px;
+            padding: 16px 24px;
+            color: #00d4aa;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+        .overview-toggle:hover { background: rgba(0,212,170,0.2); }
+        .overview-toggle .arrow { transition: transform 0.3s ease; }
+        .overview-toggle.active .arrow { transform: rotate(180deg); }
+        .overview-content {
+            display: none;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            padding: 30px;
+            margin-top: -12px;
+        }
+        .overview-content.active { display: block; }
+        .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+        .overview-card {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .overview-card h3 {
+            color: #00d4aa;
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .overview-card p { margin-bottom: 12px; line-height: 1.6; font-size: 0.9rem; }
+        .overview-card ul { list-style: none; padding: 0; margin: 0; }
+        .overview-card li {
+            padding: 7px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            line-height: 1.5;
+            font-size: 0.88rem;
+        }
+        .overview-card li:last-child { border-bottom: none; }
+        .overview-card.bull h3 { color: #00d4aa; }
+        .overview-card.bear h3 { color: #ff6b6b; }
+        .overview-card.risks h3 { color: #fdcb6e; }
+        .risk-high { color: #ff6b6b; font-weight: 600; }
+        .risk-moderate { color: #fdcb6e; font-weight: 600; }
+        .risk-low { color: #00d4aa; font-weight: 600; }
+        .revenue-stream { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .revenue-stream .percent { color: #00d4aa; font-weight: 600; white-space: nowrap; }
+        .trend-hypergrowth { color: #00d4aa; }
+        .trend-growing { color: #74b9ff; }
+        .trend-stable { color: #888; }
+        .trend-declining { color: #ff6b6b; }
+        .trend-early-launch { color: #a29bfe; }
+
+        /* KPI Cards */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .kpi-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .kpi-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,212,170,0.2);
+        }
+        .kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+        .kpi-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        .kpi-change { font-size: 0.9rem; margin-top: 5px; }
+        .kpi-change.positive { color: #00d4aa; }
+        .kpi-change.negative { color: #ff6b6b; }
+
+        /* Guidance Section */
+        .guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+        .guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .guidance-header h3 {
+            color: #fff;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .guidance-header h3::before {
+            content: '';
+            display: inline-block;
+            width: 4px; height: 20px;
+            background: linear-gradient(180deg, #00d4aa, #00b894);
+            border-radius: 2px;
+        }
+        .guidance-meta { font-size: 0.85rem; color: #888; }
+        .guidance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .guidance-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 18px;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.2s ease;
+        }
+        .guidance-card:hover { transform: translateY(-2px); }
+        .guidance-metric { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+        .guidance-target { font-size: 1.4rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; }
+        .guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
+        .guidance-vs-prior {
+            display: inline-block;
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        .guidance-vs-prior.raised { background: rgba(0,212,170,0.15); color: #00d4aa; }
+        .guidance-vs-prior.lowered { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+        .guidance-vs-prior.maintained { background: rgba(255,255,255,0.1); color: #888; }
+        .guidance-vs-prior.increasing { background: rgba(116,185,255,0.15); color: #74b9ff; }
+        .guidance-vs-prior.new { background: rgba(99,102,241,0.15); color: #818cf8; }
+        .guidance-notes { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
+        .guidance-commentary {
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            padding: 16px 20px;
+            border-left: 3px solid #00d4aa;
+            font-style: italic;
+            color: #b0b0b0;
+            line-height: 1.6;
+            font-size: 0.9rem;
+        }
+        .guidance-commentary::before { content: '"'; font-size: 1.5rem; color: #00d4aa; margin-right: 4px; }
+
+        /* Section titles */
+        .section-title {
+            font-size: 1.5rem;
+            color: #fff;
+            margin: 40px auto 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(0,212,170,0.3);
+            max-width: 1400px;
+        }
+
+        /* Charts */
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 25px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .chart-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .chart-card.full-width { grid-column: 1 / -1; }
+        .chart-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .chart-header h3 {
+            color: #fff;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .chart-header h3::before {
+            content: '';
+            display: inline-block;
+            width: 4px; height: 20px;
+            background: linear-gradient(180deg, #00d4aa, #00b894);
+            border-radius: 2px;
+        }
+        .help-btn {
+            width: 24px; height: 24px;
+            border-radius: 50%;
+            background: rgba(0,212,170,0.2);
+            border: 1px solid #00d4aa;
+            color: #00d4aa;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+        .help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+        .chart-wrapper { position: relative; height: 300px; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%);
+            border-radius: 16px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid rgba(0,212,170,0.3);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .modal-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h3 { color: #00d4aa; font-size: 1.4rem; margin: 0; }
+        .modal-close {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            background: rgba(255,107,107,0.2);
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-close:hover { background: #ff6b6b; color: #fff; }
+        .modal-body { padding: 25px; line-height: 1.7; }
+        .modal-body p { margin-bottom: 15px; }
+        .modal-body strong { color: #00d4aa; }
+        .modal-body ul { margin: 15px 0; padding-left: 20px; }
+        .modal-body li { margin-bottom: 8px; }
+        .metric-highlight {
+            background: rgba(0,212,170,0.1);
+            border-left: 3px solid #00d4aa;
+            padding: 12px 15px;
+            margin: 15px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        /* DCF Section */
+        .dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+        .dcf-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .dcf-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.3s ease;
+        }
+        .dcf-card:hover { transform: translateY(-3px); }
+        .dcf-card.highlight {
+            background: rgba(0,212,170,0.1);
+            border-color: rgba(0,212,170,0.3);
+        }
+        .dcf-card.overvalued {
+            background: rgba(255,107,107,0.07);
+            border-color: rgba(255,107,107,0.25);
+        }
+        .dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .dcf-value { font-size: 2.2rem; font-weight: bold; color: #00d4aa; }
+        .dcf-card:not(.highlight):not(.overvalued) .dcf-value { color: #fff; }
+        .dcf-card.overvalued .dcf-value { color: #ff6b6b; }
+        .dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+        .dcf-change.positive { color: #00d4aa; }
+        .dcf-change.negative { color: #ff6b6b; }
+        .dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
+        .dcf-valuation-note {
+            background: rgba(253,203,110,0.1);
+            border: 1px solid rgba(253,203,110,0.3);
+            border-radius: 8px;
+            padding: 14px 18px;
+            margin-bottom: 25px;
+            color: #fdcb6e;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+        .dcf-valuation-note strong { color: #fdcb6e; }
+        .dcf-inputs {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+        .dcf-inputs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .dcf-input-card {
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #00d4aa; }
+        .dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
+        .fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
+        .fcf-projection-table {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .fcf-projection-item { text-align: center; }
+        .fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
+        .fcf-projection-item .year { font-size: 0.75rem; color: #888; margin-bottom: 2px; }
+        .fcf-projection-item .fcf-val { font-size: 1rem; color: #e0e0e0; font-weight: 500; }
+        .fcf-projection-item .growth-rate { font-size: 0.75rem; color: #00d4aa; margin-top: 2px; }
+        .dcf-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+            padding: 25px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .slider-group { display: flex; flex-direction: column; gap: 10px; }
+        .slider-group label {
+            font-size: 0.95rem;
+            color: #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+        }
+        .slider-group label span { color: #00d4aa; font-weight: 600; }
+        .slider-group input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%; height: 6px;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.1);
+            outline: none;
+        }
+        .slider-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px; height: 18px;
+            border-radius: 50%;
+            background: #00d4aa;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        .slider-hint { font-size: 0.8rem; color: #666; }
+        .scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .scenario-tab {
+            padding: 10px 24px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: transparent;
+            color: #888;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+        .scenario-tab:hover { border-color: rgba(0,212,170,0.5); color: #e0e0e0; }
+        .scenario-tab.active { background: rgba(0,212,170,0.15); border-color: #00d4aa; color: #00d4aa; }
+        .scenario-details {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .scenario-details h4 { color: #00d4aa; margin-bottom: 15px; }
+        .scenario-narrative {
+            font-size: 0.88rem;
+            color: #b0b0b0;
+            line-height: 1.6;
+            margin-bottom: 15px;
+            padding: 12px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            border-left: 3px solid #00d4aa;
+        }
+        .assumption-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        .assumption-item { text-align: center; }
+        .assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+        .assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
+        .sensitivity-section { margin-bottom: 30px; }
+        .sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; }
+        .sensitivity-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            overflow: hidden;
+            font-size: 0.9rem;
+        }
+        .sensitivity-table th, .sensitivity-table td {
+            padding: 12px 16px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .sensitivity-table th { background: rgba(0,212,170,0.1); color: #00d4aa; font-weight: 600; }
+        .sensitivity-table td { color: #e0e0e0; }
+        .sensitivity-table td.highlight { background: rgba(0,212,170,0.15); color: #00d4aa; font-weight: 600; }
+        .sensitivity-table td.below-current { color: #ff6b6b; }
+        .sensitivity-table td.above-current { color: #00d4aa; }
+        .historical-growth { margin-bottom: 30px; }
+        .historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
+        .growth-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+        }
+        .growth-item {
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .growth-item .metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
+        .growth-item .rate { font-size: 1.2rem; font-weight: 600; }
+        .growth-item .rate.positive { color: #00d4aa; }
+        .growth-item .rate.negative { color: #ff6b6b; }
+        .growth-item.selected { border-color: #00d4aa; background: rgba(0,212,170,0.1); }
+        .dcf-download { text-align: center; margin-top: 30px; }
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 28px;
+            background: rgba(0,212,170,0.15);
+            border: 1px solid #00d4aa;
+            border-radius: 8px;
+            color: #00d4aa;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .download-btn:hover { background: #00d4aa; color: #1a1a2e; }
+
+        @media (max-width: 768px) {
+            .charts-container { grid-template-columns: 1fr; }
+            .overview-grid { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.8rem; }
+            .fcf-projection-table { grid-template-columns: repeat(3,1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Eli Lilly and Company (LLY)</h1>
+    <p>Pharmaceutical / GLP-1 Obesity & Diabetes Franchise &mdash; NYSE: LLY</p>
+    <div class="header-meta">
+        <span>Sector: <strong>Pharmaceuticals</strong></span>
+        <span>Market Cap: <strong>~$987B</strong></span>
+        <span>Current Price: <strong>$1,107</strong></span>
+        <span>Data through: <strong>Q1 2026</strong></span>
+        <span>Updated: <strong>June 24, 2026</strong></span>
+    </div>
+</div>
+
+<!-- Investment Overview -->
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid" id="overviewGrid"></div>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<!-- Guidance Section -->
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf"></span> | <span id="guidanceFY"></span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<!-- Revenue Charts -->
+<h2 class="section-title">Revenue &amp; Growth</h2>
+<div class="charts-container">
+    <div class="chart-card full-width">
+        <div class="chart-header">
+            <h3>Annual Revenue (FY2020&ndash;FY2025)</h3>
+            <button class="help-btn" onclick="openModal('revenue')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="revenueChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Quarterly Revenue Trend</h3>
+            <button class="help-btn" onclick="openModal('qRevenue')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="qRevenueChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>YoY Revenue Growth Rate</h3>
+            <button class="help-btn" onclick="openModal('revenueGrowth')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="revenueGrowthChart"></canvas></div>
+    </div>
+</div>
+
+<!-- Margins & Profitability -->
+<h2 class="section-title">Margins &amp; Profitability</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Gross, Operating &amp; Net Margin</h3>
+            <button class="help-btn" onclick="openModal('margins')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="marginsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Income (Annual)</h3>
+            <button class="help-btn" onclick="openModal('netIncome')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="netIncomeChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>EPS (Diluted) Trend</h3>
+            <button class="help-btn" onclick="openModal('eps')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="epsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Quarterly Operating Margin</h3>
+            <button class="help-btn" onclick="openModal('qMargin')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="qMarginChart"></canvas></div>
+    </div>
+</div>
+
+<!-- R&D & FCF -->
+<h2 class="section-title">R&amp;D Investment &amp; Free Cash Flow</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>R&amp;D Spend vs Revenue</h3>
+            <button class="help-btn" onclick="openModal('rnd')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="rndChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>R&amp;D as % of Revenue</h3>
+            <button class="help-btn" onclick="openModal('rndPct')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="rndPctChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Free Cash Flow (Annual)</h3>
+            <button class="help-btn" onclick="openModal('fcf')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="fcfChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Quarterly FCF</h3>
+            <button class="help-btn" onclick="openModal('qFcf')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="qFcfChart"></canvas></div>
+    </div>
+</div>
+
+<!-- Balance Sheet -->
+<h2 class="section-title">Balance Sheet</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shareholders Equity vs Total Debt</h3>
+            <button class="help-btn" onclick="openModal('balanceSheet')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="balanceSheetChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Gross Profit (Annual)</h3>
+            <button class="help-btn" onclick="openModal('grossProfit')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="grossProfitChart"></canvas></div>
+    </div>
+</div>
+
+<!-- DCF Valuation -->
+<h2 class="section-title">DCF Valuation</h2>
+<div class="dcf-section">
+    <div class="dcf-valuation-note">
+        <strong>Valuation Note:</strong> At $1,107, LLY trades at a substantial premium to the base-case intrinsic value of $647 (-41.5% downside). Even the bull-case IV of $1,189 offers only +7.4% upside. The stock is pricing in near-flawless execution of GLP-1 hypergrowth, pipeline success (retatrutide, Foundayo expansion), and continued margin expansion. The probability-weighted IV across Bull/Base/Bear scenarios is $695. <strong>This is not a value play &mdash; it is a growth/quality premium.</strong>
+    </div>
+    <div class="dcf-summary">
+        <div class="dcf-card highlight">
+            <div class="dcf-label">Base IV (DCF)</div>
+            <div class="dcf-value" id="dcfIV">$647</div>
+            <div class="dcf-change negative" id="dcfUpside">-41.5% downside</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Entry Price (15% CAGR)</div>
+            <div class="dcf-value" id="dcfEntry">$422</div>
+            <div class="dcf-sublabel">Buy below for 15% annual return</div>
+        </div>
+        <div class="dcf-card overvalued">
+            <div class="dcf-label">Current Price</div>
+            <div class="dcf-value" id="dcfCurrent">$1,107</div>
+            <div class="dcf-sublabel">~60% above base-case IV</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Prob-Weighted IV</div>
+            <div class="dcf-value" id="dcfWeighted">$695</div>
+            <div class="dcf-sublabel">25% Bull / 50% Base / 25% Bear</div>
+        </div>
+    </div>
+
+    <div class="dcf-inputs">
+        <h4>DCF Model Inputs (Base Year: FY2026E)</h4>
+        <div class="dcf-inputs-grid">
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Base Year FCF</div>
+                <div class="dcf-input-value" id="baseFCF">$11.7B</div>
+                <div class="dcf-input-note">FY2026E ~14% FCF margin on $83.5B rev</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Shares Outstanding</div>
+                <div class="dcf-input-value" id="sharesOut">896M</div>
+                <div class="dcf-input-note">Minimal dilution since FY2020</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Net Debt</div>
+                <div class="dcf-input-value" id="netDebt">$38.1B</div>
+                <div class="dcf-input-note">Total debt less cash</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Base Revenue</div>
+                <div class="dcf-input-value">$83.5B</div>
+                <div class="dcf-input-note">FY2026E guidance midpoint</div>
+            </div>
+        </div>
+        <div class="fcf-projections">
+            <h5>Projected FCF &mdash; Base Case (FY2027&ndash;FY2031)</h5>
+            <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+        </div>
+    </div>
+
+    <div class="dcf-controls">
+        <div class="slider-group">
+            <label>Yr 1 Growth Rate: <span id="growthValue">28%</span></label>
+            <input type="range" id="growthSlider" min="5" max="50" value="28" step="1">
+            <div class="slider-hint" id="growthHint">Guided FY2026 rev growth ~28% (midpoint vs FY2025)</div>
+        </div>
+        <div class="slider-group">
+            <label>WACC: <span id="waccValue">8.5%</span></label>
+            <input type="range" id="waccSlider" min="6" max="14" value="8.5" step="0.5">
+            <div class="slider-hint">Risk-free ~4.3% + ERP ~5.0%, beta ~0.85</div>
+        </div>
+        <div class="slider-group">
+            <label>Terminal Growth: <span id="terminalValue">3.0%</span></label>
+            <input type="range" id="terminalSlider" min="0" max="5" value="3" step="0.5">
+            <div class="slider-hint">3% = nominal GDP; tirzepatide patent cliff ~early 2030s</div>
+        </div>
+    </div>
+
+    <div class="scenario-tabs">
+        <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+        <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+        <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+    </div>
+    <div class="scenario-details" id="scenarioDetails">
+        <h4 id="scenarioTitle">Base Case Assumptions</h4>
+        <div class="scenario-narrative" id="scenarioNarrative"></div>
+        <div class="assumption-grid" id="assumptionGrid"></div>
+    </div>
+
+    <div class="sensitivity-section">
+        <h4>Sensitivity Analysis: Intrinsic Value per Share (WACC vs Terminal Growth)</h4>
+        <table class="sensitivity-table" id="sensitivityMatrix"></table>
+    </div>
+
+    <div class="historical-growth">
+        <h4>Historical Growth Rates (CAGR) &mdash; Selected: Revenue 5yr CAGR</h4>
+        <div class="growth-grid" id="growthGrid"></div>
+    </div>
+
+    <div class="dcf-download">
+        <a href="LLY_DCF_Model.xlsx" class="download-btn" download>
+            <span>&#8681;</span> Download Excel Model
+        </a>
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&#x2715;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ===================== EMBEDDED DATA =====================
+const csvData = `Period,Revenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,NetIncome,NetMargin,EPS (diluted),FreeCashFlow,ResearchDevelopment,ShareholdersEquity,TotalDebt,CashAndEquivalents,SharesOutstanding
+FY2020,24539.8,19056.5,77.7,6058.0,24.7,6193.7,25.2,6.79,5111.7,5976.3,5825.2,16595.3,3657.1,912.5
+FY2021,28318.4,21005.6,74.2,6357.1,22.4,5581.7,19.7,6.12,6056.1,6930.7,9154.8,16884.7,3818.5,911.7
+FY2022,28541.4,21911.6,76.8,7127.3,25.0,6244.8,21.9,6.90,5731.4,7190.8,10775.4,16238.6,2067.0,904.6
+FY2023,34124.1,27041.9,79.2,6457.9,18.9,5240.4,15.4,5.80,792.5,9313.4,10863.7,25225.3,2818.6,903.3
+FY2024,45042.7,36624.4,81.3,12899.0,28.6,10590.0,23.5,11.71,3760.1,10990.6,14271.6,33644.2,3268.4,904.1
+FY2025,65179.0,54127.0,83.0,26302.0,40.4,20640.0,31.7,22.95,8972.0,13337.0,26535.0,42503.0,7268.0,899.3
+Q1 2024,8768.0,7094.5,80.9,2509.0,28.6,2242.9,25.6,2.48,179.7,2522.8,12897.4,26211.4,2460.2,903.8
+Q2 2024,11302.8,9132.6,80.8,3714.8,32.9,2967.0,26.3,3.28,241.4,2711.2,13635.5,28892.0,3223.6,904.2
+Q3 2024,11439.1,9268.3,81.0,1526.4,13.3,970.3,8.5,1.07,2361.2,2734.1,14320.7,31119.7,3369.0,905.0
+Q1 2025,12728.5,10504.3,82.5,3695.1,29.0,2759.3,21.7,3.06,156.1,2733.7,15846.8,38515.9,3093.3,900.6
+Q2 2025,15557.7,13109.9,84.3,6867.0,44.1,5660.5,36.4,6.29,1389.8,3336.1,18349.1,39903.8,3375.9,899.8
+Q3 2025,17600.8,14592.5,82.9,7365.5,41.8,5582.5,31.7,6.21,6748.2,3465.7,23850.8,42506.6,9791.9,898.8
+Q1 2026,19799.0,16222.0,81.9,8915.0,45.0,7396.0,37.4,8.26,3007.0,3510.0,31198.0,43370.0,5282.0,895.9`;
+
+const analysisData = {
+  ticker: "LLY",
+  company_name: "Eli Lilly and Company",
+  overview: "Eli Lilly and Company is a global pharmaceutical leader headquartered in Indianapolis, Indiana, developing and commercializing medicines across cardiometabolic health (diabetes and obesity), oncology, immunology, and neuroscience. The company's incretin/GLP-1 franchise — anchored by Mounjaro (tirzepatide for type 2 diabetes) and Zepbound (tirzepatide for obesity) — is the fastest-growing pharmaceutical franchise in history, generating over $36 billion combined in 2025 and representing roughly 56% of total revenue. Lilly operates in more than 125 countries and is one of the largest pharmaceutical companies in the world by market capitalization (~$987 billion as of June 2026).",
+  business_model: {
+    summary: "Lilly earns revenue from discovering, developing, manufacturing, and selling prescription pharmaceuticals, with the vast majority of revenue (>95%) from drug sales. The business is currently dominated by the dual-indication tirzepatide franchise (diabetes and obesity), with durable secondary contributors in oncology (Verzenio), cardiovascular/metabolic (Jardiance), immunology (Taltz, Ebglyss), and neuroscience (Kisunla for Alzheimer's).",
+    revenue_streams: [
+      {name: "Mounjaro (tirzepatide, diabetes)", percent_approx: 35, trend: "hypergrowth", notes: "+99% YoY FY2025; Q1 2026 $8.7B (+125%)"},
+      {name: "Zepbound (tirzepatide, obesity)", percent_approx: 21, trend: "hypergrowth", notes: "+175% YoY FY2025; launched Dec 2023"},
+      {name: "Verzenio (abemaciclib, breast cancer)", percent_approx: 9, trend: "growing", notes: "+8% YoY FY2025; CDK4/6 inhibitor"},
+      {name: "Trulicity (dulaglutide, diabetes)", percent_approx: 8, trend: "declining", notes: "Cannibalized by Mounjaro; biosimilar ~2027"},
+      {name: "Jardiance (empagliflozin)", percent_approx: 5, trend: "stable", notes: "Alliance royalties from Boehringer Ingelheim"},
+      {name: "Taltz (ixekizumab, immunology)", percent_approx: 5, trend: "stable", notes: "IL-17A inhibitor; facing biosimilar risk"},
+      {name: "Other (Ebglyss, Omvoh, Kisunla, etc.)", percent_approx: 17, trend: "growing", notes: "Emerging portfolio + early-launch Kisunla"}
+    ]
+  },
+  competitive_position: {
+    main_competitors: ["Novo Nordisk (Wegovy/Ozempic — primary GLP-1 rival)", "AstraZeneca (Farxiga, oncology)", "Novartis (Kisqali — CDK4/6)", "Biogen/Eisai (Leqembi — Alzheimer's)", "Structure Therapeutics, Viking Therapeutics (oral GLP-1)"],
+    moat_factors: [
+      {factor: "Patent & Regulatory Exclusivity", strength: "strong", description: "Tirzepatide compound patents run through early 2030s; orforglipron has separate IP extending further."},
+      {factor: "Clinical Differentiation (Efficacy Moat)", strength: "strong", description: "Dual GIP+GLP-1 agonism delivers best-in-class ~20-21% weight loss vs semaglutide ~15% (SURMOUNT-5 head-to-head)."},
+      {factor: "Manufacturing Scale & Complexity", strength: "moderate-to-strong", description: "$27B committed U.S. manufacturing expansion; complex peptide synthesis creates supply barriers."},
+      {factor: "Pipeline Depth", strength: "strong", description: "Retatrutide (triple agonist, Phase 3), Foundayo (orforglipron, approved Apr 2026), multiple label expansions."},
+      {factor: "Brand & Commercial Execution", strength: "strong", description: "LillyDirect enables direct patient access. ~57-60% U.S. GLP-1 market share by prescriptions as of mid-2025."}
+    ],
+    weaknesses: [
+      "Revenue over-concentration: ~56% of FY2025 revenues from a single molecule (tirzepatide)",
+      "Pricing pressure: TrumpRx/MFN reduces Zepbound to ~$346/month vs $1,080+ list",
+      "Trulicity (dulaglutide) declining; biosimilar entry ~2027 accelerates headwind",
+      "Novo Nordisk oral semaglutide ($149/month) competes directly with Foundayo on price"
+    ]
+  },
+  growth_drivers: [
+    "Obesity TAM expansion: GLP-1 market projected $40-65B by 2030-2035; <5% of eligible patients currently treated",
+    "Oral GLP-1 (Foundayo/orforglipron): FDA approved April 2026 — no food/water restrictions; expands needle-averse patient pool",
+    "Retatrutide (triple agonist): Phase 3 TRIUMPH data 2025-2026; ~25-30% weight loss potential; potential NDA 2026-2027",
+    "Tirzepatide label expansions: Sleep apnea (approved), MASH (positive Phase 3), CV outcomes (SURMOUNT-MMO), CKD",
+    "Geographic expansion: Europe, Japan, China in earlier launch phases than U.S.",
+    "Kisunla (Alzheimer's): EU approved Sept 2025; ramp-up as diagnostic infrastructure scales",
+    "Medicare/Medicaid access via TrumpRx ($346/month) — first-ever Medicare obesity drug coverage",
+    "Aggressive M&A: 10+ deals in 2026 totaling >$20B diversifying beyond GLP-1"
+  ],
+  risks: {
+    business: [
+      {risk: "Tirzepatide concentration risk", severity: "high", description: "~56% of revenue from one molecule; safety signal, patent challenge, or competitive displacement would be severe"},
+      {risk: "GLP-1 competitive intensification", severity: "high", description: "Novo Nordisk oral Wegovy ($149/month), CagriSema (~25% weight loss Phase 3), emerging oral GLP-1 entrants"},
+      {risk: "Compounding pharmacy risk", severity: "moderate", description: "Regulatory grey zones; illegal compounded versions suppress branded demand"},
+      {risk: "Trulicity & legacy product decline", severity: "moderate", description: "Trulicity biosimilar ~2027; Taltz biosimilar risk; combined headwind of several billion dollars per year"}
+    ],
+    financial: [
+      {risk: "Drug pricing / realized price erosion", severity: "high", description: "Low-to-mid teens % net price headwind in 2026; widens if MFN/TrumpRx expands or direct pricing grows"},
+      {risk: "High valuation / P/E multiple compression", severity: "moderate", description: "~40x trailing earnings vs. peer average ~24x; any growth miss triggers significant de-rating"},
+      {risk: "IRA Medicare drug pricing", severity: "moderate", description: "Tirzepatide not in IRA negotiations yet; legislative environment highly uncertain"},
+      {risk: "M&A integration at unprecedented pace", severity: "moderate", description: ">$20B in 2026 acquisitions across new therapeutic areas; integration and cultural risk"}
+    ],
+    regulatory: [
+      {risk: "Pharmaceutical tariffs", severity: "moderate", description: "Trump admin proposed pharma import tariffs; auto-injector components sourced globally"},
+      {risk: "Kisunla reimbursement restrictions", severity: "moderate", description: "CMS NCD for Alzheimer's amyloid drugs limits commercial ramp; HTA reviews in Europe"}
+    ],
+    pipeline: [
+      {risk: "Retatrutide Phase 3 failure", severity: "high", description: "TRIUMPH program results are critical catalysts; failure removes next major growth wave"},
+      {risk: "Foundayo competitive differentiation", severity: "moderate", description: "~12% weight loss vs Wegovy pill ~15%; payers may prefer semaglutide's longer track record"}
+    ]
+  },
+  bull_case: [
+    "GLP-1 penetration in early innings: <5% of eligible patients; if penetration reaches 20-30% (analogous to statin adoption), TAM could be $200B+. Mounjaro projected #1 drug globally at $36B by 2030.",
+    "Pipeline optionality exceptional: retatrutide (~25-30% weight loss) potential approval 2027; Foundayo already approved; label expansions in MASH, sleep apnea, CV mortality each add billions.",
+    "Oral GLP-1 paradigm shift: Foundayo's pill format opens needle-averse cohort; synthetic small-molecule manufacturing is cheaper and scales faster than injectable peptides.",
+    "Capital return potential: $20B+/year operating cash flow at scale; as M&A moderates and capex cycle completes, FCF conversion improves enabling buybacks and dividend growth.",
+    "Multiple shots on goal outside GLP-1: Kisunla (Alzheimer's), NLRP3 inhibitors, shingles vaccine (Curevo), oncology — any blockbuster reduces tirzepatide concentration risk."
+  ],
+  bear_case: [
+    "Tirzepatide concentration is existential risk: at 56%+ of revenue and growing, a single safety signal or competitive displacement could be catastrophic — paralleling Lilly's own Zyprexa cliff.",
+    "Realized price erosion is structural: MFN/TrumpRx + LillyDirect + PBM rebates compress net price per patient; if headwind widens to 20%+, volume must grow 50%+ annually just to maintain revenues.",
+    "Novo Nordisk oral semaglutide changes competitive dynamic: oral Wegovy ($149/month) is directly head-to-head with Foundayo; if payers prefer semaglutide's efficacy and longer track record, Foundayo disappoints.",
+    "Valuation leaves no room for error: ~40x earnings pricing in flawless execution; stock dropped ~30% from 2025 peak illustrating rapid sentiment shifts.",
+    "M&A execution risk: 10+ acquisitions in 2026 in areas outside core strengths; biotech M&A typically destroys acquirer value at this scale."
+  ],
+  recent_developments: [
+    {date: "2026-Q1 (Apr 30)", event: "Q1 2026 Earnings Beat & Guidance Raise", detail: "Revenue $19.8B (+56%); Mounjaro $8.7B (+125%); Zepbound $4.2B (+80%). FY2026 revenue guidance raised to $82-85B."},
+    {date: "2026-Apr 1", event: "FDA Approves Foundayo (orforglipron)", detail: "First oral GLP-1 pill with no food/water restrictions. ~12% weight loss at highest dose. From $149/month via LillyDirect."},
+    {date: "2026-May 26", event: "Three Infectious Disease Acquisitions ($3.83B)", detail: "Curevo (shingles vaccine, $1.5B), LimmaTech, Vaccine Company — 8th/9th/10th deals of 2026; total 2026 M&A >$20B."},
+    {date: "2026-Jan 7", event: "Ventyx Biosciences Acquisition ($1.2B)", detail: "NLRP3 inhibitors for recurrent pericarditis and CNS diseases; expands immunology/neuroscience pipeline."},
+    {date: "2025-Nov 6", event: "TrumpRx/MFN Pricing Agreement", detail: "Zepbound/Mounjaro at ~$346/month for Medicare/Medicaid. First-ever Medicare obesity coverage. Lilly committed $27B U.S. manufacturing."},
+    {date: "2025-Sep", event: "EU Approves Kisunla for Alzheimer's", detail: "EC approved Kisunla (donanemab) for early symptomatic Alzheimer's; combined with updated FDA label July 2025."},
+    {date: "2025-FY", event: "Record FY2025 Revenue $65.2B (+45%)", detail: "Mounjaro $22.97B (+99%), Zepbound $13.54B (+175%). Lilly surpassed Novo Nordisk in U.S. GLP-1 market share (~57-60%)."}
+  ],
+  guidance: {
+    as_of: "Q1 2026 Earnings (April 30, 2026)",
+    fiscal_year: "FY2026",
+    items: [
+      {metric: "Revenue", target: "$82.0B - $85.0B", period: "FY2026", vs_prior: "raised", notes: "Raised from initial $80-83B. Midpoint $83.5B = ~28% growth vs FY2025. Volume +40%+, offset by low-to-mid teens price headwind."},
+      {metric: "Non-GAAP EPS", target: "$35.50 - $37.00", period: "FY2026", vs_prior: "raised", notes: "Raised from $34.00-35.50. Midpoint $36.25 = ~50% YoY growth vs FY2025 non-GAAP EPS of $24.21."},
+      {metric: "Gross Margin (non-GAAP)", target: "~83-84%", period: "FY2026", vs_prior: "maintained", notes: "Consistent with FY2025 non-GAAP gross margin of 83.8%. High-margin branded mix maintains gross margin."},
+      {metric: "Operating Margin (non-GAAP)", target: "46.0% - 47.5%", period: "FY2026", vs_prior: "maintained", notes: "Reflects continued operating leverage as revenue scales faster than SG&A and R&D."},
+      {metric: "Price (net realized change)", target: "Negative low-to-mid teens %", period: "FY2026", vs_prior: "maintained", notes: "MFN/TrumpRx Medicaid pricing, LillyDirect direct pricing, PBM rebates. Volume growth >40% more than offsets."},
+      {metric: "R&D Expense", target: "High single-digit billions", period: "FY2026", vs_prior: "increasing", notes: "Phase 3 investment in retatrutide (TRIUMPH), orforglipron diabetes, tirzepatide label expansions, acquired pipeline."}
+    ],
+    management_commentary: "CEO David Ricks emphasized Lilly's position as the 'most innovative company in the history of pharmaceuticals' based on revenue growth trajectory. Management highlighted strong early demand signal for Foundayo following April 2026 launch, described as a 'historic moment for oral medicine in obesity.' Long-term guidance implies Lilly could approach $100B in revenue within 2-3 years if GLP-1 penetration continues. Volume is the dominant growth driver; price is a meaningful but manageable headwind."
+  }
+};
+
+const dcfData = {
+  ticker: "LLY",
+  company_name: "Eli Lilly and Company",
+  valuation_date: "2026-06-24",
+  current_price: 1107.08,
+  inputs: {
+    shares_outstanding: 896,
+    net_debt: 38088,
+    last_fcf: 8972,
+    base_year_fcf_used: 11700,
+    base_revenue_used: 83500,
+    currency: "USD",
+    units: "millions"
+  },
+  historical_growth: {
+    revenue_3yr_cagr: 31.69,
+    revenue_5yr_cagr: 21.58,
+    eps_3yr_cagr: 49.27,
+    eps_5yr_cagr: 27.58,
+    equity_3yr_cagr: 35.04,
+    equity_5yr_cagr: 35.43,
+    fcf_3yr_cagr: 16.11,
+    fcf_5yr_cagr: 11.91,
+    selected_growth_rate: 21.58,
+    growth_rate_source: "revenue_5yr_cagr"
+  },
+  assumptions: {
+    base: {growth_rates: [28,22,16,12,9], fcf_margins: [16.0,18.0,20.0,21.0,22.0], wacc: 8.5, terminal_growth: 3.0, narrative: "Sustained near-term hypergrowth driven by Mounjaro/Zepbound volume expansion (guided 40%+ volume in 2026), partially offset by ~low-to-mid teens price headwind. Growth decelerates meaningfully in years 3-5 as the revenue base scales, competition intensifies, and legacy product erosion becomes material. FCF margins expand from ~14% (FY2026E) toward 22% in Year 5 as manufacturing capex cycle moderates."},
+    bull: {growth_rates: [35,28,22,17,13], fcf_margins: [18.0,21.0,23.0,25.0,26.0], wacc: 8.0, terminal_growth: 3.5, narrative: "GLP-1 penetration accelerates; Foundayo adds $8-10B by Year 3; retatrutide NDA by 2027 layers additional blockbuster revenue. International markets contribute meaningfully. FCF margins benefit from oral small-molecule economics and manufacturing leverage."},
+    bear: {growth_rates: [20,14,9,6,4], fcf_margins: [14.0,15.0,16.0,17.0,18.0], wacc: 9.5, terminal_growth: 2.5, narrative: "Realized price erosion widens beyond guided low-to-mid teens to 20%+ as MFN/TrumpRx expands. Novo Nordisk oral semaglutide captures outsized oral GLP-1 share. Retatrutide misses primary endpoint. Trulicity biosimilar 2027 accelerates legacy decline. Higher WACC reflects execution risk and multiple compression."}
+  },
+  valuation: {
+    base: {intrinsic_value: 647.24, upside: -41.5},
+    bull: {intrinsic_value: 1188.6, upside: 7.4},
+    bear: {intrinsic_value: 296.09, upside: -73.3}
+  },
+  entry_price: {
+    base: {entry_price: 422.14, entry_discount_from_current: -61.9},
+    bull: {entry_price: 772.23, entry_discount_from_current: -30.2},
+    bear: {entry_price: 200.74, entry_discount_from_current: -81.9}
+  },
+  sensitivity: {
+    wacc_range: [7.5, 8.0, 8.5, 9.0, 9.5],
+    terminal_growth_range: [2.0, 2.5, 3.0, 3.5, 4.0],
+    matrix: [
+      [672,734,809,904,1025],
+      [609,660,720,794,887],
+      [556,598,647,707,779],
+      [510,545,587,635,694],
+      [471,501,535,576,624]
+    ]
+  },
+  probability_weighted: {
+    weights: {bull: 0.25, base: 0.5, bear: 0.25},
+    weighted_iv: 694.79,
+    vs_current_price: -37.2
+  }
+};
+
+// ===================== PARSE CSV =====================
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => { obj[h.trim()] = values[i] ? values[i].trim() : ''; });
+        return obj;
+    });
+}
+
+const allData = parseCSV(csvData);
+
+// Sort chronologically
+function parseDate(p) {
+    const year = parseInt(p.match(/\d{4}/)?.[0] || '0');
+    const isQ1 = p.includes('Q1'), isQ2 = p.includes('Q2'), isQ3 = p.includes('Q3');
+    const isFY = p.startsWith('FY');
+    const sub = isQ1 ? 1 : isQ2 ? 2 : isQ3 ? 3 : isFY ? 7 : 5;
+    return year * 10 + sub;
+}
+allData.sort((a,b) => parseDate(a.Period) - parseDate(b.Period));
+
+const fyData = allData.filter(d => d.Period.startsWith('FY'));
+const qData = allData.filter(d => !d.Period.startsWith('FY'));
+
+const n = (v) => parseFloat(v) || 0;
+const pct = (v) => parseFloat(v) || 0;
+const fmt = (v, decimals=1) => {
+    const abs = Math.abs(v);
+    if (abs >= 1000) return '$' + (v/1000).toFixed(decimals) + 'B';
+    return '$' + v.toFixed(decimals) + 'M';
+};
+const fmtPct = (v) => v.toFixed(1) + '%';
+
+// ===================== CHART DEFAULTS =====================
+Chart.defaults.color = '#888';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.05)';
+
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: { labels: { color: '#e0e0e0', font: { size: 11 } } },
+        tooltip: { backgroundColor: 'rgba(22,33,62,0.95)', titleColor: '#00d4aa', bodyColor: '#e0e0e0', borderColor: 'rgba(0,212,170,0.3)', borderWidth: 1 }
+    },
+    scales: {
+        x: { ticks: { color: '#888', font: {size: 11} }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888', font: {size: 11} }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+
+const colors = {
+    primary: '#00d4aa',
+    secondary: '#00b894',
+    tertiary: '#0984e3',
+    quaternary: '#6c5ce7',
+    warning: '#fdcb6e',
+    danger: '#ff6b6b',
+    purple: '#a29bfe',
+    pink: '#fd79a8'
+};
+
+// ===================== RENDER OVERVIEW =====================
+function renderOverview() {
+    const grid = document.getElementById('overviewGrid');
+    const a = analysisData;
+
+    const revenueStreamsHtml = a.business_model.revenue_streams.map(rs => `
+        <li>
+            <div class="revenue-stream">
+                <span>${rs.name}</span>
+                <span class="percent">${rs.percent_approx}%</span>
+            </div>
+            <div style="font-size:0.78rem;color:#666;margin-top:2px;">${rs.notes}</div>
+        </li>
+    `).join('');
+
+    const competitorsHtml = a.competitive_position.main_competitors.map(c => `<li>${c}</li>`).join('');
+    const moatHtml = a.competitive_position.moat_factors.map(m => `<li><strong>${m.factor}</strong> (${m.strength}): ${m.description}</li>`).join('');
+    const weakHtml = a.competitive_position.weaknesses.map(w => `<li>${w}</li>`).join('');
+    const growthHtml = a.growth_drivers.map(g => `<li>${g}</li>`).join('');
+
+    const allRisks = [...(a.risks.business||[]), ...(a.risks.financial||[]), ...(a.risks.regulatory||[]), ...(a.risks.pipeline||[])];
+    const risksHtml = allRisks.map(r => `<li><span class="risk-${r.severity}">[${r.severity.toUpperCase()}]</span> <strong>${r.risk}:</strong> ${r.description}</li>`).join('');
+
+    const bullHtml = a.bull_case.map(b => `<li>${b}</li>`).join('');
+    const bearHtml = a.bear_case.map(b => `<li>${b}</li>`).join('');
+    const recentHtml = a.recent_developments.map(rd => `<li><strong>${rd.date}:</strong> ${rd.event} — ${rd.detail}</li>`).join('');
+
+    grid.innerHTML = `
+        <div class="overview-card" style="grid-column: span 2;">
+            <h3>Company Overview</h3>
+            <p>${a.overview}</p>
+        </div>
+        <div class="overview-card">
+            <h3>Revenue Streams (FY2025)</h3>
+            <p style="font-size:0.85rem;color:#888;">Total FY2025 Revenue: <strong style="color:#00d4aa">$65.2B</strong></p>
+            <ul>${revenueStreamsHtml}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Competitive Position</h3>
+            <p><strong>Main Competitors:</strong></p>
+            <ul>${competitorsHtml}</ul>
+            <p style="margin-top:12px;"><strong>Moat Factors:</strong></p>
+            <ul>${moatHtml}</ul>
+            <p style="margin-top:12px;"><strong>Weaknesses:</strong></p>
+            <ul>${weakHtml}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Growth Drivers</h3>
+            <ul>${growthHtml}</ul>
+        </div>
+        <div class="overview-card risks">
+            <h3>Key Risks</h3>
+            <ul>${risksHtml}</ul>
+        </div>
+        <div class="overview-card bull">
+            <h3>Bull Case</h3>
+            <ul>${bullHtml}</ul>
+        </div>
+        <div class="overview-card bear">
+            <h3>Bear Case</h3>
+            <ul>${bearHtml}</ul>
+        </div>
+        <div class="overview-card" style="grid-column: span 2;">
+            <h3>Recent Developments</h3>
+            <ul>${recentHtml}</ul>
+        </div>
+    `;
+}
+
+function toggleOverview() {
+    const btn = document.querySelector('.overview-toggle');
+    const content = document.getElementById('overviewContent');
+    btn.classList.toggle('active');
+    content.classList.toggle('active');
+}
+
+// ===================== RENDER KPIs =====================
+function renderKPIs() {
+    const latest = fyData[fyData.length - 1]; // FY2025
+    const prior = fyData[fyData.length - 2];  // FY2024
+    const grid = document.getElementById('kpiGrid');
+
+    function change(cur, prv) {
+        const c = n(cur), p = n(prv);
+        if (!p) return null;
+        return ((c - p) / Math.abs(p) * 100).toFixed(1);
+    }
+    function card(label, value, chg, suffix='') {
+        const cls = chg >= 0 ? 'positive' : 'negative';
+        const arrow = chg >= 0 ? '&#9650;' : '&#9660;';
+        const chgHtml = chg !== null ? `<div class="kpi-change ${cls}">${arrow} ${Math.abs(chg)}% YoY</div>` : '';
+        return `<div class="kpi-card"><div class="kpi-value">${value}${suffix}</div><div class="kpi-label">${label}</div>${chgHtml}</div>`;
+    }
+
+    const rev = n(latest.Revenue);
+    const ni = n(latest.NetIncome);
+    const eps = n(latest['EPS (diluted)']);
+    const gm = n(latest.GrossMargin);
+    const om = n(latest.OperatingMargin);
+    const fcf = n(latest.FreeCashFlow);
+    const rnd = n(latest.ResearchDevelopment);
+    const rndPct = (rnd / rev * 100);
+
+    const revChg = parseFloat(change(latest.Revenue, prior.Revenue));
+    const niChg = parseFloat(change(latest.NetIncome, prior.NetIncome));
+    const epsChg = parseFloat(change(latest['EPS (diluted)'], prior['EPS (diluted)']));
+    const gmChg = parseFloat(change(latest.GrossMargin, prior.GrossMargin));
+    const omChg = parseFloat(change(latest.OperatingMargin, prior.OperatingMargin));
+    const fcfChg = parseFloat(change(latest.FreeCashFlow, prior.FreeCashFlow));
+    const rndChg = parseFloat(change(latest.ResearchDevelopment, prior.ResearchDevelopment));
+
+    grid.innerHTML =
+        card('FY2025 Revenue', '$65.2B', revChg) +
+        card('Net Income', '$20.6B', niChg) +
+        card('EPS (Diluted)', '$22.95', epsChg) +
+        card('Gross Margin', gm.toFixed(1) + '%', gmChg) +
+        card('Operating Margin', om.toFixed(1) + '%', omChg) +
+        card('Free Cash Flow', '$9.0B', fcfChg) +
+        card('R&D Spend', '$13.3B', rndChg) +
+        card('R&D as % Revenue', rndPct.toFixed(1) + '%', null);
+}
+
+// ===================== RENDER GUIDANCE =====================
+function renderGuidance() {
+    const g = analysisData.guidance;
+    document.getElementById('guidanceAsOf').textContent = g.as_of;
+    document.getElementById('guidanceFY').textContent = g.fiscal_year;
+
+    const grid = document.getElementById('guidanceGrid');
+    grid.innerHTML = g.items.map(item => {
+        const vsClass = item.vs_prior ? item.vs_prior.toLowerCase() : 'new';
+        const vsLabel = item.vs_prior ? item.vs_prior.charAt(0).toUpperCase() + item.vs_prior.slice(1) : 'New';
+        return `
+            <div class="guidance-card">
+                <div class="guidance-metric">${item.metric}</div>
+                <div class="guidance-target">${item.target}</div>
+                <div class="guidance-period">${item.period}</div>
+                <span class="guidance-vs-prior ${vsClass}">${vsLabel}</span>
+                ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+            </div>`;
+    }).join('');
+
+    const commentary = document.getElementById('guidanceCommentary');
+    commentary.textContent = g.management_commentary;
+}
+
+// ===================== RENDER CHARTS =====================
+function renderCharts() {
+    const fyLabels = fyData.map(d => d.Period);
+    const qLabels = qData.map(d => d.Period);
+
+    // 1. Annual Revenue (bar + line growth)
+    new Chart(document.getElementById('revenueChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'Revenue ($M)',
+                data: fyData.map(d => n(d.Revenue)),
+                backgroundColor: fyData.map((d,i) => i === fyData.length-1 ? 'rgba(0,212,170,0.8)' : 'rgba(0,212,170,0.4)'),
+                borderColor: colors.primary,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: {
+                ...chartDefaults.plugins,
+                tooltip: { ...chartDefaults.plugins.tooltip, callbacks: {
+                    label: ctx => ' $' + (ctx.raw/1000).toFixed(1) + 'B'
+                }}
+            },
+            scales: {
+                x: chartDefaults.scales.x,
+                y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => '$' + (v/1000).toFixed(0) + 'B' } }
+            }
+        }
+    });
+
+    // 2. Quarterly Revenue
+    new Chart(document.getElementById('qRevenueChart'), {
+        type: 'line',
+        data: {
+            labels: qLabels,
+            datasets: [{
+                label: 'Quarterly Revenue ($M)',
+                data: qData.map(d => n(d.Revenue)),
+                borderColor: colors.primary,
+                backgroundColor: 'rgba(0,212,170,0.15)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 5,
+                pointBackgroundColor: colors.primary
+            }]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, tooltip: { ...chartDefaults.plugins.tooltip, callbacks: { label: ctx => ' $' + (ctx.raw/1000).toFixed(1) + 'B' }}},
+            scales: { x: chartDefaults.scales.x, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => '$' + (v/1000).toFixed(0) + 'B' }}}
+        }
+    });
+
+    // 3. YoY Revenue Growth Rate
+    const growthRates = fyData.map((d,i) => {
+        if (i === 0) return null;
+        const prev = n(fyData[i-1].Revenue);
+        return prev ? ((n(d.Revenue) - prev) / prev * 100) : null;
+    }).filter(v => v !== null);
+    new Chart(document.getElementById('revenueGrowthChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels.slice(1),
+            datasets: [{
+                label: 'YoY Revenue Growth (%)',
+                data: growthRates,
+                backgroundColor: growthRates.map(v => v >= 0 ? 'rgba(0,212,170,0.6)' : 'rgba(255,107,107,0.6)'),
+                borderColor: growthRates.map(v => v >= 0 ? colors.primary : colors.danger),
+                borderWidth: 1
+            }]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, tooltip: { ...chartDefaults.plugins.tooltip, callbacks: { label: ctx => ' ' + ctx.raw.toFixed(1) + '%' }}},
+            scales: { x: chartDefaults.scales.x, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => v + '%' }}}
+        }
+    });
+
+    // 4. Margins
+    new Chart(document.getElementById('marginsChart'), {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'Gross Margin', data: fyData.map(d => n(d.GrossMargin)), borderColor: colors.primary, tension: 0.3, pointRadius: 4, fill: false },
+                { label: 'Operating Margin', data: fyData.map(d => n(d.OperatingMargin)), borderColor: colors.tertiary, tension: 0.3, pointRadius: 4, fill: false },
+                { label: 'Net Margin', data: fyData.map(d => n(d.NetMargin)), borderColor: colors.warning, tension: 0.3, pointRadius: 4, fill: false }
+            ]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, tooltip: { ...chartDefaults.plugins.tooltip, callbacks: { label: ctx => ' ' + ctx.raw.toFixed(1) + '%' }}},
+            scales: { x: chartDefaults.scales.x, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => v + '%' }}}
+        }
+    });
+
+    // 5. Net Income
+    new Chart(document.getElementById('netIncomeChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'Net Income ($M)',
+                data: fyData.map(d => n(d.NetIncome)),
+                backgroundColor: 'rgba(9,132,227,0.5)',
+                borderColor: colors.tertiary,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, tooltip: { ...chartDefaults.plugins.tooltip, callbacks: { label: ctx => ' $' + (ctx.raw/1000).toFixed(1) + 'B' }}},
+            scales: { x: chartDefaults.scales.x, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => '$' + (v/1000).toFixed(0) + 'B' }}}
+        }
+    });
+
+    // 6. EPS
+    new Chart(document.getElementById('epsChart'), {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'EPS (Diluted)',
+                data: fyData.map(d => n(d['EPS (diluted)'])),
+                borderColor: colors.warning,
+                backgroundColor: 'rgba(253,203,110,0.15)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 5,
+                pointBackgroundColor: colors.warning
+            }]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, tooltip: { ...chartDefaults.plugins.tooltip, callbacks: { label: ctx => ' $' + ctx.raw.toFixed(2) }}},
+            scales: { x: chartDefaults.scales.x, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => '$' + v.toFixed(0) }}}
+        }
+    });
+
+    // 7. Quarterly Operating Margin
+    new Chart(document.getElementById('qMarginChart'), {
+        type: 'line',
+        data: {
+            labels: qLabels,
+            datasets: [
+                { label: 'Gross Margin', data: qData.map(d => n(d.GrossMargin)), borderColor: colors.primary, tension: 0.3, pointRadius: 4, fill: false },
+                { label: 'Operating Margin', data: qData.map(d => n(d.OperatingMargin)), borderColor: colors.tertiary, tension: 0.3, pointRadius: 4, fill: false },
+                { label: 'Net Margin', data: qData.map(d => n(d.NetMargin)), borderColor: colors.warning, tension: 0.3, pointRadius: 4, fill: false }
+            ]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, tooltip: { ...chartDefaults.plugins.tooltip, callbacks: { label: ctx => ' ' + ctx.raw.toFixed(1) + '%' }}},
+            scales: { x: chartDefaults.scales.x, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => v + '%' }}}
+        }
+    });
+
+    // 8. R&D Spend vs Revenue
+    new Chart(document.getElementById('rndChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'R&D Spend ($M)', data: fyData.map(d => n(d.ResearchDevelopment)), backgroundColor: 'rgba(108,92,231,0.5)', borderColor: colors.quaternary, borderWidth: 1 },
+                { label: 'Revenue ($M)', data: fyData.map(d => n(d.Revenue)), backgroundColor: 'rgba(0,212,170,0.2)', borderColor: colors.primary, borderWidth: 1 }
+            ]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, tooltip: { ...chartDefaults.plugins.tooltip, callbacks: { label: ctx => ' $' + (ctx.raw/1000).toFixed(1) + 'B' }}},
+            scales: { x: chartDefaults.scales.x, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => '$' + (v/1000).toFixed(0) + 'B' }}}
+        }
+    });
+
+    // 9. R&D as % Revenue
+    const rndPcts = fyData.map(d => (n(d.ResearchDevelopment) / n(d.Revenue) * 100));
+    new Chart(document.getElementById('rndPctChart'), {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'R&D % of Revenue',
+                data: rndPcts,
+                borderColor: colors.quaternary,
+                backgroundColor: 'rgba(108,92,231,0.15)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 5,
+                pointBackgroundColor: colors.quaternary
+            }]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, tooltip: { ...chartDefaults.plugins.tooltip, callbacks: { label: ctx => ' ' + ctx.raw.toFixed(1) + '%' }}},
+            scales: { x: chartDefaults.scales.x, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => v.toFixed(0) + '%' }, min: 0 }}
+        }
+    });
+
+    // 10. Annual FCF
+    new Chart(document.getElementById('fcfChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'Free Cash Flow ($M)',
+                data: fyData.map(d => n(d.FreeCashFlow)),
+                backgroundColor: fyData.map(d => n(d.FreeCashFlow) >= 0 ? 'rgba(0,212,170,0.5)' : 'rgba(255,107,107,0.5)'),
+                borderColor: fyData.map(d => n(d.FreeCashFlow) >= 0 ? colors.primary : colors.danger),
+                borderWidth: 1
+            }]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, tooltip: { ...chartDefaults.plugins.tooltip, callbacks: { label: ctx => ' $' + (ctx.raw/1000).toFixed(1) + 'B' }}},
+            scales: { x: chartDefaults.scales.x, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => '$' + (v/1000).toFixed(0) + 'B' }}}
+        }
+    });
+
+    // 11. Quarterly FCF
+    new Chart(document.getElementById('qFcfChart'), {
+        type: 'bar',
+        data: {
+            labels: qLabels,
+            datasets: [{
+                label: 'Quarterly FCF ($M)',
+                data: qData.map(d => n(d.FreeCashFlow)),
+                backgroundColor: qData.map(d => n(d.FreeCashFlow) >= 0 ? 'rgba(0,212,170,0.5)' : 'rgba(255,107,107,0.5)'),
+                borderColor: qData.map(d => n(d.FreeCashFlow) >= 0 ? colors.primary : colors.danger),
+                borderWidth: 1
+            }]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, tooltip: { ...chartDefaults.plugins.tooltip, callbacks: { label: ctx => ' $' + (ctx.raw/1000).toFixed(1) + 'B' }}},
+            scales: { x: chartDefaults.scales.x, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => '$' + (v/1000).toFixed(1) + 'B' }}}
+        }
+    });
+
+    // 12. Balance Sheet
+    new Chart(document.getElementById('balanceSheetChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: "Shareholders' Equity ($M)", data: fyData.map(d => n(d.ShareholdersEquity)), backgroundColor: 'rgba(0,212,170,0.5)', borderColor: colors.primary, borderWidth: 1 },
+                { label: 'Total Debt ($M)', data: fyData.map(d => n(d.TotalDebt)), backgroundColor: 'rgba(255,107,107,0.4)', borderColor: colors.danger, borderWidth: 1 }
+            ]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, tooltip: { ...chartDefaults.plugins.tooltip, callbacks: { label: ctx => ' $' + (ctx.raw/1000).toFixed(1) + 'B' }}},
+            scales: { x: chartDefaults.scales.x, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => '$' + (v/1000).toFixed(0) + 'B' }}}
+        }
+    });
+
+    // 13. Gross Profit
+    new Chart(document.getElementById('grossProfitChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'Gross Profit ($M)',
+                data: fyData.map(d => n(d.GrossProfit)),
+                backgroundColor: 'rgba(0,184,148,0.5)',
+                borderColor: colors.secondary,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, tooltip: { ...chartDefaults.plugins.tooltip, callbacks: { label: ctx => ' $' + (ctx.raw/1000).toFixed(1) + 'B' }}},
+            scales: { x: chartDefaults.scales.x, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => '$' + (v/1000).toFixed(0) + 'B' }}}
+        }
+    });
+}
+
+// ===================== METRIC DESCRIPTIONS (HELP MODALS) =====================
+const metricDescriptions = {
+    revenue: {
+        title: "Annual Revenue",
+        content: `<p><strong>Revenue</strong> is the total net product sales and alliance revenues reported by Lilly each fiscal year.</p>
+        <div class="metric-highlight"><strong>Lilly's story in numbers:</strong> Revenue has more than doubled from $24.5B in FY2020 to $65.2B in FY2025 — a 5-year CAGR of 21.6% — driven almost entirely by the tirzepatide franchise (Mounjaro + Zepbound). Q1 2026 annualizes to roughly $79B, tracking toward the FY2026 guided midpoint of $83.5B.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Mounjaro and Zepbound combined revenue trajectory — are these still growing at 50%+ or decelerating?</li>
+            <li>Net price realization: volume growing ~40%+ in FY2026 but price is a low-to-mid teens headwind from TrumpRx/MFN deals</li>
+            <li>Trulicity decline rate as biosimilar entry approaches (~2027)</li>
+            <li>Foundayo (orforglipron) ramp — approved April 2026, watching first full-quarter revenues</li>
+        </ul>`
+    },
+    qRevenue: {
+        title: "Quarterly Revenue Trend",
+        content: `<p><strong>Quarterly revenue</strong> reveals the acceleration and cadence of GLP-1 product launches in real time.</p>
+        <div class="metric-highlight"><strong>Key milestones:</strong> Q1 2024: $8.8B (Zepbound launched Dec 2023); Q3 2024: $11.4B (manufacturing constraints); Q2 2025: $15.6B; Q3 2025: $17.6B; Q1 2026: $19.8B (+56% YoY).</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Sequential quarterly acceleration — is each quarter beating the prior quarter and the prior year quarter?</li>
+            <li>Q3 2024 operating margin was only 13.3% due to one-time charges (IPR&D write-offs); normalize for these</li>
+            <li>Seasonality: Q1 tends to be softer due to insurance deductible resets and inventory dynamics</li>
+        </ul>`
+    },
+    revenueGrowth: {
+        title: "Year-over-Year Revenue Growth",
+        content: `<p><strong>YoY growth rate</strong> shows how fast Lilly is expanding its top line year over year.</p>
+        <div class="metric-highlight"><strong>Notable:</strong> FY2023 growth was 19.7% (early Mounjaro ramp); FY2024 jumped to 32.0% (Zepbound launch + Mounjaro acceleration); FY2025 hit 44.7% — the fastest growth rate of a top-20 pharma company in modern history at this revenue scale.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>FY2026 guidance implies ~28% growth (midpoint) — a meaningful deceleration from FY2025's 44.7%</li>
+            <li>Any guidance revision (up = bullish; down = caution on volume or price)</li>
+            <li>Comp difficulty: FY2026 is lapping an already explosive FY2025 base</li>
+        </ul>`
+    },
+    margins: {
+        title: "Gross, Operating & Net Margin",
+        content: `<p><strong>Margins</strong> show the quality of Lilly's earnings and the operating leverage inherent in its pharma business model.</p>
+        <div class="metric-highlight"><strong>Lilly's margin expansion story:</strong> Gross margin expanded from 77.7% (FY2020) to 83.0% (FY2025) as high-margin tirzepatide displaces older lower-margin products. Operating margin surged from 24.7% to 40.4% — an extraordinary 15.7pp expansion driven by GLP-1 scale. Non-GAAP operating margin guided at 46-47.5% for FY2026.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Gross margin stability: should remain 82-84% as tirzepatide mix grows</li>
+            <li>Operating margin expansion toward guided 46-47.5% in FY2026 — monitors operating leverage</li>
+            <li>Q3 2024 dip (13.3% op margin) was a one-time IPR&D charge — normalize when analyzing trends</li>
+        </ul>`
+    },
+    netIncome: {
+        title: "Net Income",
+        content: `<p><strong>Net income</strong> is Lilly's bottom-line profit after all expenses, taxes, and charges.</p>
+        <div class="metric-highlight"><strong>Explosive growth:</strong> Net income grew from $5.2B (FY2023) to $20.6B (FY2025) — a 3-year tripling driven by GLP-1 revenue scale and operating leverage. Net margin expanded from 15.4% to 31.7%.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Acquired IPR&D charges from M&A deals can create large one-time GAAP hits — focus on non-GAAP for trend</li>
+            <li>Effective tax rate: any changes to global minimum tax rules or U.S. corporate tax could impact</li>
+            <li>FY2026 non-GAAP EPS guidance of $35.50-$37.00 implies continued strong net income growth</li>
+        </ul>`
+    },
+    eps: {
+        title: "EPS (Diluted)",
+        content: `<p><strong>Diluted EPS</strong> is earnings per share including all dilutive securities. Lilly has maintained remarkably stable share count (~900M diluted shares) with minimal dilution.</p>
+        <div class="metric-highlight"><strong>EPS acceleration:</strong> GAAP diluted EPS went from $5.80 (FY2023) to $11.71 (FY2024) to $22.95 (FY2025) — a 3yr CAGR of ~49%. FY2026 non-GAAP EPS guided at $35.50-$37.00, implying continued ~50% non-GAAP growth.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>GAAP vs non-GAAP EPS gap widens with more M&A (acquired IPR&D charges hit GAAP)</li>
+            <li>Share buyback program: minimal buybacks so far given M&A deployment; watch if pace picks up</li>
+            <li>3yr EPS CAGR of 49% vs revenue CAGR of 32% reflects operating leverage — sustainable if margins continue expanding</li>
+        </ul>`
+    },
+    qMargin: {
+        title: "Quarterly Margin Trend",
+        content: `<p><strong>Quarterly margins</strong> show real-time operating leverage as GLP-1 revenues scale.</p>
+        <div class="metric-highlight"><strong>Notable recovery:</strong> Q3 2024 operating margin crashed to 13.3% (IPR&D charges from Morphic acquisition). Q1 2025: 29.0%, Q2 2025: 44.1%, Q3 2025: 41.8%, Q1 2026: 45.0% — approaching guided 46-47.5% for full-year FY2026.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Q2 2025's 44.1% operating margin was the highest ever — watch whether Q2/Q3 2026 sustain or exceed this</li>
+            <li>Any new large M&A will introduce IPR&D charges, depressing GAAP margins in that quarter</li>
+            <li>Gross margin trajectory: Q2 2025's 84.3% is near the ceiling; watch for COGS inflation from auto-injector supply chains</li>
+        </ul>`
+    },
+    rnd: {
+        title: "R&D Spend vs Revenue",
+        content: `<p><strong>R&D investment</strong> is the lifeblood of pharmaceutical companies. Without innovation, drugs face patent cliffs and revenue collapses.</p>
+        <div class="metric-highlight"><strong>Lilly's R&D scale:</strong> R&D grew from $6.0B (FY2020) to $13.3B (FY2025) — more than doubling. This funds retatrutide (Phase 3), tirzepatide label expansions (MASH, sleep apnea, CV outcomes), orforglipron diabetes indication, and multiple other programs across oncology and neuroscience.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>R&D absolute dollars growing is healthy — signals pipeline investment</li>
+            <li>R&D as % of revenue is falling (from 24.4% to 20.5%) as revenue scales faster — indicates operating leverage</li>
+            <li>Phase 3 clinical trial results from retatrutide TRIUMPH program are the highest-impact near-term catalysts</li>
+        </ul>`
+    },
+    rndPct: {
+        title: "R&D as % of Revenue",
+        content: `<p><strong>R&D intensity</strong> (R&D as % of revenue) measures how much Lilly reinvests in future growth relative to its current revenue base.</p>
+        <div class="metric-highlight"><strong>Operating leverage:</strong> R&D% has declined from 24.4% (FY2020) to 20.5% (FY2025) as revenue scales faster than R&D spend. Non-GAAP R&D guidance for FY2026 is "high single-digit billions" — implying continued R&D% compression toward ~10-12% if revenue hits $83.5B. This is a major driver of operating margin expansion.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>A rising R&D% isn't necessarily bad — it could mean increased pipeline investment</li>
+            <li>Declining R&D% while absolute R&D grows = operating leverage from revenue scale</li>
+            <li>Pharma peers typically run at 15-20% R&D intensity; Lilly is converging downward as GLP-1 revenue scales</li>
+        </ul>`
+    },
+    fcf: {
+        title: "Free Cash Flow (Annual)",
+        content: `<p><strong>Free cash flow</strong> is operating cash flow minus capital expenditures. For pharma companies, FCF is the ultimate measure of cash generation after funding growth investments.</p>
+        <div class="metric-highlight"><strong>FCF distorted by capex cycle:</strong> FY2023 FCF was only $792M — a dramatic trough — not because business was weak, but because Lilly spent heavily on manufacturing buildout and the $2.3B Lilly ICOS acquisition. FY2025 recovered to $8.97B, and FY2026E FCF is modeled at ~$11.7B (~14% FCF margin on $83.5B revenue).</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>FCF conversion improving as manufacturing capex cycle moderates post-$27B buildout commitment</li>
+            <li>FCF margin trajectory: ~13.8% in FY2025, targeted ~14-16% in FY2026, potentially 20%+ by FY2029 in base case</li>
+            <li>Watch capex levels — high capex quarters depress FCF even when earnings are strong</li>
+        </ul>`
+    },
+    qFcf: {
+        title: "Quarterly Free Cash Flow",
+        content: `<p><strong>Quarterly FCF</strong> is highly lumpy for pharma companies due to capex timing, milestone payments, and working capital swings.</p>
+        <div class="metric-highlight"><strong>Notable quarters:</strong> Q3 2025 FCF was $6.75B — a single-quarter record — as capex timing eased and operating cash flow surged. Q1 2025 FCF was only $156M due to front-loaded capex. This lumpiness is normal; annualize over 4 quarters for a cleaner picture.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Large acquisitions or capex investments (new manufacturing facilities) will generate negative quarterly FCF</li>
+            <li>Trend over rolling 12 months is more meaningful than any single quarter</li>
+            <li>Q1 2026: $3.0B FCF in a single quarter signals strong cash generation trajectory</li>
+        </ul>`
+    },
+    balanceSheet: {
+        title: "Shareholders Equity vs Total Debt",
+        content: `<p><strong>Balance sheet health</strong> for Lilly involves understanding equity expansion from retained earnings and the debt taken on for manufacturing investments and M&A.</p>
+        <div class="metric-highlight"><strong>Key trends:</strong> Shareholders' equity has exploded from $5.8B (FY2020) to $26.5B (FY2025) as net income retained each year dwarfs dividends/buybacks. Total debt is $43.4B (Q1 2026) but net debt is ~$38.1B after cash — manageable against $65B+ revenue and growing FCF.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Net debt-to-EBITDA: with $26.3B operating income in FY2025, even $38B net debt is under 1.5x EBITDA</li>
+            <li>Debt growth from M&A spree (>$20B in 2026) — watch leverage metrics in H2 2026 reporting</li>
+            <li>Equity expansion trajectory: FY2025's $20.6B net income should add significantly to equity in FY2026</li>
+        </ul>`
+    },
+    grossProfit: {
+        title: "Gross Profit",
+        content: `<p><strong>Gross profit</strong> (revenue minus cost of goods sold) reflects the manufacturing profitability of Lilly's drug portfolio. High gross margins indicate premium pricing power and manufacturing efficiency.</p>
+        <div class="metric-highlight"><strong>Margin excellence:</strong> Gross profit grew from $19.1B (FY2020) to $54.1B (FY2025) as tirzepatide — a high-margin, branded injectable — became the dominant product. Non-GAAP gross margin was 83.8% in FY2025 and guided at 83-84% for FY2026.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Any COGS inflation from auto-injector components, amino acid raw materials, or energy at new manufacturing facilities</li>
+            <li>Foundayo (orforglipron) as a small-molecule pill has structurally lower COGS than injectable tirzepatide — positive for long-term gross margins</li>
+            <li>Trulicity/Taltz declining revenue reduces blended COGS uplift from older, lower-margin products</li>
+        </ul>`
+    }
+};
+
+function openModal(key) {
+    const desc = metricDescriptions[key];
+    if (!desc) return;
+    document.getElementById('modalTitle').textContent = desc.title;
+    document.getElementById('modalBody').innerHTML = desc.content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('modalOverlay').classList.remove('active'); document.body.style.overflow = ''; } });
+
+// ===================== DCF SECTION =====================
+let currentScenario = 'base';
+
+function renderFCFProjections(growth1, wacc, terminal) {
+    const baseFCF = dcfData.inputs.base_year_fcf_used; // 11700
+    const growthRates = dcfData.assumptions[currentScenario].growth_rates;
+    const fcfMargins = dcfData.assumptions[currentScenario].fcf_margins;
+    const baseRevenue = dcfData.inputs.base_revenue_used;
+
+    // Use scenario projections
+    const years = ['FY2027','FY2028','FY2029','FY2030','FY2031'];
+    const fcfVals = dcfData.projections[currentScenario].fcf;
+    const revVals = dcfData.projections[currentScenario].revenue;
+
+    let html = `
+        <div class="fcf-projection-item header">Base (FY2026E)</div>
+        <div class="fcf-projection-item header">Y1 (FY2027)</div>
+        <div class="fcf-projection-item header">Y2 (FY2028)</div>
+        <div class="fcf-projection-item header">Y3 (FY2029)</div>
+        <div class="fcf-projection-item header">Y4 (FY2030)</div>
+        <div class="fcf-projection-item header">Y5 (FY2031)</div>
+        <div class="fcf-projection-item">
+            <div class="fcf-val">$11.7B</div>
+            <div class="growth-rate">Base</div>
+        </div>
+    `;
+    fcfVals.forEach((fcf, i) => {
+        html += `<div class="fcf-projection-item">
+            <div class="fcf-val">$${(fcf/1000).toFixed(1)}B</div>
+            <div class="growth-rate">+${growthRates[i]}% rev</div>
+        </div>`;
+    });
+    document.getElementById('fcfProjectionTable').innerHTML = html;
+}
+
+function calculateDCF(growth1, wacc, terminal) {
+    // Use declining growth rates based on growth1 vs base
+    const base = dcfData.assumptions.base;
+    const endGrowth = base.growth_rates[4]; // 9%
+    const growthRates = [];
+    for (let i = 0; i < 5; i++) {
+        const r = growth1 > endGrowth
+            ? growth1 - (growth1 - endGrowth) * (i / 4)
+            : growth1;
+        growthRates.push(r);
+    }
+
+    const fcfMargins = base.fcf_margins;
+    const baseRevenue = dcfData.inputs.base_revenue_used;
+    let rev = baseRevenue;
+    let pvFCF = 0;
+    let lastFCF = 0;
+
+    for (let i = 0; i < 5; i++) {
+        rev *= (1 + growthRates[i] / 100);
+        const fcf = rev * (fcfMargins[i] / 100);
+        pvFCF += fcf / Math.pow(1 + wacc/100, i + 1);
+        if (i === 4) lastFCF = fcf;
+    }
+
+    const terminalFCF = lastFCF * (1 + terminal/100);
+    const terminalValue = terminalFCF / (wacc/100 - terminal/100);
+    const pvTerminal = terminalValue / Math.pow(1 + wacc/100, 5);
+    const ev = pvFCF + pvTerminal;
+    const equity = ev - dcfData.inputs.net_debt;
+    const iv = equity / dcfData.inputs.shares_outstanding;
+
+    const terminalPerShare = terminalValue / dcfData.inputs.shares_outstanding;
+    const entryPrice = terminalPerShare / Math.pow(1.15, 5);
+
+    return { iv, entryPrice };
+}
+
+window.updateDCFDisplay = function() {
+    const growth = parseFloat(document.getElementById('growthSlider').value);
+    const wacc = parseFloat(document.getElementById('waccSlider').value);
+    const terminal = parseFloat(document.getElementById('terminalSlider').value);
+
+    document.getElementById('growthValue').textContent = growth + '%';
+    document.getElementById('waccValue').textContent = wacc + '%';
+    document.getElementById('terminalValue').textContent = terminal.toFixed(1) + '%';
+
+    const { iv, entryPrice } = calculateDCF(growth, wacc, terminal);
+    document.getElementById('dcfIV').textContent = '$' + iv.toFixed(0);
+    document.getElementById('dcfEntry').textContent = '$' + entryPrice.toFixed(0);
+
+    const upside = (iv - dcfData.current_price) / dcfData.current_price * 100;
+    const upsideEl = document.getElementById('dcfUpside');
+    upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(1) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+    upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+    renderFCFProjections(growth, wacc, terminal);
+};
+
+window.switchScenario = function(scenario) {
+    currentScenario = scenario;
+    document.querySelectorAll('.scenario-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.scenario === scenario);
+    });
+
+    const assumptions = dcfData.assumptions[scenario];
+    const valuation = dcfData.valuation[scenario];
+    const entryP = dcfData.entry_price[scenario];
+
+    // Update sliders to scenario
+    document.getElementById('growthSlider').value = assumptions.growth_rates[0];
+    document.getElementById('waccSlider').value = assumptions.wacc;
+    document.getElementById('terminalSlider').value = assumptions.terminal_growth;
+    document.getElementById('growthValue').textContent = assumptions.growth_rates[0] + '%';
+    document.getElementById('waccValue').textContent = assumptions.wacc + '%';
+    document.getElementById('terminalValue').textContent = assumptions.terminal_growth.toFixed(1) + '%';
+
+    document.getElementById('scenarioTitle').textContent = scenario.charAt(0).toUpperCase() + scenario.slice(1) + ' Case Assumptions';
+    document.getElementById('scenarioNarrative').textContent = assumptions.narrative;
+
+    const grid = document.getElementById('assumptionGrid');
+    grid.innerHTML = `
+        <div class="assumption-item"><div class="label">Yr 1 Growth</div><div class="value">${assumptions.growth_rates[0]}%</div></div>
+        <div class="assumption-item"><div class="label">Yr 5 Growth</div><div class="value">${assumptions.growth_rates[4]}%</div></div>
+        <div class="assumption-item"><div class="label">Yr 5 FCF Margin</div><div class="value">${assumptions.fcf_margins[4]}%</div></div>
+        <div class="assumption-item"><div class="label">WACC</div><div class="value">${assumptions.wacc}%</div></div>
+        <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${assumptions.terminal_growth}%</div></div>
+        <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa;">$${valuation.intrinsic_value.toFixed(0)}</div></div>
+        <div class="assumption-item"><div class="label">Upside/Downside</div><div class="value" style="color:${valuation.upside >= 0 ? '#00d4aa' : '#ff6b6b'}">${valuation.upside >= 0 ? '+' : ''}${valuation.upside.toFixed(1)}%</div></div>
+        <div class="assumption-item"><div class="label">Entry Price (15%)</div><div class="value" style="color:#74b9ff;">$${entryP.entry_price.toFixed(0)}</div></div>
+    `;
+
+    // Update main display
+    document.getElementById('dcfIV').textContent = '$' + valuation.intrinsic_value.toFixed(0);
+    document.getElementById('dcfEntry').textContent = '$' + entryP.entry_price.toFixed(0);
+    const upsideEl = document.getElementById('dcfUpside');
+    upsideEl.textContent = (valuation.upside >= 0 ? '+' : '') + valuation.upside.toFixed(1) + '% ' + (valuation.upside >= 0 ? 'upside' : 'downside');
+    upsideEl.className = 'dcf-change ' + (valuation.upside >= 0 ? 'positive' : 'negative');
+
+    renderFCFProjections(assumptions.growth_rates[0], assumptions.wacc, assumptions.terminal_growth);
+};
+
+function renderHistoricalGrowth() {
+    const hg = dcfData.historical_growth;
+    const selectedSource = hg.growth_rate_source;
+    const metrics = [
+        {key: 'revenue_3yr_cagr', label: 'Revenue 3Y'},
+        {key: 'revenue_5yr_cagr', label: 'Revenue 5Y'},
+        {key: 'eps_3yr_cagr', label: 'EPS 3Y'},
+        {key: 'eps_5yr_cagr', label: 'EPS 5Y'},
+        {key: 'equity_3yr_cagr', label: 'Equity 3Y'},
+        {key: 'equity_5yr_cagr', label: 'Equity 5Y'},
+        {key: 'fcf_3yr_cagr', label: 'FCF 3Y'},
+        {key: 'fcf_5yr_cagr', label: 'FCF 5Y'}
+    ];
+    const grid = document.getElementById('growthGrid');
+    grid.innerHTML = metrics.map(m => {
+        const rate = hg[m.key];
+        const isSelected = m.key === selectedSource;
+        const colorClass = rate >= 0 ? 'positive' : 'negative';
+        return `<div class="growth-item ${isSelected ? 'selected' : ''}">
+            <div class="metric">${m.label}${isSelected ? ' *' : ''}</div>
+            <div class="rate ${colorClass}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div>
+        </div>`;
+    }).join('');
+}
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const currentPrice = dcfData.current_price;
+    const baseWacc = dcfData.assumptions.base.wacc;
+    const baseTg = dcfData.assumptions.base.terminal_growth;
+    let html = '<tr><th>WACC \\ Term G</th>';
+    sens.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+    html += '</tr>';
+    sens.wacc_range.forEach((wacc, i) => {
+        html += `<tr><th>${wacc}%</th>`;
+        sens.matrix[i].forEach((val, j) => {
+            const isHighlight = wacc === baseWacc && sens.terminal_growth_range[j] === baseTg;
+            const colorClass = val >= currentPrice ? 'above-current' : 'below-current';
+            html += `<td class="${isHighlight ? 'highlight' : colorClass}">$${val}</td>`;
+        });
+        html += '</tr>';
+    });
+    document.getElementById('sensitivityMatrix').innerHTML = html;
+}
+
+function initDCF() {
+    document.getElementById('dcfCurrent').textContent = '$' + dcfData.current_price.toFixed(0);
+    document.getElementById('dcfWeighted').textContent = '$' + dcfData.probability_weighted.weighted_iv.toFixed(0);
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    switchScenario('base');
+
+    // Bind sliders
+    ['growthSlider','waccSlider','terminalSlider'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', window.updateDCFDisplay);
+            el.addEventListener('change', window.updateDCFDisplay);
+        }
+    });
+}
+
+// ===================== INIT =====================
+renderOverview();
+renderKPIs();
+renderGuidance();
+renderCharts();
+initDCF();
+</script>
+</body>
+</html>
