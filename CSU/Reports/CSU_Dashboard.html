@@ -1,1419 +1,1422 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Constellation Software (CSU) Financial Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #e0e0e0;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding: 20px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-        }
-        .header h1 {
-            font-size: 2.5rem;
-            background: linear-gradient(90deg, #00d4aa, #00b894);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 10px;
-        }
-        .header p { color: #888; font-size: 1.1rem; }
-        .header .currency-note {
-            margin-top: 8px;
-            font-size: 0.85rem;
-            color: #fdcb6e;
-            background: rgba(253,203,110,0.1);
-            border: 1px solid rgba(253,203,110,0.3);
-            border-radius: 6px;
-            padding: 6px 12px;
-            display: inline-block;
-        }
-        .kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 15px;
-            margin-bottom: 30px;
-            max-width: 1400px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        .kpi-card {
-            background: rgba(255,255,255,0.05);
-            border-radius: 12px;
-            padding: 20px;
-            text-align: center;
-            border: 1px solid rgba(255,255,255,0.1);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        .kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0,212,170,0.2); }
-        .kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
-        .kpi-label { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
-        .kpi-change { font-size: 0.85rem; margin-top: 5px; }
-        .kpi-change.positive { color: #00d4aa; }
-        .kpi-change.negative { color: #ff6b6b; }
-        .kpi-sub { font-size: 0.75rem; color: #666; margin-top: 3px; }
-
-        /* Overview */
-        .overview-section { max-width: 1400px; margin: 0 auto 30px; }
-        .overview-toggle {
-            width: 100%;
-            background: rgba(0,212,170,0.1);
-            border: 1px solid rgba(0,212,170,0.3);
-            border-radius: 12px;
-            padding: 16px 24px;
-            color: #00d4aa;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: all 0.2s ease;
-        }
-        .overview-toggle:hover { background: rgba(0,212,170,0.2); }
-        .overview-toggle .arrow { transition: transform 0.3s ease; }
-        .overview-toggle.active .arrow { transform: rotate(180deg); }
-        .overview-content {
-            display: none;
-            background: rgba(255,255,255,0.03);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-top: none;
-            border-radius: 0 0 12px 12px;
-            padding: 30px;
-            margin-top: -12px;
-        }
-        .overview-content.active { display: block; }
-        .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
-        .overview-card {
-            background: rgba(255,255,255,0.03);
-            border-radius: 12px;
-            padding: 20px;
-            border: 1px solid rgba(255,255,255,0.08);
-        }
-        .overview-card h3 { color: #00d4aa; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .overview-card p { margin-bottom: 12px; line-height: 1.6; font-size: 0.92rem; }
-        .overview-card ul { list-style: none; padding: 0; margin: 0; }
-        .overview-card li { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); line-height: 1.5; font-size: 0.9rem; }
-        .overview-card li:last-child { border-bottom: none; }
-        .overview-card.bull h3 { color: #00d4aa; }
-        .overview-card.bear h3 { color: #ff6b6b; }
-        .overview-card.risks h3 { color: #fdcb6e; }
-        .risk-high { color: #ff6b6b; }
-        .risk-moderate { color: #fdcb6e; }
-        .risk-low { color: #00d4aa; }
-        .revenue-stream { display: flex; justify-content: space-between; align-items: center; }
-        .revenue-stream .percent { color: #00d4aa; font-weight: 600; }
-        .trend-growing { color: #00d4aa; }
-        .trend-stable { color: #888; }
-        .trend-declining { color: #ff6b6b; }
-
-        /* Guidance */
-        .guidance-section { max-width: 1400px; margin: 0 auto 30px; }
-        .guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .guidance-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
-        .guidance-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px; }
-        .guidance-meta { font-size: 0.85rem; color: #888; }
-        .guidance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .guidance-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 18px; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s ease; }
-        .guidance-card:hover { transform: translateY(-2px); }
-        .guidance-metric { font-size: 0.78rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-        .guidance-target { font-size: 1.1rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; line-height: 1.4; }
-        .guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
-        .guidance-vs-prior { display: inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
-        .guidance-vs-prior.raised { background: rgba(0,212,170,0.15); color: #00d4aa; }
-        .guidance-vs-prior.lowered { background: rgba(255,107,107,0.15); color: #ff6b6b; }
-        .guidance-vs-prior.maintained { background: rgba(255,255,255,0.1); color: #888; }
-        .guidance-vs-prior.new { background: rgba(99,102,241,0.15); color: #818cf8; }
-        .guidance-notes { font-size: 0.78rem; color: #666; margin-top: 8px; line-height: 1.4; }
-        .guidance-commentary { background: rgba(255,255,255,0.03); border-radius: 10px; padding: 16px 20px; border-left: 3px solid #00d4aa; font-style: italic; color: #b0b0b0; line-height: 1.6; font-size: 0.9rem; }
-        .guidance-commentary::before { content: '"'; font-size: 1.5rem; color: #00d4aa; margin-right: 4px; }
-
-        /* Charts */
-        .section-title { font-size: 1.5rem; color: #fff; margin: 40px auto 20px; padding-bottom: 10px; border-bottom: 2px solid rgba(0,212,170,0.3); max-width: 1400px; }
-        .charts-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 25px; max-width: 1400px; margin: 0 auto; }
-        .chart-card { background: rgba(255,255,255,0.05); border-radius: 15px; padding: 25px; border: 1px solid rgba(255,255,255,0.1); }
-        .chart-card.full-width { grid-column: 1 / -1; }
-        .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-        .chart-header h3 { color: #fff; font-size: 1.1rem; display: flex; align-items: center; gap: 10px; }
-        .chart-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px; }
-        .help-btn { width: 24px; height: 24px; border-radius: 50%; background: rgba(0,212,170,0.2); border: 1px solid #00d4aa; color: #00d4aa; font-size: 14px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; flex-shrink: 0; }
-        .help-btn:hover { background: #00d4aa; color: #1a1a2e; }
-        .chart-wrapper { position: relative; height: 300px; }
-
-        /* Modal */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
-        .modal-overlay.active { display: flex; }
-        .modal { background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%); border-radius: 16px; max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto; border: 1px solid rgba(0,212,170,0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
-        .modal-header { padding: 20px 25px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
-        .modal-header h3 { color: #00d4aa; font-size: 1.4rem; margin: 0; }
-        .modal-close { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,107,107,0.2); border: 1px solid #ff6b6b; color: #ff6b6b; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .modal-close:hover { background: #ff6b6b; color: #fff; }
-        .modal-body { padding: 25px; line-height: 1.7; }
-        .modal-body p { margin-bottom: 15px; }
-        .modal-body strong { color: #00d4aa; }
-        .modal-body ul { margin: 15px 0; padding-left: 20px; }
-        .modal-body li { margin-bottom: 8px; }
-        .metric-highlight { background: rgba(0,212,170,0.1); border-left: 3px solid #00d4aa; padding: 12px 15px; margin: 15px 0; border-radius: 0 8px 8px 0; }
-
-        /* DCF */
-        .dcf-section { max-width: 1400px; margin: 0 auto 40px; }
-        .dcf-currency-note { background: rgba(253,203,110,0.1); border: 1px solid rgba(253,203,110,0.3); border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; color: #fdcb6e; font-size: 0.88rem; line-height: 1.5; }
-        .dcf-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .dcf-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 24px; text-align: center; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s ease; }
-        .dcf-card:hover { transform: translateY(-3px); }
-        .dcf-card.highlight { background: rgba(0,212,170,0.1); border-color: rgba(0,212,170,0.3); }
-        .dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-        .dcf-value { font-size: 2rem; font-weight: bold; color: #00d4aa; }
-        .dcf-value-cad { font-size: 0.9rem; color: #888; margin-top: 4px; }
-        .dcf-card:not(.highlight) .dcf-value { color: #fff; }
-        .dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
-        .dcf-change.positive { color: #00d4aa; }
-        .dcf-change.negative { color: #ff6b6b; }
-        .dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
-        .dcf-warning { background: rgba(253,203,110,0.15); border: 1px solid rgba(253,203,110,0.4); border-radius: 8px; padding: 12px 16px; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; color: #fdcb6e; }
-        .warning-icon { font-size: 1.2rem; }
-        .dcf-inputs { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.08); }
-        .dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
-        .dcf-inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .dcf-input-card { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
-        .dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-        .dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #00d4aa; }
-        .dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
-        .fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
-        .fcf-projection-table { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 12px; }
-        .fcf-projection-item { text-align: center; }
-        .fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
-        .fcf-projection-item .fcf-value { font-size: 0.95rem; color: #e0e0e0; font-weight: 500; }
-        .fcf-projection-item .growth-rate { font-size: 0.75rem; color: #00d4aa; margin-top: 2px; }
-        .dcf-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; margin-bottom: 30px; padding: 25px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
-        .slider-group { display: flex; flex-direction: column; gap: 10px; }
-        .slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
-        .slider-group label span { color: #00d4aa; font-weight: 600; }
-        .slider-group input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); outline: none; }
-        .slider-group input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #00d4aa; cursor: pointer; transition: transform 0.2s; }
-        .slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
-        .slider-hint { font-size: 0.8rem; color: #666; }
-        .scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
-        .scenario-tab { padding: 10px 24px; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: #888; border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s; }
-        .scenario-tab:hover { border-color: rgba(0,212,170,0.5); color: #e0e0e0; }
-        .scenario-tab.active { background: rgba(0,212,170,0.15); border-color: #00d4aa; color: #00d4aa; }
-        .scenario-details { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.08); }
-        .scenario-details h4 { color: #00d4aa; margin-bottom: 15px; }
-        .assumption-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
-        .assumption-item { text-align: center; }
-        .assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
-        .assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
-        .sensitivity-section { margin-bottom: 30px; }
-        .sensitivity-section h4 { color: #e0e0e0; margin-bottom: 8px; }
-        .sensitivity-section .sens-note { font-size: 0.8rem; color: #666; margin-bottom: 12px; }
-        .sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.03); border-radius: 8px; overflow: hidden; font-size: 0.88rem; }
-        .sensitivity-table th, .sensitivity-table td { padding: 10px 14px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
-        .sensitivity-table th { background: rgba(0,212,170,0.1); color: #00d4aa; font-weight: 600; }
-        .sensitivity-table td { color: #e0e0e0; }
-        .sensitivity-table td.highlight { background: rgba(0,212,170,0.15); color: #00d4aa; font-weight: 600; }
-        .sensitivity-table td.below-current { color: #ff6b6b; }
-        .sensitivity-table td.above-current { color: #00d4aa; }
-        .historical-growth { margin-bottom: 30px; }
-        .historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
-        .growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
-        .growth-item { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 15px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
-        .growth-item .metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
-        .growth-item .rate { font-size: 1.2rem; font-weight: 600; }
-        .growth-item .rate.positive { color: #00d4aa; }
-        .growth-item .rate.negative { color: #ff6b6b; }
-        .growth-item.selected { border-color: #00d4aa; background: rgba(0,212,170,0.1); }
-        .dcf-download { text-align: center; margin-top: 30px; }
-        .download-btn { display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; background: rgba(0,212,170,0.15); border: 1px solid #00d4aa; border-radius: 8px; color: #00d4aa; text-decoration: none; font-weight: 600; transition: all 0.2s; }
-        .download-btn:hover { background: #00d4aa; color: #1a1a2e; }
-        .download-icon { font-size: 1.2rem; }
-
-        @media (max-width: 768px) {
-            .charts-container { grid-template-columns: 1fr; }
-            .overview-grid { grid-template-columns: 1fr; }
-            .header h1 { font-size: 1.8rem; }
-            .fcf-projection-table { grid-template-columns: repeat(3, 1fr); }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Constellation Software (CSU) Financial Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#e0e0e0;min-height:100vh;padding:20px;}
+.header{text-align:center;margin-bottom:30px;padding:20px;background:rgba(255,255,255,0.05);border-radius:15px;backdrop-filter:blur(10px);}
+.header h1{font-size:2.5rem;background:linear-gradient(90deg,#00d4aa,#00b894);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:10px;}
+.header p{color:#888;font-size:1.1rem;}
+.header .currency-note{margin-top:8px;font-size:0.85rem;color:#fdcb6e;background:rgba(253,203,110,0.1);border:1px solid rgba(253,203,110,0.3);border-radius:6px;padding:6px 12px;display:inline-block;}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:15px;margin-bottom:30px;max-width:1400px;margin-left:auto;margin-right:auto;}
+.kpi-card{background:rgba(255,255,255,0.05);border-radius:12px;padding:20px;text-align:center;border:1px solid rgba(255,255,255,0.1);transition:transform 0.3s ease,box-shadow 0.3s ease;}
+.kpi-card:hover{transform:translateY(-5px);box-shadow:0 10px 30px rgba(0,212,170,0.2);}
+.kpi-value{font-size:1.8rem;font-weight:bold;color:#00d4aa;margin-bottom:5px;}
+.kpi-label{font-size:0.8rem;color:#888;text-transform:uppercase;letter-spacing:1px;}
+.kpi-change{font-size:0.85rem;margin-top:5px;}
+.kpi-change.positive{color:#00d4aa;}
+.kpi-change.negative{color:#ff6b6b;}
+.kpi-sub{font-size:0.75rem;color:#666;margin-top:3px;}
+.overview-section{max-width:1400px;margin:0 auto 30px;}
+.overview-toggle{width:100%;background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.3);border-radius:12px;padding:16px 24px;color:#00d4aa;font-size:1.1rem;font-weight:600;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:all 0.2s ease;}
+.overview-toggle:hover{background:rgba(0,212,170,0.2);}
+.overview-toggle .arrow{transition:transform 0.3s ease;}
+.overview-toggle.active .arrow{transform:rotate(180deg);}
+.overview-content{display:none;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-top:none;border-radius:0 0 12px 12px;padding:30px;margin-top:-12px;}
+.overview-content.active{display:block;}
+.overview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(350px,1fr));gap:25px;}
+.overview-card{background:rgba(255,255,255,0.03);border-radius:12px;padding:20px;border:1px solid rgba(255,255,255,0.08);}
+.overview-card h3{color:#00d4aa;font-size:1.1rem;margin-bottom:15px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.1);}
+.overview-card p{margin-bottom:12px;line-height:1.6;font-size:0.9rem;}
+.overview-card ul{list-style:none;padding:0;margin:0;}
+.overview-card li{padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);line-height:1.5;font-size:0.88rem;}
+.overview-card li:last-child{border-bottom:none;}
+.overview-card.bull h3{color:#00d4aa;}
+.overview-card.bear h3{color:#ff6b6b;}
+.overview-card.risks h3{color:#fdcb6e;}
+.risk-high{color:#ff6b6b;}
+.risk-moderate{color:#fdcb6e;}
+.risk-low{color:#00d4aa;}
+.revenue-stream{display:flex;justify-content:space-between;align-items:center;}
+.revenue-stream .pct{color:#00d4aa;font-weight:600;}
+.guidance-section{max-width:1400px;margin:0 auto 30px;}
+.guidance-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;}
+.guidance-header h3{color:#fff;font-size:1.2rem;display:flex;align-items:center;gap:10px;}
+.guidance-header h3::before{content:'';display:inline-block;width:4px;height:20px;background:linear-gradient(180deg,#00d4aa,#00b894);border-radius:2px;}
+.guidance-meta{font-size:0.85rem;color:#888;}
+.guidance-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:15px;margin-bottom:20px;}
+.guidance-card{background:rgba(255,255,255,0.05);border-radius:12px;padding:18px;border:1px solid rgba(255,255,255,0.1);transition:transform 0.2s ease;}
+.guidance-card:hover{transform:translateY(-2px);}
+.guidance-metric{font-size:0.8rem;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;}
+.guidance-target{font-size:1.05rem;font-weight:600;color:#00d4aa;margin-bottom:6px;line-height:1.4;}
+.guidance-period{font-size:0.85rem;color:#e0e0e0;margin-bottom:8px;}
+.guidance-vs-prior{display:inline-block;font-size:0.75rem;padding:3px 8px;border-radius:4px;font-weight:500;}
+.guidance-vs-prior.raised{background:rgba(0,212,170,0.15);color:#00d4aa;}
+.guidance-vs-prior.lowered{background:rgba(255,107,107,0.15);color:#ff6b6b;}
+.guidance-vs-prior.maintained{background:rgba(255,255,255,0.1);color:#888;}
+.guidance-vs-prior.new{background:rgba(99,102,241,0.15);color:#818cf8;}
+.guidance-notes{font-size:0.78rem;color:#666;margin-top:8px;line-height:1.4;}
+.guidance-commentary{background:rgba(255,255,255,0.03);border-radius:10px;padding:16px 20px;border-left:3px solid #00d4aa;font-style:italic;color:#b0b0b0;line-height:1.6;font-size:0.9rem;}
+.section-title{font-size:1.5rem;color:#fff;margin:40px auto 20px;padding-bottom:10px;border-bottom:2px solid rgba(0,212,170,0.3);max-width:1400px;}
+.charts-container{display:grid;grid-template-columns:repeat(auto-fit,minmax(500px,1fr));gap:25px;max-width:1400px;margin:0 auto;}
+.chart-card{background:rgba(255,255,255,0.05);border-radius:15px;padding:25px;border:1px solid rgba(255,255,255,0.1);}
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.chart-header h3{color:#fff;font-size:1.1rem;display:flex;align-items:center;gap:10px;}
+.chart-header h3::before{content:'';display:inline-block;width:4px;height:20px;background:linear-gradient(180deg,#00d4aa,#00b894);border-radius:2px;}
+.help-btn{width:24px;height:24px;border-radius:50%;background:rgba(0,212,170,0.2);border:1px solid #00d4aa;color:#00d4aa;font-size:14px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s ease;flex-shrink:0;}
+.help-btn:hover{background:#00d4aa;color:#1a1a2e;}
+.chart-wrapper{position:relative;height:300px;}
+.modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:1000;justify-content:center;align-items:center;padding:20px;}
+.modal-overlay.active{display:flex;}
+.modal{background:linear-gradient(135deg,#1e2a4a 0%,#16213e 100%);border-radius:16px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto;border:1px solid rgba(0,212,170,0.3);box-shadow:0 20px 60px rgba(0,0,0,0.5);}
+.modal-header{padding:20px 25px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;}
+.modal-header h3{color:#00d4aa;font-size:1.4rem;margin:0;}
+.modal-close{width:32px;height:32px;border-radius:50%;background:rgba(255,107,107,0.2);border:1px solid #ff6b6b;color:#ff6b6b;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.modal-close:hover{background:#ff6b6b;color:#fff;}
+.modal-body{padding:25px;line-height:1.7;font-size:0.93rem;}
+.modal-body p{margin-bottom:15px;}
+.modal-body strong{color:#00d4aa;}
+.modal-body ul{margin:15px 0;padding-left:20px;}
+.modal-body li{margin-bottom:8px;}
+.metric-highlight{background:rgba(0,212,170,0.1);border-left:3px solid #00d4aa;padding:12px 15px;margin:15px 0;border-radius:0 8px 8px 0;}
+/* DCF Section */
+.dcf-section{max-width:1400px;margin:0 auto 40px;}
+.dcf-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px;margin-bottom:30px;}
+.dcf-card{background:rgba(255,255,255,0.05);border-radius:12px;padding:24px;text-align:center;border:1px solid rgba(255,255,255,0.1);transition:transform 0.3s ease;}
+.dcf-card:hover{transform:translateY(-3px);}
+.dcf-card.highlight{background:rgba(0,212,170,0.1);border-color:rgba(0,212,170,0.3);}
+.dcf-label{font-size:0.8rem;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+.dcf-value{font-size:2rem;font-weight:bold;color:#00d4aa;}
+.dcf-card:not(.highlight) .dcf-value{color:#fff;}
+.dcf-change{font-size:0.95rem;margin-top:8px;font-weight:600;}
+.dcf-change.positive{color:#00d4aa;}
+.dcf-change.negative{color:#ff6b6b;}
+.dcf-sublabel{font-size:0.78rem;color:#666;margin-top:8px;}
+.dcf-inputs{background:rgba(255,255,255,0.03);border-radius:12px;padding:20px;margin-bottom:25px;border:1px solid rgba(255,255,255,0.08);}
+.dcf-inputs h4{color:#e0e0e0;margin-bottom:15px;font-size:1rem;}
+.dcf-inputs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:15px;margin-bottom:20px;}
+.dcf-input-card{background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;text-align:center;border:1px solid rgba(255,255,255,0.05);}
+.dcf-input-label{font-size:0.75rem;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;}
+.dcf-input-value{font-size:1.2rem;font-weight:600;color:#00d4aa;}
+.dcf-input-note{font-size:0.7rem;color:#666;margin-top:4px;}
+.fcf-projections h5{color:#b0b0b0;font-size:0.9rem;margin-bottom:10px;}
+.fcf-projection-table{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;background:rgba(0,0,0,0.2);border-radius:8px;padding:12px;}
+.fcf-projection-item{text-align:center;}
+.fcf-projection-item.header{font-size:0.75rem;color:#888;font-weight:600;}
+.fcf-projection-item .proj-year{font-size:0.75rem;color:#888;margin-bottom:2px;}
+.fcf-projection-item .proj-val{font-size:0.95rem;color:#e0e0e0;font-weight:500;}
+.fcf-projection-item .proj-growth{font-size:0.75rem;color:#00d4aa;margin-top:2px;}
+.dcf-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:25px;margin-bottom:30px;padding:25px;background:rgba(255,255,255,0.03);border-radius:12px;border:1px solid rgba(255,255,255,0.08);}
+.slider-group{display:flex;flex-direction:column;gap:10px;}
+.slider-group label{font-size:0.95rem;color:#e0e0e0;display:flex;justify-content:space-between;}
+.slider-group label span{color:#00d4aa;font-weight:600;}
+.slider-group input[type=range]{-webkit-appearance:none;width:100%;height:6px;border-radius:3px;background:rgba(255,255,255,0.1);outline:none;}
+.slider-group input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#00d4aa;cursor:pointer;transition:transform 0.2s;}
+.slider-group input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.2);}
+.slider-hint{font-size:0.8rem;color:#666;}
+.scenario-tabs{display:flex;gap:10px;margin-bottom:20px;}
+.scenario-tab{padding:10px 24px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:#888;border-radius:8px;cursor:pointer;font-size:0.95rem;transition:all 0.2s;}
+.scenario-tab:hover{border-color:rgba(0,212,170,0.5);color:#e0e0e0;}
+.scenario-tab.active{background:rgba(0,212,170,0.15);border-color:#00d4aa;color:#00d4aa;}
+.scenario-details{background:rgba(255,255,255,0.03);border-radius:12px;padding:20px;margin-bottom:30px;border:1px solid rgba(255,255,255,0.08);}
+.scenario-details h4{color:#00d4aa;margin-bottom:15px;}
+.assumption-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:15px;}
+.assumption-item{text-align:center;}
+.assumption-item .a-label{font-size:0.8rem;color:#888;margin-bottom:4px;}
+.assumption-item .a-value{font-size:1.1rem;color:#e0e0e0;font-weight:500;}
+.sensitivity-section{margin-bottom:30px;}
+.sensitivity-section h4{color:#e0e0e0;margin-bottom:15px;}
+.sensitivity-table{width:100%;border-collapse:collapse;background:rgba(255,255,255,0.03);border-radius:8px;overflow:hidden;font-size:0.88rem;}
+.sensitivity-table th,.sensitivity-table td{padding:10px 14px;text-align:center;border:1px solid rgba(255,255,255,0.08);}
+.sensitivity-table th{background:rgba(0,212,170,0.1);color:#00d4aa;font-weight:600;}
+.sensitivity-table td{color:#e0e0e0;}
+.sensitivity-table td.cell-highlight{background:rgba(0,212,170,0.15);color:#00d4aa;font-weight:600;}
+.sensitivity-table td.below-current{color:#ff6b6b;}
+.sensitivity-table td.above-current{color:#00d4aa;}
+.historical-growth{margin-bottom:30px;}
+.historical-growth h4{color:#e0e0e0;margin-bottom:15px;}
+.growth-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:15px;}
+.growth-item{background:rgba(255,255,255,0.03);border-radius:8px;padding:15px;text-align:center;border:1px solid rgba(255,255,255,0.08);}
+.growth-item .g-metric{font-size:0.78rem;color:#888;margin-bottom:6px;}
+.growth-item .g-rate{font-size:1.2rem;font-weight:600;}
+.growth-item .g-rate.positive{color:#00d4aa;}
+.growth-item .g-rate.negative{color:#ff6b6b;}
+.growth-item.selected{border-color:#00d4aa;background:rgba(0,212,170,0.08);}
+.dcf-note-box{background:rgba(253,203,110,0.08);border:1px solid rgba(253,203,110,0.25);border-radius:8px;padding:14px 18px;margin-bottom:25px;font-size:0.85rem;color:#c8a84b;line-height:1.6;}
+.irga-note{background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.25);border-radius:8px;padding:14px 18px;margin-bottom:25px;font-size:0.85rem;color:#818cf8;line-height:1.6;}
+.dcf-download{text-align:center;margin-top:30px;}
+.download-btn{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;background:rgba(0,212,170,0.15);border:1px solid #00d4aa;border-radius:8px;color:#00d4aa;text-decoration:none;font-weight:600;transition:all 0.2s;}
+.download-btn:hover{background:#00d4aa;color:#1a1a2e;}
+@media(max-width:768px){.charts-container{grid-template-columns:1fr;}.overview-grid{grid-template-columns:1fr;}.header h1{font-size:1.8rem;}.fcf-projection-table{grid-template-columns:repeat(3,1fr);}}
+</style>
 </head>
 <body>
 
-<!-- HEADER -->
 <div class="header">
-    <h1>Constellation Software Inc. (CSU)</h1>
-    <p>Serial Acquirer of Vertical Market Software | TSX-listed | Reports in USD</p>
-    <div class="currency-note">All financial figures in USD millions unless noted. Stock price in CAD (TSX). DCF performed in USD with CAD equivalents shown.</div>
-</div>
-
-<!-- INVESTMENT OVERVIEW -->
-<div class="overview-section">
-    <button class="overview-toggle" onclick="toggleOverview()">
-        <span>Investment Overview &amp; Analysis</span>
-        <span class="arrow">&#9660;</span>
-    </button>
-    <div class="overview-content" id="overviewContent">
-        <div class="overview-grid" id="overviewGrid"></div>
-    </div>
+  <h1>Constellation Software Inc. (CSU)</h1>
+  <p>TSX-Listed Serial Acquirer of Vertical Market Software &mdash; Financial Dashboard</p>
+  <div class="currency-note">Financials reported in USD millions &bull; Share price in CAD (TSX) &bull; Valuation date: June 27, 2026</div>
 </div>
 
 <!-- KPI CARDS -->
 <div class="kpi-grid" id="kpiGrid"></div>
 
-<!-- MANAGEMENT GUIDANCE -->
+<!-- INVESTMENT OVERVIEW -->
+<div class="overview-section">
+  <button class="overview-toggle" onclick="toggleOverview()" id="overviewToggle">
+    <span>Investment Overview &amp; Analysis</span>
+    <span class="arrow">&#9660;</span>
+  </button>
+  <div class="overview-content" id="overviewContent">
+    <div class="overview-grid" id="overviewGrid"></div>
+  </div>
+</div>
+
+<!-- GUIDANCE -->
 <div class="guidance-section" id="guidanceSection">
-    <div class="guidance-header">
-        <h3>Management Guidance &amp; Capital Allocation Commentary</h3>
-        <span class="guidance-meta">As of <span id="guidanceAsOf"></span> | <span id="guidanceFY"></span></span>
-    </div>
-    <div class="guidance-grid" id="guidanceGrid"></div>
-    <div class="guidance-commentary" id="guidanceCommentary" style="display:none;"></div>
+  <div class="guidance-header">
+    <h3>Management Guidance</h3>
+    <span class="guidance-meta">As of <span id="guidanceAsOf"></span> | <span id="guidanceFY"></span></span>
+  </div>
+  <div class="guidance-grid" id="guidanceGrid"></div>
+  <div class="guidance-commentary" id="guidanceCommentary"></div>
 </div>
 
-<!-- ANNUAL FINANCIAL PERFORMANCE -->
-<h2 class="section-title">Annual Financial Performance</h2>
+<!-- CHARTS: GROWTH & REVENUE -->
+<h2 class="section-title">Revenue &amp; Growth</h2>
 <div class="charts-container">
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Annual Revenue</h3>
-            <button class="help-btn" onclick="openModal('revenue')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="chartRevenue"></canvas></div>
-    </div>
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>YoY Revenue Growth Rate</h3>
-            <button class="help-btn" onclick="openModal('revenueGrowth')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="chartRevenueGrowth"></canvas></div>
-    </div>
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>FCFA2S vs Free Cash Flow</h3>
-            <button class="help-btn" onclick="openModal('fcfa2s')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="chartFCFA2S"></canvas></div>
-    </div>
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Operating Cash Flow</h3>
-            <button class="help-btn" onclick="openModal('ocf')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="chartOCF"></canvas></div>
-    </div>
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Net Income &amp; EPS</h3>
-            <button class="help-btn" onclick="openModal('netIncome')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="chartNetIncome"></canvas></div>
-    </div>
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Net Margin (%)</h3>
-            <button class="help-btn" onclick="openModal('netMargin')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="chartNetMargin"></canvas></div>
-    </div>
+  <div class="chart-card">
+    <div class="chart-header"><h3>Annual Revenue (USD M)</h3><button class="help-btn" onclick="openModal('revenue')">?</button></div>
+    <div class="chart-wrapper"><canvas id="chartRevenue"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header"><h3>Revenue Growth Rate (YoY %)</h3><button class="help-btn" onclick="openModal('revenueGrowth')">?</button></div>
+    <div class="chart-wrapper"><canvas id="chartRevenueGrowth"></canvas></div>
+  </div>
 </div>
 
-<!-- BALANCE SHEET & CAPITAL STRUCTURE -->
+<!-- CHARTS: CASH FLOW -->
+<h2 class="section-title">Cash Flow &amp; Capital Generation</h2>
+<div class="charts-container">
+  <div class="chart-card">
+    <div class="chart-header"><h3>FCFA2S &amp; Free Cash Flow (USD M)</h3><button class="help-btn" onclick="openModal('fcfa2s')">?</button></div>
+    <div class="chart-wrapper"><canvas id="chartFCFA2S"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header"><h3>Operating Cash Flow vs CapEx (USD M)</h3><button class="help-btn" onclick="openModal('ocf')">?</button></div>
+    <div class="chart-wrapper"><canvas id="chartOCF"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header"><h3>FCFA2S Annual Growth (%)</h3><button class="help-btn" onclick="openModal('fcfa2sGrowth')">?</button></div>
+    <div class="chart-wrapper"><canvas id="chartFCFA2SGrowth"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header"><h3>FCF Margin &amp; Net Margin (%)</h3><button class="help-btn" onclick="openModal('margins')">?</button></div>
+    <div class="chart-wrapper"><canvas id="chartMargins"></canvas></div>
+  </div>
+</div>
+
+<!-- CHARTS: PROFITABILITY -->
+<h2 class="section-title">Profitability</h2>
+<div class="charts-container">
+  <div class="chart-card">
+    <div class="chart-header"><h3>Net Income (USD M)</h3><button class="help-btn" onclick="openModal('netIncome')">?</button></div>
+    <div class="chart-wrapper"><canvas id="chartNetIncome"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header"><h3>EPS Diluted (USD)</h3><button class="help-btn" onclick="openModal('eps')">?</button></div>
+    <div class="chart-wrapper"><canvas id="chartEPS"></canvas></div>
+  </div>
+</div>
+
+<!-- CHARTS: BALANCE SHEET -->
 <h2 class="section-title">Balance Sheet &amp; Capital Structure</h2>
 <div class="charts-container">
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Debt vs Cash vs Shareholders' Equity</h3>
-            <button class="help-btn" onclick="openModal('balanceSheet')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="chartBalanceSheet"></canvas></div>
-    </div>
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Shareholders' Equity Growth</h3>
-            <button class="help-btn" onclick="openModal('equity')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="chartEquity"></canvas></div>
-    </div>
+  <div class="chart-card">
+    <div class="chart-header"><h3>Total Assets &amp; Shareholders Equity (USD M)</h3><button class="help-btn" onclick="openModal('balanceSheet')">?</button></div>
+    <div class="chart-wrapper"><canvas id="chartBalanceSheet"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header"><h3>Cash &amp; Total Debt (USD M)</h3><button class="help-btn" onclick="openModal('debt')">?</button></div>
+    <div class="chart-wrapper"><canvas id="chartDebt"></canvas></div>
+  </div>
 </div>
 
-<!-- REVENUE BREAKDOWN -->
-<h2 class="section-title">Revenue Breakdown (FY2024)</h2>
-<div class="charts-container">
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Revenue by Type (FY2024)</h3>
-            <button class="help-btn" onclick="openModal('revBreakdown')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="chartRevBreakdown"></canvas></div>
-    </div>
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Revenue Mix: Maintenance vs Other (Annual)</h3>
-            <button class="help-btn" onclick="openModal('revMix')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="chartRevMix"></canvas></div>
-    </div>
-</div>
-
-<!-- QUARTERLY PERFORMANCE -->
+<!-- CHARTS: QUARTERLY -->
 <h2 class="section-title">Quarterly Performance</h2>
 <div class="charts-container">
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Quarterly Revenue</h3>
-            <button class="help-btn" onclick="openModal('qRevenue')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="chartQRevenue"></canvas></div>
-    </div>
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Quarterly Net Income</h3>
-            <button class="help-btn" onclick="openModal('qNetIncome')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="chartQNetIncome"></canvas></div>
-    </div>
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Quarterly FCFA2S</h3>
-            <button class="help-btn" onclick="openModal('qFCFA2S')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="chartQFCFA2S"></canvas></div>
-    </div>
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Quarterly Operating Cash Flow</h3>
-            <button class="help-btn" onclick="openModal('qOCF')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="chartQOCF"></canvas></div>
-    </div>
+  <div class="chart-card">
+    <div class="chart-header"><h3>Quarterly Revenue (USD M)</h3><button class="help-btn" onclick="openModal('qRevenue')">?</button></div>
+    <div class="chart-wrapper"><canvas id="chartQRevenue"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header"><h3>Quarterly FCFA2S (USD M)</h3><button class="help-btn" onclick="openModal('qFCFA2S')">?</button></div>
+    <div class="chart-wrapper"><canvas id="chartQFCFA2S"></canvas></div>
+  </div>
 </div>
 
-<!-- DCF VALUATION -->
+<!-- DCF SECTION -->
 <h2 class="section-title">DCF Valuation</h2>
 <div class="dcf-section">
-    <div class="dcf-currency-note">
-        <strong>Currency note:</strong> CSU trades on the TSX in CAD. All DCF calculations are performed in USD (reporting currency). Current price: USD $1,580.73 / CAD $2,258.18. USD/CAD rate: 0.70. Intrinsic values are shown in USD with CAD equivalents in parentheses.
+  <div class="dcf-note-box">
+    <strong>Note:</strong> All DCF values are in <strong>USD per share</strong>. CSU trades on the TSX in <strong>CAD</strong>. CAD equivalents are shown in parentheses using the USD/CAD rate of 0.7045 (1 USD = 1.419 CAD). Current price: CAD&nbsp;$2,818.02 (USD&nbsp;$1,984.99). FCF metric used: <strong>FCFA2S</strong> (Free Cash Flow Available to Shareholders) &mdash; CSU management's preferred intrinsic value measure.
+  </div>
+  <div class="irga-note">
+    <strong>IRGA Liability:</strong> The Topicus Joday Group put option (IRGA) was ~$1,234M at Dec 31, 2025 and is <em>excluded</em> from net debt in this model (consistent with management convention). Including it would reduce all intrinsic values by approximately <strong>$58/share USD ($83/share CAD)</strong>.
+  </div>
+  <div class="dcf-summary">
+    <div class="dcf-card highlight">
+      <div class="dcf-label">Base IV (USD / CAD)</div>
+      <div class="dcf-value" id="dcfIV">$2,039</div>
+      <div class="dcf-sublabel" id="dcfIVcad">CAD $2,894</div>
+      <div class="dcf-change" id="dcfUpside"></div>
     </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Entry Price &mdash; 15% CAGR</div>
+      <div class="dcf-value" id="dcfEntry">$1,296</div>
+      <div class="dcf-sublabel" id="dcfEntryCad">CAD $1,839</div>
+      <div class="dcf-sublabel">Buy below for 15% annual return</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Current Price</div>
+      <div class="dcf-value">USD $1,985</div>
+      <div class="dcf-sublabel">CAD $2,818 (TSX)</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Prob-Weighted IV</div>
+      <div class="dcf-value" id="dcfWeighted">$2,068</div>
+      <div class="dcf-sublabel" id="dcfWeightedCad">CAD $2,936</div>
+      <div class="dcf-sublabel">25% Bull / 50% Base / 25% Bear</div>
+    </div>
+  </div>
 
-    <div class="dcf-summary">
-        <div class="dcf-card highlight">
-            <div class="dcf-label">Intrinsic Value (USD)</div>
-            <div class="dcf-value" id="dcfIV">$1,919</div>
-            <div class="dcf-value-cad" id="dcfIVCad">CAD $2,741</div>
-            <div class="dcf-change positive" id="dcfUpside">+21.4% upside</div>
-        </div>
-        <div class="dcf-card">
-            <div class="dcf-label">Entry Price (15% CAGR)</div>
-            <div class="dcf-value" id="dcfEntry">$1,228</div>
-            <div class="dcf-value-cad" id="dcfEntryCad">CAD $1,754</div>
-            <div class="dcf-sublabel">Buy below for 15% annual return</div>
-        </div>
-        <div class="dcf-card">
-            <div class="dcf-label">Current Price</div>
-            <div class="dcf-value" id="dcfCurrent">$1,581</div>
-            <div class="dcf-value-cad">CAD $2,258</div>
-            <div class="dcf-sublabel">TSX: CSU</div>
-        </div>
-        <div class="dcf-card">
-            <div class="dcf-label">Prob-Weighted IV</div>
-            <div class="dcf-value" id="dcfWeighted">$1,944</div>
-            <div class="dcf-value-cad" id="dcfWeightedCad">CAD $2,777</div>
-            <div class="dcf-sublabel">25% Bull / 50% Base / 25% Bear</div>
-        </div>
+  <div class="dcf-inputs">
+    <h4>DCF Model Inputs (FCFA2S-Based)</h4>
+    <div class="dcf-inputs-grid">
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Normalised Base FCFA2S</div>
+        <div class="dcf-input-value">$1,900M</div>
+        <div class="dcf-input-note">Conservative blend of FY2025 $1,683M and Q1 2026 run-rate</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">LTM FCFA2S</div>
+        <div class="dcf-input-value">$2,323M</div>
+        <div class="dcf-input-note">Q2 2025 through Q1 2026</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Shares Outstanding</div>
+        <div class="dcf-input-value">21.19M</div>
+        <div class="dcf-input-note">Stable since IPO; no dilution</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Net Debt</div>
+        <div class="dcf-input-value">$2,112M</div>
+        <div class="dcf-input-note">Q1 2026: Debt $5,122M minus Cash $3,010M</div>
+      </div>
     </div>
+    <div class="fcf-projections">
+      <h5>Projected FCFA2S &mdash; Base Case (5-Year)</h5>
+      <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+    </div>
+  </div>
 
-    <div class="dcf-warning" id="growthWarning" style="display:none;">
-        <span class="warning-icon">&#9888;</span>
-        <span id="warningText"></span>
+  <div class="dcf-controls">
+    <div class="slider-group">
+      <label>Year 1 Growth Rate: <span id="growthValue">18%</span></label>
+      <input type="range" id="growthSlider" min="5" max="30" value="18" step="1">
+      <div class="slider-hint">FCFA2S 6yr CAGR: 19.1% | 3yr CAGR: 25.4%</div>
     </div>
+    <div class="slider-group">
+      <label>WACC: <span id="waccValue">10%</span></label>
+      <input type="range" id="waccSlider" min="7" max="15" value="10" step="0.5">
+      <div class="slider-hint">Investment-grade serial acquirer benchmark</div>
+    </div>
+    <div class="slider-group">
+      <label>Terminal Growth: <span id="terminalValue">3%</span></label>
+      <input type="range" id="terminalSlider" min="1" max="5" value="3" step="0.5">
+      <div class="slider-hint">VMS + organic growth long-run floor</div>
+    </div>
+  </div>
 
-    <div class="dcf-inputs">
-        <h4>DCF Model Inputs (USD)</h4>
-        <div class="dcf-inputs-grid">
-            <div class="dcf-input-card">
-                <div class="dcf-input-label">Base Year FCF (FCFA2S)</div>
-                <div class="dcf-input-value" id="baseFCF">$1.7B</div>
-                <div class="dcf-input-note">LTM Q4-2024 to Q3-2025</div>
-            </div>
-            <div class="dcf-input-card">
-                <div class="dcf-input-label">Shares Outstanding</div>
-                <div class="dcf-input-value" id="sharesOut">21.2M</div>
-                <div class="dcf-input-note">Static since 2015 - no buybacks</div>
-            </div>
-            <div class="dcf-input-card">
-                <div class="dcf-input-label">Net Debt</div>
-                <div class="dcf-input-value" id="netDebt">$2.2B</div>
-                <div class="dcf-input-note">Total debt minus cash</div>
-            </div>
-            <div class="dcf-input-card">
-                <div class="dcf-input-label">Total Debt</div>
-                <div class="dcf-input-value">$5.0B</div>
-                <div class="dcf-input-note">Q3 2025</div>
-            </div>
-            <div class="dcf-input-card">
-                <div class="dcf-input-label">Cash</div>
-                <div class="dcf-input-value">$2.8B</div>
-                <div class="dcf-input-note">Q3 2025</div>
-            </div>
-        </div>
-        <div class="fcf-projections">
-            <h5>Projected FCFA2S (5-Year, Base Case Growth Rates)</h5>
-            <div class="fcf-projection-table" id="fcfProjectionTable"></div>
-        </div>
-    </div>
+  <div class="scenario-tabs">
+    <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+    <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+    <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+  </div>
 
-    <div class="dcf-controls">
-        <div class="slider-group">
-            <label>Initial Growth Rate: <span id="growthValue">20%</span></label>
-            <input type="range" id="growthSlider" min="0" max="35" value="20" step="1">
-            <div class="slider-hint" id="growthHint">Based on FCFA2S 5yr CAGR (20.1%)</div>
-        </div>
-        <div class="slider-group">
-            <label>WACC: <span id="waccValue">10%</span></label>
-            <input type="range" id="waccSlider" min="6" max="18" value="10" step="0.5">
-        </div>
-        <div class="slider-group">
-            <label>Terminal Growth: <span id="terminalValue">3%</span></label>
-            <input type="range" id="terminalSlider" min="0" max="5" value="3" step="0.5">
-        </div>
-    </div>
+  <div class="scenario-details" id="scenarioDetails">
+    <h4>Scenario Assumptions</h4>
+    <div class="assumption-grid" id="assumptionGrid"></div>
+  </div>
 
-    <div class="scenario-tabs">
-        <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
-        <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
-        <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+  <div class="sensitivity-section">
+    <h4>Sensitivity Analysis &mdash; Intrinsic Value (CAD per share) by WACC &amp; Terminal Growth</h4>
+    <div style="overflow-x:auto;">
+    <table class="sensitivity-table" id="sensitivityMatrix"></table>
     </div>
+  </div>
 
-    <div class="scenario-details" id="scenarioDetails">
-        <h4>Scenario Assumptions</h4>
-        <div class="assumption-grid" id="assumptionGrid"></div>
-    </div>
+  <div class="historical-growth">
+    <h4>Historical Growth Rates (CAGR)</h4>
+    <div class="growth-grid" id="growthGrid"></div>
+  </div>
 
-    <div class="sensitivity-section">
-        <h4>Sensitivity Analysis: Intrinsic Value (USD) by WACC &amp; Terminal Growth</h4>
-        <p class="sens-note">Values in USD per share. Green = above current price ($1,581 USD). Red = below current price. Highlighted cell = base case assumption.</p>
-        <table class="sensitivity-table" id="sensitivityMatrix"></table>
-        <p class="sens-note" style="margin-top:8px;">CAD equivalents (divide USD by 0.70): e.g., USD $1,919 = CAD $2,741</p>
-    </div>
-
-    <div class="historical-growth">
-        <h4>Historical Growth Rates (CAGR) - Used to calibrate DCF</h4>
-        <div class="growth-grid" id="growthGrid"></div>
-        <p style="font-size:0.78rem;color:#666;margin-top:10px;">* FCFA2S 5yr CAGR selected as primary growth driver (highlighted). Equity CAGR excluded - CSU uses acquisition leverage that inflates book value growth without proportional per-share benefit.</p>
-    </div>
-
-    <div class="dcf-download">
-        <a href="CSU_DCF_Model.xlsx" class="download-btn" download>
-            <span class="download-icon">&#8681;</span> Download Excel Model
-        </a>
-    </div>
+  <div class="dcf-download">
+    <a href="CSU_DCF_Model.xlsx" class="download-btn" download>&#8681; Download Excel Model</a>
+  </div>
 </div>
 
 <!-- MODAL -->
 <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
-    <div class="modal">
-        <div class="modal-header">
-            <h3 id="modalTitle"></h3>
-            <button class="modal-close" onclick="closeModal()">&#215;</button>
-        </div>
-        <div class="modal-body" id="modalBody"></div>
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modalTitle"></h3>
+      <button class="modal-close" onclick="closeModal()">&#215;</button>
     </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
 </div>
 
 <script>
-// =====================================================================
-// EMBEDDED DATA
-// =====================================================================
+// ============================================================
+// EMBEDDED CSV DATA
+// ============================================================
 const csvData = `Period,Revenue,NetIncome,NetMargin,EPS_Diluted,OperatingCashFlow,CapEx,FreeCashFlow,FCFA2S,AdjEBITA,MaintenanceRevenue,LicenseRevenue,ProfServicesRevenue,HardwareRevenue,TotalAssets,ShareholdersEquity,TotalDebt,CashAndEquivalents,SharesOutstanding,Notes
-Q1 2015,422.9,32.9,7.8,1.55,112.6,2.1,110.5,,93.4,268.8,30.3,92.7,31.0,,,,131.8,21.192,USD millions
-Q2 2015,443.5,32.7,7.4,1.54,64.2,3.4,60.8,,99.0,,,,,,,,,21.192,
-Q3 2015,460.4,45.7,9.9,2.16,105.1,2.8,102.3,,120.3,,,,,,,,,21.192,
-Q4 2015,511.6,66.0,12.9,3.11,114.0,4.6,109.4,,132.8,,,,,1639.3,337.3,355.1,178.5,21.192,
+Q1 2015,422.9,32.9,7.8,1.55,112.6,2.1,110.5,,93.4,268.8,30.3,92.7,31.0,,,,131.8,21.192,
+Q2 2015,443.5,32.7,7.4,1.54,64.2,3.4,60.8,,99.0,,,,,,,,21.192,
+Q3 2015,460.4,45.7,9.9,2.16,105.1,2.8,102.3,,120.3,,,,,,,,21.192,
+Q4 2015,511.6,66.0,12.9,3.11,114.0,4.6,109.4,,132.8,,,,,,,,21.192,
 FY2015,1838.3,177.2,9.6,8.36,395.9,12.9,383.0,,445.5,1169.8,131.0,384.6,152.9,1639.3,337.3,355.1,178.5,21.192,
-Q1 2016,487.0,18.7,3.8,0.88,146.5,3.2,143.3,,107.5,,,,,,,,,21.192,
-Q2 2016,528.7,55.0,10.4,2.60,72.8,6.5,66.3,,130.7,,,,,,,,,21.192,
-Q3 2016,545.6,67.5,12.4,3.18,137.9,3.9,134.0,,140.7,,,,,,,,,21.192,
-Q4 2016,563.8,65.7,11.7,3.10,133.7,5.5,128.2,,151.4,,,,,1883.5,457.5,344.0,353.5,21.192,
+Q1 2016,487.0,18.7,3.8,0.88,146.5,3.2,143.3,,107.5,,,,,,,,21.192,
+Q2 2016,528.7,55.0,10.4,2.60,72.8,6.5,66.3,,130.7,,,,,,,,21.192,
+Q3 2016,545.6,67.5,12.4,3.18,137.9,3.9,134.0,,140.7,,,,,,,,21.192,
+Q4 2016,563.8,65.7,11.7,3.10,133.7,5.5,128.2,,151.4,,,,,,,,21.192,
 FY2016,2125.1,206.8,9.7,9.76,490.9,19.1,471.8,,530.0,1400.3,142.5,434.5,147.8,1883.5,457.5,344.0,353.5,21.192,
-Q1 2017,555.3,40.4,7.3,1.91,182.0,4.4,177.6,,130.6,,,,,,,,,21.192,
-Q2 2017,600.1,51.2,8.5,2.41,60.4,4.5,55.9,,154.6,,,,,,,,,21.192,
-Q3 2017,636.5,54.3,8.5,2.56,122.8,5.5,117.3,,161.6,,,,,,,,,21.192,
-Q4 2017,687.6,76.1,11.1,3.59,162.6,5.3,157.3,,174.5,,,,,2288.2,604.1,323.1,489.0,21.192,
+Q1 2017,555.3,40.4,7.3,1.91,182.0,4.4,177.6,,130.6,,,,,,,,21.192,
+Q2 2017,600.1,51.2,8.5,2.41,60.4,4.5,55.9,,154.6,,,,,,,,21.192,
+Q3 2017,636.5,54.3,8.5,2.56,122.8,5.5,117.3,,161.6,,,,,,,,21.192,
+Q4 2017,687.6,76.1,11.1,3.59,162.6,5.3,157.3,,174.5,,,,,,,,21.192,
 FY2017,2479.4,222.0,9.0,10.47,527.8,19.7,508.1,,621.2,1643.2,170.4,498.2,167.6,2288.2,604.1,323.1,489.0,21.192,
-Q1 2018,718.5,82.5,11.5,3.90,258.0,4.4,253.6,,158.6,,,,,,,,,21.192,
-Q2 2018,752.0,52.0,6.9,2.45,53.0,4.5,48.5,,175.4,,,,,,,,,21.192,
-Q3 2018,759.1,65.7,8.7,3.10,143.0,5.5,137.5,,196.6,,,,,,,,,21.192,
+Q1 2018,718.5,82.5,11.5,3.90,258.0,4.4,253.6,,158.6,,,,,,,,21.192,
+Q2 2018,752.0,52.0,6.9,2.45,53.0,4.5,48.5,,175.4,,,,,,,,21.192,
+Q3 2018,759.1,65.7,8.7,3.10,143.0,5.5,137.5,,196.6,,,,,,,,21.192,
 Q4 2018,830.5,179.0,21.5,8.45,208.0,10.9,197.1,178.0,226.1,2071.6,198.3,615.6,174.6,2935.4,866.1,389.0,588.6,21.192,
 FY2018,3060.1,379.3,12.4,17.90,662.0,25.3,636.7,559.0,756.7,2071.6,198.3,615.6,174.6,2935.4,866.1,389.0,588.6,21.192,
-Q1 2019,819.0,87.0,10.6,4.09,284.0,7.0,277.0,250.0,,,,,,,,,21.192,
-Q2 2019,846.0,73.0,8.6,3.45,50.0,8.0,42.0,12.0,,,,,,,,,21.192,
-Q3 2019,870.0,82.0,9.4,3.85,177.0,9.0,168.0,134.0,,,,,,,,,21.192,
+Q1 2019,819.0,87.0,10.6,4.09,284.0,7.0,277.0,250.0,,,,,,,,21.192,
+Q2 2019,846.0,73.0,8.6,3.45,50.0,8.0,42.0,12.0,,,,,,,,21.192,
+Q3 2019,870.0,82.0,9.4,3.85,177.0,9.0,168.0,134.0,,,,,,,,21.192,
 Q4 2019,956.0,92.0,9.6,4.34,255.0,10.0,245.0,193.0,,2417.0,226.0,673.0,173.0,3488.0,687.0,715.0,316.0,21.192,
 FY2019,3490.0,333.0,9.5,15.73,767.0,34.0,733.0,590.0,,2417.0,226.0,673.0,173.0,3488.0,687.0,715.0,316.0,21.192,
-Q1 2020,953.0,83.0,8.7,3.91,361.0,5.0,356.0,311.0,,,,,,,,,21.192,
-Q2 2020,922.0,83.0,9.0,3.90,237.0,6.0,231.0,190.0,,,,,,,,,21.192,
-Q3 2020,1003.0,122.0,12.2,5.78,234.0,8.0,226.0,181.0,,,,,,,,,21.192,
-Q4 2020,1091.0,149.0,13.7,7.02,355.0,6.0,349.0,307.0,,,,,4375.0,1048.0,761.0,758.0,21.192,
-FY2020,3969.0,436.0,11.0,20.59,1186.0,25.0,1161.0,989.0,,,,,4375.0,1048.0,761.0,758.0,21.192,
-Q1 2021,1176.0,-9.0,-0.8,-0.41,495.0,9.0,486.0,269.0,,,,,,,,,21.192,
-Q2 2021,1249.0,88.0,7.0,4.16,171.0,8.0,163.0,145.0,,,,,,,,,21.192,
-Q3 2021,1299.0,107.0,8.2,5.04,292.0,6.0,286.0,226.0,,,,,,,,,21.192,
-Q4 2021,1383.0,124.0,9.0,5.86,341.0,6.0,335.0,244.0,,,,,5766.0,1521.0,1125.0,763.0,21.192,
-FY2021,5106.0,310.0,6.1,14.65,1300.0,29.0,1271.0,883.0,,,,,5766.0,1521.0,1125.0,763.0,21.192,
-Q1 2022,1431.0,98.0,6.9,4.63,498.0,8.0,490.0,324.0,,,,,,,,,21.192,
-Q2 2022,1618.0,126.0,7.8,5.94,78.0,11.0,67.0,12.0,,,,,,,,,21.192,
-Q3 2022,1725.0,136.0,7.9,6.42,321.0,11.0,310.0,229.0,,,,,,,,,21.192,
-Q4 2022,1847.0,152.0,8.2,7.19,400.0,11.0,389.0,290.0,,,,,7882.0,1933.0,1974.0,811.0,21.192,
-FY2022,6622.0,512.0,7.7,24.18,1297.0,41.0,1256.0,853.0,,,,,7882.0,1933.0,1974.0,811.0,21.192,
-Q1 2023,1919.0,94.0,4.9,4.44,632.0,9.0,623.0,453.0,,,,,,,,,21.192,
-Q2 2023,2039.0,103.0,5.1,4.88,123.0,11.0,112.0,14.0,,,,,,,,,21.192,
-Q3 2023,2126.0,227.0,10.7,10.70,513.0,9.0,504.0,367.0,,,,,,,,,21.192,
-Q4 2023,2323.0,141.0,6.1,6.64,511.0,13.0,498.0,325.0,,,,,10899.0,1961.0,4148.0,1284.0,21.192,
-FY2023,8407.0,565.0,6.7,26.67,1779.0,42.0,1737.0,1160.0,,,,,10899.0,1961.0,4148.0,1284.0,21.192,
-Q1 2024,2353.0,105.0,4.5,4.95,737.0,10.0,727.0,446.0,,,,,,,,,21.192,
-Q2 2024,2468.0,177.0,7.2,8.35,265.0,11.0,254.0,182.0,,,,,,,,,21.192,
-Q3 2024,2541.0,164.0,6.5,7.74,517.0,19.0,498.0,362.0,,,,,12573.0,3136.0,4149.0,2069.0,21.192,
-Q4 2024,2703.0,285.0,10.5,13.44,678.0,25.0,653.0,482.0,,,,,12863.0,3288.0,4166.0,1980.0,21.192,
+Q1 2020,953.0,83.0,8.7,3.91,361.0,5.0,356.0,311.0,,,,,,,,21.192,
+Q2 2020,922.0,83.0,9.0,3.90,237.0,6.0,231.0,190.0,,,,,,,,21.192,
+Q3 2020,1003.0,122.0,12.2,5.78,234.0,8.0,226.0,181.0,,,,,,,,21.192,
+Q4 2020,1091.0,149.0,13.7,7.02,355.0,6.0,349.0,307.0,,,,4375.0,1048.0,761.0,758.0,21.192,
+FY2020,3969.0,436.0,11.0,20.59,1186.0,25.0,1161.0,989.0,,,,4375.0,1048.0,761.0,758.0,21.192,
+Q1 2021,1176.0,-9.0,-0.8,-0.41,495.0,9.0,486.0,269.0,,,,,,,,21.192,
+Q2 2021,1249.0,88.0,7.0,4.16,171.0,8.0,163.0,145.0,,,,,,,,21.192,
+Q3 2021,1299.0,107.0,8.2,5.04,292.0,6.0,286.0,226.0,,,,,,,,21.192,
+Q4 2021,1383.0,124.0,9.0,5.86,341.0,6.0,335.0,244.0,,,,5766.0,1521.0,1125.0,763.0,21.192,
+FY2021,5106.0,310.0,6.1,14.65,1300.0,29.0,1271.0,883.0,,,,5766.0,1521.0,1125.0,763.0,21.192,
+Q1 2022,1431.0,98.0,6.9,4.63,498.0,8.0,490.0,324.0,,,,,,,,21.192,
+Q2 2022,1618.0,126.0,7.8,5.94,78.0,11.0,67.0,12.0,,,,,,,,21.192,
+Q3 2022,1725.0,136.0,7.9,6.42,321.0,11.0,310.0,229.0,,,,,,,,21.192,
+Q4 2022,1847.0,152.0,8.2,7.19,400.0,11.0,389.0,290.0,,,,7882.0,1933.0,1974.0,811.0,21.192,
+FY2022,6622.0,512.0,7.7,24.18,1297.0,41.0,1256.0,853.0,,,,7882.0,1933.0,1974.0,811.0,21.192,
+Q1 2023,1919.0,94.0,4.9,4.44,632.0,9.0,623.0,453.0,,,,,,,,21.192,
+Q2 2023,2039.0,103.0,5.1,4.88,123.0,11.0,112.0,14.0,,,,,,,,21.192,
+Q3 2023,2126.0,227.0,10.7,10.70,513.0,9.0,504.0,367.0,,,,,,,,21.192,
+Q4 2023,2323.0,141.0,6.1,6.64,511.0,13.0,498.0,325.0,,,,10899.0,1961.0,4148.0,1284.0,21.192,
+FY2023,8407.0,565.0,6.7,26.67,1779.0,42.0,1737.0,1160.0,,,,10899.0,1961.0,4148.0,1284.0,21.192,
+Q1 2024,2353.0,105.0,4.5,4.95,737.0,10.0,727.0,446.0,,,,,,,,21.192,
+Q2 2024,2468.0,177.0,7.2,8.35,265.0,11.0,254.0,182.0,,,,,,,,21.192,
+Q3 2024,2541.0,164.0,6.5,7.74,517.0,19.0,498.0,362.0,,,,12573.0,3136.0,4149.0,2069.0,21.192,
+Q4 2024,2703.0,285.0,10.5,13.44,678.0,25.0,653.0,482.0,,,,12863.0,3288.0,4166.0,1980.0,21.192,
 FY2024,10066.0,731.0,7.3,34.48,2196.0,67.0,2129.0,1472.0,7396.0,393.0,1975.0,302.0,12863.0,3288.0,4166.0,1980.0,21.192,
-Q1 2025,2654.0,115.0,4.3,5.44,827.0,16.0,811.0,510.0,,,,,,,,,21.192,
-Q2 2025,2844.0,56.0,2.0,2.66,433.0,16.0,417.0,220.0,,,,,,,,,21.192,
-Q3 2025,2948.0,210.0,7.1,9.89,685.0,16.0,669.0,529.0,,,,,15326.0,4103.0,5015.0,2770.0,21.192,`;
+Q1 2025,2654.0,136.0,5.1,6.41,827.0,16.0,811.0,510.0,,,,,,,,21.192,
+Q2 2025,2844.0,56.0,2.0,2.66,433.0,16.0,417.0,220.0,,,,,,,,21.192,
+Q3 2025,2948.0,210.0,7.1,9.89,685.0,16.0,669.0,529.0,,,,15326.0,4103.0,5015.0,2770.0,21.192,
+Q4 2025,3177.0,110.0,3.5,5.19,787.0,20.0,767.0,734.0,,,,16171.0,4267.0,5365.0,3089.0,21.192,
+FY2025,11623.0,512.0,4.4,24.15,2732.0,68.0,2664.0,2533.0,,8700.0,415.0,2126.0,382.0,16171.0,4267.0,5365.0,3089.0,21.192,
+Q1 2026,3181.0,367.0,11.5,17.32,897.0,19.0,878.0,840.0,,,,16969.0,4609.0,5122.0,3010.0,21.192,`;
 
+// ============================================================
+// EMBEDDED ANALYSIS JSON
+// ============================================================
 const analysis = {
   "ticker": "CSU",
   "company_name": "Constellation Software Inc.",
-  "exchange": "TSX",
-  "overview": "Constellation Software is a Canadian serial acquirer of vertical market software (VMS) businesses, founded by Mark Leonard in 1995. The company acquires and manages hundreds of small-to-mid-sized software businesses serving specific niche verticals (transit, healthcare, education, public sector, utilities, hospitality, and many others) across six operating groups: Volaris, Harris, Jonas, Vela, Perseus, and Topicus. Operating in over 100 countries, Constellation has grown from a single-digit revenue business to a $10B+ revenue conglomerate while maintaining decentralized management and rigorous capital allocation discipline.",
+  "overview": "Constellation Software is a Canadian serial acquirer of vertical market software (VMS) businesses, founded by Mark Leonard in 1995 and headquartered in Toronto. The company acquires and manages hundreds of small-to-mid-sized software businesses serving specific niche verticals across six operating groups globally. Operating in over 100 countries and reporting in USD, Constellation has grown revenue from ~$1B in 2011 to $11.6B in FY2025, compounding almost entirely through disciplined serial acquisition.",
   "business_model": {
-    "summary": "Constellation acquires VMS businesses at IRR hurdle rates (historically ~25-30% for small/mid, ~20% for large deals), then manages them perpetually without selling. Revenue is predominantly recurring maintenance and SaaS fees (~75%). The company reinvests virtually all free cash flow into further acquisitions, compounding intrinsic value per share over time.",
+    "summary": "Constellation acquires VMS businesses at IRR hurdle rates (historically ~25-30% for small/mid, ~20% for large deals), then manages them perpetually without selling. Revenue is predominantly recurring maintenance and SaaS fees (~75%). The company reinvests virtually all free cash flow into further acquisitions. In 2025-2026 it introduced the PEMS (Permanent Engaged Minority Shareholder) strategy as a complementary capital deployment vehicle for very large opportunities.",
     "revenue_streams": [
-      {"name": "Maintenance and other recurring", "percent": 75, "trend": "growing"},
+      {"name": "Maintenance & other recurring", "percent": 75, "trend": "growing"},
       {"name": "Professional services", "percent": 18, "trend": "stable"},
       {"name": "Licenses", "percent": 4, "trend": "declining"},
-      {"name": "Hardware and other", "percent": 3, "trend": "stable"}
+      {"name": "Hardware & other", "percent": 3, "trend": "stable"}
     ]
   },
   "competitive_position": {
-    "main_competitors": ["Vista Equity Partners (PE)", "Thoma Bravo (PE)", "Roper Technologies", "Francisco Partners (PE)", "Hg Capital (PE, European)", "Topicus.com (TSXV:TOI)", "Enghouse Systems"],
+    "main_competitors": ["Vista Equity Partners","Thoma Bravo","Roper Technologies","Hg Capital","Francisco Partners","Topicus.com (spun-out)","Lumine Group (spun-out)","Enghouse Systems","CSI-imitator roll-ups"],
     "moat_factors": [
-      {"factor": "Switching costs in portfolio companies", "strength": "very strong", "description": "VMS businesses serve niche verticals with deeply embedded, mission-critical software. Customers face enormous switching costs leading to ~90%+ maintenance retention."},
-      {"factor": "Reputation as perpetual owner", "strength": "strong", "description": "Founders and owner-managers of VMS businesses value Constellation's 'never sell' philosophy and cultural fit over purely financial buyers."},
-      {"factor": "Institutional M&A playbook", "strength": "strong", "description": "30 years of post-acquisition reviews (PARs) across 500+ acquisitions creates a compounding advantage in deal sourcing and portfolio management."},
-      {"factor": "Capital allocation flywheel", "strength": "strong", "description": "FCFA2S of ~$1.5-2B/year redeployed at IRR hurdle rates, compounding returns without diluting shareholders. Near-zero share issuance since IPO."}
+      {"factor": "Switching costs in portfolio companies","strength": "very strong","description": "VMS businesses serve niche verticals with deeply embedded, mission-critical software. Customers face enormous switching costs (retraining, data migration, workflow disruption), leading to low churn and sticky maintenance revenue averaging 90%+ retention."},
+      {"factor": "Reputation as perpetual owner","strength": "strong","description": "Founders value Constellation's 'never sell' philosophy and cultural fit over purely financial buyers, creating a proprietary deal pipeline unavailable to PE firms."},
+      {"factor": "Institutional M&A knowledge","strength": "strong","description": "30 years of post-acquisition reviews (PARs) and best practices across 500+ acquisitions creates a compounding advantage in deal sourcing, due diligence, and portfolio management."},
+      {"factor": "Capital allocation flywheel","strength": "strong","description": "FCFA2S of $1,683M in FY2025 (growing ~14% YoY) is continuously redeployed at IRR hurdle rates, compounding returns without diluting shareholders. Stable share count since IPO."}
     ],
-    "weaknesses": ["Low organic growth historically (2-4%)", "PE competition inflating acquisition multiples", "Harder to deploy $2B/yr at 25%+ IRR than prior years", "Altera (healthcare IT) drag on margins"]
+    "weaknesses": [
+      "Organic growth historically low (2-4%), only recently improving to 4-6%",
+      "Competition from PE firms and CSI-imitators inflating acquisition multiples",
+      "Altera (Allscripts healthcare IT) has been a persistent drag with negative organic growth",
+      "PEMS strategy is unproven at scale; Sabre investment is a significant departure from the core model",
+      "Mark Leonard's complete Board departure (May 2026) removes last formal governance link to founding philosophy"
+    ]
   },
   "growth_drivers": [
-    "Continued small/mid VMS acquisition pace - targeting 50-100+ acquisitions per year",
-    "Improving organic growth: Q2-Q3 2025 organic growth of 5% vs 1-2% in 2024",
-    "European expansion via Topicus (€388M revenue in Q3 2025, 24% growth)",
-    "Lumine Group media/telecom VMS consolidation strategy",
-    "Asseco Poland investment (24.83% stake, ~$463M) - expanding beyond traditional VMS",
-    "Large VMS pursuit - dedicated head office team for multi-hundred-million dollar deals",
-    "AI integration within portfolio companies to accelerate organic growth"
+    "Record Q1 2026 acquisition deployment: $809M closed + $786M committed post-quarter = ~$1.6B in first 4-5 months, on track for record annual deployment",
+    "PEMS strategy expands the capital deployment universe to very large businesses; Sabre (12.7% stake in US travel tech) is the first meaningful expression",
+    "European expansion via Topicus (Q1 2026 revenue $510M, +36% YoY in USD) in a large, fragmented, less PE-contested market",
+    "Lumine Group media/telecom VMS consolidation: Q1 2026 revenue $208M (+16% YoY)",
+    "Asseco Poland equity method investment (~23.14% stake, fair value $872M vs. carrying $590M at Q1 2026)",
+    "AI integration as offensive tool: VMS companies integrating AI to improve products and create new revenue layers on top of mission-critical data assets",
+    "Improving organic growth trend: FY2025 4% (up from ~2% in 2024); Q1 2026 6% reported"
   ],
   "risks": {
     "business": [
-      {"risk": "Founder departure / key man dependency", "severity": "high", "description": "Mark Leonard resigned September 2025 for health reasons. Mark Miller (30+ years at CSI/Volaris) appointed as new President. Stock fell ~12% on the news."},
-      {"risk": "PE competition for acquisitions", "severity": "high", "description": "Vista Equity, Thoma Bravo, and dozens of PE firms actively compete for VMS targets, inflating multiples and compressing IRRs."},
-      {"risk": "Altera integration and turnaround", "severity": "moderate", "description": "Altera (Allscripts hospital IT, ~$1.4B acquisition) shows negative organic revenue growth (-5 to -9%) and is a drag on group margins."},
-      {"risk": "Organic growth shortfall", "severity": "moderate", "description": "Historical 2-4% organic growth is below software investor expectations. Recent 5% improvement encouraging but not yet proven sustainable."}
+      {"risk": "Competition for acquisitions from PE firms","severity": "high","description": "Vista Equity Partners, Thoma Bravo, Hg Capital, and dozens of other PE firms actively compete for the same VMS targets, inflating multiples. CSI was historically only invited to ~16% of large VMS auctions."},
+      {"risk": "AI disruption to VMS products ('SaaSpocalypse')","severity": "moderate","description": "The February 2026 'SaaSpocalypse' highlighted AI agent disruption fears. Management argues VMS moats (proprietary data, regulatory workflows, switching costs) make these businesses defensible."},
+      {"risk": "Organic growth shortfall","severity": "moderate","description": "Q1 2026 FX-adjusted organic growth was only 2% - a step backward from the improving trend. FY2025 was 3% FX-adjusted."},
+      {"risk": "PEMS strategy execution risk","severity": "moderate","description": "The Sabre PEMS investment is a significant departure from the core model. Minority investing in public distressed companies requires different skills and outcomes are less controllable."}
     ],
     "financial": [
-      {"risk": "Rising debt levels", "severity": "moderate", "description": "Total debt $5.0B at Q3 2025. $1B Senior Notes issued Feb 2024 at 5.16-5.46%."},
-      {"risk": "IRGA liability (Topicus put option)", "severity": "moderate", "description": "Joday Group put option reached ~$1.03B at Q3 2025, Euro-denominated and growing with Topicus maintenance revenue."},
-      {"risk": "Declining ROIC at scale", "severity": "moderate", "description": "Deploying $2B+ per year at 20-25%+ IRR is increasingly difficult as the company scales."}
+      {"risk": "Non-cash income volatility","severity": "moderate","description": "FY2025 net income impacted by $440M IRGA revaluation charge and $260M Asseco reclassification loss - causing GAAP net income to fall from $731M to $512M despite strong operations."},
+      {"risk": "Rising debt and IRGA liability","severity": "moderate","description": "Total debt ~$5.2B at Q1 2026. IRGA liability (Topicus Joday put option) ~$1,234M at Dec 2025 is a material contingent obligation not in the reported debt figure."}
     ],
-    "regulatory": [],
-    "macro": [
-      {"risk": "Interest rate environment", "severity": "moderate", "description": "Higher rates increase acquisition financing costs and raise required IRR hurdles for competitive bidding."}
+    "regulatory": [
+      {"risk": "Global tax environment","severity": "moderate","description": "OECD Pillar Two global minimum tax and cross-border transfer pricing audits. Effective tax rate was 38% in FY2025 vs. 24% in 2024."}
+    ],
+    "execution": [
+      {"risk": "Mark Leonard Board departure","severity": "high","description": "Leonard did not stand for re-election at the May 2026 AGM, completing his formal governance departure. Mark Miller (President, 30+ years at CSI/Volaris) leads the company. No investor has seen CSU execute through a multi-year cycle without Leonard in formal governance."},
+      {"risk": "Capital deployment at scale","severity": "moderate","description": "Deploying $1.5-2B+ per year sustainably at target IRRs requires continuously expanding M&A capacity without quality degradation."}
     ]
   },
   "bull_case": [
-    "30-year compounding track record: Revenue and FCFA2S per share compounded at 20-30%+ annually through multiple cycles. Decentralized model has proven remarkably durable.",
-    "Massive addressable market: Thousands of VMS businesses globally still unacquired. Topicus opens European opportunities with less PE competition.",
-    "FCFA2S acceleration: FCFA2S grew 46% YoY in Q3 2025 and 27% for full year 2024. $1.5B+ annual free cash flow and growing.",
-    "Improving organic growth: Q2-Q3 2025 showed 5% organic growth, significant improvement from 1-2% in 2024.",
-    "Stock down ~34% from ATH: CSU at ~CAD $2,350-2,400 vs. 52-week high near CAD $5,300, potentially creating a compelling entry point.",
-    "Asseco Poland investment signals willingness to deploy capital in new ways, opening a much larger opportunity set."
+    "Record Q1 2026 acquisition deployment ($809M closed + $786M committed) suggests FY2026 could far exceed prior annual records, driving significant inorganic revenue growth into 2027",
+    "PEMS strategy structurally expands the capital deployment opportunity set - Mark Leonard advising specifically on PEMS means CSI's most experienced capital allocator is focused on unlocking large-company opportunities previously inaccessible",
+    "AI as an opportunity, not just a threat: portfolio companies sit on proprietary mission-critical data, making them ideal AI integrators; a workflow automation layer could accelerate organic growth from 2-4% toward 6-10%",
+    "Asseco Poland stake represents ~$282M embedded unrealized gain at Q1 2026 - significant additional NAV per share (~$13 USD / ~$19 CAD) not reflected in the DCF",
+    "Stock has de-rated ~47% from all-time highs (~CAD $5,300) to ~CAD $2,877, yet the underlying business continues to compound; analyst consensus ~CAD $3,945-4,025 implies ~40% upside",
+    "Decentralized model proven resilient through leadership transition: six Operating Group presidents each running their own mini-Constellations protects against single points of failure"
   ],
   "bear_case": [
-    "Mark Leonard is irreplaceable: Leonard was the architect of CSI's philosophy and capital allocation genius. Re-earning the premium will take years of demonstrated execution.",
-    "Declining ROIC is structural: As CSI deploys $2B+/year, maintaining 20-25%+ IRRs becomes geometrically harder.",
-    "PE competition is not abating: Vista Equity, Thoma Bravo, Hg Capital with combined hundreds of billions will continue bidding up VMS multiples.",
-    "Demanding valuation: At ~53x trailing earnings, CSI requires sustained 20%+ FCF growth. Any deceleration could cause further multiple compression.",
-    "Altera persistent overhang: ~$1.4B Allscripts acquisition consistently shows negative organic revenue growth (-5 to -9%). Full turnaround timeline unclear."
+    "Mark Leonard's complete Board departure (May 2026) removes the last formal governance link to the company's founding philosophy; no investor has seen CSU execute through a multi-year cycle without Leonard in formal governance",
+    "FX-adjusted organic growth was only 2% in Q1 2026 - a step backward from the improving trend; if AI substitution accelerates in certain VMS verticals, organic growth could turn negative in affected segments",
+    "FCFA2S growth decelerated to 14% in FY2025 (vs. 27% in FY2024); sustaining historical compounding returns at $2B+ annual deployment is mathematically harder",
+    "The Sabre PEMS investment raises strategic questions: a distressed, debt-laden US public travel tech company is very different from the stable, profitable niche VMS businesses CSU has built its reputation on",
+    "At CAD ~$2,877 with forward P/E ~42x, CSU trades at a premium valuation demanding continued high-single-digit-to-double-digit revenue growth; any sustained deceleration or PEMS missteps could cause further multiple compression"
   ],
   "recent_developments": [
-    {"date": "2025-09-25", "event": "Mark Leonard resigns as President for health reasons. Mark Miller (30+ years at CSI/Volaris) appointed as new President. Stock fell ~12%."},
-    {"date": "2025-11-07", "event": "Q3 2025 results: Revenue $2.95B (+16% YoY), FCFA2S $529M (+46% YoY), organic growth 5%. Nine-month acquisition spending $955M."},
-    {"date": "2025-10-01", "event": "Topicus completes acquisition of 14.84% Asseco Poland treasury shares, bringing CSI group's total stake to ~24.83% (~$463M total investment)."},
-    {"date": "2025-01-31", "event": "Constellation purchased 9.99% of Asseco Poland for $174M - first major move into a large, listed, diversified IT company."},
-    {"date": "2024-12-31", "event": "Full year 2024: Revenue $10.07B (+20% YoY), FCFA2S $1.47B (+27% YoY), net income $731M (+29% YoY). $1.68B in acquisitions - largest annual spend in company history."},
-    {"date": "2024-02-16", "event": "CSI completed $1B Senior Notes offering: $500M at 5.158% due 2029 and $500M at 5.461% due 2034."},
-    {"date": "2026-02", "event": "CSU trading around CAD $2,350-2,400, down ~34% from ATH near CAD $5,300. Market cap ~CAD $50B. PE ratio ~53x TTM earnings."}
+    {"date": "2026-06-19","event": "Q1 2026 dividend of $1.00/share declared in May, payable July 10, 2026. Quarterly dividend maintained at $1.00/share ($4.00 annualized)."},
+    {"date": "2026-05-15","event": "Annual General Meeting: Mark Leonard did not stand for re-election to the Board, completing his formal governance departure. Leonard remains as advisor focused on the PEMS strategy."},
+    {"date": "2026-05-12","event": "Q1 2026 results: Revenue $3,181M (+20% YoY), net income $367M ($17.32/share). Acquisitions: $809M closed (Synchronoss $309M + 20+ smaller deals). Post-quarter committed: $786M."},
+    {"date": "2026-03-27","event": "CSI and Sabre Corporation reached a governance agreement after CSI disclosed a 12.7% stake - the first 'meaningful expression' of the PEMS strategy. A Constellation executive was appointed to Sabre's Board."},
+    {"date": "2026-03-09","event": "FY2025 results: Revenue $11,623M (+15% YoY), FCFA2S $1,683M (+14% YoY), organic growth 4% (3% FX-adjusted). Net income $512M (down from $731M due to $440M IRGA revaluation charge)."},
+    {"date": "2025-10-01","event": "Topicus completes acquisition of Asseco Poland treasury shares, bringing total CSI group shareholding to ~23.14%. Asseco fair value $1,220M at year-end vs. carrying value of $575M."},
+    {"date": "2025-09-25","event": "Mark Leonard resigns as President for health reasons. Mark Miller (COO, 30+ years at CSI/Volaris) appointed as new President. Stock fell ~12% on the news."},
+    {"date": "2025-06-02","event": "CSI acquires Cipal Schaubroeck NV, a Belgium-based local government VMS company, for $258M - one of the larger individually-disclosed acquisitions in FY2025."}
   ],
   "guidance": {
-    "as_of": "Q3 2025 Earnings (November 7, 2025)",
-    "fiscal_year": "FY2025",
+    "as_of": "Q1 2026 Results (May 12, 2026)",
+    "fiscal_year": "FY2026",
     "items": [
-      {"metric": "Acquisition pace", "target": "Continue to deploy FCFA2S at hurdle rates; targeting $1.5-2B+ annually", "period": "Ongoing", "vs_prior": "maintained", "notes": "Nine-month 2025 spend was $955M. Full-year 2024 was $1.79B total consideration."},
-      {"metric": "Organic revenue growth", "target": "Improving trend from ~2% toward 5%+", "period": "FY2025", "vs_prior": "raised", "notes": "Organic growth was 1-2% for most of 2024, improving to 5% in Q2 and Q3 2025 (3% FX-adjusted)."},
-      {"metric": "Capital allocation strategy", "target": "No special dividends; quarterly dividend $1.00/share; all FCFA2S to acquisitions", "period": "FY2025-beyond", "vs_prior": "maintained", "notes": "Mark Miller confirmed he will continue Mark Leonard's playbook."},
-      {"metric": "FCFA2S growth", "target": "~25-30% annual growth based on recent trajectory", "period": "FY2025", "vs_prior": "maintained", "notes": "Nine-month 2025 FCFA2S was $1.26B (+27% YoY). Full-year 2024 was $1.47B."},
-      {"metric": "Asseco Poland strategic relationship", "target": "Long-term strategic partner, not a financial trade", "period": "Long-term", "vs_prior": "new", "notes": "Designated as FVOCI (held for long-term). Signals expanding circle of competence beyond traditional VMS."},
-      {"metric": "Large VMS acquisition strategy", "target": "Target 1-2 large VMS acquisitions per year at ~20% IRR", "period": "Ongoing", "vs_prior": "maintained", "notes": "Dedicated head office team being built. Competition from PE is intense for large deals."}
+      {"metric": "Acquisition pace","target": "Record 2026 pace; Q1 alone: $809M closed + $786M committed = ~$1.6B in first 4-5 months","period": "FY2026","vs_prior": "raised","notes": "Full-year FY2025 total was $1,579M. The 2026 pace is already tracking materially above trend."},
+      {"metric": "FCFA2S","target": "~$1.7-1.9B expected for FY2026; Q1 OCF of $897M suggests strong underlying generation","period": "FY2026","vs_prior": "maintained","notes": "FY2025 FCFA2S $1,683M (+14% YoY). No formal target given."},
+      {"metric": "Organic revenue growth","target": "Low-to-mid single digits FX-adjusted; 4-6% reported","period": "FY2026","vs_prior": "maintained","notes": "Q1 2026 reported 6% (2% FX-adjusted). FY2025 was 4% (3% FX-adjusted)."},
+      {"metric": "Capital allocation - dividends","target": "$1.00/share/quarter ($4.00 annualized); no buybacks; all FCFA2S into acquisitions","period": "FY2026-ongoing","vs_prior": "maintained","notes": "No change to capital return policy under Mark Miller."},
+      {"metric": "PEMS strategy","target": "Sabre is first meaningful expression; Leonard as advisor focused on PEMS pipeline","period": "Long-term","vs_prior": "new","notes": "PEMS allows CSI to deploy into very large businesses where full acquisition is not feasible. Scale of future investments unclear but potentially material."},
+      {"metric": "Asseco Poland stake","target": "23.14% held long-term under equity method; carrying value $590M, fair value $872M","period": "Long-term","vs_prior": "maintained","notes": "Embedded unrealized gain ~$282M at Q1 2026. Strategic, not financial, holding."}
     ],
-    "management_commentary": "Mark Miller (Q3 2025 earnings): 'We'll just continue to focus on the same things that we always have here at Constellation.' The company emphasizes its decentralized model, focus on perpetual ownership of VMS businesses, and disciplined IRR-based capital allocation are unchanged. Management acknowledges organic growth improvement as a continued priority for Operating Group managers."
+    "management_commentary": "Mark Miller (Q1 2026 earnings, May 2026): Emphasized the strength of the acquisition pipeline and 'leaning in' to deal flow amid the 'SaaSpocalypse' software sector disruption. Management argues CSI is 'well-positioned' to handle AI disruption given VMS moats of proprietary data, customer relationships, and mission-critical workflow integration. The company views market anxiety about AI as a potential source of attractively priced acquisition opportunities. Miller confirmed the PEMS strategy as a complementary capital deployment avenue and noted Leonard's advisor role focused on PEMS execution."
   }
 };
 
+// ============================================================
+// EMBEDDED DCF JSON
+// ============================================================
 const dcfData = {
-  "ticker": "CSU",
-  "current_price_cad": 2258.18,
-  "current_price_usd": 1580.73,
-  "usd_cad_rate": 0.70,
+  "current_price_cad": 2818.02,
+  "current_price_usd": 1984.99,
+  "usd_cad_rate": 0.7045,
   "inputs": {
     "shares_outstanding": 21.192,
-    "net_debt": 2245.0,
-    "total_debt": 5015.0,
-    "cash": 2770.0,
-    "last_fcf": 1741.0,
+    "last_fcf": 1900.0,
+    "net_debt": 2112.0,
     "currency": "USD",
     "units": "millions"
   },
   "historical_growth": {
-    "revenue_3yr_cagr": 25.4,
-    "revenue_5yr_cagr": 23.6,
-    "eps_3yr_cagr": 33.0,
-    "eps_5yr_cagr": 17.0,
-    "equity_3yr_cagr": 29.3,
-    "equity_5yr_cagr": 36.8,
-    "fcf_3yr_cagr": 18.6,
-    "fcf_5yr_cagr": 20.1,
-    "selected_growth_rate": 20.1,
-    "growth_rate_source": "fcf_5yr_cagr",
-    "growth_divergence_warning": null
+    "revenue_3yr_cagr": 20.6,
+    "revenue_5yr_cagr": 24.0,
+    "eps_3yr_cagr": -0.1,
+    "eps_5yr_cagr": 3.2,
+    "equity_3yr_cagr": 30.2,
+    "equity_5yr_cagr": 32.4,
+    "fcf_ocf_minus_capex_3yr_cagr": 28.5,
+    "fcf_ocf_minus_capex_5yr_cagr": 18.1,
+    "fcfa2s_3yr_cagr": 25.4,
+    "fcfa2s_5yr_cagr": 11.2,
+    "fcfa2s_6yr_cagr": 19.1,
+    "selected_growth_rate": 18,
+    "growth_rate_source": "FCFA2S 6yr CAGR (best long-run estimate)"
   },
   "assumptions": {
-    "base": {"growth_rates": [20, 17, 15, 13, 12], "wacc": 10, "terminal_growth": 3.0, "fcf_margin": 14.6},
-    "bull": {"growth_rates": [25, 22, 19, 17, 15], "wacc": 9, "terminal_growth": 3.5, "fcf_margin": 17.0},
-    "bear": {"growth_rates": [12, 10, 8, 6, 5], "wacc": 12, "terminal_growth": 2.5, "fcf_margin": 11.5}
+    "base": {"growth_rates": [18,16,14,13,12],"wacc": 10.0,"terminal_growth": 3.0,"fcf_margin": 14.5,"notes": "Normalised FCFA2S base $1,900M grows at 18% in Y1, decelerating to 12% by Y5."},
+    "bull": {"growth_rates": [22,20,18,16,15],"wacc": 9.0,"terminal_growth": 3.5,"fcf_margin": 17.0,"notes": "Record Q1 2026 pace sustained; PEMS adds capital deployment; Topicus/Lumine aggressive expansion; organic improves to 6-8%."},
+    "bear": {"growth_rates": [12,10,9,8,7],"wacc": 12.0,"terminal_growth": 2.5,"fcf_margin": 11.0,"notes": "Leadership transition disruption; PE competition severely compresses IRRs; PEMS disappoints; FX-adjusted organic at 2%."}
   },
   "valuation": {
-    "base": {"intrinsic_value_usd": 1919.00, "intrinsic_value_cad": 2741.43, "upside_vs_current_usd": 21.4},
-    "bull": {"intrinsic_value_usd": 2916.10, "intrinsic_value_cad": 4165.86, "upside_vs_current_usd": 84.5},
-    "bear": {"intrinsic_value_usd": 1022.20, "intrinsic_value_cad": 1460.29, "upside_vs_current_usd": -35.3}
+    "base": {"intrinsic_value_usd": 2038.69,"intrinsic_value_cad": 2893.81,"upside_vs_current_cad": 2.7},
+    "bull": {"intrinsic_value_usd": 3019.35,"intrinsic_value_cad": 4285.80,"upside_vs_current_cad": 52.1},
+    "bear": {"intrinsic_value_usd": 1177.13,"intrinsic_value_cad": 1670.88,"upside_vs_current_cad": -40.7}
   },
   "entry_price": {
-    "base": {"entry_price_usd": 1228.10, "entry_price_cad": 1754.43},
-    "bull": {"entry_price_usd": 1876.80, "entry_price_cad": 2681.14},
-    "bear": {"entry_price_usd": 652.64, "entry_price_cad": 932.34}
-  },
-  "sensitivity": {
-    "wacc_range": [8, 9, 10, 11, 12],
-    "terminal_growth_range": [2.0, 2.5, 3.0, 3.5, 4.0],
-    "matrix": [
-      [2356, 2543, 2768, 3042, 3385],
-      [1989, 2120, 2272, 2452, 2669],
-      [1714, 1810, 1919, 2045, 2192],
-      [1501, 1573, 1655, 1747, 1852],
-      [1331, 1387, 1449, 1519, 1597]
-    ]
+    "base": {"entry_price_usd": 1295.82,"entry_price_cad": 1839.33},
+    "bull": {"entry_price_usd": 1932.31,"entry_price_cad": 2743.00},
+    "bear": {"entry_price_usd": 745.77,"entry_price_cad": 1058.55}
   },
   "probability_weighted": {
-    "weighted_iv_usd": 1944.07,
-    "weighted_iv_cad": 2777.24
+    "weighted_iv": 2068.47,
+    "weighted_iv_cad": 2936.08,
+    "upside_vs_current_usd": 4.2
+  },
+  "sensitivity": {
+    "wacc_range": [8,9,10,11,12],
+    "terminal_growth_range": [2.0,2.5,3.0,3.5,4.0],
+    "matrix": [
+      [3548,3828,4164,4575,5088],
+      [2999,3194,3423,3692,4016],
+      [2587,2730,2894,3082,3303],
+      [2268,2376,2498,2636,2793],
+      [2013,2097,2190,2295,2412]
+    ]
   }
 };
 
-// =====================================================================
-// PARSE CSV
-// =====================================================================
+// ============================================================
+// METRIC DESCRIPTIONS (modals)
+// ============================================================
+const metricDescriptions = {
+  revenue: {
+    title: "Annual Revenue",
+    content: `<p><strong>Revenue</strong> is the total income from Constellation's portfolio of vertical market software businesses, predominantly recurring maintenance and SaaS fees.</p>
+    <div class="metric-highlight"><strong>For CSU:</strong> ~75% of revenue is recurring maintenance and SaaS, making revenue highly predictable. Growth is driven almost entirely by acquisitions, not organic expansion. FY2025 revenue reached $11,623M (+15% YoY).</div>
+    <p><strong>What to watch:</strong></p><ul>
+    <li>Organic growth component (currently 4-6% reported, 2-3% FX-adjusted)</li>
+    <li>Acquisition contribution to growth (the primary driver at 10-13%)</li>
+    <li>Maintenance vs. services revenue mix (higher maintenance = higher quality)</li></ul>`
+  },
+  revenueGrowth: {
+    title: "Revenue Growth Rate",
+    content: `<p><strong>Revenue growth</strong> for CSU reflects almost entirely inorganic (acquisition) growth, with a modest organic component.</p>
+    <div class="metric-highlight"><strong>CSU context:</strong> The 3-5yr revenue CAGR of 20-24% is driven by ~100 acquisitions per year. Organic growth of 4-6% is improving but remains modest. The key insight is that revenue growth OVERSTATES FCFA2S growth because acquired revenue comes at a cost (acquisition price). FCFA2S per share is the better long-run compounding metric.</div>
+    <p><strong>What to watch:</strong></p><ul>
+    <li>Organic growth improving from ~2% toward 4-6% - if it reaches 8-10%, it's highly value-additive</li>
+    <li>FX headwinds/tailwinds (reports in USD but has large EUR, GBP exposure)</li></ul>`
+  },
+  fcfa2s: {
+    title: "FCFA2S (Free Cash Flow Available to Shareholders)",
+    content: `<p><strong>FCFA2S</strong> is CSU management's preferred intrinsic value metric. It equals operating cash flow minus maintenance CapEx minus lease payments, attributable only to CSI shareholders (excluding Topicus/Lumine NCI).</p>
+    <div class="metric-highlight"><strong>Why FCFA2S?</strong> Unlike GAAP earnings (distorted by non-cash charges like IRGA revaluations), FCFA2S captures the actual cash generation available to compound through further acquisitions. FY2025 FCFA2S was $1,683M; LTM (through Q1 2026) was $2,323M.</div>
+    <p><strong>What to watch:</strong></p><ul>
+    <li>YoY FCFA2S growth (decelerated from 27% in FY2024 to 14% in FY2025 - a key concern)</li>
+    <li>Q1 is seasonally the strongest OCF quarter; LTM figures should be interpreted carefully</li>
+    <li>Ratio of FCFA2S to acquisition spend (reinvestment rate)</li></ul>`
+  },
+  ocf: {
+    title: "Operating Cash Flow vs CapEx",
+    content: `<p><strong>Operating cash flow (OCF)</strong> shows the cash generated by CSU's portfolio businesses. <strong>CapEx</strong> (maintenance capital expenditure) is extremely low for software businesses - typically $60-70M on ~$11B of revenue.</p>
+    <div class="metric-highlight"><strong>CSU is a capital-light model:</strong> CapEx/Revenue ratio is typically &lt;1%. This means OCF and FCF are very close, and virtually all OCF can be redeployed into acquisitions. FY2025 OCF was $2,732M on $11,623M revenue (23.5% OCF margin).</div>
+    <p><strong>What to watch:</strong></p><ul>
+    <li>OCF margin trend (improving from ~20% to ~23% in FY2025)</li>
+    <li>Q1 seasonally elevated due to maintenance billing cycles</li></ul>`
+  },
+  fcfa2sGrowth: {
+    title: "FCFA2S Annual Growth Rate",
+    content: `<p><strong>FCFA2S growth rate</strong> is the single most important metric for evaluating CSU's value-creation progress.</p>
+    <div class="metric-highlight"><strong>Context:</strong> FCFA2S grew from $559M (FY2018) to $1,683M (FY2025) - a 6yr CAGR of 19.1%. The FY2021-22 weakness ($883M and $853M) reflected the Topicus spinout and Altera drag. The reacceleration in FY2023-24 (36% and 27%) is encouraging, though FY2025's 14% was a step-back.</div>
+    <p><strong>What to watch:</strong></p><ul>
+    <li>Whether growth reaccelerates toward 20%+ given record 2026 acquisition pace</li>
+    <li>LTM FCFA2S of $2,323M suggests the underlying run-rate is well above the $1,683M FY2025 figure</li></ul>`
+  },
+  margins: {
+    title: "FCF Margin & Net Margin",
+    content: `<p><strong>FCF Margin</strong> (FCF / Revenue) and <strong>Net Margin</strong> (GAAP Net Income / Revenue) reflect profitability at different levels of the income statement.</p>
+    <div class="metric-highlight"><strong>GAAP Net Margin is not CSU's relevant profitability metric.</strong> FY2025 net margin of 4.4% was depressed by $440M IRGA revaluation charge and $260M Asseco reclassification loss. FCF Margin of 22.9% is a far more useful signal of underlying cash generation quality.</div>
+    <p><strong>What to watch:</strong></p><ul>
+    <li>FCF margin trend - improving from ~18% (2019) toward 23% as organic growth improves</li>
+    <li>Net margin is heavily distorted by non-cash items; ignore year-to-year swings</li></ul>`
+  },
+  netIncome: {
+    title: "Net Income (GAAP)",
+    content: `<p><strong>GAAP Net Income</strong> for CSU attributable to CSI shareholders.</p>
+    <div class="metric-highlight"><strong>GAAP earnings are highly misleading for CSU.</strong> FY2025 net income fell from $731M to $512M despite strong operating performance, due to: (1) $440M IRGA revaluation charge (non-cash); (2) $260M Asseco equity method reclassification loss (non-cash); (3) $154M FX loss. These items should be stripped out to assess business quality.</div>
+    <p><strong>What to watch:</strong></p><ul>
+    <li>Q1 2026 net income was $367M ($17.32/share) - one of the highest quarterly results ever, benefiting from IRGA revaluation credit</li>
+    <li>Use FCFA2S, not GAAP net income, to evaluate CSU's progress</li></ul>`
+  },
+  eps: {
+    title: "EPS Diluted",
+    content: `<p><strong>Diluted EPS</strong> for Constellation Software - GAAP earnings per share attributable to CSI common shareholders.</p>
+    <div class="metric-highlight"><strong>CSU has 21.192M shares outstanding and this has not changed since IPO.</strong> There is essentially zero dilution from options or share issuance. However, EPS is distorted by the same non-cash items as net income. LTM EPS (Q2 2025 through Q1 2026) = $35.06, which is more representative than FY2025's $24.15.</div>
+    <p><strong>What to watch:</strong></p><ul>
+    <li>The stable share count means FCFA2S per share = FCFA2S total / 21.192M</li>
+    <li>On LTM FCFA2S of $2,323M, FCFA2S/share is ~$109.6 - the true earnings power metric</li></ul>`
+  },
+  balanceSheet: {
+    title: "Total Assets & Shareholders Equity",
+    content: `<p><strong>Total assets</strong> are dominated by intangible assets and goodwill from 500+ acquisitions. <strong>Shareholders equity</strong> reflects the net book value of CSI's portfolio.</p>
+    <div class="metric-highlight"><strong>CSU's book value is not a traditional valuation anchor.</strong> Most acquired businesses have customer relationships and proprietary software that is partially amortized off the balance sheet. The true value of the portfolio is far higher than book equity. At Q1 2026: Total assets $16,969M, Equity $4,609M (including NCI from Topicus/Lumine).</div>
+    <p><strong>What to watch:</strong></p><ul>
+    <li>Equity growth reflects acquisition leverage and goodwill accumulation - not a primary valuation driver</li>
+    <li>CSI-only shareholders equity at Q1 2026 was $3,884M</li></ul>`
+  },
+  debt: {
+    title: "Cash & Total Debt",
+    content: `<p><strong>Cash</strong> and <strong>Total Debt</strong> include both CSI recourse debt and Topicus/Lumine non-recourse subsidiary debt.</p>
+    <div class="metric-highlight"><strong>CSU's debt structure is complex:</strong> Total debt at Q1 2026 is $5,122M (CSI carrying $2,613M + WR/Topicus $2,509M). CSI recourse debt includes $1B Senior Notes and debentures. The $1,234M IRGA liability is NOT included in debt but is a material contingent obligation. Cash of $3,010M provides substantial liquidity. Net debt is $2,112M.</div>
+    <p><strong>What to watch:</strong></p><ul>
+    <li>CSI's $1.085B revolving credit facility is undrawn - ample dry powder for large acquisitions</li>
+    <li>IRGA liability currently ~$1,234M (excluded from debt line); grows as Topicus grows</li></ul>`
+  },
+  qRevenue: {
+    title: "Quarterly Revenue",
+    content: `<p><strong>Quarterly revenue</strong> trend shows the continuous ramp from acquisitions closing throughout each year.</p>
+    <div class="metric-highlight"><strong>CSU's quarterly revenue is not seasonal in the traditional sense</strong> - it steps up each quarter primarily as newly acquired businesses are consolidated for a full quarter. The YoY comparison is the most relevant view. Q1 2026 revenue of $3,181M was +20% YoY.</div>
+    <p><strong>What to watch:</strong></p><ul>
+    <li>YoY growth rate in each quarter (improving from ~15% in FY2025 to 20% in Q1 2026)</li>
+    <li>Post-quarter committed acquisitions of $786M should drive revenue growth into Q2-Q3 2026</li></ul>`
+  },
+  qFCFA2S: {
+    title: "Quarterly FCFA2S",
+    content: `<p><strong>Quarterly FCFA2S</strong> is highly seasonal. Q1 is typically the strongest quarter due to annual maintenance billing cycles in January/February.</p>
+    <div class="metric-highlight"><strong>Q1 2026 FCFA2S was $840M</strong> - the highest single quarter ever reported. Q2 is typically weakest (~$12-220M range historically). Annualizing any single quarter is unreliable; LTM is the best trailing metric. FY2025 total FCFA2S was $2,533M (management FCFA2S: $1,683M - difference relates to NCI treatment).</div>
+    <p><strong>What to watch:</strong></p><ul>
+    <li>Q2 FCFA2S (typically low) as a test of underlying business quality</li>
+    <li>Full-year FCFA2S vs. prior year for the true compounding trend</li></ul>`
+  }
+};
+
+// ============================================================
+// CSV PARSER & DATA SETUP
+// ============================================================
 function parseCSV(csv) {
-    const lines = csv.trim().split('\n');
-    const headers = lines[0].split(',');
-    return lines.slice(1).map(line => {
-        const values = line.split(',');
-        const obj = {};
-        headers.forEach((h, i) => obj[h.trim()] = values[i]?.trim());
-        return obj;
-    });
+  const lines = csv.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.trim());
+  return lines.slice(1).map(line => {
+    const vals = line.split(',');
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = vals[i] ? vals[i].trim() : ''; });
+    return obj;
+  });
 }
 
-const data = parseCSV(csvData);
+const allData = parseCSV(csvData);
 
-data.sort((a, b) => {
-    const parseDate = (p) => {
-        const year = parseInt(p.match(/\d{4}/)?.[0] || '0');
-        const isQ1 = p.includes('Q1'), isQ2 = p.includes('Q2'), isQ3 = p.includes('Q3'), isQ4 = p.includes('Q4');
-        const isFY = p.startsWith('FY');
-        const sub = isQ1 ? 1 : isQ2 ? 2 : isQ3 ? 3 : isQ4 ? 4 : isFY ? 7 : 0;
-        return year * 10 + sub;
-    };
-    return parseDate(a.Period) - parseDate(b.Period);
+function parseDate(p) {
+  const year = parseInt(p.match(/\d{4}/)?.[0] || '0');
+  const isQ1 = p.includes('Q1');
+  const isQ2 = p.includes('Q2');
+  const isQ3 = p.includes('Q3');
+  const isQ4 = p.includes('Q4');
+  const isFY = p.startsWith('FY');
+  const sub = isQ1?1:isQ2?2:isQ3?3:isQ4?4:isFY?7:5;
+  return year * 10 + sub;
+}
+allData.sort((a,b) => parseDate(a.Period) - parseDate(b.Period));
+
+const fyData = allData.filter(d => d.Period.startsWith('FY'));
+const qData  = allData.filter(d => /^Q\d \d{4}/.test(d.Period));
+
+function n(v) { return v && v !== '' ? parseFloat(v) : null; }
+function fmt(v, dec=1) { return v != null ? v.toFixed(dec) : 'N/A'; }
+function fmtB(v) { return v != null ? '$' + (v/1000).toFixed(1) + 'B' : 'N/A'; }
+function fmtM(v) { return v != null ? '$' + v.toFixed(0) + 'M' : 'N/A'; }
+function pct(cur, prev) {
+  if (cur == null || prev == null || prev === 0) return null;
+  return ((cur - prev) / Math.abs(prev) * 100).toFixed(1);
+}
+
+// ============================================================
+// KPI CARDS
+// ============================================================
+const latestFY = fyData[fyData.length - 1];  // FY2025
+const prevFY   = fyData[fyData.length - 2];  // FY2024
+const latestQ  = qData[qData.length - 1];    // Q1 2026
+
+const kpis = [
+  {
+    label: 'FY2025 Revenue',
+    value: fmtB(n(latestFY.Revenue)),
+    change: pct(n(latestFY.Revenue), n(prevFY.Revenue)),
+    sub: 'vs FY2024'
+  },
+  {
+    label: 'Q1 2026 Revenue',
+    value: fmtM(n(latestQ.Revenue)),
+    change: pct(n(latestQ.Revenue), n(qData.filter(d=>d.Period==='Q1 2025')[0]?.Revenue)),
+    sub: 'vs Q1 2025'
+  },
+  {
+    label: 'FY2025 FCFA2S',
+    value: '$1,683M',
+    change: '14.3',
+    sub: 'mgmt reported; vs FY2024'
+  },
+  {
+    label: 'Q1 2026 FCFA2S',
+    value: fmtM(n(latestQ.FCFA2S)),
+    change: pct(n(latestQ.FCFA2S), n(qData.filter(d=>d.Period==='Q1 2025')[0]?.FCFA2S)),
+    sub: 'vs Q1 2025; record quarter'
+  },
+  {
+    label: 'FY2025 Free CF',
+    value: fmtB(n(latestFY.FreeCashFlow)),
+    change: pct(n(latestFY.FreeCashFlow), n(prevFY.FreeCashFlow)),
+    sub: 'OCF minus CapEx'
+  },
+  {
+    label: 'Q1 2026 EPS',
+    value: '$17.32',
+    change: pct(17.32, 6.41),
+    sub: 'vs Q1 2025 $6.41'
+  },
+  {
+    label: 'Shares Outstanding',
+    value: '21.19M',
+    change: null,
+    sub: 'Stable since IPO'
+  },
+  {
+    label: 'Current Price (TSX)',
+    value: 'CAD $2,818',
+    change: null,
+    sub: 'USD $1,985 | June 27 2026'
+  }
+];
+
+const kpiGrid = document.getElementById('kpiGrid');
+kpis.forEach(k => {
+  const chgClass = k.change > 0 ? 'positive' : (k.change < 0 ? 'negative' : '');
+  const chgSign  = k.change > 0 ? '+' : '';
+  kpiGrid.innerHTML += `
+    <div class="kpi-card">
+      <div class="kpi-value">${k.value}</div>
+      <div class="kpi-label">${k.label}</div>
+      ${k.change != null ? `<div class="kpi-change ${chgClass}">${chgSign}${k.change}% YoY</div>` : ''}
+      <div class="kpi-sub">${k.sub}</div>
+    </div>`;
 });
 
-const fyData = data.filter(d => d.Period.startsWith('FY'));
-const qData = data.filter(d => /^Q\d/.test(d.Period));
-
-function v(d, k) { return parseFloat(d[k]) || 0; }
-function fmt(n, dec=1) { return n >= 1000 ? (n/1000).toFixed(dec)+'B' : n.toFixed(dec < 1 ? 0 : dec)+'M'; }
-
-// =====================================================================
-// COLORS
-// =====================================================================
-const colors = {
-    primary: '#00d4aa', secondary: '#00b894', tertiary: '#0984e3',
-    quaternary: '#6c5ce7', warning: '#fdcb6e', danger: '#ff6b6b', purple: '#a29bfe'
-};
-
-const chartDefaults = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } } },
-    scales: {
-        x: { ticks: { color: '#888', maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.05)' } },
-        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
-    }
-};
-
-// =====================================================================
-// KPI CARDS
-// =====================================================================
-function renderKPIs() {
-    const last = fyData[fyData.length - 1];
-    const prev = fyData[fyData.length - 2];
-    const lastQ = qData[qData.length - 1];
-
-    // LTM FCFA2S: Q4 2024 + Q1-Q3 2025
-    const ltmFCFA2S = 482 + 510 + 220 + 529; // from data
-    const ltmFCFA2S_prev = 325 + 250 + 12 + 134; // Q4 2023 + Q1-Q3 2024 actually: Q4-2023=325, Q1-Q3 2024=446+182+362=990 => let's use FY2024 vs FY2023
-    const fcfa2sYoY = ((v(last,'FCFA2S') - v(prev,'FCFA2S')) / v(prev,'FCFA2S') * 100).toFixed(1);
-    const revYoY = ((v(last,'Revenue') - v(prev,'Revenue')) / v(prev,'Revenue') * 100).toFixed(1);
-    const niYoY = ((v(last,'NetIncome') - v(prev,'NetIncome')) / v(prev,'NetIncome') * 100).toFixed(1);
-
-    const kpis = [
-        { label: 'FY2024 Revenue', value: '$10.1B', change: `+${revYoY}% YoY`, pos: true, sub: 'USD' },
-        { label: 'FY2024 FCFA2S', value: '$1.47B', change: `+${fcfa2sYoY}% YoY`, pos: true, sub: "CSU's key metric" },
-        { label: 'LTM FCFA2S', value: '$1.74B', change: '+27% vs FY2024', pos: true, sub: 'Q4-24 to Q3-25' },
-        { label: 'FY2024 Net Income', value: '$731M', change: `+${niYoY}% YoY`, pos: true, sub: 'CSU shareholders' },
-        { label: 'FY2024 EPS (Diluted)', value: '$34.48', change: `+29% YoY`, pos: true, sub: 'USD per share' },
-        { label: 'Net Margin (FY2024)', value: '7.3%', change: 'vs 6.7% FY2023', pos: true, sub: '' },
-        { label: 'Total Debt (Q3 2025)', value: '$5.0B', change: 'vs $4.2B FY2024', pos: false, sub: 'USD' },
-        { label: 'Cash (Q3 2025)', value: '$2.77B', change: 'vs $1.98B FY2024', pos: true, sub: 'USD' },
-        { label: "Shareholders' Equity", value: '$4.1B', change: 'Q3 2025', pos: true, sub: 'vs $3.3B FY2024' },
-        { label: 'Shares Outstanding', value: '21.19M', change: 'Unchanged since 2015', pos: true, sub: 'No dilution, no buybacks' }
-    ];
-
-    const grid = document.getElementById('kpiGrid');
-    grid.innerHTML = kpis.map(k => `
-        <div class="kpi-card">
-            <div class="kpi-value">${k.value}</div>
-            <div class="kpi-label">${k.label}</div>
-            <div class="kpi-change ${k.pos ? 'positive' : 'negative'}">${k.change}</div>
-            ${k.sub ? `<div class="kpi-sub">${k.sub}</div>` : ''}
-        </div>
-    `).join('');
-}
-
-// =====================================================================
-// OVERVIEW
-// =====================================================================
+// ============================================================
+// INVESTMENT OVERVIEW
+// ============================================================
 function toggleOverview() {
-    document.querySelector('.overview-toggle').classList.toggle('active');
-    document.getElementById('overviewContent').classList.toggle('active');
+  const btn = document.getElementById('overviewToggle');
+  const content = document.getElementById('overviewContent');
+  btn.classList.toggle('active');
+  content.classList.toggle('active');
 }
 
-function renderOverview() {
-    const a = analysis;
-    const revenueStreams = a.business_model.revenue_streams.map(s => `
-        <li><div class="revenue-stream">
-            <span>${s.name}</span>
-            <span class="percent trend-${s.trend}">${s.percent}% <span class="trend-${s.trend}">(${s.trend})</span></span>
-        </div></li>
-    `).join('');
+const og = document.getElementById('overviewGrid');
 
-    const moatItems = a.competitive_position.moat_factors.map(m =>
-        `<li><strong>${m.factor}</strong> (${m.strength}): ${m.description}</li>`).join('');
+// Company overview
+og.innerHTML += `<div class="overview-card"><h3>Company Overview</h3><p>${analysis.overview}</p></div>`;
 
-    const allRisks = [...(a.risks.business||[]), ...(a.risks.financial||[]), ...(a.risks.macro||[])];
-    const riskItems = allRisks.map(r =>
-        `<li><span class="risk-${r.severity}">[${r.severity.toUpperCase()}]</span> <strong>${r.risk}</strong>: ${r.description}</li>`).join('');
+// Business model
+let streamsHtml = analysis.business_model.revenue_streams.map(s =>
+  `<li><div class="revenue-stream"><span>${s.name}</span><span class="pct">${s.percent}%</span></div></li>`
+).join('');
+og.innerHTML += `<div class="overview-card"><h3>Business Model</h3><p>${analysis.business_model.summary}</p><ul>${streamsHtml}</ul></div>`;
 
-    const growthItems = a.growth_drivers.map(g => `<li>${g}</li>`).join('');
-    const bullItems = a.bull_case.map(b => `<li>${b}</li>`).join('');
-    const bearItems = a.bear_case.map(b => `<li>${b}</li>`).join('');
-    const devItems = a.recent_developments.map(d => `<li><strong>${d.date}:</strong> ${d.event}</li>`).join('');
-    const compList = a.competitive_position.main_competitors.join(', ');
+// Competitive position
+let moatHtml = analysis.competitive_position.moat_factors.map(m =>
+  `<li><strong>${m.factor}</strong> (${m.strength}): ${m.description}</li>`
+).join('');
+let weakHtml = analysis.competitive_position.weaknesses.map(w => `<li>${w}</li>`).join('');
+og.innerHTML += `<div class="overview-card"><h3>Competitive Position</h3>
+  <p><strong>Competitors:</strong> ${analysis.competitive_position.main_competitors.join(', ')}</p>
+  <p><strong>Moat:</strong></p><ul>${moatHtml}</ul>
+  <p style="margin-top:12px"><strong>Weaknesses:</strong></p><ul>${weakHtml}</ul></div>`;
 
-    document.getElementById('overviewGrid').innerHTML = `
-        <div class="overview-card">
-            <h3>Company Overview</h3>
-            <p>${a.overview}</p>
-        </div>
-        <div class="overview-card">
-            <h3>Business Model</h3>
-            <p>${a.business_model.summary}</p>
-            <ul>${revenueStreams}</ul>
-        </div>
-        <div class="overview-card">
-            <h3>Competitive Position</h3>
-            <p><strong>Competitors:</strong> ${compList}</p>
-            <p><strong>Economic Moat:</strong></p>
-            <ul>${moatItems}</ul>
-        </div>
-        <div class="overview-card">
-            <h3>Growth Drivers</h3>
-            <ul>${growthItems}</ul>
-        </div>
-        <div class="overview-card risks">
-            <h3>Key Risks</h3>
-            <ul>${riskItems}</ul>
-        </div>
-        <div class="overview-card bull">
-            <h3>Bull Case</h3>
-            <ul>${bullItems}</ul>
-        </div>
-        <div class="overview-card bear">
-            <h3>Bear Case</h3>
-            <ul>${bearItems}</ul>
-        </div>
-        <div class="overview-card">
-            <h3>Recent Developments</h3>
-            <ul>${devItems}</ul>
-        </div>
-    `;
-}
+// Operating Groups
+og.innerHTML += `<div class="overview-card"><h3>Six Operating Groups</h3>
+  <ul>
+    <li><strong>Volaris Group</strong> &mdash; Transit, utilities, manufacturing, automotive, telecom</li>
+    <li><strong>Harris Computer</strong> &mdash; Public sector utilities, local government, healthcare (includes Altera)</li>
+    <li><strong>Jonas Software</strong> &mdash; Clubs/hospitality, construction, fitness, media, energy</li>
+    <li><strong>Vela Group</strong> &mdash; Marine, power sports, outdoors, rental</li>
+    <li><strong>Perseus Group</strong> &mdash; Education, legal, public safety, marketing technology</li>
+    <li><strong>Topicus.com (TSXV:TOI)</strong> &mdash; European VMS; CSI ~60.65%; Q1 2026 rev $510M (+36% YoY USD)</li>
+    <li><strong>Lumine Group</strong> &mdash; Media/telecom/broadband VMS; CSI 61.4%; Q1 2026 rev $208M (+16% YoY)</li>
+  </ul></div>`;
 
-// =====================================================================
+// Growth drivers
+let gdHtml = analysis.growth_drivers.map(g => `<li>${g}</li>`).join('');
+og.innerHTML += `<div class="overview-card"><h3>Growth Drivers</h3><ul>${gdHtml}</ul></div>`;
+
+// Key risks
+let allRisks = [
+  ...analysis.risks.business,
+  ...analysis.risks.financial,
+  ...(analysis.risks.regulatory||[]),
+  ...(analysis.risks.execution||[])
+];
+let riskHtml = allRisks.map(r =>
+  `<li><span class="risk-${r.severity}"><strong>[${r.severity.toUpperCase()}]</strong></span> <strong>${r.risk}</strong>: ${r.description}</li>`
+).join('');
+og.innerHTML += `<div class="overview-card risks"><h3>Key Risks</h3><ul>${riskHtml}</ul></div>`;
+
+// Bull case
+let bullHtml = analysis.bull_case.map(b => `<li>${b}</li>`).join('');
+og.innerHTML += `<div class="overview-card bull"><h3>Bull Case</h3><ul>${bullHtml}</ul></div>`;
+
+// Bear case
+let bearHtml = analysis.bear_case.map(b => `<li>${b}</li>`).join('');
+og.innerHTML += `<div class="overview-card bear"><h3>Bear Case</h3><ul>${bearHtml}</ul></div>`;
+
+// Recent developments
+let devHtml = analysis.recent_developments.map(d => `<li><strong>${d.date}:</strong> ${d.event}</li>`).join('');
+og.innerHTML += `<div class="overview-card"><h3>Recent Developments</h3><ul>${devHtml}</ul></div>`;
+
+// ============================================================
 // GUIDANCE
-// =====================================================================
-function renderGuidance() {
-    const g = analysis.guidance;
-    if (!g || !g.items || !g.items.length) { document.getElementById('guidanceSection').style.display='none'; return; }
-    document.getElementById('guidanceAsOf').textContent = g.as_of || '';
-    document.getElementById('guidanceFY').textContent = g.fiscal_year || '';
-    document.getElementById('guidanceGrid').innerHTML = g.items.map(item => {
-        const cls = item.vs_prior ? item.vs_prior.toLowerCase() : 'new';
-        const lbl = item.vs_prior ? item.vs_prior.charAt(0).toUpperCase()+item.vs_prior.slice(1) : 'New';
-        return `<div class="guidance-card">
-            <div class="guidance-metric">${item.metric}</div>
-            <div class="guidance-target">${item.target}</div>
-            <div class="guidance-period">${item.period}</div>
-            <span class="guidance-vs-prior ${cls}">${lbl}</span>
-            ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
-        </div>`;
-    }).join('');
-    const comm = document.getElementById('guidanceCommentary');
-    if (g.management_commentary) { comm.textContent = g.management_commentary; comm.style.display='block'; }
-}
+// ============================================================
+const g = analysis.guidance;
+document.getElementById('guidanceAsOf').textContent = g.as_of;
+document.getElementById('guidanceFY').textContent = g.fiscal_year;
+const guidanceGrid = document.getElementById('guidanceGrid');
+guidanceGrid.innerHTML = g.items.map(item => `
+  <div class="guidance-card">
+    <div class="guidance-metric">${item.metric}</div>
+    <div class="guidance-target">${item.target}</div>
+    <div class="guidance-period">${item.period}</div>
+    <span class="guidance-vs-prior ${item.vs_prior}">${item.vs_prior.charAt(0).toUpperCase()+item.vs_prior.slice(1)}</span>
+    ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+  </div>`).join('');
+const gc = document.getElementById('guidanceCommentary');
+if (g.management_commentary) { gc.textContent = g.management_commentary; }
 
-// =====================================================================
-// METRIC DESCRIPTIONS
-// =====================================================================
-const metricDescriptions = {
-    revenue: {
-        title: "Annual Revenue",
-        content: `<p><strong>Revenue</strong> is the total income from Constellation Software's portfolio of VMS businesses.</p>
-        <div class="metric-highlight"><strong>For CSU:</strong> Revenue has grown from $1.8B (2015) to $10.1B (2024) - almost entirely through acquisitions. Organic growth has historically been low (2-4%) but improved to 5% in Q2-Q3 2025.</div>
-        <p><strong>What to watch:</strong></p><ul>
-        <li>Total revenue growth rate - driven by acquisition pace and organic growth combined</li>
-        <li>Organic growth rate separately - a key operational quality signal</li>
-        <li>Maintenance revenue as % of total - should stay ~75% for revenue quality</li></ul>`
-    },
-    revenueGrowth: {
-        title: "YoY Revenue Growth Rate",
-        content: `<p><strong>YoY Revenue Growth</strong> shows the annual percentage increase in total revenue year-over-year.</p>
-        <div class="metric-highlight"><strong>For CSU:</strong> Revenue growth is primarily acquisition-driven (~15-20% per year). The 2021 jump reflects the Topicus spinout consolidation. Organic growth improvement is a key quality signal.</div>
-        <p><strong>What to watch:</strong></p><ul>
-        <li>Sustained 15%+ overall growth requires deploying $1.5-2B+ in acquisitions annually</li>
-        <li>If acquisition pace slows, total growth decelerates quickly</li>
-        <li>Organic growth acceleration would be a major positive catalyst</li></ul>`
-    },
-    fcfa2s: {
-        title: "FCFA2S vs Free Cash Flow",
-        content: `<p><strong>FCFA2S (Free Cash Flow Available to Shareholders)</strong> is Constellation Software's proprietary key metric, defined as operating cash flow minus maintenance capital expenditures and preferred dividends.</p>
-        <div class="metric-highlight"><strong>Why FCFA2S matters for CSU:</strong> Management uses FCFA2S as its primary measure of intrinsic value creation per share. It is more conservative than simple OCF - CapEx because it strips out maintenance CapEx embedded in acquisitions. Mark Leonard historically described FCFA2S per share growth as the best measure of long-term value creation.</div>
-        <p><strong>What to watch:</strong></p><ul>
-        <li>FCFA2S should grow at 20-30%+ annually if acquisition pace and quality are maintained</li>
-        <li>The spread between FCFA2S and simple FCF (OCF-CapEx) shows maintenance CapEx intensity</li>
-        <li>FCFA2S per share is more important than total FCFA2S since share count is static</li></ul>`
-    },
-    ocf: {
-        title: "Operating Cash Flow",
-        content: `<p><strong>Operating Cash Flow (OCF)</strong> is cash generated from CSU's portfolio businesses before capital expenditures and acquisitions.</p>
-        <div class="metric-highlight"><strong>For CSU:</strong> OCF has grown from $396M (2015) to $2.2B (2024), a ~5.5x increase in 10 years. This reflects the power of the acquisition compounding engine.</div>
-        <p><strong>What to watch:</strong></p><ul>
-        <li>OCF growth should track FCFA2S growth closely</li>
-        <li>Q2 OCF is typically the weakest quarter due to timing of acquisition-related working capital</li>
-        <li>OCF conversion from net income should remain high (typically 3-4x net income)</li></ul>`
-    },
-    netIncome: {
-        title: "Net Income & EPS",
-        content: `<p><strong>Net Income</strong> is CSU's GAAP profit attributable to common shareholders. <strong>EPS</strong> is diluted earnings per share.</p>
-        <div class="metric-highlight"><strong>For CSU:</strong> Net income is less important than FCFA2S as a valuation metric because acquisition accounting (amortization of acquired intangibles) significantly depresses reported earnings. FCFA2S adds back acquisition-related amortization to reflect true cash generation.</div>
-        <p><strong>What to watch:</strong></p><ul>
-        <li>Net income volatility is normal - Q1 2021 showed a loss due to Topicus-related charges</li>
-        <li>EPS should grow over time even if net income is choppy</li>
-        <li>Prefer FCFA2S over net income for CSU valuation purposes</li></ul>`
-    },
-    netMargin: {
-        title: "Net Margin (%)",
-        content: `<p><strong>Net Margin</strong> is the percentage of revenue that reaches the bottom line as net income.</p>
-        <div class="metric-highlight"><strong>For CSU:</strong> Net margin of 6-12% understates true economics due to heavy acquisition-related amortization charges. The 'true' cash margin is better reflected by FCFA2S/Revenue (approximately 14-17%).</div>
-        <p><strong>What to watch:</strong></p><ul>
-        <li>Net margin is expected to be lower than peers because of high acquisition activity generating amortization</li>
-        <li>Improving net margin over time would be a positive signal of portfolio maturation</li>
-        <li>FCFA2S margin (FCFA2S/Revenue) is a better operational quality indicator</li></ul>`
-    },
-    balanceSheet: {
-        title: "Balance Sheet: Debt vs Cash vs Equity",
-        content: `<p>This chart shows Constellation Software's capital structure evolution - total debt, cash on hand, and shareholders' equity over time.</p>
-        <div class="metric-highlight"><strong>For CSU:</strong> Debt has grown significantly to support large acquisitions ($1B Senior Notes in 2024). Net debt is $2.2B at Q3 2025. The company generates enough FCFA2S to service this debt comfortably, but leverage build-up bears watching.</div>
-        <p><strong>What to watch:</strong></p><ul>
-        <li>Net Debt / FCFA2S ratio - currently ~1.3x, manageable for a high-quality compounder</li>
-        <li>The IRGA liability (~$1.0B Topicus put option) is an off-balance-sheet contingent obligation</li>
-        <li>Equity growth reflects retained earnings from acquisitions</li></ul>`
-    },
-    equity: {
-        title: "Shareholders' Equity Growth",
-        content: `<p><strong>Shareholders' Equity</strong> represents the book value attributable to CSU common shareholders.</p>
-        <div class="metric-highlight"><strong>Caution for CSU:</strong> Equity CAGR (~37% 5yr) appears impressive but is partly inflated by acquisition accounting and leverage. It is NOT used as the primary DCF growth driver. FCFA2S CAGR is the preferred metric.</div>
-        <p><strong>What to watch:</strong></p><ul>
-        <li>Equity growth reflects the compounding of acquisition-driven value creation</li>
-        <li>Large jumps (like 2024) reflect profitable years and new debt raising equity indirectly</li>
-        <li>Book value per share growth is interesting but FCFA2S/share is more actionable</li></ul>`
-    },
-    revBreakdown: {
-        title: "Revenue by Type (FY2024)",
-        content: `<p>This pie chart shows CSU's FY2024 revenue breakdown by type: Maintenance, Professional Services, Licenses, and Hardware.</p>
-        <div class="metric-highlight"><strong>For CSU:</strong> Maintenance revenue (~75% of total) is the most valuable stream - it is recurring, high-margin, and reflects the sticky, mission-critical nature of VMS software. Customers face enormous switching costs.</div>
-        <p><strong>What to watch:</strong></p><ul>
-        <li>Maintenance as % of revenue should remain stable or grow as acquired businesses mature</li>
-        <li>License revenue declining as industry shifts to SaaS/subscription models</li>
-        <li>Professional services growth indicates new customer implementations</li></ul>`
-    },
-    revMix: {
-        title: "Revenue Mix: Maintenance vs Other",
-        content: `<p>This chart shows the annual breakdown between Maintenance revenue and other revenue streams (Professional Services, Licenses, Hardware).</p>
-        <div class="metric-highlight"><strong>For CSU:</strong> The maintenance revenue proportion (~75%) is a key quality indicator. High maintenance % means predictable, recurring cash flows that underpin the acquisition compounding model.</div>
-        <p><strong>What to watch:</strong></p><ul>
-        <li>Maintenance share should stay above 70% for revenue quality</li>
-        <li>FY2024 maintenance of $7.4B represents ~73.5% of revenue</li>
-        <li>Growth in maintenance is the highest quality growth signal for CSU</li></ul>`
-    },
-    qRevenue: {
-        title: "Quarterly Revenue",
-        content: `<p>This chart shows CSU's quarterly revenue progression, demonstrating the quarter-by-quarter compounding effect of the acquisition engine.</p>
-        <div class="metric-highlight"><strong>For CSU:</strong> Revenue should grow sequentially each quarter as acquired businesses are added. The trend should show a consistent staircase upward.</div>
-        <p><strong>What to watch:</strong></p><ul>
-        <li>Sequential quarter-over-quarter revenue acceleration</li>
-        <li>Year-over-year quarterly growth should remain 15%+ to sustain the compounding story</li>
-        <li>Q3 2025 at $2.95B represents 16% YoY growth</li></ul>`
-    },
-    qNetIncome: {
-        title: "Quarterly Net Income",
-        content: `<p>Quarterly net income shows the seasonality and variability in CSU's reported earnings.</p>
-        <div class="metric-highlight"><strong>For CSU:</strong> Net income is volatile quarter-to-quarter due to acquisition timing, earnout adjustments, FX impacts, and bargain purchase gains. Q1 tends to be weaker; Q4 is typically the strongest quarter.</div>
-        <p><strong>What to watch:</strong></p><ul>
-        <li>Trend over multiple years rather than individual quarter performance</li>
-        <li>Negative quarters can occur without fundamental impairment (e.g., Q1 2021 due to Topicus)</li>
-        <li>FCFA2S is a more reliable quarterly metric than net income for CSU</li></ul>`
-    },
-    qFCFA2S: {
-        title: "Quarterly FCFA2S",
-        content: `<p><strong>Quarterly FCFA2S</strong> shows the Free Cash Flow Available to Shareholders on a quarterly basis.</p>
-        <div class="metric-highlight"><strong>For CSU:</strong> FCFA2S varies significantly by quarter due to working capital timing. Q2 is typically the weakest (annual maintenance contract renewals cause cash inflows in Q1). Look at trailing twelve months (LTM) for a smoother picture.</div>
-        <p><strong>What to watch:</strong></p><ul>
-        <li>Q3 2025 FCFA2S of $529M was up 46% YoY - a very strong signal</li>
-        <li>LTM FCFA2S of ~$1.74B is the base for the DCF model</li>
-        <li>Q2 FCFA2S weakness is structural, not a concern</li></ul>`
-    },
-    qOCF: {
-        title: "Quarterly Operating Cash Flow",
-        content: `<p><strong>Quarterly Operating Cash Flow</strong> reflects cash generated from CSU's portfolio businesses before capital expenditures.</p>
-        <div class="metric-highlight"><strong>For CSU:</strong> OCF has the same seasonal pattern as FCFA2S - Q1 is strongest due to maintenance contract renewals, Q2 is weakest. The long-term trend is what matters.</div>
-        <p><strong>What to watch:</strong></p><ul>
-        <li>LTM OCF should trend above $2.2B and growing</li>
-        <li>Q3 2025 OCF was $685M - strong sequential improvement</li>
-        <li>OCF minus CapEx (simple FCF) overstates distributable cash vs FCFA2S</li></ul>`
-    }
+// ============================================================
+// CHART DEFAULTS & COLORS
+// ============================================================
+const colors = {
+  primary: '#00d4aa',
+  secondary: '#00b894',
+  tertiary: '#0984e3',
+  quaternary: '#6c5ce7',
+  warning: '#fdcb6e',
+  danger: '#ff6b6b',
+  pink: '#fd79a8'
 };
-
-// =====================================================================
-// MODAL
-// =====================================================================
-function openModal(key) {
-    if (!metricDescriptions[key]) return;
-    document.getElementById('modalTitle').textContent = metricDescriptions[key].title;
-    document.getElementById('modalBody').innerHTML = metricDescriptions[key].content;
-    document.getElementById('modalOverlay').classList.add('active');
-    document.body.style.overflow = 'hidden';
-}
-function closeModal(event) {
-    if (event && event.target !== document.getElementById('modalOverlay')) return;
-    document.getElementById('modalOverlay').classList.remove('active');
-    document.body.style.overflow = '';
-}
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { document.getElementById('modalOverlay').classList.remove('active'); document.body.style.overflow=''; } });
-
-// =====================================================================
-// CHARTS
-// =====================================================================
-function makeChart(id, type, labels, datasets, extraOpts) {
-    const ctx = document.getElementById(id).getContext('2d');
-    return new Chart(ctx, {
-        type,
-        data: { labels, datasets },
-        options: Object.assign({}, chartDefaults, extraOpts || {})
-    });
-}
-
-function renderCharts() {
-    const fyLabels = fyData.map(d => d.Period);
-
-    // 1. Annual Revenue
-    makeChart('chartRevenue', 'bar', fyLabels,
-        [{ label: 'Revenue ($M)', data: fyData.map(d=>v(d,'Revenue')), backgroundColor: colors.primary+'cc', borderColor: colors.primary, borderWidth: 1 }],
-        { plugins: { legend: { display: false } }, scales: { y: { ticks: { color:'#888', callback: n => '$'+fmt(n,1) }, grid: { color:'rgba(255,255,255,0.05)' } }, x: { ticks:{color:'#888'}, grid:{color:'rgba(255,255,255,0.05)'} } } }
-    );
-
-    // 2. YoY Revenue Growth
-    const growthRates = fyData.map((d,i) => {
-        if (i===0) return null;
-        const prev = fyData[i-1];
-        return ((v(d,'Revenue')-v(prev,'Revenue'))/v(prev,'Revenue')*100).toFixed(1);
-    }).filter(x=>x!==null);
-    const growthLabels = fyLabels.slice(1);
-    makeChart('chartRevenueGrowth', 'line', growthLabels,
-        [{ label: 'YoY Growth (%)', data: growthRates.map(Number), borderColor: colors.warning, backgroundColor: colors.warning+'33', borderWidth: 2, fill: true, tension: 0.3 }],
-        { plugins: { legend:{display:false} }, scales: { y: { ticks:{color:'#888',callback:n=>n+'%'}, grid:{color:'rgba(255,255,255,0.05)'} }, x:{ticks:{color:'#888'},grid:{color:'rgba(255,255,255,0.05)'}} } }
-    );
-
-    // 3. FCFA2S vs FCF
-    const fcfa2sFY = fyData.filter(d=>v(d,'FCFA2S')>0);
-    makeChart('chartFCFA2S', 'bar', fcfa2sFY.map(d=>d.Period), [
-        { label: 'FCFA2S ($M)', data: fcfa2sFY.map(d=>v(d,'FCFA2S')), backgroundColor: colors.primary+'cc', borderColor: colors.primary, borderWidth: 1 },
-        { label: 'Free Cash Flow (OCF-CapEx) ($M)', data: fcfa2sFY.map(d=>v(d,'FreeCashFlow')), backgroundColor: colors.tertiary+'88', borderColor: colors.tertiary, borderWidth: 1 }
-    ], { scales: { y:{ticks:{color:'#888',callback:n=>'$'+fmt(n,0)},grid:{color:'rgba(255,255,255,0.05)'}}, x:{ticks:{color:'#888'},grid:{color:'rgba(255,255,255,0.05)'}} }, plugins:{legend:{labels:{color:'#e0e0e0',font:{size:11}}}} });
-
-    // 4. Operating Cash Flow
-    makeChart('chartOCF', 'bar', fyLabels,
-        [{ label: 'Operating Cash Flow ($M)', data: fyData.map(d=>v(d,'OperatingCashFlow')), backgroundColor: colors.quaternary+'cc', borderColor: colors.quaternary, borderWidth: 1 }],
-        { plugins:{legend:{display:false}}, scales:{y:{ticks:{color:'#888',callback:n=>'$'+fmt(n,0)},grid:{color:'rgba(255,255,255,0.05)'}},x:{ticks:{color:'#888'},grid:{color:'rgba(255,255,255,0.05)'}}} }
-    );
-
-    // 5. Net Income & EPS (combo)
-    const niCtx = document.getElementById('chartNetIncome').getContext('2d');
-    new Chart(niCtx, {
-        data: {
-            labels: fyLabels,
-            datasets: [
-                { type:'bar', label:'Net Income ($M)', data: fyData.map(d=>v(d,'NetIncome')), backgroundColor: colors.secondary+'cc', borderColor: colors.secondary, borderWidth:1, yAxisID:'y' },
-                { type:'line', label:'EPS ($)', data: fyData.map(d=>v(d,'EPS_Diluted')), borderColor: colors.warning, backgroundColor: colors.warning+'33', borderWidth:2, yAxisID:'y2', tension:0.3, pointRadius:4 }
-            ]
-        },
-        options: { responsive:true, maintainAspectRatio:false,
-            plugins:{legend:{labels:{color:'#e0e0e0',font:{size:11}}}},
-            scales:{
-                y:{type:'linear',position:'left',ticks:{color:'#888',callback:n=>'$'+fmt(n,0)},grid:{color:'rgba(255,255,255,0.05)'}},
-                y2:{type:'linear',position:'right',ticks:{color:'#888',callback:n=>'$'+n},grid:{display:false}},
-                x:{ticks:{color:'#888'},grid:{color:'rgba(255,255,255,0.05)'}}
-            }
-        }
-    });
-
-    // 6. Net Margin
-    makeChart('chartNetMargin', 'line', fyLabels,
-        [{ label: 'Net Margin (%)', data: fyData.map(d=>v(d,'NetMargin')), borderColor: colors.danger, backgroundColor: colors.danger+'22', borderWidth:2, fill:true, tension:0.3, pointRadius:4 }],
-        { plugins:{legend:{display:false}}, scales:{y:{ticks:{color:'#888',callback:n=>n+'%'},grid:{color:'rgba(255,255,255,0.05)'}},x:{ticks:{color:'#888'},grid:{color:'rgba(255,255,255,0.05)'}}} }
-    );
-
-    // 7. Balance Sheet
-    const bsFY = fyData.filter(d=>v(d,'TotalDebt')>0);
-    makeChart('chartBalanceSheet', 'bar', bsFY.map(d=>d.Period), [
-        { label: "Total Debt ($M)", data: bsFY.map(d=>v(d,'TotalDebt')), backgroundColor: colors.danger+'99', borderColor: colors.danger, borderWidth:1 },
-        { label: "Cash ($M)", data: bsFY.map(d=>v(d,'CashAndEquivalents')), backgroundColor: colors.primary+'99', borderColor: colors.primary, borderWidth:1 },
-        { label: "Shareholders' Equity ($M)", data: bsFY.map(d=>v(d,'ShareholdersEquity')), backgroundColor: colors.quaternary+'99', borderColor: colors.quaternary, borderWidth:1 }
-    ], { scales:{y:{ticks:{color:'#888',callback:n=>'$'+fmt(n,0)},grid:{color:'rgba(255,255,255,0.05)'}},x:{ticks:{color:'#888'},grid:{color:'rgba(255,255,255,0.05)'}}} });
-
-    // 8. Equity growth
-    makeChart('chartEquity', 'line', bsFY.map(d=>d.Period),
-        [{ label: "Shareholders' Equity ($M)", data: bsFY.map(d=>v(d,'ShareholdersEquity')), borderColor: colors.purple, backgroundColor: colors.purple+'33', borderWidth:2, fill:true, tension:0.3, pointRadius:4 }],
-        { plugins:{legend:{display:false}}, scales:{y:{ticks:{color:'#888',callback:n=>'$'+fmt(n,0)},grid:{color:'rgba(255,255,255,0.05)'}},x:{ticks:{color:'#888'},grid:{color:'rgba(255,255,255,0.05)'}}} }
-    );
-
-    // 9. Revenue Breakdown Pie (FY2024)
-    const fy24 = fyData.find(d=>d.Period==='FY2024');
-    if (fy24) {
-        const pieCtx = document.getElementById('chartRevBreakdown').getContext('2d');
-        const maint = v(fy24,'MaintenanceRevenue');
-        const prof = v(fy24,'ProfServicesRevenue');
-        const lic = v(fy24,'LicenseRevenue');
-        const hw = v(fy24,'HardwareRevenue');
-        const other = v(fy24,'Revenue') - maint - prof - lic - hw;
-        new Chart(pieCtx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Maintenance & Recurring', 'Professional Services', 'Licenses', 'Hardware & Other'],
-                datasets: [{ data: [maint, prof, lic, hw > 0 ? hw : other], backgroundColor: [colors.primary+'cc', colors.tertiary+'cc', colors.warning+'cc', colors.danger+'cc'], borderWidth: 2, borderColor: '#1a1a2e' }]
-            },
-            options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'right', labels:{ color:'#e0e0e0', font:{size:11} } } } }
-        });
+const chartDefaults = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } } },
+  scales: {
+    x: { ticks: { color: '#888', maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+    y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+  }
+};
+function deepMerge(base, override) {
+  const result = Object.assign({}, base);
+  for (const k in override) {
+    if (typeof override[k] === 'object' && !Array.isArray(override[k]) && override[k] !== null) {
+      result[k] = deepMerge(base[k] || {}, override[k]);
+    } else {
+      result[k] = override[k];
     }
-
-    // 10. Revenue Mix stacked bar (annual years with breakdown)
-    const revMixData = fyData.filter(d=>v(d,'MaintenanceRevenue')>0);
-    makeChart('chartRevMix', 'bar', revMixData.map(d=>d.Period), [
-        { label:'Maintenance & Recurring', data: revMixData.map(d=>v(d,'MaintenanceRevenue')), backgroundColor: colors.primary+'cc', borderColor:colors.primary, borderWidth:1 },
-        { label:'Professional Services', data: revMixData.map(d=>v(d,'ProfServicesRevenue')), backgroundColor: colors.tertiary+'cc', borderColor:colors.tertiary, borderWidth:1 },
-        { label:'Licenses', data: revMixData.map(d=>v(d,'LicenseRevenue')), backgroundColor: colors.warning+'cc', borderColor:colors.warning, borderWidth:1 },
-        { label:'Hardware', data: revMixData.map(d=>v(d,'HardwareRevenue')), backgroundColor: colors.danger+'cc', borderColor:colors.danger, borderWidth:1 }
-    ], { scales:{ x:{stacked:true,ticks:{color:'#888'},grid:{color:'rgba(255,255,255,0.05)'}}, y:{stacked:true,ticks:{color:'#888',callback:n=>'$'+fmt(n,0)},grid:{color:'rgba(255,255,255,0.05)'}} } });
-
-    // Quarterly charts - show last 16 quarters
-    const lastQ = qData.slice(-16);
-    const qLabels = lastQ.map(d=>d.Period);
-
-    makeChart('chartQRevenue', 'bar', qLabels,
-        [{ label:'Revenue ($M)', data: lastQ.map(d=>v(d,'Revenue')), backgroundColor: colors.primary+'cc', borderColor:colors.primary, borderWidth:1 }],
-        { plugins:{legend:{display:false}}, scales:{y:{ticks:{color:'#888',callback:n=>'$'+n+'M'},grid:{color:'rgba(255,255,255,0.05)'}},x:{ticks:{color:'#888',maxRotation:45},grid:{color:'rgba(255,255,255,0.05)'}}} }
-    );
-
-    makeChart('chartQNetIncome', 'bar', qLabels,
-        [{ label:'Net Income ($M)', data: lastQ.map(d=>v(d,'NetIncome')), backgroundColor: lastQ.map(d=>v(d,'NetIncome')>=0?colors.secondary+'cc':colors.danger+'cc'), borderColor: lastQ.map(d=>v(d,'NetIncome')>=0?colors.secondary:colors.danger), borderWidth:1 }],
-        { plugins:{legend:{display:false}}, scales:{y:{ticks:{color:'#888',callback:n=>'$'+n+'M'},grid:{color:'rgba(255,255,255,0.05)'}},x:{ticks:{color:'#888',maxRotation:45},grid:{color:'rgba(255,255,255,0.05)'}}} }
-    );
-
-    const qFCFA2SData = lastQ.filter(d=>v(d,'FCFA2S')>0);
-    makeChart('chartQFCFA2S', 'bar', qFCFA2SData.map(d=>d.Period),
-        [{ label:'FCFA2S ($M)', data: qFCFA2SData.map(d=>v(d,'FCFA2S')), backgroundColor: colors.quaternary+'cc', borderColor:colors.quaternary, borderWidth:1 }],
-        { plugins:{legend:{display:false}}, scales:{y:{ticks:{color:'#888',callback:n=>'$'+n+'M'},grid:{color:'rgba(255,255,255,0.05)'}},x:{ticks:{color:'#888',maxRotation:45},grid:{color:'rgba(255,255,255,0.05)'}}} }
-    );
-
-    makeChart('chartQOCF', 'bar', qLabels,
-        [{ label:'Operating Cash Flow ($M)', data: lastQ.map(d=>v(d,'OperatingCashFlow')), backgroundColor: colors.warning+'cc', borderColor:colors.warning, borderWidth:1 }],
-        { plugins:{legend:{display:false}}, scales:{y:{ticks:{color:'#888',callback:n=>'$'+n+'M'},grid:{color:'rgba(255,255,255,0.05)'}},x:{ticks:{color:'#888',maxRotation:45},grid:{color:'rgba(255,255,255,0.05)'}}} }
-    );
+  }
+  return result;
 }
 
-// =====================================================================
-// DCF
-// =====================================================================
-let currentScenario = 'base';
+// ============================================================
+// CHARTS: REVENUE
+// ============================================================
+new Chart(document.getElementById('chartRevenue'), {
+  type: 'bar',
+  data: {
+    labels: fyData.map(d => d.Period),
+    datasets: [{
+      label: 'Revenue (USD M)',
+      data: fyData.map(d => n(d.Revenue)),
+      backgroundColor: colors.primary + '99',
+      borderColor: colors.primary,
+      borderWidth: 2
+    }]
+  },
+  options: deepMerge(chartDefaults, {
+    plugins: { legend: { labels: { color: '#e0e0e0' } } },
+    scales: { y: { ticks: { callback: v => '$' + (v/1000).toFixed(0) + 'B' } } }
+  })
+});
 
-function initDCF() {
-    if (!dcfData || !dcfData.valuation) return;
+// Revenue growth
+const fyRevGrowth = fyData.map((d,i) => {
+  if (i === 0) return null;
+  return n(pct(n(d.Revenue), n(fyData[i-1].Revenue)));
+});
+new Chart(document.getElementById('chartRevenueGrowth'), {
+  type: 'line',
+  data: {
+    labels: fyData.map(d => d.Period),
+    datasets: [{
+      label: 'Revenue Growth YoY (%)',
+      data: fyRevGrowth,
+      borderColor: colors.tertiary,
+      backgroundColor: colors.tertiary + '33',
+      borderWidth: 2,
+      fill: true,
+      tension: 0.3,
+      pointBackgroundColor: colors.tertiary
+    }]
+  },
+  options: deepMerge(chartDefaults, {
+    scales: { y: { ticks: { callback: v => v + '%' } } }
+  })
+});
 
-    const currentUSD = dcfData.current_price_usd;
-    document.getElementById('dcfCurrent').textContent = '$' + Math.round(currentUSD).toLocaleString();
+// ============================================================
+// CHARTS: CASH FLOW
+// ============================================================
+// FCFA2S known annual series (management reported)
+const fcfa2sAnnual = {
+  'FY2018': 559, 'FY2019': 590, 'FY2020': 989, 'FY2021': 883,
+  'FY2022': 853, 'FY2023': 1160, 'FY2024': 1472, 'FY2025': 1683
+};
+new Chart(document.getElementById('chartFCFA2S'), {
+  type: 'bar',
+  data: {
+    labels: fyData.map(d => d.Period),
+    datasets: [
+      {
+        label: 'Free Cash Flow (OCF-CapEx)',
+        data: fyData.map(d => n(d.FreeCashFlow)),
+        backgroundColor: colors.tertiary + '88',
+        borderColor: colors.tertiary,
+        borderWidth: 1
+      },
+      {
+        label: 'FCFA2S (mgmt metric)',
+        data: fyData.map(d => fcfa2sAnnual[d.Period] || null),
+        backgroundColor: colors.primary + 'BB',
+        borderColor: colors.primary,
+        borderWidth: 2
+      }
+    ]
+  },
+  options: deepMerge(chartDefaults, {
+    scales: { y: { ticks: { callback: v => '$' + v + 'M' } } }
+  })
+});
 
-    if (dcfData.historical_growth.growth_divergence_warning) {
-        document.getElementById('growthWarning').style.display = 'flex';
-        document.getElementById('warningText').textContent = dcfData.historical_growth.growth_divergence_warning;
-    }
+// OCF vs CapEx
+new Chart(document.getElementById('chartOCF'), {
+  type: 'bar',
+  data: {
+    labels: fyData.map(d => d.Period),
+    datasets: [
+      {
+        label: 'Operating Cash Flow',
+        data: fyData.map(d => n(d.OperatingCashFlow)),
+        backgroundColor: colors.secondary + 'AA',
+        borderColor: colors.secondary,
+        borderWidth: 1
+      },
+      {
+        label: 'CapEx (Maintenance)',
+        data: fyData.map(d => n(d.CapEx)),
+        backgroundColor: colors.danger + 'AA',
+        borderColor: colors.danger,
+        borderWidth: 1
+      }
+    ]
+  },
+  options: deepMerge(chartDefaults, {
+    scales: { y: { ticks: { callback: v => '$' + v + 'M' } } }
+  })
+});
 
-    const base = dcfData.assumptions.base;
-    document.getElementById('growthSlider').value = dcfData.historical_growth.selected_growth_rate;
-    document.getElementById('waccSlider').value = base.wacc;
-    document.getElementById('terminalSlider').value = base.terminal_growth;
-    document.getElementById('growthValue').textContent = dcfData.historical_growth.selected_growth_rate + '%';
-    document.getElementById('waccValue').textContent = base.wacc + '%';
-    document.getElementById('terminalValue').textContent = base.terminal_growth + '%';
+// FCFA2S growth rate
+const fcfa2sYears = Object.keys(fcfa2sAnnual);
+const fcfa2sVals  = Object.values(fcfa2sAnnual);
+const fcfa2sGrowth = fcfa2sYears.map((yr, i) => {
+  if (i === 0) return null;
+  return +pct(fcfa2sVals[i], fcfa2sVals[i-1]);
+});
+new Chart(document.getElementById('chartFCFA2SGrowth'), {
+  type: 'bar',
+  data: {
+    labels: fcfa2sYears,
+    datasets: [{
+      label: 'FCFA2S YoY Growth (%)',
+      data: fcfa2sGrowth,
+      backgroundColor: fcfa2sGrowth.map(v => v >= 0 ? colors.primary + 'AA' : colors.danger + 'AA'),
+      borderColor: fcfa2sGrowth.map(v => v >= 0 ? colors.primary : colors.danger),
+      borderWidth: 2
+    }]
+  },
+  options: deepMerge(chartDefaults, {
+    scales: { y: { ticks: { callback: v => v + '%' } } }
+  })
+});
 
-    renderDCFInputs();
-    renderHistoricalGrowth();
-    renderSensitivityMatrix();
-    switchScenario('base');
-}
+// FCF margin & net margin
+new Chart(document.getElementById('chartMargins'), {
+  type: 'line',
+  data: {
+    labels: fyData.map(d => d.Period),
+    datasets: [
+      {
+        label: 'FCF Margin (OCF-CapEx/Rev %)',
+        data: fyData.map(d => {
+          const fcf = n(d.FreeCashFlow), rev = n(d.Revenue);
+          return fcf && rev ? +(fcf/rev*100).toFixed(1) : null;
+        }),
+        borderColor: colors.primary,
+        backgroundColor: colors.primary + '22',
+        borderWidth: 2,
+        fill: false,
+        tension: 0.3
+      },
+      {
+        label: 'Net Margin (%)',
+        data: fyData.map(d => n(d.NetMargin)),
+        borderColor: colors.warning,
+        backgroundColor: colors.warning + '22',
+        borderWidth: 2,
+        fill: false,
+        tension: 0.3
+      }
+    ]
+  },
+  options: deepMerge(chartDefaults, {
+    scales: { y: { ticks: { callback: v => v + '%' } } }
+  })
+});
 
-function renderDCFInputs() {
-    const inp = dcfData.inputs;
-    const fcf = inp.last_fcf;
-    document.getElementById('baseFCF').textContent = '$' + (fcf/1000).toFixed(2) + 'B';
-    document.getElementById('sharesOut').textContent = inp.shares_outstanding.toFixed(2) + 'M';
-    document.getElementById('netDebt').textContent = '$' + (inp.net_debt/1000).toFixed(2) + 'B';
-    renderFCFProjections();
-}
+// ============================================================
+// CHARTS: PROFITABILITY
+// ============================================================
+new Chart(document.getElementById('chartNetIncome'), {
+  type: 'bar',
+  data: {
+    labels: fyData.map(d => d.Period),
+    datasets: [{
+      label: 'Net Income (CSI shareholders, USD M)',
+      data: fyData.map(d => n(d.NetIncome)),
+      backgroundColor: fyData.map(d => n(d.NetIncome) >= 0 ? colors.secondary + 'BB' : colors.danger + 'BB'),
+      borderColor: fyData.map(d => n(d.NetIncome) >= 0 ? colors.secondary : colors.danger),
+      borderWidth: 2
+    }]
+  },
+  options: deepMerge(chartDefaults, {
+    scales: { y: { ticks: { callback: v => '$' + v + 'M' } } }
+  })
+});
 
+new Chart(document.getElementById('chartEPS'), {
+  type: 'bar',
+  data: {
+    labels: fyData.map(d => d.Period),
+    datasets: [{
+      label: 'EPS Diluted (USD)',
+      data: fyData.map(d => n(d.EPS_Diluted)),
+      backgroundColor: colors.quaternary + 'BB',
+      borderColor: colors.quaternary,
+      borderWidth: 2
+    }]
+  },
+  options: deepMerge(chartDefaults, {
+    scales: { y: { ticks: { callback: v => '$' + v } } }
+  })
+});
+
+// ============================================================
+// CHARTS: BALANCE SHEET
+// ============================================================
+const fyBS = fyData.filter(d => n(d.TotalAssets));
+new Chart(document.getElementById('chartBalanceSheet'), {
+  type: 'line',
+  data: {
+    labels: fyBS.map(d => d.Period),
+    datasets: [
+      {
+        label: 'Total Assets',
+        data: fyBS.map(d => n(d.TotalAssets)),
+        borderColor: colors.tertiary,
+        backgroundColor: colors.tertiary + '22',
+        borderWidth: 2,
+        fill: false,
+        tension: 0.3
+      },
+      {
+        label: "Shareholders Equity (incl NCI)",
+        data: fyBS.map(d => n(d.ShareholdersEquity)),
+        borderColor: colors.primary,
+        backgroundColor: colors.primary + '22',
+        borderWidth: 2,
+        fill: false,
+        tension: 0.3
+      }
+    ]
+  },
+  options: deepMerge(chartDefaults, {
+    scales: { y: { ticks: { callback: v => '$' + (v/1000).toFixed(0) + 'B' } } }
+  })
+});
+
+new Chart(document.getElementById('chartDebt'), {
+  type: 'bar',
+  data: {
+    labels: fyBS.map(d => d.Period),
+    datasets: [
+      {
+        label: 'Cash & Equivalents',
+        data: fyBS.map(d => n(d.CashAndEquivalents)),
+        backgroundColor: colors.primary + 'AA',
+        borderColor: colors.primary,
+        borderWidth: 1
+      },
+      {
+        label: 'Total Debt',
+        data: fyBS.map(d => n(d.TotalDebt)),
+        backgroundColor: colors.danger + 'AA',
+        borderColor: colors.danger,
+        borderWidth: 1
+      }
+    ]
+  },
+  options: deepMerge(chartDefaults, {
+    scales: { y: { ticks: { callback: v => '$' + (v/1000).toFixed(1) + 'B' } } }
+  })
+});
+
+// ============================================================
+// CHARTS: QUARTERLY
+// ============================================================
+const recentQ = qData.slice(-12);
+new Chart(document.getElementById('chartQRevenue'), {
+  type: 'bar',
+  data: {
+    labels: recentQ.map(d => d.Period),
+    datasets: [{
+      label: 'Quarterly Revenue (USD M)',
+      data: recentQ.map(d => n(d.Revenue)),
+      backgroundColor: colors.primary + '88',
+      borderColor: colors.primary,
+      borderWidth: 2
+    }]
+  },
+  options: deepMerge(chartDefaults, {
+    scales: { y: { ticks: { callback: v => '$' + v + 'M' } } }
+  })
+});
+
+new Chart(document.getElementById('chartQFCFA2S'), {
+  type: 'bar',
+  data: {
+    labels: recentQ.map(d => d.Period),
+    datasets: [{
+      label: 'Quarterly FCFA2S (USD M)',
+      data: recentQ.map(d => n(d.FCFA2S)),
+      backgroundColor: recentQ.map(d => n(d.FCFA2S) >= 0 ? colors.secondary + 'AA' : colors.danger + 'AA'),
+      borderColor: recentQ.map(d => n(d.FCFA2S) >= 0 ? colors.secondary : colors.danger),
+      borderWidth: 2
+    }]
+  },
+  options: deepMerge(chartDefaults, {
+    scales: { y: { ticks: { callback: v => '$' + v + 'M' } } }
+  })
+});
+
+// ============================================================
+// DCF SECTION
+// ============================================================
+const CAD_RATE = dcfData.usd_cad_rate; // USD per CAD; CAD = USD / CAD_RATE
+function toCad(usd) { return (usd / CAD_RATE).toFixed(0); }
+
+// FCF Projections table
 function renderFCFProjections() {
-    const startGrowth = parseFloat(document.getElementById('growthSlider')?.value || 20);
-    const baseFCF = dcfData.inputs.last_fcf;
-    const endGrowth = 10;
-    const growthRates = [];
-    for (let i=0; i<5; i++) {
-        const rate = startGrowth > endGrowth ? startGrowth - (startGrowth-endGrowth)*(i/4) : startGrowth;
-        growthRates.push(rate);
-    }
-    let fcf = baseFCF;
-    const fcfValues = [baseFCF];
-    for (let i=0; i<5; i++) { fcf *= (1 + growthRates[i]/100); fcfValues.push(fcf); }
+  const growth = parseFloat(document.getElementById('growthSlider').value);
+  const base = dcfData.inputs.last_fcf;
+  const endGrowth = 10;
+  const growthRates = [];
+  for (let i=0;i<5;i++) {
+    const r = growth > endGrowth
+      ? growth - (growth - endGrowth) * (i/4)
+      : growth;
+    growthRates.push(r);
+  }
+  let fcf = base;
+  const vals = [base];
+  for (let i=0;i<5;i++) { fcf = fcf*(1+growthRates[i]/100); vals.push(fcf); }
 
-    let html = `<div class="fcf-projection-item header">Base</div>
-        <div class="fcf-projection-item header">Year 1</div>
-        <div class="fcf-projection-item header">Year 2</div>
-        <div class="fcf-projection-item header">Year 3</div>
-        <div class="fcf-projection-item header">Year 4</div>
-        <div class="fcf-projection-item header">Year 5</div>
-        <div class="fcf-projection-item"><div class="fcf-value">$${(fcfValues[0]/1000).toFixed(2)}B</div><div class="growth-rate">-</div></div>`;
-    for (let i=1; i<=5; i++) {
-        html += `<div class="fcf-projection-item"><div class="fcf-value">$${(fcfValues[i]/1000).toFixed(2)}B</div><div class="growth-rate">+${growthRates[i-1].toFixed(0)}%</div></div>`;
-    }
-    document.getElementById('fcfProjectionTable').innerHTML = html;
+  let html = ['Base','Year 1','Year 2','Year 3','Year 4','Year 5']
+    .map(h => `<div class="fcf-projection-item header">${h}</div>`).join('');
+  html += `<div class="fcf-projection-item"><div class="proj-val">$${vals[0].toFixed(0)}M</div><div class="proj-growth">-</div></div>`;
+  for (let i=1;i<=5;i++) {
+    html += `<div class="fcf-projection-item"><div class="proj-val">$${vals[i].toFixed(0)}M</div><div class="proj-growth">+${growthRates[i-1].toFixed(0)}%</div></div>`;
+  }
+  document.getElementById('fcfProjectionTable').innerHTML = html;
 }
 
-function calculateDCF(startGrowth, wacc, terminalGrowth) {
-    const years = 5;
-    const fcf = dcfData.inputs.last_fcf;
-    let pvFCF = 0, projectedFCF = fcf;
-    const endGrowth = 10;
-    for (let i=0; i<years; i++) {
-        const yg = startGrowth > endGrowth ? startGrowth - (startGrowth-endGrowth)*(i/4) : startGrowth;
-        projectedFCF *= (1 + yg/100);
-        pvFCF += projectedFCF / Math.pow(1+wacc/100, i+1);
-    }
-    const termFCF = projectedFCF * (1 + terminalGrowth/100);
-    const termVal = termFCF / (wacc/100 - terminalGrowth/100);
-    const pvTerm = termVal / Math.pow(1+wacc/100, years);
-    const ev = pvFCF + pvTerm;
-    const eq = ev - dcfData.inputs.net_debt;
-    const iv = eq / dcfData.inputs.shares_outstanding;
-    const termPerShare = termVal / dcfData.inputs.shares_outstanding;
-    const entryPrice = termPerShare / Math.pow(1.15, years);
-    return { iv, entryPrice, pvFCF, pvTerm, ev };
+function calculateDCF(startGrowth, wacc, termGrowth) {
+  const years = 5;
+  let fcf = dcfData.inputs.last_fcf;
+  let pvFCF = 0;
+  const endGrowth = 10;
+  let projFCF = fcf;
+  for (let i=0;i<years;i++) {
+    const r = startGrowth > endGrowth ? startGrowth - (startGrowth-endGrowth)*(i/4) : startGrowth;
+    projFCF *= (1+r/100);
+    pvFCF += projFCF / Math.pow(1+wacc/100, i+1);
+  }
+  const tv = projFCF*(1+termGrowth/100)/(wacc/100-termGrowth/100);
+  const pvTV = tv / Math.pow(1+wacc/100, years);
+  const EV = pvFCF + pvTV;
+  const equity = EV - dcfData.inputs.net_debt;
+  const iv = equity / dcfData.inputs.shares_outstanding;
+  const termPerShare = tv / dcfData.inputs.shares_outstanding;
+  const entry = termPerShare / Math.pow(1.15, years);
+  return { iv, entry };
 }
 
 window.updateDCFDisplay = function() {
-    const growth = parseFloat(document.getElementById('growthSlider').value);
-    const wacc = parseFloat(document.getElementById('waccSlider').value);
-    const terminal = parseFloat(document.getElementById('terminalSlider').value);
-    document.getElementById('growthValue').textContent = growth + '%';
-    document.getElementById('waccValue').textContent = wacc + '%';
-    document.getElementById('terminalValue').textContent = terminal + '%';
-    renderFCFProjections();
-    const result = calculateDCF(growth, wacc, terminal);
-    const rate = dcfData.usd_cad_rate;
-    document.getElementById('dcfIV').textContent = '$' + Math.round(result.iv).toLocaleString();
-    document.getElementById('dcfIVCad').textContent = 'CAD $' + Math.round(result.iv/rate).toLocaleString();
-    document.getElementById('dcfEntry').textContent = '$' + Math.round(result.entryPrice).toLocaleString();
-    document.getElementById('dcfEntryCad').textContent = 'CAD $' + Math.round(result.entryPrice/rate).toLocaleString();
-    const upside = ((result.iv - dcfData.current_price_usd) / dcfData.current_price_usd * 100);
-    const upsideEl = document.getElementById('dcfUpside');
-    upsideEl.textContent = (upside>=0?'+':'') + upside.toFixed(1) + '% ' + (upside>=0?'upside':'downside');
-    upsideEl.className = 'dcf-change ' + (upside>=0?'positive':'negative');
-    document.getElementById('dcfWeighted').textContent = '$' + Math.round(dcfData.probability_weighted.weighted_iv_usd).toLocaleString();
-    document.getElementById('dcfWeightedCad').textContent = 'CAD $' + Math.round(dcfData.probability_weighted.weighted_iv_cad).toLocaleString();
-    const grid = document.getElementById('assumptionGrid');
-    if (grid) {
-        grid.innerHTML = `
-            <div class="assumption-item"><div class="label">Growth Rate</div><div class="value">${growth}%</div></div>
-            <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc}%</div></div>
-            <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${terminal}%</div></div>
-            <div class="assumption-item"><div class="label">IV (USD)</div><div class="value" style="color:#00d4aa;">$${Math.round(result.iv).toLocaleString()}</div></div>
-            <div class="assumption-item"><div class="label">IV (CAD)</div><div class="value" style="color:#00d4aa;">$${Math.round(result.iv/rate).toLocaleString()}</div></div>
-            <div class="assumption-item"><div class="label">Entry Price</div><div class="value" style="color:#00d4aa;">$${Math.round(result.entryPrice).toLocaleString()}</div></div>
-        `;
-    }
+  const growth   = parseFloat(document.getElementById('growthSlider').value);
+  const wacc     = parseFloat(document.getElementById('waccSlider').value);
+  const terminal = parseFloat(document.getElementById('terminalSlider').value);
+
+  document.getElementById('growthValue').textContent   = growth + '%';
+  document.getElementById('waccValue').textContent     = wacc + '%';
+  document.getElementById('terminalValue').textContent = terminal + '%';
+
+  renderFCFProjections();
+
+  const result = calculateDCF(growth, wacc, terminal);
+
+  document.getElementById('dcfIV').textContent    = '$' + result.iv.toFixed(0);
+  document.getElementById('dcfIVcad').textContent = 'CAD $' + toCad(result.iv);
+  document.getElementById('dcfEntry').textContent = '$' + result.entry.toFixed(0);
+  document.getElementById('dcfEntryCad').textContent = 'CAD $' + toCad(result.entry);
+
+  const upside = ((result.iv - dcfData.current_price_usd) / dcfData.current_price_usd * 100);
+  const upsideEl = document.getElementById('dcfUpside');
+  upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(0) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+  upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+  document.getElementById('dcfWeighted').textContent    = '$' + dcfData.probability_weighted.weighted_iv.toFixed(0);
+  document.getElementById('dcfWeightedCad').textContent = 'CAD $' + toCad(dcfData.probability_weighted.weighted_iv);
 };
 
 window.switchScenario = function(scenario) {
-    currentScenario = scenario;
-    document.querySelectorAll('.scenario-tab').forEach(t => t.classList.toggle('active', t.dataset.scenario===scenario));
-    const assumptions = dcfData.assumptions[scenario];
-    const valuation = dcfData.valuation[scenario];
-    const ep = dcfData.entry_price[scenario];
-    const rate = dcfData.usd_cad_rate;
-    document.getElementById('growthSlider').value = assumptions.growth_rates[0];
-    document.getElementById('waccSlider').value = assumptions.wacc;
-    document.getElementById('terminalSlider').value = assumptions.terminal_growth;
-    renderFCFProjections();
-    const grid = document.getElementById('assumptionGrid');
-    grid.innerHTML = `
-        <div class="assumption-item"><div class="label">Year 1 Growth</div><div class="value">${assumptions.growth_rates[0]}%</div></div>
-        <div class="assumption-item"><div class="label">Year 5 Growth</div><div class="value">${assumptions.growth_rates[4]}%</div></div>
-        <div class="assumption-item"><div class="label">FCF Margin</div><div class="value">${assumptions.fcf_margin}%</div></div>
-        <div class="assumption-item"><div class="label">WACC</div><div class="value">${assumptions.wacc}%</div></div>
-        <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${assumptions.terminal_growth}%</div></div>
-        <div class="assumption-item"><div class="label">IV (USD)</div><div class="value" style="color:#00d4aa;">$${Math.round(valuation.intrinsic_value_usd).toLocaleString()}</div></div>
-        <div class="assumption-item"><div class="label">IV (CAD)</div><div class="value" style="color:#00d4aa;">$${Math.round(valuation.intrinsic_value_cad).toLocaleString()}</div></div>
-        <div class="assumption-item"><div class="label">Entry Price (15% CAGR)</div><div class="value" style="color:#fdcb6e;">$${Math.round(ep.entry_price_usd).toLocaleString()} USD</div></div>
-    `;
-    updateDCFDisplay();
+  document.querySelectorAll('.scenario-tab').forEach(t => t.classList.toggle('active', t.dataset.scenario === scenario));
+  const a = dcfData.assumptions[scenario];
+  const v = dcfData.valuation[scenario];
+  const ep = dcfData.entry_price[scenario];
+
+  document.getElementById('growthSlider').value   = a.growth_rates[0];
+  document.getElementById('waccSlider').value     = a.wacc;
+  document.getElementById('terminalSlider').value = a.terminal_growth;
+
+  const grid = document.getElementById('assumptionGrid');
+  grid.innerHTML = [
+    { label: 'Year 1 Growth', value: a.growth_rates[0] + '%' },
+    { label: 'Year 5 Growth', value: a.growth_rates[4] + '%' },
+    { label: 'FCF Margin', value: a.fcf_margin + '%' },
+    { label: 'WACC', value: a.wacc + '%' },
+    { label: 'Terminal Growth', value: a.terminal_growth + '%' },
+    { label: 'IV (USD / CAD)', value: '$' + v.intrinsic_value_usd.toFixed(0) + ' / CAD $' + v.intrinsic_value_cad.toFixed(0) },
+    { label: 'Entry (15% CAGR)', value: '$' + ep.entry_price_usd.toFixed(0) + ' / CAD $' + ep.entry_price_cad.toFixed(0) },
+    { label: 'Upside/Downside', value: (v.upside_vs_current_cad >= 0 ? '+' : '') + v.upside_vs_current_cad.toFixed(1) + '%' }
+  ].map(item => `<div class="assumption-item"><div class="a-label">${item.label}</div><div class="a-value">${item.value}</div></div>`).join('');
+
+  updateDCFDisplay();
 };
 
 function renderHistoricalGrowth() {
-    const growth = dcfData.historical_growth;
-    const selectedSource = growth.growth_rate_source;
-    const metrics = [
-        {key:'revenue_3yr_cagr', label:'Revenue 3Y'},
-        {key:'revenue_5yr_cagr', label:'Revenue 5Y'},
-        {key:'eps_3yr_cagr', label:'EPS 3Y'},
-        {key:'eps_5yr_cagr', label:'EPS 5Y'},
-        {key:'equity_3yr_cagr', label:'Equity 3Y'},
-        {key:'equity_5yr_cagr', label:'Equity 5Y'},
-        {key:'fcf_3yr_cagr', label:'FCFA2S 3Y'},
-        {key:'fcf_5yr_cagr', label:'FCFA2S 5Y'}
-    ];
-    document.getElementById('growthGrid').innerHTML = metrics.map(m => {
-        const rate = growth[m.key];
-        const isSelected = m.key === selectedSource;
-        const colorClass = rate >= 0 ? 'positive' : 'negative';
-        return `<div class="growth-item ${isSelected?'selected':''}">
-            <div class="metric">${m.label}</div>
-            <div class="rate ${colorClass}">${rate>=0?'+':''}${rate.toFixed(1)}%</div>
-        </div>`;
-    }).join('');
+  const hg = dcfData.historical_growth;
+  const metrics = [
+    { key: 'revenue_3yr_cagr', label: 'Revenue 3Y' },
+    { key: 'revenue_5yr_cagr', label: 'Revenue 5Y' },
+    { key: 'eps_3yr_cagr', label: 'EPS 3Y' },
+    { key: 'eps_5yr_cagr', label: 'EPS 5Y' },
+    { key: 'equity_3yr_cagr', label: 'Equity 3Y' },
+    { key: 'equity_5yr_cagr', label: 'Equity 5Y' },
+    { key: 'fcfa2s_3yr_cagr', label: 'FCFA2S 3Y' },
+    { key: 'fcfa2s_5yr_cagr', label: 'FCFA2S 5Y' },
+    { key: 'fcfa2s_6yr_cagr', label: 'FCFA2S 6Y' }
+  ];
+  document.getElementById('growthGrid').innerHTML = metrics.map(m => {
+    const rate = hg[m.key];
+    const pos  = rate >= 0;
+    const selected = m.key === 'fcfa2s_6yr_cagr';
+    return `<div class="growth-item${selected?' selected':''}">
+      <div class="g-metric">${m.label}${selected?' *':''}</div>
+      <div class="g-rate ${pos?'positive':'negative'}">${pos?'+':''}${rate.toFixed(1)}%</div>
+    </div>`;
+  }).join('');
 }
 
 function renderSensitivityMatrix() {
-    const sens = dcfData.sensitivity;
-    const currentUSD = dcfData.current_price_usd;
-    const baseWACC = dcfData.assumptions.base.wacc;
-    const baseTG = dcfData.assumptions.base.terminal_growth;
-    let html = '<tr><th>WACC \\ Term G</th>';
-    sens.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
-    html += '</tr>';
-    sens.wacc_range.forEach((wacc, i) => {
-        html += `<tr><th>${wacc}%</th>`;
-        sens.matrix[i].forEach((val, j) => {
-            const tg = sens.terminal_growth_range[j];
-            const isHighlight = (wacc === baseWACC && tg === baseTG);
-            const colorClass = val >= currentUSD ? 'above-current' : 'below-current';
-            html += `<td class="${isHighlight ? 'highlight' : colorClass}">$${val.toLocaleString()}</td>`;
-        });
-        html += '</tr>';
+  const s = dcfData.sensitivity;
+  const currentCad = dcfData.current_price_cad;
+  let html = '<tr><th>WACC \\ Term G</th>';
+  s.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+  html += '</tr>';
+  s.wacc_range.forEach((wacc, i) => {
+    html += `<tr><th>${wacc}%</th>`;
+    s.matrix[i].forEach((val, j) => {
+      const isHL = wacc === dcfData.assumptions.base.wacc && s.terminal_growth_range[j] === dcfData.assumptions.base.terminal_growth;
+      const cls  = isHL ? 'cell-highlight' : (val >= currentCad ? 'above-current' : 'below-current');
+      html += `<td class="${cls}">$${val}</td>`;
     });
-    document.getElementById('sensitivityMatrix').innerHTML = html;
+    html += '</tr>';
+  });
+  document.getElementById('sensitivityMatrix').innerHTML = html;
 }
 
-// Bind slider events
-document.getElementById('growthSlider').addEventListener('input', window.updateDCFDisplay);
-document.getElementById('growthSlider').addEventListener('change', window.updateDCFDisplay);
-document.getElementById('waccSlider').addEventListener('input', window.updateDCFDisplay);
-document.getElementById('waccSlider').addEventListener('change', window.updateDCFDisplay);
-document.getElementById('terminalSlider').addEventListener('input', window.updateDCFDisplay);
-document.getElementById('terminalSlider').addEventListener('change', window.updateDCFDisplay);
+// Init DCF
+renderFCFProjections();
+renderHistoricalGrowth();
+renderSensitivityMatrix();
+switchScenario('base');
 
-// =====================================================================
-// INIT
-// =====================================================================
-renderOverview();
-renderKPIs();
-renderGuidance();
-renderCharts();
-initDCF();
+// Bind sliders
+['growthSlider','waccSlider','terminalSlider'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) { el.oninput = window.updateDCFDisplay; el.onchange = window.updateDCFDisplay; }
+});
+
+// ============================================================
+// MODALS
+// ============================================================
+function openModal(key) {
+  const desc = metricDescriptions[key];
+  if (!desc) return;
+  document.getElementById('modalTitle').textContent = desc.title;
+  document.getElementById('modalBody').innerHTML = desc.content;
+  document.getElementById('modalOverlay').classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+  if (event && event.target !== document.getElementById('modalOverlay')) return;
+  document.getElementById('modalOverlay').classList.remove('active');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 </script>
 </body>
 </html>
