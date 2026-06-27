@@ -1,0 +1,1473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solution Dynamics (SDL.NZ) Financial Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#e0e0e0;min-height:100vh;padding:20px}
+.header{text-align:center;margin-bottom:30px;padding:24px 20px;background:rgba(255,255,255,0.05);border-radius:15px;backdrop-filter:blur(10px)}
+.header h1{font-size:2.2rem;background:linear-gradient(90deg,#00d4aa,#00b894);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:8px}
+.header p{color:#888;font-size:1rem}
+.header .sub{color:#aaa;font-size:0.85rem;margin-top:6px}
+/* Reset Banner */
+.reset-banner{max-width:1400px;margin:0 auto 24px;padding:16px 20px;background:rgba(255,107,107,0.1);border:1px solid rgba(255,107,107,0.4);border-radius:10px;font-size:0.9rem;line-height:1.6;color:#d0d0d0}
+.reset-banner strong{color:#ff6b6b}
+/* Overview */
+.overview-section{max-width:1400px;margin:0 auto 28px}
+.overview-toggle{width:100%;background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.3);border-radius:12px;padding:16px 24px;color:#00d4aa;font-size:1.05rem;font-weight:600;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:all .2s ease}
+.overview-toggle:hover{background:rgba(0,212,170,0.18)}
+.overview-toggle .arrow{transition:transform .3s ease}
+.overview-toggle.active .arrow{transform:rotate(180deg)}
+.overview-content{display:none;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-top:none;border-radius:0 0 12px 12px;padding:28px;margin-top:-12px}
+.overview-content.active{display:block}
+.overview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:22px}
+.overview-card{background:rgba(255,255,255,0.03);border-radius:12px;padding:20px;border:1px solid rgba(255,255,255,0.08)}
+.overview-card h3{color:#00d4aa;font-size:1rem;margin-bottom:13px;padding-bottom:9px;border-bottom:1px solid rgba(255,255,255,0.1)}
+.overview-card p{margin-bottom:10px;line-height:1.6;font-size:0.9rem}
+.overview-card ul{list-style:none;padding:0;margin:0}
+.overview-card li{padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);line-height:1.5;font-size:0.88rem}
+.overview-card li:last-child{border-bottom:none}
+.overview-card.bull h3{color:#00d4aa}
+.overview-card.bear h3{color:#ff6b6b}
+.overview-card.risks h3{color:#fdcb6e}
+.risk-high{color:#ff6b6b}
+.risk-moderate{color:#fdcb6e}
+/* KPI Grid */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:14px;margin-bottom:28px;max-width:1400px;margin-left:auto;margin-right:auto}
+.kpi-card{background:rgba(255,255,255,0.05);border-radius:12px;padding:18px;text-align:center;border:1px solid rgba(255,255,255,0.1);transition:transform .3s ease,box-shadow .3s ease;cursor:default}
+.kpi-card:hover{transform:translateY(-4px);box-shadow:0 10px 30px rgba(0,212,170,0.15)}
+.kpi-card.alert{border-color:rgba(255,107,107,0.35);background:rgba(255,107,107,0.06)}
+.kpi-card.cash-card{border-color:rgba(0,212,170,0.35);background:rgba(0,212,170,0.06)}
+.kpi-value{font-size:1.7rem;font-weight:bold;color:#00d4aa;margin-bottom:4px}
+.kpi-card.alert .kpi-value{color:#ff8c8c}
+.kpi-label{font-size:0.78rem;color:#888;text-transform:uppercase;letter-spacing:.8px}
+.kpi-change{font-size:0.82rem;margin-top:4px}
+.kpi-change.positive{color:#00d4aa}
+.kpi-change.negative{color:#ff6b6b}
+.kpi-change.neutral{color:#888}
+.kpi-sub{font-size:0.75rem;color:#666;margin-top:2px}
+/* Guidance */
+.guidance-section{max-width:1400px;margin:0 auto 28px}
+.guidance-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.guidance-header h3{color:#fff;font-size:1.1rem;display:flex;align-items:center;gap:10px}
+.guidance-header h3::before{content:'';display:inline-block;width:4px;height:20px;background:linear-gradient(180deg,#00d4aa,#00b894);border-radius:2px}
+.guidance-meta{font-size:0.82rem;color:#888}
+.guidance-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:18px}
+.guidance-card{background:rgba(255,255,255,0.05);border-radius:12px;padding:17px;border:1px solid rgba(255,255,255,0.1);transition:transform .2s ease}
+.guidance-card:hover{transform:translateY(-2px)}
+.guidance-metric{font-size:0.78rem;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+.guidance-target{font-size:1.2rem;font-weight:600;color:#00d4aa;margin-bottom:5px}
+.guidance-period{font-size:0.82rem;color:#e0e0e0;margin-bottom:7px}
+.guidance-vs-prior{display:inline-block;font-size:0.72rem;padding:3px 8px;border-radius:4px;font-weight:500}
+.guidance-vs-prior.raised,.guidance-vs-prior.raised-ambition{background:rgba(0,212,170,0.15);color:#00d4aa}
+.guidance-vs-prior.lowered{background:rgba(255,107,107,0.15);color:#ff6b6b}
+.guidance-vs-prior.maintained{background:rgba(255,255,255,0.1);color:#888}
+.guidance-vs-prior.new,.guidance-vs-prior.n-a{background:rgba(99,102,241,0.15);color:#818cf8}
+.guidance-notes{font-size:0.78rem;color:#666;margin-top:7px;line-height:1.4}
+.guidance-commentary{background:rgba(255,255,255,0.03);border-radius:10px;padding:14px 18px;border-left:3px solid #00d4aa;font-style:italic;color:#b0b0b0;line-height:1.6;font-size:0.88rem}
+/* Sections */
+.section-title{font-size:1.35rem;color:#fff;margin:38px auto 18px;padding-bottom:9px;border-bottom:2px solid rgba(0,212,170,0.3);max-width:1400px}
+.charts-container{display:grid;grid-template-columns:repeat(auto-fit,minmax(480px,1fr));gap:22px;max-width:1400px;margin:0 auto}
+.charts-container.single{grid-template-columns:1fr}
+.chart-card{background:rgba(255,255,255,0.05);border-radius:15px;padding:24px;border:1px solid rgba(255,255,255,0.1)}
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.chart-header h3{color:#fff;font-size:1.05rem;display:flex;align-items:center;gap:10px}
+.chart-header h3::before{content:'';display:inline-block;width:4px;height:18px;background:linear-gradient(180deg,#00d4aa,#00b894);border-radius:2px}
+.help-btn{width:22px;height:22px;border-radius:50%;background:rgba(0,212,170,0.2);border:1px solid #00d4aa;color:#00d4aa;font-size:13px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s ease;flex-shrink:0}
+.help-btn:hover{background:#00d4aa;color:#1a1a2e}
+.chart-wrapper{position:relative;height:290px}
+.chart-wrapper.tall{height:340px}
+/* Modal */
+.modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.72);z-index:1000;justify-content:center;align-items:center;padding:20px}
+.modal-overlay.active{display:flex}
+.modal{background:linear-gradient(135deg,#1e2a4a 0%,#16213e 100%);border-radius:16px;max-width:580px;width:100%;max-height:80vh;overflow-y:auto;border:1px solid rgba(0,212,170,0.3);box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+.modal-header{padding:20px 24px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center}
+.modal-header h3{color:#00d4aa;font-size:1.25rem;margin:0}
+.modal-close{width:30px;height:30px;border-radius:50%;background:rgba(255,107,107,0.2);border:1px solid #ff6b6b;color:#ff6b6b;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.modal-close:hover{background:#ff6b6b;color:#fff}
+.modal-body{padding:22px;line-height:1.7;font-size:0.9rem}
+.modal-body p{margin-bottom:13px}
+.modal-body strong{color:#00d4aa}
+.modal-body ul{margin:12px 0;padding-left:20px}
+.modal-body li{margin-bottom:7px}
+.metric-highlight{background:rgba(0,212,170,0.1);border-left:3px solid #00d4aa;padding:11px 14px;margin:13px 0;border-radius:0 8px 8px 0}
+.warn-highlight{background:rgba(255,107,107,0.1);border-left:3px solid #ff6b6b;padding:11px 14px;margin:13px 0;border-radius:0 8px 8px 0}
+/* H1 FY2026 mini chart note */
+.chart-note{font-size:0.76rem;color:#888;margin-top:8px;font-style:italic;text-align:center}
+/* DCF */
+.dcf-philosophy-banner{max-width:1400px;margin:0 auto 20px;padding:16px 20px;background:rgba(253,203,110,0.08);border:1px solid rgba(253,203,110,0.3);border-radius:10px;font-size:0.88rem;line-height:1.6;color:#d0d0d0}
+.dcf-philosophy-banner strong{color:#fdcb6e}
+.dcf-section{max-width:1400px;margin:0 auto 40px}
+.dcf-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:18px;margin-bottom:28px}
+.dcf-card{background:rgba(255,255,255,0.05);border-radius:12px;padding:22px;text-align:center;border:1px solid rgba(255,255,255,0.1);transition:transform .3s ease}
+.dcf-card:hover{transform:translateY(-3px)}
+.dcf-card.highlight{background:rgba(0,212,170,0.1);border-color:rgba(0,212,170,0.3)}
+.dcf-label{font-size:0.78rem;color:#888;text-transform:uppercase;letter-spacing:.8px;margin-bottom:7px}
+.dcf-value{font-size:2rem;font-weight:bold;color:#00d4aa}
+.dcf-card:not(.highlight) .dcf-value{color:#fff}
+.dcf-change{font-size:0.95rem;margin-top:7px;font-weight:600}
+.dcf-change.positive{color:#00d4aa}
+.dcf-change.negative{color:#ff6b6b}
+.dcf-sublabel{font-size:0.76rem;color:#666;margin-top:6px}
+.dcf-inputs{background:rgba(255,255,255,0.03);border-radius:12px;padding:20px;margin-bottom:22px;border:1px solid rgba(255,255,255,0.08)}
+.dcf-inputs h4{color:#e0e0e0;margin-bottom:13px;font-size:0.95rem}
+.dcf-inputs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:13px;margin-bottom:18px}
+.dcf-input-card{background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;text-align:center;border:1px solid rgba(255,255,255,0.05)}
+.dcf-input-label{font-size:0.72rem;color:#888;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px}
+.dcf-input-value{font-size:1.2rem;font-weight:600;color:#00d4aa}
+.dcf-input-note{font-size:0.68rem;color:#666;margin-top:3px}
+.fcf-projections h5{color:#b0b0b0;font-size:0.85rem;margin-bottom:9px}
+.fcf-projection-table{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;background:rgba(0,0,0,0.2);border-radius:8px;padding:11px}
+.fcf-projection-item{text-align:center}
+.fcf-projection-item.header{font-size:0.72rem;color:#888;font-weight:600}
+.fcf-projection-item .fcf-value{font-size:0.95rem;color:#e0e0e0;font-weight:500}
+.fcf-projection-item .growth-rate{font-size:0.7rem;color:#00d4aa;margin-top:2px}
+.dcf-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:22px;margin-bottom:28px;padding:22px;background:rgba(255,255,255,0.03);border-radius:12px;border:1px solid rgba(255,255,255,0.08)}
+.slider-group{display:flex;flex-direction:column;gap:9px}
+.slider-group label{font-size:0.9rem;color:#e0e0e0;display:flex;justify-content:space-between}
+.slider-group label span{color:#00d4aa;font-weight:600}
+.slider-group input[type="range"]{-webkit-appearance:none;width:100%;height:6px;border-radius:3px;background:rgba(255,255,255,0.1);outline:none}
+.slider-group input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;background:#00d4aa;cursor:pointer;transition:transform .2s}
+.slider-group input[type="range"]::-webkit-slider-thumb:hover{transform:scale(1.2)}
+.slider-hint{font-size:0.75rem;color:#666}
+.scenario-tabs{display:flex;gap:9px;margin-bottom:18px}
+.scenario-tab{padding:9px 22px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:#888;border-radius:8px;cursor:pointer;font-size:0.9rem;transition:all .2s}
+.scenario-tab:hover{border-color:rgba(0,212,170,0.5);color:#e0e0e0}
+.scenario-tab.active{background:rgba(0,212,170,0.15);border-color:#00d4aa;color:#00d4aa}
+.scenario-details{background:rgba(255,255,255,0.03);border-radius:12px;padding:20px;margin-bottom:28px;border:1px solid rgba(255,255,255,0.08)}
+.scenario-details h4{color:#00d4aa;margin-bottom:13px;font-size:0.95rem}
+.assumption-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:13px}
+.assumption-item{text-align:center}
+.assumption-item .label{font-size:0.76rem;color:#888;margin-bottom:3px}
+.assumption-item .value{font-size:1.05rem;color:#e0e0e0;font-weight:500}
+.sensitivity-section{margin-bottom:28px}
+.sensitivity-section h4{color:#e0e0e0;margin-bottom:13px;font-size:0.95rem}
+.sensitivity-table{width:100%;border-collapse:collapse;background:rgba(255,255,255,0.03);border-radius:8px;overflow:hidden;font-size:0.88rem}
+.sensitivity-table th,.sensitivity-table td{padding:10px 14px;text-align:center;border:1px solid rgba(255,255,255,0.07)}
+.sensitivity-table th{background:rgba(0,212,170,0.1);color:#00d4aa;font-weight:600}
+.sensitivity-table td{color:#e0e0e0}
+.sensitivity-table td.highlight{background:rgba(0,212,170,0.15);color:#00d4aa;font-weight:600}
+.sensitivity-table td.below-current{color:#ff6b6b}
+.sensitivity-table td.above-current{color:#00d4aa}
+.historical-growth{margin-bottom:28px}
+.historical-growth h4{color:#e0e0e0;margin-bottom:13px;font-size:0.95rem}
+.growth-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:13px}
+.growth-item{background:rgba(255,255,255,0.03);border-radius:8px;padding:13px;text-align:center;border:1px solid rgba(255,255,255,0.07)}
+.growth-item .metric{font-size:0.76rem;color:#888;margin-bottom:5px}
+.growth-item .rate{font-size:1.1rem;font-weight:600}
+.growth-item .rate.positive{color:#00d4aa}
+.growth-item .rate.negative{color:#ff6b6b}
+.dcf-download{text-align:center;margin-top:28px}
+.download-btn{display:inline-flex;align-items:center;gap:8px;padding:13px 26px;background:rgba(0,212,170,0.15);border:1px solid #00d4aa;border-radius:8px;color:#00d4aa;text-decoration:none;font-weight:600;transition:all .2s;font-size:0.9rem}
+.download-btn:hover{background:#00d4aa;color:#1a1a2e}
+@media(max-width:768px){.charts-container{grid-template-columns:1fr}.overview-grid{grid-template-columns:1fr}.header h1{font-size:1.6rem}.kpi-grid{grid-template-columns:repeat(2,1fr)}.fcf-projection-table{grid-template-columns:repeat(3,1fr)}.dcf-summary{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Solution Dynamics Limited (SDL.NZ)</h1>
+  <p>Customer Communications Management &bull; NZX Micro-Cap &bull; Fiscal Year Ends 30 June &bull; All figures NZD</p>
+  <p class="sub">Market Cap ~NZ$8.5M &bull; 14.68M shares &bull; Net Cash NZ$8.36M (NZ$0.57/share) &bull; Current Price NZ$0.58</p>
+</div>
+
+<!-- Structural Reset Banner -->
+<div class="reset-banner" style="max-width:1400px;margin:0 auto 22px">
+  <strong>STRUCTURAL EARNINGS RESET IN PROGRESS (FY2026):</strong> SDL's largest international customer (an aid-funded NGO) departed in mid-FY2025 after reducing from ~30-35% of international revenue to near-zero following US/UK government funding cuts. H1 FY2026 revenue fell <strong>-34.5%</strong> year-on-year and EBITDA fell ~<strong>81%</strong>. FY2026 full-year NPAT guidance is only <strong>NZ$0.1-0.6M</strong> vs NZ$2.62M in FY2025. At NZ$0.58/share, the market is pricing this near net-cash liquidation value (~NZ$0.57/share cash). The operating business is being valued near zero.
+</div>
+
+<!-- Investment Overview -->
+<div class="overview-section">
+  <button class="overview-toggle" onclick="toggleOverview()">
+    <span>Investment Overview &amp; Analysis</span>
+    <span class="arrow">&#9660;</span>
+  </button>
+  <div class="overview-content" id="overviewContent">
+    <div class="overview-grid">
+      <div class="overview-card">
+        <h3>Company Overview</h3>
+        <p>Solution Dynamics Limited (SDL) is a New Zealand-headquartered customer communications management (CCM) company operating in New Zealand, North America, and the UK. It provides cloud software platforms, professional services, and managed mailhouse operations helping organisations compose, personalise, and distribute communications across print and digital channels.</p>
+        <p>The company is transitioning from a predominantly print-and-mailhouse model toward recurring SaaS and AI-enabled digital communications software, though the NZ mailhouse still anchors the business.</p>
+      </div>
+      <div class="overview-card">
+        <h3>Revenue Streams</h3>
+        <p><strong>Software &amp; Technology (~40% H1 FY2026)</strong><br>International CCM cloud platform — SaaS subscriptions (DMC, Composer, Campaign+), per-document fees, professional services. Clients include Pitney Bowes (US/UK/France/Japan) and UK dental groups. Pure software margin is high.</p>
+        <p><strong>Digital Print &amp; Document Handling (~13%)</strong><br>NZ mailhouse — high-speed printing of invoices, statements, and rates notices for councils, utilities, and financial services. Structurally declining due to digital shift.</p>
+        <p><strong>Outsourced Services / Postage (~48%)</strong><br>Pass-through of NZ Post bulk postage, paper, envelopes, freight. Revenue inflating from NZ Post price rises (+15% July 2024, +26% July 2025) without proportional earnings uplift.</p>
+      </div>
+      <div class="overview-card">
+        <h3>Competitive Position</h3>
+        <p><strong>Main competitors:</strong> OpenText (Exstream), Quadient (Inspire), Precisely (EngageOne), Messagepoint, Pitney Bowes (partner/competitor hybrid)</p>
+        <p><strong>Moat factors:</strong></p>
+        <ul>
+          <li>Deep integration into enterprise billing/data workflows — high switching costs</li>
+          <li>Dominant position in NZ council and utility communications</li>
+          <li>Global distributed print network (Jupiter) across 50+ countries</li>
+          <li>ISO 27001:2022 and in-progress SOC2 certifications</li>
+          <li>Pitney Bowes channel partnership — click-based SaaS growing strongly</li>
+          <li>nGAGE: AI-native dental practice marketing SaaS (early-stage optionality)</li>
+        </ul>
+      </div>
+      <div class="overview-card">
+        <h3>Growth Drivers</h3>
+        <ul>
+          <li>NZ Local Water Done Well reforms — mandatory council water entity separation creates multi-year pipeline of new billing clients</li>
+          <li>nGAGE UK dental market expansion — two corporate dental groups (58+ sites) signed; scalable SaaS product in underserved niche</li>
+          <li>Pitney Bowes click-based SaaS channel growing strongly despite overall international decline</li>
+          <li>NZ market consolidation — major competitor exiting, displaced customers available</li>
+          <li>Digital transition within existing NZ customers — deepening per-customer platform dependency</li>
+          <li>GRI Marketing acquisition (Jan 2025) adds creative services for North American enterprise clients</li>
+          <li>AI-enabled features across DMC, Composer, Campaign+ platforms</li>
+          <li>Australian council expansion via local print partner</li>
+        </ul>
+      </div>
+      <div class="overview-card risks">
+        <h3>Key Risks</h3>
+        <ul>
+          <li><span class="risk-high">[HIGH]</span> Customer concentration — top-5 customers = ~46% of revenue; loss of one already proved catastrophic</li>
+          <li><span class="risk-high">[HIGH]</span> Accelerating physical mail decline — NZ Post up 44% in two years, pushing enterprise clients digital</li>
+          <li><span class="risk-high">[HIGH]</span> nGAGE execution risk — early-stage, unproven at scale, well-funded competitors possible</li>
+          <li><span class="risk-high">[HIGH]</span> CEO vacancy — Acting CEO Susie Watts since Jan 2026; Patrick Brand departed due to family medical circumstances</li>
+          <li><span class="risk-moderate">[MOD]</span> Pitney Bowes channel dependency — SDL cannot fully control partner arrangements</li>
+          <li><span class="risk-moderate">[MOD]</span> FX exposure — ~52% of FY2025 revenue in USD/GBP, no disclosed hedging</li>
+          <li><span class="risk-moderate">[MOD]</span> Single-site NZ production facility operational risk</li>
+          <li><span class="risk-moderate">[MOD]</span> Micro-cap illiquidity — ~14.7M shares, very thin NZX trading</li>
+        </ul>
+      </div>
+      <div class="overview-card bull">
+        <h3>Bull Case</h3>
+        <ul>
+          <li>Net cash NZ$8.36M (~NZ$0.57/share) — market near liquidation value; shareholders essentially getting operating business free</li>
+          <li>nGAGE is a genuinely differentiated AI-native SaaS in an underserved UK dental niche — 1,200+ dental corporate groups addressable</li>
+          <li>Local Water Done Well reforms — structural multi-year pipeline of new NZ government billing clients</li>
+          <li>NZ competitor exit creating market share opportunity in a consolidating mailhouse market</li>
+          <li>Pitney Bowes SaaS channel growing independently and profitably</li>
+          <li>Cost base substantially right-sized — SG&amp;A down 26.6% in H1 FY2026; operating leverage from any revenue recovery</li>
+          <li>Active buyback programme (up to NZ$0.5M) signals Board confidence; buybacks below cash backing per share</li>
+        </ul>
+      </div>
+      <div class="overview-card bear">
+        <h3>Bear Case</h3>
+        <ul>
+          <li>FY2026 collapse demonstrates extreme earnings fragility — a single customer destroyed two years of profit</li>
+          <li>nGAGE unproven: SDL's R&amp;D budget (~NZ$0.9M/yr) is modest; Dentally could build native marketing tools</li>
+          <li>Structural mail decline accelerating beyond SDL's ability to compensate — digital items earn far less per-unit</li>
+          <li>~351 shareholders on record, very thin daily trading — meaningful entry or exit moves the market</li>
+          <li>Acting CEO during critical reinvention period — execution continuity risk is elevated</li>
+          <li>Value trap risk: if operating cash flow stays near zero, the net-cash buffer erodes over time</li>
+        </ul>
+      </div>
+      <div class="overview-card">
+        <h3>Recent Developments</h3>
+        <ul>
+          <li><strong>Feb 2026:</strong> H1 FY2026 — revenue -34.5%, NPAT -91%; FY2026 NPAT guidance NZ$0.1-0.6M maintained</li>
+          <li><strong>Jan 2026:</strong> CEO Patrick Brand stepped down (family medical); CFO Susie Watts appointed Acting CEO; Brand joins Board</li>
+          <li><strong>Dec 2025-Feb 2026:</strong> nGAGE MVP launched; first UK dental corporate customer (18 sites) live in Feb 2026; second group (40+ sites) signed in 2H FY2026</li>
+          <li><strong>Mar 2026:</strong> New on-market share buyback programme up to NZ$0.5M commenced</li>
+          <li><strong>Jul 2025:</strong> NZ Post postage +26% to NZ$2.90 — accelerating customer migration to digital</li>
+          <li><strong>Dec 2025-Jan 2026:</strong> NZ$1.5M inserter equipment investment (replacing end-of-life machines; largely completes near-term capex)</li>
+          <li><strong>Jan 2025:</strong> GRI Marketing Group (Connecticut) acquired; brings Hartford and Pitney Bowes creative services clients</li>
+          <li><strong>FY2025:</strong> Major customer formally concluded RFP — moved to multi-vendor model; SDL reduced to project-by-project supplier</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="kpi-grid" id="kpiGrid">
+  <!-- populated by JS -->
+</div>
+
+<!-- Guidance -->
+<div class="guidance-section">
+  <div class="guidance-header">
+    <h3>Management Guidance</h3>
+    <span class="guidance-meta">As of H1 FY2026 Results (26 February 2026) &bull; FY2026</span>
+  </div>
+  <div class="guidance-grid" id="guidanceGrid"></div>
+  <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<!-- Charts: Financial Trends (Annual FY only) -->
+<h2 class="section-title">Financial Trends (Annual FY Periods)</h2>
+<div class="charts-container">
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>Revenue &amp; Net Profit</h3>
+      <button class="help-btn" onclick="openModal('revenueProfit')">?</button>
+    </div>
+    <div class="chart-wrapper">
+      <canvas id="revenueProfitChart"></canvas>
+    </div>
+    <p class="chart-note">Annual FY2017-FY2025 actuals. FY2026 guidance band (NZD 0.1-0.6M NPAT) overlaid as a reference zone.</p>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>EBITDA &amp; EBITDA Margin</h3>
+      <button class="help-btn" onclick="openModal('ebitda')">?</button>
+    </div>
+    <div class="chart-wrapper">
+      <canvas id="ebitdaChart"></canvas>
+    </div>
+    <p class="chart-note">Annual FY data. H1 FY2026 EBITDA was NZD 0.69M (4.0% margin) — a marked compression from prior years.</p>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>EPS &amp; Dividend Per Share</h3>
+      <button class="help-btn" onclick="openModal('epsDividend')">?</button>
+    </div>
+    <div class="chart-wrapper">
+      <canvas id="epsDivChart"></canvas>
+    </div>
+    <p class="chart-note">FY2025 dividend cut to 3.0c (from 11.5c in FY2023). H1 FY2026 interim dividend: 2.0c on 1.5c EPS (payout from balance sheet cash).</p>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>Free Cash Flow &amp; Operating Cash Flow</h3>
+      <button class="help-btn" onclick="openModal('cashflow')">?</button>
+    </div>
+    <div class="chart-wrapper">
+      <canvas id="cashflowChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Charts: Balance Sheet & Half-Year -->
+<h2 class="section-title">Balance Sheet Strength &amp; Half-Year Snapshot</h2>
+<div class="charts-container">
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>Net Cash Position (Annual)</h3>
+      <button class="help-btn" onclick="openModal('netcash')">?</button>
+    </div>
+    <div class="chart-wrapper">
+      <canvas id="netCashChart"></canvas>
+    </div>
+    <p class="chart-note">SDL carries zero debt. Net cash = cash &amp; equivalents. At Dec 2025 (H1 FY2026): NZD 8.36M = NZD 0.57/share, near the entire NZD 0.58 share price.</p>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>H1 Revenue &amp; EBITDA Trend (Half-Year Comparisons)</h3>
+      <button class="help-btn" onclick="openModal('halfyear')">?</button>
+    </div>
+    <div class="chart-wrapper">
+      <canvas id="halfYearChart"></canvas>
+    </div>
+    <p class="chart-note">H1 FY2026 versus prior H1 periods — shows the severity of the customer loss on the first-half trading period.</p>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>Revenue vs Operating Margin</h3>
+      <button class="help-btn" onclick="openModal('opMargin')">?</button>
+    </div>
+    <div class="chart-wrapper">
+      <canvas id="marginChart"></canvas>
+    </div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>Shareholders' Equity</h3>
+      <button class="help-btn" onclick="openModal('equity')">?</button>
+    </div>
+    <div class="chart-wrapper">
+      <canvas id="equityChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- DCF Valuation -->
+<h2 class="section-title">DCF Valuation</h2>
+
+<div class="dcf-philosophy-banner">
+  <strong>Model approach:</strong> Solution Dynamics is a net-cash micro-cap in the middle of a structural earnings reset, so the valuation hinges entirely on the <strong style="color:#fdcb6e">NORMALIZED free cash flow of the business AFTER the loss of its largest international (aid-funded NGO) customer</strong> — not on the elevated FY2023-FY2025 results that included that customer, and not on the depressed FY2026 trough year distorted by one-off restructuring. We anchor the base case on a normalized ~NZ$2.0M FCF (vs a 9-year median of ~NZ$2.8M and a FY2026 trough near zero). Net cash of ~NZ$8.4M is ~NZ$0.57/share — almost the entire current share price — so the market at NZ$0.58 is effectively assigning close to zero value to the operating business. The <strong style="color:#fdcb6e">large apparent upside (~160% base case) is a function of the market pricing near liquidation value while the model assumes the remaining business survives and stabilizes</strong>; this gap reflects genuine survival/execution uncertainty, which is loaded into a deliberately high ~17% WACC rather than into the cash flows. This is a <strong style="color:#fdcb6e">deep-value / asset-backed situation, NOT a multi-bagger growth thesis</strong>.
+</div>
+
+<div class="dcf-section">
+  <div class="dcf-summary">
+    <div class="dcf-card highlight">
+      <div class="dcf-label">Intrinsic Value (Base)</div>
+      <div class="dcf-value" id="dcfIV">$1.51</div>
+      <div class="dcf-change positive" id="dcfUpside">+160% upside</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Entry Price (15% CAGR)</div>
+      <div class="dcf-value" id="dcfEntry">$0.80</div>
+      <div class="dcf-sublabel">Buy below for 15% annual return</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Current Price</div>
+      <div class="dcf-value" id="dcfCurrent">$0.58</div>
+      <div class="dcf-sublabel">NZX as at Jun 2026</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Prob-Weighted IV</div>
+      <div class="dcf-value" id="dcfWeighted">$1.54</div>
+      <div class="dcf-sublabel">50% Base / 25% Bull / 25% Bear</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Net Cash / Share</div>
+      <div class="dcf-value">$0.57</div>
+      <div class="dcf-sublabel">NZD 8.36M total; ~98% of current price</div>
+    </div>
+  </div>
+
+  <div class="dcf-inputs">
+    <h4>DCF Model Inputs (Normalized Basis)</h4>
+    <div class="dcf-inputs-grid">
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Base Year FCF</div>
+        <div class="dcf-input-value" id="baseFCF">NZ$2.0M</div>
+        <div class="dcf-input-note">Post-reset normalized; 9yr median was NZ$2.8M</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Shares Outstanding</div>
+        <div class="dcf-input-value" id="sharesOut">14.68M</div>
+        <div class="dcf-input-note">As at Dec 2025</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Net Cash</div>
+        <div class="dcf-input-value" id="netDebt" style="color:#00d4aa">+NZ$8.36M</div>
+        <div class="dcf-input-note">No debt; added to equity value</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">WACC</div>
+        <div class="dcf-input-value">17%</div>
+        <div class="dcf-input-note">Risk-loaded: +5.5% above base for concentration/illiquidity/mail decline/mgmt</div>
+      </div>
+    </div>
+    <div class="fcf-projections">
+      <h5>Projected FCF — 5-Year Base Case</h5>
+      <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+    </div>
+  </div>
+
+  <div class="dcf-controls">
+    <div class="slider-group">
+      <label>FCF Growth Year 1: <span id="growthValue">2.5%</span></label>
+      <input type="range" id="growthSlider" min="-5" max="15" value="2.5" step="0.5">
+      <div class="slider-hint">Base: 2.5% (modest growth as nGAGE/council water offsets mail decline)</div>
+    </div>
+    <div class="slider-group">
+      <label>WACC: <span id="waccValue">17%</span></label>
+      <input type="range" id="waccSlider" min="10" max="22" value="17" step="0.5">
+      <div class="slider-hint">17% = 11.5% base NZ small-cap + 5.5% structural risk premiums</div>
+    </div>
+    <div class="slider-group">
+      <label>Terminal Growth: <span id="terminalValue">2%</span></label>
+      <input type="range" id="terminalSlider" min="0" max="4" value="2" step="0.5">
+      <div class="slider-hint">2% = roughly NZ long-run inflation / stable digital CCM base</div>
+    </div>
+  </div>
+
+  <div class="scenario-tabs">
+    <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+    <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+    <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+  </div>
+  <div class="scenario-details" id="scenarioDetails">
+    <h4 id="scenarioLabel">Base Case — Normalized post-customer-loss steady state</h4>
+    <div class="assumption-grid" id="assumptionGrid"></div>
+    <p style="font-size:0.82rem;color:#888;margin-top:14px;line-height:1.5" id="scenarioRationale"></p>
+  </div>
+
+  <div class="sensitivity-section">
+    <h4>Sensitivity Analysis: Intrinsic Value per Share by WACC &amp; Terminal Growth Rate</h4>
+    <div style="overflow-x:auto">
+      <table class="sensitivity-table" id="sensitivityMatrix"></table>
+    </div>
+    <p style="font-size:0.78rem;color:#666;margin-top:8px">Green = above current price (NZ$0.58). Red = below current price. Bold = base-case cell (17% WACC, 2% terminal growth).</p>
+  </div>
+
+  <div class="historical-growth">
+    <h4>Historical Growth Rates (Pre-Reset CAGRs — reference only; NOT used to project post-reset base)</h4>
+    <div class="growth-grid" id="growthGrid"></div>
+    <p style="font-size:0.78rem;color:#666;margin-top:10px">FY2026 excluded from all CAGRs — it is a structural step-down, not a trend continuation. These rates describe the pre-reset business.</p>
+  </div>
+
+  <div class="dcf-download">
+    <a href="SDL.NZ_DCF_Model.xlsx" class="download-btn" download>
+      &#8681; Download Excel DCF Model
+    </a>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modalTitle"></h3>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// EMBEDDED CSV DATA
+// ============================================================
+const csvData = `Period,Revenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,EBITDA,EBITDAMargin,NetIncome,NetMargin,EPS,DividendPerShare,OperatingCashFlow,CapEx,FreeCashFlow,ShareholdersEquity,TotalDebt,CashAndEquivalents,SharesOutstanding
+FY2017,19.991,,,1.801,9.0,2.087,10.4,1.310,6.6,9.3,6.75,1.681,0.206,1.475,3.519,0.0,2.080,14.060
+FY2018,22.732,,,1.904,8.4,2.273,10.0,1.332,5.9,9.3,7.50,1.622,0.188,1.434,4.011,0.0,1.956,14.560
+H1 FY2019,12.726,,,0.300,2.4,0.582,4.6,0.192,1.5,1.3,2.00,0.170,0.233,-0.063,3.714,0.0,1.385,14.560
+FY2019,25.155,,,0.788,3.1,1.373,5.5,0.670,2.7,4.6,4.00,0.356,0.386,-0.030,3.934,0.0,1.182,14.640
+FY2020,34.030,,,2.873,8.4,4.354,12.8,1.866,5.5,12.7,9.00,5.766,0.222,5.544,4.893,0.0,5.012,14.640
+H1 FY2021,18.522,,,2.083,11.2,2.845,15.4,1.449,7.8,9.9,7.00,2.538,0.053,2.485,5.369,0.0,6.063,14.640
+FY2021,35.445,,,2.775,7.8,4.214,11.9,2.034,5.7,13.9,11.00,2.608,0.749,1.859,4.935,0.0,4.713,14.640
+H1 FY2022,23.718,,,3.048,12.8,3.621,15.3,2.032,8.6,13.9,9.00,3.341,0.038,3.303,6.450,0.0,6.998,14.640
+FY2022,40.127,,,3.466,8.6,4.519,11.3,2.563,6.4,17.5,13.00,2.979,0.154,2.825,5.914,0.0,5.009,14.720
+FY2023,40.385,,,4.662,11.5,5.712,14.1,3.425,8.5,23.3,11.50,4.843,0.275,4.568,7.351,0.0,6.628,14.720
+H1 FY2024,22.766,8.642,38.0,3.534,15.5,4.001,17.6,2.473,10.9,16.8,7.00,2.342,0.104,2.238,9.579,0.0,8.291,14.720
+FY2024,38.668,14.428,37.3,3.930,10.2,4.835,12.5,2.819,7.3,19.2,9.50,3.355,0.081,3.274,9.002,0.0,7.950,14.720
+H1 FY2025,26.091,8.880,34.0,3.264,12.5,3.715,14.2,2.343,9.0,15.9,0.00,5.188,0.018,5.170,11.252,0.0,9.405,14.720
+FY2025,41.324,,,3.525,8.5,4.446,10.8,2.619,6.3,17.8,3.00,4.293,0.065,4.228,11.316,0.0,11.193,14.706
+H1 FY2026,17.092,4.603,26.9,0.204,1.2,0.690,4.0,0.214,1.3,1.5,2.00,-0.766,1.309,-2.075,11.127,0.0,8.355,14.682`;
+
+// ============================================================
+// EMBEDDED ANALYSIS JSON
+// ============================================================
+const analysis = {
+  "ticker": "SDL.NZ",
+  "company_name": "Solution Dynamics Limited",
+  "guidance": {
+    "as_of": "H1 FY2026 Results (26 February 2026)",
+    "fiscal_year": "FY2026",
+    "items": [
+      {"metric": "Net Profit After Tax", "target": "NZ$0.1M to NZ$0.6M", "period": "FY2026 (year ending 30 June 2026)", "vs_prior": "maintained", "notes": "Full year FY2025 NPAT was NZ$2.62M. Modest profit expected in 2H FY2026. nGAGE investment will incur additional unbudgeted costs."},
+      {"metric": "Dividend Policy", "target": "Full earnings payout + buybacks when depressed", "period": "FY2026 and beyond", "vs_prior": "raised ambition", "notes": "NZTE IGF co-funding grant (previously capping payout at 50%) expired November 2025. Board intends full payout. 2.0c interim dividend declared for H1 FY2026 (137% payout ratio — distributed from balance sheet cash)."},
+      {"metric": "Capital Expenditure", "target": "Minimal near-term capex", "period": "H2 FY2026", "vs_prior": "n.a.", "notes": "NZ$1.5M inserter equipment purchase in H1 largely completes near-term capex. No further material capex expected H2 FY2026."}
+    ],
+    "management_commentary": "Acting CEO Susie Watts and Chair John McMahon noted trading conditions are mixed — international performance is robust from Pitney Bowes SaaS growth and UK dental gains, while New Zealand faces growing margin pressure from accelerating digitalisation driven by NZ Post postage increases. nGAGE is viewed as a meaningful long-term value driver with expansion likely into the US and Australia/NZ beyond the UK."
+  }
+};
+
+// ============================================================
+// EMBEDDED DCF JSON
+// ============================================================
+const dcfData = {
+  "ticker": "SDL.NZ",
+  "currency": "NZD",
+  "current_price": 0.58,
+  "shares_outstanding_m": 14.682,
+  "net_cash_m": 8.355,
+  "net_cash_per_share": 0.569,
+  "market_cap_m": 8.52,
+  "wacc": 0.17,
+  "terminal_growth": 0.02,
+  "scenarios": {
+    "base": {
+      "label": "Base — normalized post-customer-loss steady state",
+      "fcf_base_year": 2.0,
+      "growth_schedule": [0.025, 0.025, 0.025, 0.02, 0.02],
+      "growth_rationale": "Modest ~2.5% growth as digital/SaaS (nGAGE, council water billing) offsets ongoing physical mail decline — roughly tracking inflation/flat real volumes.",
+      "fcf_projection_m": [2.05, 2.101, 2.154, 2.197, 2.241],
+      "pv_explicit_m": 6.826,
+      "pv_terminal_m": 6.95,
+      "enterprise_value_m": 13.776,
+      "equity_value_m": 22.131,
+      "intrinsic_value": 1.507,
+      "upside": 159.8,
+      "terminal_growth": 0.02
+    },
+    "bull": {
+      "label": "Bull — nGAGE traction + Local Water Done Well pipeline",
+      "fcf_base_year": 2.5,
+      "growth_schedule": [0.08, 0.07, 0.06, 0.05, 0.04],
+      "growth_rationale": "nGAGE (AI-native UK dental SaaS) scales beyond first two groups, and NZ council water-entity reforms drive a multi-year pipeline of new billing-communications clients.",
+      "fcf_projection_m": [2.7, 2.889, 3.062, 3.215, 3.344],
+      "enterprise_value_m": 20.793,
+      "equity_value_m": 29.148,
+      "intrinsic_value": 1.985,
+      "upside": 242.2,
+      "terminal_growth": 0.03
+    },
+    "bear": {
+      "label": "Bear — continued attrition + accelerating mail decline",
+      "fcf_base_year": 1.5,
+      "growth_schedule": [-0.03, -0.02, -0.01, 0.0, 0.005],
+      "growth_rationale": "Revenue and FCF keep eroding before stabilizing at a lower base; new products fail to offset legacy decline.",
+      "fcf_projection_m": [1.455, 1.426, 1.412, 1.412, 1.419],
+      "enterprise_value_m": 8.652,
+      "equity_value_m": 17.007,
+      "intrinsic_value": 1.158,
+      "upside": 99.7,
+      "terminal_growth": 0.01
+    }
+  },
+  "probability_weighted": {
+    "weights": {"base": 0.5, "bull": 0.25, "bear": 0.25},
+    "weighted_iv": 1.539,
+    "weighted_upside": 165.3
+  },
+  "entry_price": {"base": {"entry_price": 0.799, "target_cagr": 0.15}},
+  "sensitivity": {
+    "wacc_axis": [0.15, 0.16, 0.17, 0.18, 0.19],
+    "terminal_growth_axis": [0.01, 0.015, 0.02, 0.025, 0.03],
+    "matrix": [
+      [1.604, 1.627, 1.652, 1.679, 1.708],
+      [1.534, 1.554, 1.574, 1.597, 1.621],
+      [1.473, 1.490, 1.507, 1.526, 1.546],
+      [1.420, 1.434, 1.449, 1.465, 1.481],
+      [1.372, 1.384, 1.397, 1.410, 1.425]
+    ]
+  },
+  "historical_cagr": {
+    "revenue_3yr_fy22_fy25": 0.009,
+    "revenue_5yr_fy20_fy25": 0.040,
+    "eps_3yr_fy22_fy25": 0.005,
+    "eps_5yr_fy20_fy25": 0.070,
+    "fcf_5yr_fy20_fy25": -0.054,
+    "equity_5yr_fy20_fy25": 0.183
+  }
+};
+
+// ============================================================
+// CSV PARSER
+// ============================================================
+function parseCSV(csv) {
+  const lines = csv.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.trim());
+  return lines.slice(1).map(line => {
+    const values = line.split(',');
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = values[i] ? values[i].trim() : ''; });
+    return obj;
+  });
+}
+
+const allData = parseCSV(csvData);
+
+// FY annual rows only (Period starts with "FY")
+const fyData = allData.filter(d => d.Period.startsWith('FY'));
+// Sort chronologically
+fyData.sort((a, b) => parseInt(a.Period.replace('FY','')) - parseInt(b.Period.replace('FY','')));
+
+// Half-year rows
+const h1Data = allData.filter(d => d.Period.startsWith('H1'));
+
+const fyLabels = fyData.map(d => d.Period);
+
+function n(d, key) { const v = parseFloat(d[key]); return isNaN(v) ? null : v; }
+
+// ============================================================
+// KPI CARDS
+// ============================================================
+function renderKPIs() {
+  const last = fyData[fyData.length - 1]; // FY2025
+  const prev = fyData[fyData.length - 2]; // FY2024
+  const h1fy26 = allData.find(d => d.Period === 'H1 FY2026');
+
+  function pct(cur, pre, k) {
+    const c = n(cur, k), p = n(pre, k);
+    if (c === null || p === null || p === 0) return null;
+    return ((c - p) / Math.abs(p) * 100).toFixed(1);
+  }
+
+  const kpis = [
+    {
+      label: 'Revenue (FY2025)',
+      value: 'NZ$41.3M',
+      change: '+' + pct(last, prev, 'Revenue') + '% YoY',
+      changeClass: 'positive',
+      sub: 'H1 FY2026: NZ$17.1M (-34.5% YoY)',
+      alertClass: ''
+    },
+    {
+      label: 'EBITDA (FY2025)',
+      value: 'NZ$4.4M',
+      change: '10.8% margin',
+      changeClass: 'neutral',
+      sub: 'H1 FY2026: NZ$0.69M (4.0% margin)',
+      alertClass: 'alert'
+    },
+    {
+      label: 'Net Profit (FY2025)',
+      value: 'NZ$2.62M',
+      change: '6.3% margin',
+      changeClass: 'positive',
+      sub: 'FY2026 guidance: NZ$0.1-0.6M',
+      alertClass: 'alert'
+    },
+    {
+      label: 'EPS (FY2025)',
+      value: '17.8c',
+      change: '-7.3% vs FY2024 (19.2c)',
+      changeClass: 'negative',
+      sub: 'H1 FY2026: 1.5c per share',
+      alertClass: ''
+    },
+    {
+      label: 'Dividend Per Share (FY2025)',
+      value: '3.0c',
+      change: '-68% vs FY2024 (9.5c)',
+      changeClass: 'negative',
+      sub: 'Peak: 11.5c (FY2023). H1 FY2026: 2.0c interim',
+      alertClass: 'alert'
+    },
+    {
+      label: 'Net Cash',
+      value: 'NZ$8.36M',
+      change: 'NZ$0.57/share',
+      changeClass: 'positive',
+      sub: '~98% of current share price (NZ$0.58)',
+      alertClass: 'cash-card'
+    },
+    {
+      label: 'DCF Intrinsic Value',
+      value: 'NZ$1.51',
+      change: '+160% upside (base case)',
+      changeClass: 'positive',
+      sub: 'WACC 17% | Prob-weighted: NZ$1.54',
+      alertClass: ''
+    },
+    {
+      label: 'Market Cap',
+      value: 'NZ$8.5M',
+      change: 'EV ≈ NZ$0.2M',
+      changeClass: 'neutral',
+      sub: 'Market values operating biz near zero',
+      alertClass: 'alert'
+    }
+  ];
+
+  const grid = document.getElementById('kpiGrid');
+  grid.innerHTML = kpis.map(k => `
+    <div class="kpi-card ${k.alertClass}">
+      <div class="kpi-value">${k.value}</div>
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-change ${k.changeClass}">${k.change}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+// GUIDANCE SECTION
+// ============================================================
+function renderGuidance() {
+  const g = analysis.guidance;
+  const grid = document.getElementById('guidanceGrid');
+  grid.innerHTML = g.items.map(item => {
+    let vsClass = (item.vs_prior || 'new').toLowerCase().replace(/\s+/g,'-');
+    let vsLabel = item.vs_prior || 'New';
+    return `
+      <div class="guidance-card">
+        <div class="guidance-metric">${item.metric}</div>
+        <div class="guidance-target">${item.target}</div>
+        <div class="guidance-period">${item.period}</div>
+        <span class="guidance-vs-prior ${vsClass}">${vsLabel}</span>
+        ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+  const comm = document.getElementById('guidanceCommentary');
+  if (g.management_commentary) {
+    comm.textContent = g.management_commentary;
+    comm.style.display = 'block';
+  }
+}
+
+// ============================================================
+// CHART DEFAULTS
+// ============================================================
+const chartDefaults = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { labels: { color: '#e0e0e0', font: { size: 11 } } },
+    tooltip: { backgroundColor: 'rgba(20,30,60,0.95)', titleColor: '#00d4aa', bodyColor: '#e0e0e0', borderColor: 'rgba(0,212,170,0.3)', borderWidth: 1 }
+  },
+  scales: {
+    x: { ticks: { color: '#888', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+    y: { ticks: { color: '#888', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+  }
+};
+
+function deepMerge(target, source) {
+  for (const key of Object.keys(source)) {
+    if (source[key] instanceof Object && !Array.isArray(source[key])) {
+      if (!target[key]) target[key] = {};
+      deepMerge(target[key], source[key]);
+    } else {
+      target[key] = source[key];
+    }
+  }
+  return target;
+}
+function cfg(overrides) { return deepMerge(JSON.parse(JSON.stringify(chartDefaults)), overrides || {}); }
+
+const C = {
+  teal: '#00d4aa', teal40: 'rgba(0,212,170,0.4)', teal15: 'rgba(0,212,170,0.15)',
+  blue: '#0984e3', blue40: 'rgba(9,132,227,0.4)', blue15: 'rgba(9,132,227,0.15)',
+  red: '#ff6b6b', red40: 'rgba(255,107,107,0.4)', red15: 'rgba(255,107,107,0.15)',
+  yellow: '#fdcb6e', yellow40: 'rgba(253,203,110,0.4)',
+  purple: '#6c5ce7', purple40: 'rgba(108,92,231,0.4)'
+};
+
+// ============================================================
+// CHARTS
+// ============================================================
+
+// 1. Revenue & Net Profit (FY annual)
+(function() {
+  const revenues = fyData.map(d => n(d,'Revenue'));
+  const profits  = fyData.map(d => n(d,'NetIncome'));
+  const ctx = document.getElementById('revenueProfitChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: fyLabels,
+      datasets: [
+        {
+          label: 'Revenue (NZD M)',
+          data: revenues,
+          backgroundColor: fyLabels.map(l => l === 'FY2025' ? C.teal40 : 'rgba(0,212,170,0.25)'),
+          borderColor: C.teal,
+          borderWidth: 1.5,
+          yAxisID: 'y'
+        },
+        {
+          label: 'Net Profit / NPAT (NZD M)',
+          data: profits,
+          type: 'line',
+          borderColor: C.yellow,
+          backgroundColor: C.yellow40,
+          pointBackgroundColor: C.yellow,
+          pointRadius: 5,
+          tension: 0.3,
+          yAxisID: 'y2'
+        }
+      ]
+    },
+    options: cfg({
+      scales: {
+        y: { position: 'left', title: { display: true, text: 'Revenue (NZD M)', color: '#888', font:{size:10} } },
+        y2: { position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'NPAT (NZD M)', color: '#888', font:{size:10} }, ticks:{color:'#888'} }
+      },
+      plugins: {
+        annotation: {},
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const v = ctx.parsed.y;
+              return `${ctx.dataset.label}: NZD ${v !== null ? v.toFixed(2) : '-'}M`;
+            }
+          }
+        }
+      }
+    })
+  });
+})();
+
+// 2. EBITDA & Margin
+(function() {
+  const ebitda  = fyData.map(d => n(d,'EBITDA'));
+  const margins = fyData.map(d => n(d,'EBITDAMargin'));
+  const ctx = document.getElementById('ebitdaChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: fyLabels,
+      datasets: [
+        {
+          label: 'EBITDA (NZD M)',
+          data: ebitda,
+          backgroundColor: 'rgba(108,92,231,0.35)',
+          borderColor: C.purple,
+          borderWidth: 1.5,
+          yAxisID: 'y'
+        },
+        {
+          label: 'EBITDA Margin (%)',
+          data: margins,
+          type: 'line',
+          borderColor: C.teal,
+          pointBackgroundColor: C.teal,
+          pointRadius: 5,
+          tension: 0.3,
+          yAxisID: 'y2'
+        }
+      ]
+    },
+    options: cfg({
+      scales: {
+        y: { position: 'left', title: { display: true, text: 'EBITDA (NZD M)', color:'#888', font:{size:10} } },
+        y2: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color:'#888', callback: v => v+'%' }, title: { display:true, text:'EBITDA Margin (%)', color:'#888', font:{size:10} } }
+      }
+    })
+  });
+})();
+
+// 3. EPS & Dividend Per Share
+(function() {
+  const eps  = fyData.map(d => n(d,'EPS'));
+  const divs = fyData.map(d => n(d,'DividendPerShare'));
+  const ctx = document.getElementById('epsDivChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: fyLabels,
+      datasets: [
+        {
+          label: 'EPS (cents)',
+          data: eps,
+          backgroundColor: 'rgba(9,132,227,0.35)',
+          borderColor: C.blue,
+          borderWidth: 1.5,
+          yAxisID: 'y'
+        },
+        {
+          label: 'Dividend Per Share (cents)',
+          data: divs,
+          backgroundColor: fyLabels.map((l, i) => {
+            const d = divs[i];
+            if (d === null) return 'rgba(0,0,0,0)';
+            if (l === 'FY2025') return C.red40;
+            return C.teal40;
+          }),
+          borderColor: fyLabels.map(l => l === 'FY2025' ? C.red : C.teal),
+          borderWidth: 1.5,
+          type: 'bar',
+          yAxisID: 'y'
+        }
+      ]
+    },
+    options: cfg({
+      scales: {
+        y: { title: { display: true, text: 'Cents per share', color:'#888', font:{size:10} } }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y !== null ? ctx.parsed.y.toFixed(1) : '-'}c`
+          }
+        }
+      }
+    })
+  });
+})();
+
+// 4. Operating Cash Flow & Free Cash Flow
+(function() {
+  const ocf = fyData.map(d => n(d,'OperatingCashFlow'));
+  const fcf = fyData.map(d => n(d,'FreeCashFlow'));
+  const ctx = document.getElementById('cashflowChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: fyLabels,
+      datasets: [
+        {
+          label: 'Operating Cash Flow (NZD M)',
+          data: ocf,
+          borderColor: C.teal,
+          backgroundColor: C.teal15,
+          pointBackgroundColor: C.teal,
+          pointRadius: 5,
+          tension: 0.3,
+          fill: false
+        },
+        {
+          label: 'Free Cash Flow (NZD M)',
+          data: fcf,
+          borderColor: C.blue,
+          backgroundColor: C.blue15,
+          pointBackgroundColor: C.blue,
+          pointRadius: 5,
+          tension: 0.3,
+          fill: false,
+          borderDash: [5,3]
+        }
+      ]
+    },
+    options: cfg({
+      scales: {
+        y: { title: { display: true, text: 'NZD M', color:'#888', font:{size:10} } }
+      }
+    })
+  });
+})();
+
+// 5. Net Cash (Annual)
+(function() {
+  const cash = fyData.map(d => n(d,'CashAndEquivalents'));
+  // Add H1 FY2026 as a point
+  const labelsWithH1 = [...fyLabels, 'H1 FY2026'];
+  const cashWithH1   = [...cash, 8.355];
+  const ctx = document.getElementById('netCashChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labelsWithH1,
+      datasets: [
+        {
+          label: 'Net Cash (NZD M)',
+          data: cashWithH1,
+          backgroundColor: labelsWithH1.map(l => l === 'H1 FY2026' ? 'rgba(0,212,170,0.5)' : C.teal15),
+          borderColor: labelsWithH1.map(l => l === 'H1 FY2026' ? C.teal : 'rgba(0,212,170,0.5)'),
+          borderWidth: labelsWithH1.map(l => l === 'H1 FY2026' ? 2 : 1),
+        },
+        {
+          label: 'Cash per Share (NZD)',
+          data: labelsWithH1.map((l, i) => {
+            const shares = parseFloat(fyData[i] ? fyData[i].SharesOutstanding : '14.682');
+            return cashWithH1[i] !== null ? (cashWithH1[i] / (shares || 14.68)).toFixed(3) : null;
+          }),
+          type: 'line',
+          borderColor: C.yellow,
+          pointBackgroundColor: C.yellow,
+          pointRadius: 4,
+          tension: 0.3,
+          yAxisID: 'y2',
+          fill: false
+        }
+      ]
+    },
+    options: cfg({
+      scales: {
+        y: { position: 'left', title: { display:true, text:'Net Cash (NZD M)', color:'#888', font:{size:10} } },
+        y2: { position: 'right', grid: { drawOnChartArea:false }, ticks: { color:'#888', callback: v => 'NZ$'+v }, title: { display:true, text:'Cash/Share (NZD)', color:'#888', font:{size:10} } }
+      }
+    })
+  });
+})();
+
+// 6. H1 Half-Year Revenue & EBITDA trend
+(function() {
+  const h1Labels = h1Data.map(d => d.Period).sort((a,b) => {
+    const ya = parseInt(a.match(/\d{4}/)[0]), yb = parseInt(b.match(/\d{4}/)[0]);
+    return ya - yb;
+  });
+  const sortedH1 = h1Labels.map(l => h1Data.find(d => d.Period === l));
+  const h1Rev    = sortedH1.map(d => n(d,'Revenue'));
+  const h1Ebitda = sortedH1.map(d => n(d,'EBITDA'));
+  const ctx = document.getElementById('halfYearChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: h1Labels,
+      datasets: [
+        {
+          label: 'H1 Revenue (NZD M)',
+          data: h1Rev,
+          backgroundColor: h1Labels.map(l => l === 'H1 FY2026' ? C.red40 : C.teal15),
+          borderColor: h1Labels.map(l => l === 'H1 FY2026' ? C.red : C.teal),
+          borderWidth: 1.5,
+          yAxisID: 'y'
+        },
+        {
+          label: 'H1 EBITDA (NZD M)',
+          data: h1Ebitda,
+          type: 'line',
+          borderColor: C.yellow,
+          pointBackgroundColor: h1Labels.map(l => l === 'H1 FY2026' ? C.red : C.yellow),
+          pointRadius: 6,
+          tension: 0.3,
+          yAxisID: 'y2',
+          fill: false
+        }
+      ]
+    },
+    options: cfg({
+      scales: {
+        y: { position: 'left', title: { display:true, text:'H1 Revenue (NZD M)', color:'#888', font:{size:10} } },
+        y2: { position: 'right', grid: { drawOnChartArea:false }, ticks:{color:'#888'}, title: { display:true, text:'H1 EBITDA (NZD M)', color:'#888', font:{size:10} } }
+      }
+    })
+  });
+})();
+
+// 7. Revenue vs Operating Margin
+(function() {
+  const rev = fyData.map(d => n(d,'Revenue'));
+  const om  = fyData.map(d => n(d,'OperatingMargin'));
+  const ctx = document.getElementById('marginChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: fyLabels,
+      datasets: [
+        {
+          label: 'Revenue (NZD M)',
+          data: rev,
+          borderColor: C.blue,
+          backgroundColor: C.blue15,
+          pointBackgroundColor: C.blue,
+          pointRadius: 5,
+          tension: 0.3,
+          fill: true,
+          yAxisID: 'y'
+        },
+        {
+          label: 'Operating Margin (%)',
+          data: om,
+          borderColor: C.teal,
+          pointBackgroundColor: C.teal,
+          pointRadius: 5,
+          tension: 0.3,
+          fill: false,
+          yAxisID: 'y2'
+        }
+      ]
+    },
+    options: cfg({
+      scales: {
+        y: { position:'left', title:{display:true,text:'Revenue (NZD M)',color:'#888',font:{size:10}} },
+        y2: { position:'right', grid:{drawOnChartArea:false}, ticks:{color:'#888',callback:v=>v+'%'}, title:{display:true,text:'Operating Margin (%)',color:'#888',font:{size:10}} }
+      }
+    })
+  });
+})();
+
+// 8. Shareholders' Equity
+(function() {
+  const equity = fyData.map(d => n(d,'ShareholdersEquity'));
+  const labelsWithH1 = [...fyLabels, 'H1 FY2026'];
+  const equityWithH1 = [...equity, 11.127];
+  const ctx = document.getElementById('equityChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labelsWithH1,
+      datasets: [
+        {
+          label: "Shareholders' Equity (NZD M)",
+          data: equityWithH1,
+          borderColor: C.purple,
+          backgroundColor: 'rgba(108,92,231,0.15)',
+          pointBackgroundColor: labelsWithH1.map(l => l==='H1 FY2026' ? C.yellow : C.purple),
+          pointRadius: 5,
+          tension: 0.3,
+          fill: true
+        }
+      ]
+    },
+    options: cfg({
+      scales: {
+        y: { title:{display:true,text:'NZD M',color:'#888',font:{size:10}} }
+      }
+    })
+  });
+})();
+
+// ============================================================
+// OVERVIEW TOGGLE
+// ============================================================
+function toggleOverview() {
+  const btn = document.querySelector('.overview-toggle');
+  const content = document.getElementById('overviewContent');
+  btn.classList.toggle('active');
+  content.classList.toggle('active');
+}
+
+// ============================================================
+// MODAL
+// ============================================================
+const metricDescriptions = {
+  revenueProfit: {
+    title: 'Revenue & Net Profit',
+    content: `
+      <p><strong>Revenue</strong> is SDL's total income from its NZ mailhouse operations and international CCM software and managed print services. All figures are in NZD millions.</p>
+      <div class="metric-highlight"><strong>For SDL:</strong> Revenue grew from NZ$20M in FY2017 to over NZ$41M in FY2025, but a significant portion of this growth came from a single large international customer (an aid-funded NGO). When that customer departed in mid-FY2025, H1 FY2026 revenue fell 34.5% to NZ$17.1M.</div>
+      <p><strong>Net Profit After Tax (NPAT)</strong> is what's left after all operating costs, depreciation, interest, and tax. SDL is generally a lean operator with consistent (if modest) margins.</p>
+      <div class="warn-highlight"><strong>FY2026 reset:</strong> FY2026 full-year NPAT guidance is only NZ$0.1-0.6M, down from NZ$2.62M in FY2025 — a ~91% collapse driven by the single customer departure.</div>
+      <p><strong>What to watch:</strong></p>
+      <ul>
+        <li>Whether revenue stabilizes in the NZ$30-34M range post-customer-loss (the base case normalized assumption)</li>
+        <li>nGAGE revenue contribution beginning to show in H2 FY2026 / FY2027 reporting</li>
+        <li>NZ council water entity contracts as Local Water Done Well reforms progress</li>
+      </ul>
+    `
+  },
+  ebitda: {
+    title: 'EBITDA & EBITDA Margin',
+    content: `
+      <p><strong>EBITDA</strong> stands for Earnings Before Interest, Tax, Depreciation, and Amortisation. It is a proxy for operating cash generation before capital structure and accounting decisions. For SDL — a company with very low debt and modest capex — EBITDA is close to operating cash flow.</p>
+      <div class="metric-highlight"><strong>For SDL:</strong> EBITDA peaked at NZ$5.7M (14.1% margin) in FY2023 when the large NGO customer was at maximum revenue. In H1 FY2026 EBITDA collapsed to NZ$0.69M (4.0% margin) after that customer's departure.</div>
+      <p><strong>EBITDA margin</strong> shows what percentage of every dollar of revenue SDL retains as operating earnings. SDL's NZ mailhouse business is inherently lower margin (postage and paper are pass-throughs at thin spreads). The software/CCM segment carries higher margins.</p>
+      <p><strong>What to watch:</strong></p>
+      <ul>
+        <li>Whether the restructured cost base (SG&A down 26.6% H1 FY2026 YoY) allows margins to recover as revenue stabilizes</li>
+        <li>NZ gross margin trend: NZ Post price increases are inflating revenue without proportional EBITDA — watch gross margin %</li>
+        <li>A return to 10%+ EBITDA margin at a lower revenue base would signal operating leverage kicking in</li>
+      </ul>
+    `
+  },
+  epsDividend: {
+    title: 'EPS & Dividend Per Share',
+    content: `
+      <p><strong>EPS (Earnings Per Share)</strong> is net profit divided by shares outstanding. SDL has ~14.7M shares, so NZ$1M of NPAT = ~6.8c EPS. EPS peaked at 23.3c in FY2023.</p>
+      <p><strong>Dividend Per Share</strong>: SDL has paid fully imputed dividends for over 10 years. All dividends carry full NZ imputation credits, worth an additional ~39% gross-up for NZ resident shareholders (effectively tax-free income up to the imputation credit limit).</p>
+      <div class="warn-highlight"><strong>Dividend cut:</strong> FY2025 dividend was reduced to 3.0c (from 11.5c in FY2023 and 9.5c in FY2024) following the customer loss. The H1 FY2026 interim dividend was 2.0c — paid at a 137% payout ratio, meaning it came from the balance sheet cash pile, not from current earnings. This signals Board commitment to distributions but is not sustainable long-term.</div>
+      <p><strong>Future dividend outlook:</strong></p>
+      <ul>
+        <li>The NZTE IGF co-funding grant (which previously capped payout ratio at 50%) expired November 2025</li>
+        <li>The Board has signalled intent to pay out 100% of earnings as dividends going forward</li>
+        <li>With NPAT guidance of NZ$0.1-0.6M for FY2026, the full-year dividend is likely to be low (1-4c)</li>
+        <li>Recovery of earnings power is the key to dividend restoration</li>
+      </ul>
+    `
+  },
+  cashflow: {
+    title: 'Free Cash Flow & Operating Cash Flow',
+    content: `
+      <p><strong>Operating Cash Flow (OCF)</strong> is cash generated from normal business operations before investing activities. SDL's OCF tends to track EBITDA closely due to low capex requirements.</p>
+      <p><strong>Free Cash Flow (FCF)</strong> is OCF minus capital expenditure. SDL is historically a light capex business — R&D is expensed rather than capitalised, and the NZ mailhouse equipment is relatively mature.</p>
+      <div class="metric-highlight"><strong>For SDL:</strong> The 9-year FCF median is approximately NZ$2.8M. The notable outlier is FY2020 (NZ$5.5M FCF) when working capital from the major NGO contract was strong, and FY2026 where H1 OCF is negative due to capex on new inserter machines (NZ$1.5M one-off) and trading near breakeven.</div>
+      <div class="warn-highlight"><strong>H1 FY2026 FCF was -NZ$2.1M</strong> primarily due to the NZ$1.3M capex on inserter machines. This equipment purchase is now complete and H2 FY2026 capex should normalize to very low levels.</div>
+      <p><strong>What to watch:</strong></p>
+      <ul>
+        <li>Whether FCF returns to NZ$1.5-2.5M range in FY2027 as the restructured cost base stabilizes</li>
+        <li>nGAGE investment (unbudgeted additional spend in H2 FY2026) acting as a near-term drag</li>
+        <li>The DCF base case assumes normalized FCF of NZ$2.0M — below the 9-year median to reflect the permanently smaller revenue base</li>
+      </ul>
+    `
+  },
+  netcash: {
+    title: 'Net Cash Position',
+    content: `
+      <p><strong>Net Cash</strong> = Cash and cash equivalents minus total debt. SDL carries <strong>zero financial debt</strong>, so net cash equals the cash balance outright. This is a significant balance-sheet strength for a micro-cap company.</p>
+      <div class="metric-highlight"><strong>Key valuation insight:</strong> At 31 December 2025 (H1 FY2026 balance date), SDL held NZ$8.36M in net cash — approximately NZ$0.57 per share. The current share price is approximately NZ$0.58. This means the market is effectively valuing the <em>entire operating business</em> (annual revenues of NZ$34M+, software platforms, customer relationships, nGAGE product, Jupiter print network) at approximately NZ$0.01 per share — near zero.</div>
+      <p><strong>Why this matters:</strong></p>
+      <ul>
+        <li>The net cash provides a genuine valuation floor — management would need to actively destroy value through poor acquisitions or sustained cash burn for the balance sheet to deteriorate materially</li>
+        <li>The active share buyback (up to NZ$0.5M) at prices below NZ$0.80 is accretive to per-share cash value</li>
+        <li>SDL has historically been debt-free — a structural feature, not a temporary condition</li>
+        <li>The risk: if the operating business generates negative FCF for an extended period, the NZ$8.4M cash buffer begins to erode</li>
+      </ul>
+    `
+  },
+  halfyear: {
+    title: 'H1 Half-Year Revenue & EBITDA',
+    content: `
+      <p>This chart compares SDL's first-half (July-December) trading periods across years. The first half is typically SDL's stronger trading period due to the international customer volumes that historically peaked in H1.</p>
+      <div class="warn-highlight"><strong>The cliff:</strong> H1 FY2026 revenue of NZ$17.1M compares to H1 FY2025's NZ$26.1M and H1 FY2024's NZ$22.8M. EBITDA fell to NZ$0.69M (4.0% margin) from NZ$3.7M (14.2%) the prior first half. This is the direct impact of the NGO customer departure.</div>
+      <p><strong>For SDL specifically:</strong></p>
+      <ul>
+        <li>The NGO customer provided approximately 30-35% of international revenue and their exit hit H1 FY2026 almost entirely</li>
+        <li>Despite the revenue decline, the NZ business remained stable — revenue compression was predominantly from the international segment</li>
+        <li>Pitney Bowes click-based SaaS revenue grew strongly in H1 FY2026, partially offsetting the NGO loss</li>
+        <li>nGAGE revenue (two dental corporate group customers) will begin appearing in H2 FY2026 and FY2027 reporting</li>
+      </ul>
+    `
+  },
+  opMargin: {
+    title: 'Revenue vs Operating Margin',
+    content: `
+      <p><strong>Operating Margin</strong> = Operating Income / Revenue. It shows how much profit SDL generates from each dollar of revenue after direct costs and overhead, but before interest and tax.</p>
+      <div class="metric-highlight"><strong>For SDL:</strong> Operating margin improved significantly from 3.1% in FY2019 to 11.5% in FY2023 as the NGO customer relationship scaled up. The departure of that customer in FY2025-FY2026 has compressed margin back sharply.</div>
+      <p><strong>Understanding SDL's margin dynamics:</strong></p>
+      <ul>
+        <li>Outsourced postage and paper (~48% of H1 FY2026 revenue) are very low margin pass-throughs — this depresses the reported revenue-to-margin ratio</li>
+        <li>The software/CCM segment carries inherently higher margins than the mailhouse</li>
+        <li>NZ Post price increases inflate revenue without proportional margin improvement</li>
+        <li>The restructured cost base (SG&A -26.6% in H1 FY2026) should improve margin leverage once revenue stabilizes</li>
+      </ul>
+    `
+  },
+  equity: {
+    title: "Shareholders' Equity",
+    content: `
+      <p><strong>Shareholders' Equity</strong> (also called book value or net assets) = Total assets minus total liabilities. It represents the accounting value of the owners' stake in the business.</p>
+      <div class="metric-highlight"><strong>For SDL:</strong> Equity has grown from NZ$3.5M in FY2017 to NZ$11.3M at FY2025 — an ~18% per year CAGR — primarily driven by retained earnings (profits not paid as dividends). SDL has zero long-term debt, so equity growth directly reflects profit accumulation.</div>
+      <p><strong>Net cash makes up ~74% of shareholders' equity</strong> at H1 FY2026 (NZ$8.36M cash vs NZ$11.1M equity), confirming the balance-sheet quality.</p>
+      <p><strong>Current market vs book:</strong> At NZ$0.58/share with equity of NZ$11.1M, SDL trades at approximately <strong>0.75x book value</strong> — well below its historical P/B range of 0.78x-9.43x (10-year average ~5.8x). The company is trading near or below book value for the first time in its listed history.</p>
+    `
+  }
+};
+
+function openModal(key) {
+  const desc = metricDescriptions[key];
+  if (!desc) return;
+  document.getElementById('modalTitle').textContent = desc.title;
+  document.getElementById('modalBody').innerHTML = desc.content;
+  document.getElementById('modalOverlay').classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+  if (event && event.target !== document.getElementById('modalOverlay')) return;
+  document.getElementById('modalOverlay').classList.remove('active');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+// Allow close button click
+document.querySelector('.modal-close').addEventListener('click', () => closeModal());
+
+// ============================================================
+// DCF SECTION
+// ============================================================
+let currentScenario = 'base';
+
+function calculateDCF(baseFCF, growthY1, wacc, terminalGrowth) {
+  // 5-year DCF with declining growth toward stable
+  const endGrowth = Math.min(growthY1, terminalGrowth + 0.02);
+  const growthRates = [];
+  for (let i = 0; i < 5; i++) {
+    const t = i / 4;
+    growthRates.push(growthY1 - (growthY1 - endGrowth) * t);
+  }
+  let fcf = baseFCF;
+  let pvFCF = 0;
+  const fcfValues = [baseFCF];
+  for (let i = 0; i < 5; i++) {
+    fcf = fcf * (1 + growthRates[i] / 100);
+    fcfValues.push(fcf);
+    pvFCF += fcf / Math.pow(1 + wacc / 100, i + 1);
+  }
+  const terminalFCF = fcf * (1 + terminalGrowth / 100);
+  const waccDec = wacc / 100;
+  const tgDec = terminalGrowth / 100;
+  if (waccDec <= tgDec) return { iv: 0, entryPrice: 0 };
+  const terminalValue = terminalFCF / (waccDec - tgDec);
+  const pvTerminal = terminalValue / Math.pow(1 + waccDec, 5);
+  const ev = pvFCF + pvTerminal;
+  const equityValue = ev + dcfData.net_cash_m;
+  const iv = equityValue / dcfData.shares_outstanding_m;
+  const entryPrice = (terminalValue / dcfData.shares_outstanding_m) / Math.pow(1.15, 5);
+  return { iv, entryPrice, fcfValues, growthRates };
+}
+
+function renderFCFProjections(baseFCF, growthY1) {
+  const wacc = parseFloat(document.getElementById('waccSlider').value);
+  const tg   = parseFloat(document.getElementById('terminalSlider').value);
+  const result = calculateDCF(baseFCF, growthY1, wacc, tg);
+  const fcfValues = result.fcfValues || [];
+  const growthRates = result.growthRates || [];
+
+  let html = '';
+  const years = ['Base', 'Yr 1', 'Yr 2', 'Yr 3', 'Yr 4', 'Yr 5'];
+  years.forEach(y => { html += `<div class="fcf-projection-item header">${y}</div>`; });
+  html += `<div class="fcf-projection-item"><div class="fcf-value">NZ$${fcfValues[0] ? fcfValues[0].toFixed(2) : '-'}M</div><div class="growth-rate">—</div></div>`;
+  for (let i = 1; i <= 5; i++) {
+    const g = growthRates[i-1];
+    html += `<div class="fcf-projection-item">
+      <div class="fcf-value">NZ$${fcfValues[i] ? fcfValues[i].toFixed(2) : '-'}M</div>
+      <div class="growth-rate">${g !== undefined ? (g >= 0 ? '+' : '') + g.toFixed(1) + '%' : ''}</div>
+    </div>`;
+  }
+  document.getElementById('fcfProjectionTable').innerHTML = html;
+}
+
+function updateDCFDisplay() {
+  const growth   = parseFloat(document.getElementById('growthSlider').value);
+  const wacc     = parseFloat(document.getElementById('waccSlider').value);
+  const terminal = parseFloat(document.getElementById('terminalSlider').value);
+
+  document.getElementById('growthValue').textContent   = growth + '%';
+  document.getElementById('waccValue').textContent     = wacc + '%';
+  document.getElementById('terminalValue').textContent = terminal + '%';
+
+  // Use base scenario FCF unless in bull/bear
+  const s = dcfData.scenarios[currentScenario];
+  const baseFCF = s.fcf_base_year;
+
+  renderFCFProjections(baseFCF, growth);
+  const result = calculateDCF(baseFCF, growth, wacc, terminal);
+
+  document.getElementById('dcfIV').textContent = 'NZ$' + result.iv.toFixed(2);
+  document.getElementById('dcfEntry').textContent = 'NZ$' + result.entryPrice.toFixed(2);
+
+  const upside = ((result.iv - dcfData.current_price) / dcfData.current_price * 100);
+  const el = document.getElementById('dcfUpside');
+  el.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(0) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+  el.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+  document.getElementById('dcfWeighted').textContent = 'NZ$' + dcfData.probability_weighted.weighted_iv.toFixed(2);
+
+  // Update assumption grid
+  const grid = document.getElementById('assumptionGrid');
+  if (grid) {
+    grid.innerHTML = `
+      <div class="assumption-item"><div class="label">Base Year FCF</div><div class="value">NZ$${baseFCF.toFixed(1)}M</div></div>
+      <div class="assumption-item"><div class="label">Year 1 Growth</div><div class="value">${growth}%</div></div>
+      <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc}%</div></div>
+      <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${terminal}%</div></div>
+      <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa">NZ$${result.iv.toFixed(2)}</div></div>
+      <div class="assumption-item"><div class="label">Entry Price (15% CAGR)</div><div class="value" style="color:#00d4aa">NZ$${result.entryPrice.toFixed(2)}</div></div>
+    `;
+  }
+}
+
+function switchScenario(scenario) {
+  currentScenario = scenario;
+  document.querySelectorAll('.scenario-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.scenario === scenario);
+  });
+  const s = dcfData.scenarios[scenario];
+  const firstGrowth = (s.growth_schedule[0] * 100).toFixed(1);
+  const tg = (s.terminal_growth || dcfData.terminal_growth) * 100;
+
+  document.getElementById('growthSlider').value   = firstGrowth;
+  document.getElementById('waccSlider').value     = (dcfData.wacc * 100).toString();
+  document.getElementById('terminalSlider').value = tg.toString();
+  document.getElementById('scenarioLabel').textContent = s.label;
+  document.getElementById('scenarioRationale').textContent = s.growth_rationale;
+  updateDCFDisplay();
+}
+
+function renderSensitivityMatrix() {
+  const sens = dcfData.sensitivity;
+  const currentPrice = dcfData.current_price;
+  let html = '<tr><th>WACC \\ Term Growth</th>';
+  sens.terminal_growth_axis.forEach(tg => { html += `<th>${(tg*100).toFixed(1)}%</th>`; });
+  html += '</tr>';
+  sens.wacc_axis.forEach((wacc, i) => {
+    html += `<tr><th>${(wacc*100).toFixed(0)}%</th>`;
+    sens.matrix[i].forEach((val, j) => {
+      const isBase = Math.abs(wacc - dcfData.wacc) < 0.001 && Math.abs(sens.terminal_growth_axis[j] - dcfData.terminal_growth) < 0.001;
+      const cls = isBase ? 'highlight' : (val >= currentPrice ? 'above-current' : 'below-current');
+      html += `<td class="${cls}">NZ$${val.toFixed(2)}</td>`;
+    });
+    html += '</tr>';
+  });
+  document.getElementById('sensitivityMatrix').innerHTML = html;
+}
+
+function renderHistoricalGrowth() {
+  const hg = dcfData.historical_cagr;
+  const metrics = [
+    { key: 'revenue_3yr_fy22_fy25', label: 'Revenue 3Y (FY22-FY25)' },
+    { key: 'revenue_5yr_fy20_fy25', label: 'Revenue 5Y (FY20-FY25)' },
+    { key: 'eps_3yr_fy22_fy25',     label: 'EPS 3Y (FY22-FY25)' },
+    { key: 'eps_5yr_fy20_fy25',     label: 'EPS 5Y (FY20-FY25)' },
+    { key: 'fcf_5yr_fy20_fy25',     label: 'FCF 5Y (FY20-FY25)' },
+    { key: 'equity_5yr_fy20_fy25',  label: 'Equity 5Y (FY20-FY25)' }
+  ];
+  const grid = document.getElementById('growthGrid');
+  grid.innerHTML = metrics.map(m => {
+    const rate = hg[m.key] * 100;
+    const cls  = rate >= 0 ? 'positive' : 'negative';
+    return `<div class="growth-item">
+      <div class="metric">${m.label}</div>
+      <div class="rate ${cls}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div>
+    </div>`;
+  }).join('');
+}
+
+function initDCF() {
+  document.getElementById('dcfCurrent').textContent  = 'NZ$' + dcfData.current_price.toFixed(2);
+  document.getElementById('dcfWeighted').textContent = 'NZ$' + dcfData.probability_weighted.weighted_iv.toFixed(2);
+  renderSensitivityMatrix();
+  renderHistoricalGrowth();
+  switchScenario('base');
+
+  // Wire sliders
+  ['growthSlider','waccSlider','terminalSlider'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.oninput = updateDCFDisplay; el.onchange = updateDCFDisplay; }
+  });
+}
+
+// ============================================================
+// INIT
+// ============================================================
+renderKPIs();
+renderGuidance();
+initDCF();
+</script>
+</body>
+</html>
