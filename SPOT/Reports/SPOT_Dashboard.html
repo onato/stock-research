@@ -1,663 +1,426 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spotify Technology S.A. (SPOT) Financial Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #e0e0e0;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding: 20px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-        }
-        .header h1 {
-            font-size: 2.5rem;
-            background: linear-gradient(90deg, #1DB954, #00d4aa);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 10px;
-        }
-        .header p { color: #888; font-size: 1.1rem; }
-        .header-meta { display: flex; justify-content: center; gap: 30px; margin-top: 12px; flex-wrap: wrap; }
-        .header-meta span { font-size: 0.9rem; color: #aaa; }
-        .header-meta strong { color: #1DB954; }
-        /* KPI */
-        .kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 30px;
-            max-width: 1400px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        .kpi-card {
-            background: rgba(255,255,255,0.05);
-            border-radius: 12px;
-            padding: 20px;
-            text-align: center;
-            border: 1px solid rgba(255,255,255,0.1);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        .kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(29,185,84,0.2); }
-        .kpi-value { font-size: 1.8rem; font-weight: bold; color: #1DB954; margin-bottom: 5px; }
-        .kpi-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
-        .kpi-change { font-size: 0.9rem; margin-top: 5px; }
-        .kpi-change.positive { color: #1DB954; }
-        .kpi-change.negative { color: #ff6b6b; }
-        /* Overview */
-        .overview-section { max-width: 1400px; margin: 0 auto 30px; }
-        .overview-toggle {
-            width: 100%;
-            background: rgba(29,185,84,0.1);
-            border: 1px solid rgba(29,185,84,0.3);
-            border-radius: 12px;
-            padding: 16px 24px;
-            color: #1DB954;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: all 0.2s ease;
-        }
-        .overview-toggle:hover { background: rgba(29,185,84,0.2); }
-        .overview-toggle .arrow { transition: transform 0.3s ease; }
-        .overview-toggle.active .arrow { transform: rotate(180deg); }
-        .overview-content {
-            display: none;
-            background: rgba(255,255,255,0.03);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-top: none;
-            border-radius: 0 0 12px 12px;
-            padding: 30px;
-            margin-top: -12px;
-        }
-        .overview-content.active { display: block; }
-        .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
-        .overview-card {
-            background: rgba(255,255,255,0.03);
-            border-radius: 12px;
-            padding: 20px;
-            border: 1px solid rgba(255,255,255,0.08);
-        }
-        .overview-card h3 { color: #1DB954; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .overview-card p { margin-bottom: 12px; line-height: 1.6; }
-        .overview-card ul { list-style: none; padding: 0; margin: 0; }
-        .overview-card li { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); line-height: 1.5; }
-        .overview-card li:last-child { border-bottom: none; }
-        .overview-card.bull h3 { color: #1DB954; }
-        .overview-card.bear h3 { color: #ff6b6b; }
-        .overview-card.risks h3 { color: #fdcb6e; }
-        .risk-high { color: #ff6b6b; }
-        .risk-moderate { color: #fdcb6e; }
-        .risk-low { color: #1DB954; }
-        .revenue-stream { display: flex; justify-content: space-between; align-items: center; }
-        .revenue-stream .percent { color: #1DB954; font-weight: 600; }
-        .trend-growing { color: #1DB954; }
-        .trend-stable { color: #888; }
-        .trend-declining { color: #ff6b6b; }
-        /* Guidance */
-        .guidance-section { max-width: 1400px; margin: 0 auto 30px; }
-        .guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .guidance-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
-        .guidance-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg, #1DB954, #00d4aa); border-radius: 2px; }
-        .guidance-meta { font-size: 0.85rem; color: #888; }
-        .guidance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .guidance-card {
-            background: rgba(255,255,255,0.05);
-            border-radius: 12px;
-            padding: 18px;
-            border: 1px solid rgba(255,255,255,0.1);
-            transition: transform 0.2s ease;
-        }
-        .guidance-card:hover { transform: translateY(-2px); }
-        .guidance-metric { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-        .guidance-target { font-size: 1.4rem; font-weight: 600; color: #1DB954; margin-bottom: 6px; }
-        .guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
-        .guidance-vs-prior { display: inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
-        .guidance-vs-prior.raised { background: rgba(29,185,84,0.15); color: #1DB954; }
-        .guidance-vs-prior.lowered { background: rgba(255,107,107,0.15); color: #ff6b6b; }
-        .guidance-vs-prior.maintained { background: rgba(255,255,255,0.1); color: #888; }
-        .guidance-vs-prior.new { background: rgba(99,102,241,0.15); color: #818cf8; }
-        .guidance-notes { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
-        .guidance-commentary {
-            background: rgba(255,255,255,0.03);
-            border-radius: 10px;
-            padding: 16px 20px;
-            border-left: 3px solid #1DB954;
-            font-style: italic;
-            color: #b0b0b0;
-            line-height: 1.6;
-        }
-        .guidance-commentary::before { content: '\201C'; font-size: 1.5rem; color: #1DB954; margin-right: 4px; }
-        /* Section title */
-        .section-title {
-            font-size: 1.5rem;
-            color: #fff;
-            margin: 40px auto 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid rgba(29,185,84,0.3);
-            max-width: 1400px;
-        }
-        /* Charts */
-        .charts-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 25px; max-width: 1400px; margin: 0 auto; }
-        .chart-card {
-            background: rgba(255,255,255,0.05);
-            border-radius: 15px;
-            padding: 25px;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-        .chart-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
-        .chart-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg, #1DB954, #00d4aa); border-radius: 2px; }
-        .help-btn {
-            width: 24px; height: 24px; border-radius: 50%;
-            background: rgba(29,185,84,0.2); border: 1px solid #1DB954;
-            color: #1DB954; font-size: 14px; font-weight: bold;
-            cursor: pointer; display: flex; align-items: center; justify-content: center;
-            transition: all 0.2s ease; flex-shrink: 0;
-        }
-        .help-btn:hover { background: #1DB954; color: #1a1a2e; }
-        .chart-wrapper { position: relative; height: 300px; }
-        /* Modal */
-        .modal-overlay {
-            display: none; position: fixed; top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7); z-index: 1000;
-            justify-content: center; align-items: center; padding: 20px;
-        }
-        .modal-overlay.active { display: flex; }
-        .modal {
-            background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%);
-            border-radius: 16px; max-width: 600px; width: 100%;
-            max-height: 80vh; overflow-y: auto;
-            border: 1px solid rgba(29,185,84,0.3);
-            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-        }
-        .modal-header {
-            padding: 20px 25px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            display: flex; justify-content: space-between; align-items: center;
-        }
-        .modal-header h3 { color: #1DB954; font-size: 1.4rem; margin: 0; }
-        .modal-close {
-            width: 32px; height: 32px; border-radius: 50%;
-            background: rgba(255,107,107,0.2); border: 1px solid #ff6b6b;
-            color: #ff6b6b; font-size: 20px; cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-        }
-        .modal-close:hover { background: #ff6b6b; color: #fff; }
-        .modal-body { padding: 25px; line-height: 1.7; }
-        .modal-body p { margin-bottom: 15px; }
-        .modal-body strong { color: #1DB954; }
-        .modal-body ul { margin: 15px 0; padding-left: 20px; }
-        .modal-body li { margin-bottom: 8px; }
-        .metric-highlight {
-            background: rgba(29,185,84,0.1);
-            border-left: 3px solid #1DB954;
-            padding: 12px 15px; margin: 15px 0;
-            border-radius: 0 8px 8px 0;
-        }
-        /* DCF */
-        .dcf-section { max-width: 1400px; margin: 0 auto 40px; }
-        .dcf-note { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; border-left: 3px solid #888; font-size: 0.85rem; color: #999; line-height: 1.6; }
-        .dcf-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .dcf-card {
-            background: rgba(255,255,255,0.05); border-radius: 12px;
-            padding: 24px; text-align: center;
-            border: 1px solid rgba(255,255,255,0.1);
-            transition: transform 0.3s ease;
-        }
-        .dcf-card:hover { transform: translateY(-3px); }
-        .dcf-card.highlight { background: rgba(29,185,84,0.1); border-color: rgba(29,185,84,0.3); }
-        .dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-        .dcf-value { font-size: 2.2rem; font-weight: bold; color: #1DB954; }
-        .dcf-card:not(.highlight) .dcf-value { color: #fff; }
-        .dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
-        .dcf-change.positive { color: #1DB954; }
-        .dcf-change.negative { color: #ff6b6b; }
-        .dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
-        .dcf-warning {
-            background: rgba(253,203,110,0.15); border: 1px solid rgba(253,203,110,0.4);
-            border-radius: 8px; padding: 12px 16px; margin-bottom: 25px;
-            display: flex; align-items: flex-start; gap: 10px; color: #fdcb6e;
-        }
-        .warning-icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 2px; }
-        .dcf-inputs { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.08); }
-        .dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
-        .dcf-inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .dcf-input-card { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
-        .dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-        .dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #1DB954; }
-        .dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
-        .fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
-        .fcf-projection-table { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 12px; }
-        .fcf-projection-item { text-align: center; }
-        .fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
-        .fcf-projection-item .fcf-val { font-size: 1rem; color: #e0e0e0; font-weight: 500; }
-        .fcf-projection-item .growth-rate { font-size: 0.75rem; color: #1DB954; margin-top: 2px; }
-        .dcf-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; margin-bottom: 30px; padding: 25px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
-        .slider-group { display: flex; flex-direction: column; gap: 10px; }
-        .slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
-        .slider-group label span { color: #1DB954; font-weight: 600; }
-        .slider-group input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); outline: none; }
-        .slider-group input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #1DB954; cursor: pointer; transition: transform 0.2s; }
-        .slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
-        .slider-hint { font-size: 0.8rem; color: #666; }
-        .scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
-        .scenario-tab { padding: 10px 24px; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: #888; border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s; }
-        .scenario-tab:hover { border-color: rgba(29,185,84,0.5); color: #e0e0e0; }
-        .scenario-tab.active { background: rgba(29,185,84,0.15); border-color: #1DB954; color: #1DB954; }
-        .scenario-details { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.08); }
-        .scenario-details h4 { color: #1DB954; margin-bottom: 15px; }
-        .assumption-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
-        .assumption-item { text-align: center; }
-        .assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
-        .assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
-        .sensitivity-section { margin-bottom: 30px; }
-        .sensitivity-section h4 { color: #e0e0e0; margin-bottom: 8px; }
-        .sens-note { font-size: 0.8rem; color: #888; margin-bottom: 12px; }
-        .sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.03); border-radius: 8px; overflow: hidden; }
-        .sensitivity-table th, .sensitivity-table td { padding: 12px 16px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
-        .sensitivity-table th { background: rgba(29,185,84,0.1); color: #1DB954; font-weight: 600; }
-        .sensitivity-table td { color: #e0e0e0; }
-        .sensitivity-table td.highlight { background: rgba(29,185,84,0.15); color: #1DB954; font-weight: 600; }
-        .sensitivity-table td.below-current { color: #ff6b6b; }
-        .sensitivity-table td.above-current { color: #1DB954; }
-        .historical-growth { margin-bottom: 30px; }
-        .historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
-        .growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
-        .growth-item { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 15px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
-        .growth-item .metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
-        .growth-item .rate { font-size: 1.2rem; font-weight: 600; }
-        .growth-item .rate.positive { color: #1DB954; }
-        .growth-item .rate.negative { color: #ff6b6b; }
-        .growth-item .rate.na { color: #555; }
-        .growth-item.selected { border-color: #1DB954; background: rgba(29,185,84,0.1); }
-        .dcf-download { text-align: center; margin-top: 30px; }
-        .download-btn { display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; background: rgba(29,185,84,0.15); border: 1px solid #1DB954; border-radius: 8px; color: #1DB954; text-decoration: none; font-weight: 600; transition: all 0.2s; }
-        .download-btn:hover { background: #1DB954; color: #1a1a2e; }
-        .download-icon { font-size: 1.2rem; }
-        @media (max-width: 768px) {
-            .charts-container { grid-template-columns: 1fr; }
-            .overview-grid { grid-template-columns: 1fr; }
-            .header h1 { font-size: 1.8rem; }
-            .fcf-projection-table { grid-template-columns: repeat(3, 1fr); }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spotify Technology S.A. (SPOT) Financial Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#e0e0e0;min-height:100vh;padding:20px;}
+.header{text-align:center;margin-bottom:30px;padding:20px;background:rgba(255,255,255,0.05);border-radius:15px;backdrop-filter:blur(10px);}
+.header h1{font-size:2.5rem;background:linear-gradient(90deg,#1db954,#1ed760);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:10px;}
+.header p{color:#888;font-size:1.1rem;}
+.header .meta{display:flex;justify-content:center;gap:20px;margin-top:12px;flex-wrap:wrap;}
+.header .meta span{font-size:0.85rem;color:#666;background:rgba(255,255,255,0.05);padding:4px 12px;border-radius:20px;}
+.header .meta span b{color:#1db954;}
+/* Overview */
+.overview-section{max-width:1400px;margin:0 auto 30px;}
+.overview-toggle{width:100%;background:rgba(29,185,84,0.1);border:1px solid rgba(29,185,84,0.3);border-radius:12px;padding:16px 24px;color:#1db954;font-size:1.1rem;font-weight:600;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:all 0.2s ease;}
+.overview-toggle:hover{background:rgba(29,185,84,0.2);}
+.overview-toggle .arrow{transition:transform 0.3s ease;}
+.overview-toggle.active .arrow{transform:rotate(180deg);}
+.overview-content{display:none;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-top:none;border-radius:0 0 12px 12px;padding:30px;margin-top:-12px;}
+.overview-content.active{display:block;}
+.overview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(350px,1fr));gap:25px;}
+.overview-card{background:rgba(255,255,255,0.03);border-radius:12px;padding:20px;border:1px solid rgba(255,255,255,0.08);}
+.overview-card h3{color:#1db954;font-size:1.1rem;margin-bottom:15px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.1);}
+.overview-card p{margin-bottom:12px;line-height:1.6;font-size:0.9rem;}
+.overview-card ul{list-style:none;padding:0;margin:0;}
+.overview-card li{padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);line-height:1.5;font-size:0.88rem;}
+.overview-card li:last-child{border-bottom:none;}
+.overview-card.bull h3{color:#1db954;}
+.overview-card.bear h3{color:#ff6b6b;}
+.overview-card.risks h3{color:#fdcb6e;}
+.risk-high{color:#ff6b6b;}
+.risk-moderate{color:#fdcb6e;}
+.risk-low{color:#1db954;}
+.revenue-stream{display:flex;justify-content:space-between;align-items:center;}
+.trend-growing{color:#1db954;}
+.trend-stable{color:#888;}
+.trend-declining{color:#ff6b6b;}
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:15px;margin:0 auto 30px;max-width:1400px;}
+.kpi-card{background:rgba(255,255,255,0.05);border-radius:12px;padding:20px;text-align:center;border:1px solid rgba(255,255,255,0.1);transition:transform 0.3s ease,box-shadow 0.3s ease;}
+.kpi-card:hover{transform:translateY(-5px);box-shadow:0 10px 30px rgba(29,185,84,0.2);}
+.kpi-value{font-size:1.75rem;font-weight:bold;color:#1db954;margin-bottom:5px;}
+.kpi-label{font-size:0.78rem;color:#888;text-transform:uppercase;letter-spacing:1px;}
+.kpi-change{font-size:0.88rem;margin-top:5px;}
+.kpi-change.positive{color:#1db954;}
+.kpi-change.negative{color:#ff6b6b;}
+.kpi-sub{font-size:0.73rem;color:#666;margin-top:3px;}
+/* Guidance */
+.guidance-section{max-width:1400px;margin:0 auto 30px;}
+.guidance-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;}
+.guidance-header h3{color:#fff;font-size:1.2rem;display:flex;align-items:center;gap:10px;}
+.guidance-header h3::before{content:'';display:inline-block;width:4px;height:20px;background:linear-gradient(180deg,#1db954,#1ed760);border-radius:2px;}
+.guidance-meta{font-size:0.83rem;color:#888;}
+.guidance-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:15px;margin-bottom:20px;}
+.guidance-card{background:rgba(255,255,255,0.05);border-radius:12px;padding:18px;border:1px solid rgba(255,255,255,0.1);transition:transform 0.2s ease;}
+.guidance-card:hover{transform:translateY(-2px);}
+.guidance-metric{font-size:0.78rem;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;}
+.guidance-target{font-size:1.25rem;font-weight:600;color:#1db954;margin-bottom:6px;}
+.guidance-period{font-size:0.83rem;color:#e0e0e0;margin-bottom:8px;}
+.guidance-vs-prior{display:inline-block;font-size:0.73rem;padding:3px 8px;border-radius:4px;font-weight:500;}
+.guidance-vs-prior.raised{background:rgba(29,185,84,0.15);color:#1db954;}
+.guidance-vs-prior.lowered{background:rgba(255,107,107,0.15);color:#ff6b6b;}
+.guidance-vs-prior.maintained{background:rgba(255,255,255,0.1);color:#888;}
+.guidance-vs-prior.new{background:rgba(99,102,241,0.15);color:#818cf8;}
+.guidance-notes{font-size:0.76rem;color:#666;margin-top:8px;line-height:1.4;}
+.guidance-commentary{background:rgba(255,255,255,0.03);border-radius:10px;padding:16px 20px;border-left:3px solid #1db954;font-style:italic;color:#b0b0b0;line-height:1.6;font-size:0.88rem;}
+.guidance-commentary::before{content:'"';font-size:1.5rem;color:#1db954;margin-right:4px;}
+/* Section title */
+.section-title{font-size:1.5rem;color:#fff;margin:40px auto 20px;padding-bottom:10px;border-bottom:2px solid rgba(29,185,84,0.3);max-width:1400px;}
+/* Charts */
+.charts-container{display:grid;grid-template-columns:repeat(auto-fit,minmax(500px,1fr));gap:25px;max-width:1400px;margin:0 auto;}
+.chart-card{background:rgba(255,255,255,0.05);border-radius:15px;padding:25px;border:1px solid rgba(255,255,255,0.1);}
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.chart-header h3{color:#fff;font-size:1.1rem;display:flex;align-items:center;gap:10px;}
+.chart-header h3::before{content:'';display:inline-block;width:4px;height:20px;background:linear-gradient(180deg,#1db954,#1ed760);border-radius:2px;}
+.help-btn{width:24px;height:24px;border-radius:50%;background:rgba(29,185,84,0.2);border:1px solid #1db954;color:#1db954;font-size:14px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s ease;flex-shrink:0;}
+.help-btn:hover{background:#1db954;color:#1a1a2e;}
+.chart-wrapper{position:relative;height:300px;}
+/* Modal */
+.modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:1000;justify-content:center;align-items:center;padding:20px;}
+.modal-overlay.active{display:flex;}
+.modal{background:linear-gradient(135deg,#1e2a4a 0%,#16213e 100%);border-radius:16px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto;border:1px solid rgba(29,185,84,0.3);box-shadow:0 20px 60px rgba(0,0,0,0.5);}
+.modal-header{padding:20px 25px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;}
+.modal-header h3{color:#1db954;font-size:1.4rem;margin:0;}
+.modal-close{width:32px;height:32px;border-radius:50%;background:rgba(255,107,107,0.2);border:1px solid #ff6b6b;color:#ff6b6b;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.modal-close:hover{background:#ff6b6b;color:#fff;}
+.modal-body{padding:25px;line-height:1.7;}
+.modal-body p{margin-bottom:15px;}
+.modal-body strong{color:#1db954;}
+.modal-body ul{margin:15px 0;padding-left:20px;}
+.modal-body li{margin-bottom:8px;}
+.metric-highlight{background:rgba(29,185,84,0.1);border-left:3px solid #1db954;padding:12px 15px;margin:15px 0;border-radius:0 8px 8px 0;}
+/* DCF */
+.dcf-section{max-width:1400px;margin:0 auto 40px;}
+.dcf-philosophy{background:rgba(255,255,255,0.03);border-radius:10px;padding:14px 18px;border-left:3px solid #1db954;margin-bottom:25px;font-size:0.87rem;color:#b0b0b0;line-height:1.6;}
+.dcf-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px;margin-bottom:30px;}
+.dcf-card{background:rgba(255,255,255,0.05);border-radius:12px;padding:24px;text-align:center;border:1px solid rgba(255,255,255,0.1);transition:transform 0.3s ease;}
+.dcf-card:hover{transform:translateY(-3px);}
+.dcf-card.highlight{background:rgba(29,185,84,0.1);border-color:rgba(29,185,84,0.3);}
+.dcf-label{font-size:0.83rem;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+.dcf-value{font-size:2.2rem;font-weight:bold;color:#1db954;}
+.dcf-card:not(.highlight) .dcf-value{color:#fff;}
+.dcf-change{font-size:1rem;margin-top:8px;font-weight:600;}
+.dcf-change.positive{color:#1db954;}
+.dcf-change.negative{color:#ff6b6b;}
+.dcf-sublabel{font-size:0.78rem;color:#666;margin-top:8px;}
+.dcf-inputs{background:rgba(255,255,255,0.03);border-radius:12px;padding:20px;margin-bottom:25px;border:1px solid rgba(255,255,255,0.08);}
+.dcf-inputs h4{color:#e0e0e0;margin-bottom:15px;font-size:1rem;}
+.dcf-inputs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:15px;margin-bottom:20px;}
+.dcf-input-card{background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;text-align:center;border:1px solid rgba(255,255,255,0.05);}
+.dcf-input-label{font-size:0.73rem;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;}
+.dcf-input-value{font-size:1.25rem;font-weight:600;color:#1db954;}
+.dcf-input-note{font-size:0.68rem;color:#666;margin-top:4px;}
+.fcf-projections h5{color:#b0b0b0;font-size:0.88rem;margin-bottom:10px;}
+.fcf-projection-table{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;background:rgba(0,0,0,0.2);border-radius:8px;padding:12px;}
+.fcf-proj-item{text-align:center;}
+.fcf-proj-item.hdr{font-size:0.73rem;color:#888;font-weight:600;}
+.fcf-proj-item .fv{font-size:0.93rem;color:#e0e0e0;font-weight:500;}
+.fcf-proj-item .gr{font-size:0.71rem;color:#1db954;margin-top:2px;}
+.dcf-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:25px;margin-bottom:30px;padding:25px;background:rgba(255,255,255,0.03);border-radius:12px;border:1px solid rgba(255,255,255,0.08);}
+.slider-group{display:flex;flex-direction:column;gap:10px;}
+.slider-group label{font-size:0.93rem;color:#e0e0e0;display:flex;justify-content:space-between;}
+.slider-group label span{color:#1db954;font-weight:600;}
+.slider-group input[type="range"]{-webkit-appearance:none;width:100%;height:6px;border-radius:3px;background:rgba(255,255,255,0.1);outline:none;}
+.slider-group input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#1db954;cursor:pointer;transition:transform 0.2s;}
+.slider-group input[type="range"]::-webkit-slider-thumb:hover{transform:scale(1.2);}
+.slider-hint{font-size:0.78rem;color:#666;}
+.scenario-tabs{display:flex;gap:10px;margin-bottom:20px;}
+.scenario-tab{padding:10px 24px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:#888;border-radius:8px;cursor:pointer;font-size:0.93rem;transition:all 0.2s;}
+.scenario-tab:hover{border-color:rgba(29,185,84,0.5);color:#e0e0e0;}
+.scenario-tab.active{background:rgba(29,185,84,0.15);border-color:#1db954;color:#1db954;}
+.scenario-details{background:rgba(255,255,255,0.03);border-radius:12px;padding:20px;margin-bottom:30px;border:1px solid rgba(255,255,255,0.08);}
+.scenario-details h4{color:#1db954;margin-bottom:12px;}
+.scenario-narrative{font-size:0.86rem;color:#b0b0b0;line-height:1.6;margin-bottom:15px;padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;border-left:3px solid rgba(29,185,84,0.4);}
+.assumption-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:15px;}
+.assumption-item{text-align:center;}
+.assumption-item .alabel{font-size:0.78rem;color:#888;margin-bottom:4px;}
+.assumption-item .avalue{font-size:1.1rem;color:#e0e0e0;font-weight:500;}
+.sensitivity-section{margin-bottom:30px;}
+.sensitivity-section h4{color:#e0e0e0;margin-bottom:15px;}
+.sensitivity-table{width:100%;border-collapse:collapse;background:rgba(255,255,255,0.03);border-radius:8px;overflow:hidden;}
+.sensitivity-table th,.sensitivity-table td{padding:11px 14px;text-align:center;border:1px solid rgba(255,255,255,0.08);}
+.sensitivity-table th{background:rgba(29,185,84,0.1);color:#1db954;font-weight:600;}
+.sensitivity-table td{color:#e0e0e0;}
+.sensitivity-table td.hl{background:rgba(29,185,84,0.15);color:#1db954;font-weight:600;}
+.sensitivity-table td.below{color:#ff6b6b;}
+.sensitivity-table td.above{color:#1db954;}
+.historical-growth{margin-bottom:30px;}
+.historical-growth h4{color:#e0e0e0;margin-bottom:15px;}
+.growth-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:15px;}
+.growth-item{background:rgba(255,255,255,0.03);border-radius:8px;padding:14px;text-align:center;border:1px solid rgba(255,255,255,0.08);}
+.growth-item .gmetric{font-size:0.76rem;color:#888;margin-bottom:6px;}
+.growth-item .grate{font-size:1.1rem;font-weight:600;}
+.growth-item .grate.pos{color:#1db954;}
+.growth-item .grate.neg{color:#ff6b6b;}
+.growth-item .grate.na{color:#555;}
+.growth-item.selected{border-color:#1db954;background:rgba(29,185,84,0.1);}
+.dcf-download{text-align:center;margin-top:30px;}
+.download-btn{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;background:rgba(29,185,84,0.15);border:1px solid #1db954;border-radius:8px;color:#1db954;text-decoration:none;font-weight:600;transition:all 0.2s;}
+.download-btn:hover{background:#1db954;color:#1a1a2e;}
+@media(max-width:768px){
+  .charts-container{grid-template-columns:1fr;}
+  .overview-grid{grid-template-columns:1fr;}
+  .header h1{font-size:1.8rem;}
+  .fcf-projection-table{grid-template-columns:repeat(3,1fr);}
+}
+</style>
 </head>
 <body>
 
-<!-- HEADER -->
 <div class="header">
-    <h1>Spotify Technology S.A. (SPOT)</h1>
-    <p>Global Audio Streaming Platform &mdash; World's Largest Music, Podcast &amp; Audiobook Service</p>
-    <div class="header-meta">
-        <span>761M MAUs &bull; 293M Premium Subscribers &bull; 184 Markets</span>
-        <span>Reports in <strong>EUR</strong> &bull; Trades in <strong>USD</strong> on NYSE</span>
-        <span>FY2025 Revenue: <strong>&#8364;17.2B</strong> &bull; TTM FCF: <strong>&#8364;3.2B</strong></span>
-        <span>Dashboard updated: <strong>June 30, 2026</strong></span>
-    </div>
+  <h1>Spotify Technology S.A. (SPOT)</h1>
+  <p>Audio Streaming Platform &mdash; Premium Subscriptions &amp; Ad-Supported Free Tier</p>
+  <div class="meta">
+    <span>All financials in <b>EUR millions</b></span>
+    <span>Stock price in <b>USD</b></span>
+    <span>Data through <b>Q1 2026</b></span>
+    <span>Current price: <b>$462.29</b></span>
+    <span>EUR/USD: <b>1.1396</b></span>
+    <span>Updated: <b>2026-06-30</b></span>
+  </div>
 </div>
 
-<!-- INVESTMENT OVERVIEW -->
+<!-- Investment Overview -->
 <div class="overview-section">
-    <button class="overview-toggle" onclick="toggleOverview()">
-        <span>Investment Overview &amp; Analysis</span>
-        <span class="arrow">&#9660;</span>
-    </button>
-    <div class="overview-content" id="overviewContent">
-        <div class="overview-grid">
-            <div class="overview-card">
-                <h3>Company Overview</h3>
-                <p>Spotify is the world's largest audio streaming platform with 751 million monthly active users and 290 million premium subscribers across 184 countries and territories as of Q4 2025. Founded in Sweden in 2006, the company offers over 100 million music tracks, 6.5 million podcast titles, and a growing audiobook and video catalog.</p>
-                <p>Spotify achieved its first full year of operating profitability in FY2024 and accelerated that trajectory through FY2025, generating &#8364;2.9B in free cash flow. Management declared 2026 the "Year of Raising Ambition," targeting approximately 800M MAUs by year-end and hosting an Investor Day on May 21, 2026.</p>
-            </div>
-            <div class="overview-card">
-                <h3>Business Model &amp; Revenue Streams</h3>
-                <p>Spotify operates a two-sided marketplace connecting creators with audiences. Premium subscriptions (89% of revenue) provide unlimited ad-free streaming; the ad-supported tier (11%) monetizes 476M free users. Royalties to labels consume ~67-68% of revenue, constraining gross margins below pure software peers. FY2025 gross margin reached 32.0%, with Q4 2025 at a record 33.1%.</p>
-                <ul>
-                    <li><div class="revenue-stream"><span>Premium Subscriptions</span><span class="percent trend-growing">89% &#8593;</span></div></li>
-                    <li><div class="revenue-stream"><span>Ad-Supported (Music + Podcast Ads)</span><span class="percent trend-stable">11% &#8212;</span></div></li>
-                    <li><div class="revenue-stream"><span>Music Advertising</span><span class="percent trend-growing">~7% &#8593;</span></div></li>
-                    <li><div class="revenue-stream"><span>Podcast Advertising (via Megaphone)</span><span class="percent trend-growing">~3% &#8593;</span></div></li>
-                    <li><div class="revenue-stream"><span>Audiobooks &amp; Other</span><span class="percent trend-growing">&lt;1% &#8593;</span></div></li>
-                </ul>
-            </div>
-            <div class="overview-card">
-                <h3>Competitive Position</h3>
-                <p><strong>Competitors:</strong> Apple Music, Amazon Music, YouTube Music, Tencent Music, SiriusXM/Pandora, Deezer, Tidal</p>
-                <p><strong>Market share:</strong> ~31-32% global paid subscriber share vs. Apple Music (~13%), Amazon Music (~11%), YouTube Music (~10%). ~36% US subscriber share.</p>
-                <p><strong>Moat factors:</strong></p>
-                <ul>
-                    <li><strong>Data-driven AI personalization:</strong> 751M MAUs power Discover Weekly, AI DJ, Prompted Playlist &mdash; unmatched at scale</li>
-                    <li><strong>Playlist ecosystem &amp; cultural lock-in:</strong> Wrapped (300M+ engaged, 630M shares), personal listening identities create switching costs</li>
-                    <li><strong>Brand strength:</strong> Globally synonymous with music streaming, especially among younger demographics</li>
-                    <li><strong>Two-sided marketplace:</strong> $11B+ paid to music industry in 2025; Spotify Ad Exchange (+142% advertiser participation)</li>
-                    <li><strong>AI product velocity:</strong> Internal 'Honk' system enabling 50+ features shipped in 2025</li>
-                </ul>
-            </div>
-            <div class="overview-card">
-                <h3>Growth Drivers</h3>
-                <ul>
-                    <li><strong>MAU expansion:</strong> Record Q4 2025 38M net adds vs. 32M guidance; targeting ~800M MAUs by end of 2026</li>
-                    <li><strong>Gross margin expansion:</strong> 30.1% (FY2024) &#8594; 32.0% (FY2025) &#8594; 33.1% Q4 2025 record; marketplace programs and audiobook bundling</li>
-                    <li><strong>Spotify Ad Exchange (SAX):</strong> +142% advertiser participation, +64% programmatic adoption since April 2025 launch</li>
-                    <li><strong>Pricing power:</strong> US Individual raised to $12.99/month (Jan 2026); European markets +&#8364;1/month in 2025</li>
-                    <li><strong>Audiobooks expansion:</strong> 50%+ engagement in English-language markets; launched in Nordics Q4 2025</li>
-                    <li><strong>AI operational leverage:</strong> Top developers not writing manual code since Dec 2025 via 'Honk' AI system</li>
-                    <li><strong>Emerging market penetration:</strong> Southeast Asia, Africa, underpenetrated Latin America represent multi-year subscriber growth</li>
-                    <li><strong>Investor Day May 21, 2026:</strong> Long-term financial targets expected; potential for upward consensus revision</li>
-                </ul>
-            </div>
-            <div class="overview-card risks">
-                <h3>Key Risks</h3>
-                <ul>
-                    <li><span class="risk-high">[HIGH]</span> <strong>Label negotiating power:</strong> UMG, Sony, Warner, Merlin = 71% of streams; &#8364;4.4B minimum guarantees through 2027</li>
-                    <li><span class="risk-high">[HIGH]</span> <strong>Ecosystem competition:</strong> Apple/Amazon/Google can subsidize, preload, and bundle services; Apple 30% in-app commission</li>
-                    <li><span class="risk-high">[HIGH]</span> <strong>FX headwinds:</strong> ~670 bps drag on Q1 2026 reported Y/Y growth; EUR reporting vs. global revenue base</li>
-                    <li><span class="risk-high">[HIGH]</span> <strong>US-EU geopolitical risk:</strong> Trump administration named Spotify as potential retaliatory target (Dec 2025)</li>
-                    <li><span class="risk-high">[HIGH]</span> <strong>Google Cloud dependency:</strong> Heavy GCP reliance with minimum purchase commitments included in &#8364;1.7B+ obligations</li>
-                    <li><span class="risk-moderate">[MOD]</span> <strong>Social charges volatility:</strong> Every 10% stock move = ~&#8364;30M quarterly operating income impact (Swedish payroll taxes)</li>
-                    <li><span class="risk-moderate">[MOD]</span> <strong>Co-CEO transition:</strong> Norstrom + Soderstrom untested at scale; dual-CEO coordination risks</li>
-                    <li><span class="risk-moderate">[MOD]</span> <strong>Content cost ceiling:</strong> Royalties ~67-68% of revenue; structural gross margin cap vs. pure software peers</li>
-                </ul>
-            </div>
-            <div class="overview-card bull">
-                <h3>Bull Case</h3>
-                <ul>
-                    <li>Scale-driven data moat: 751M MAUs generate listening data competitors cannot replicate; AI personalization advantage compounds</li>
-                    <li>Margin expansion: Multiple levers toward 35-40% gross margin; operating margin from 12.8% expanding as revenue outpaces cost growth</li>
-                    <li>FCF inflection validates model: &#8364;2.9B FY2025 FCF (up 26% Y/Y); FY2026 expected to meaningfully exceed; &#8364;510M buybacks in 2025</li>
-                    <li>Multi-format expansion: Audiobooks (50%+ engagement), music videos (111 markets), podcast advertising create new revenue layers</li>
-                    <li>Emerging market runway: Southeast Asia, Africa, underpenetrated Latin America = multi-year subscriber growth at improving monetization</li>
-                    <li>Pricing power: US at $12.99/month; constant-currency ARPU grew +2% Y/Y in Q4 2025 despite geographic mix dilution</li>
-                    <li>AI compressing product costs: Internal 'Honk' system enabling faster product velocity with fewer engineers</li>
-                </ul>
-            </div>
-            <div class="overview-card bear">
-                <h3>Bear Case</h3>
-                <ul>
-                    <li>Structural royalty ceiling: Labels hold leverage; 33-35% gross margin may represent ceiling vs. 70%+ for pure software platforms</li>
-                    <li>Ecosystem bundling threat: Apple One, Amazon Prime Music subsidized and preloaded; App Store 30% commission is a persistent tax</li>
-                    <li>ARPU dilution: Reported Premium ARPU -3% Y/Y Q4 2025; geographic expansion to lower-ARPU markets is structural drag</li>
-                    <li>US-EU geopolitical liability: Uniquely exposed as European company in crossfire between EU DMA enforcement and US retaliation</li>
-                    <li>Leadership transition risk: Co-CEO model untested; cultural shift from 19 years of Ek's day-to-day leadership</li>
-                    <li>Social charges distort earnings: Favorable/unfavorable variance tied to stock price creates unpredictable reported results</li>
-                    <li>Valuation embeds high expectations: Post-15% Q4 2025 earnings surge; market cap approaching $100B; any execution miss</li>
-                    <li>FX headwinds structural and worsening: Q1 2026 guidance assumes ~670 bps drag, worse than Q4's ~580 bps</li>
-                </ul>
-            </div>
-            <div class="overview-card">
-                <h3>Recent Developments</h3>
-                <ul>
-                    <li><strong>Apr 28, 2026:</strong> Q1 2026 results: revenue &#8364;4,533M (+8% reported, ~15% cc), operating income &#8364;715M (15.8% margin, +40% Y/Y), diluted EPS &#8364;3.45, FCF &#8364;824M (+54% Y/Y), 761M MAUs (+12% Y/Y), 293M Premium subs (+9% Y/Y), ARPU &#8364;4.76</li>
-                    <li><strong>Mar 2026:</strong> US$1.5B Exchangeable Notes matured and settled in cash (&#8364;1,304M); debt now ~&#8364;476M leases, net cash ~&#8364;8.3B</li>
-                    <li><strong>Feb 10, 2026:</strong> Q4 2025 earnings beat; 751M MAUs (record 38M net adds), &#8364;701M operating income (+47% Y/Y vs. &#8364;620M guidance). Stock +15%</li>
-                    <li><strong>Feb 10, 2026:</strong> 2026 declared "Year of Raising Ambition"; Investor Day announced May 21, 2026, New York</li>
-                    <li><strong>Feb 12, 2026:</strong> Top developers not writing manual code since Dec 2025 via AI 'Honk' system (built on Claude Code)</li>
-                    <li><strong>Jan 15, 2026:</strong> US Premium Individual raised to $12.99/month (from $11.99); Duo to $18.99, Family to $21.99</li>
-                    <li><strong>Jan 22, 2026:</strong> Prompted Playlist AI feature expanded to US and Canada in beta</li>
-                    <li><strong>Jan 1, 2026:</strong> Daniel Ek becomes Executive Chairman; Alex Norstrom and Gustav Soderstrom named co-CEOs</li>
-                    <li><strong>Dec 2025:</strong> Record Wrapped 2025: 300M+ engaged users, 630M shares globally across 56 languages</li>
-                    <li><strong>Apr 2025:</strong> Spotify Ad Exchange (SAX) launched; +142% advertiser participation, +64% programmatic adoption</li>
-                    <li><strong>Jan 29, 2025:</strong> MLC lawsuit dismissed with prejudice; potential &#8364;150M+ liability eliminated</li>
-                </ul>
-            </div>
-        </div>
-    </div>
+  <button class="overview-toggle" onclick="toggleOverview()">
+    <span>Investment Overview &amp; Analysis</span>
+    <span class="arrow">&#9660;</span>
+  </button>
+  <div class="overview-content" id="overviewContent">
+    <div class="overview-grid" id="overviewGrid"></div>
+  </div>
 </div>
 
-<!-- KPI CARDS -->
+<!-- KPI Cards -->
 <div class="kpi-grid" id="kpiGrid"></div>
 
-<!-- MANAGEMENT GUIDANCE -->
+<!-- Guidance -->
 <div class="guidance-section" id="guidanceSection">
-    <div class="guidance-header">
-        <h3>Management Guidance</h3>
-        <span class="guidance-meta">As of <span id="guidanceAsOf"></span> | <span id="guidanceFY"></span></span>
-    </div>
-    <div class="guidance-grid" id="guidanceGrid"></div>
-    <div class="guidance-commentary" id="guidanceCommentary" style="display:none;"></div>
+  <div class="guidance-header">
+    <h3>Management Guidance</h3>
+    <span class="guidance-meta">As of <span id="guidanceAsOf"></span> | <span id="guidanceFY"></span></span>
+  </div>
+  <div class="guidance-grid" id="guidanceGrid"></div>
+  <div class="guidance-commentary" id="guidanceCommentary"></div>
 </div>
 
-<!-- FINANCIAL PERFORMANCE CHARTS -->
-<h2 class="section-title">Financial Performance</h2>
+<!-- Revenue & Growth Charts -->
+<h2 class="section-title">Revenue &amp; Growth</h2>
 <div class="charts-container">
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Revenue &amp; Gross Profit (Annual, &#8364;M)</h3>
-            <button class="help-btn" onclick="openModal('revenueGP')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="revenueGPChart"></canvas></div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>Annual Revenue</h3>
+      <button class="help-btn" onclick="openModal('revenue')">?</button>
     </div>
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Margin Trends (Annual, %)</h3>
-            <button class="help-btn" onclick="openModal('margins')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="marginsChart"></canvas></div>
+    <div class="chart-wrapper"><canvas id="chartRevenue"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>Quarterly Revenue Trend</h3>
+      <button class="help-btn" onclick="openModal('quarterly')">?</button>
     </div>
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Quarterly Revenue &amp; YoY Growth</h3>
-            <button class="help-btn" onclick="openModal('qRevGrowth')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="qRevGrowthChart"></canvas></div>
-    </div>
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Quarterly Operating Income (&#8364;M)</h3>
-            <button class="help-btn" onclick="openModal('opIncome')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="opIncomeChart"></canvas></div>
-    </div>
+    <div class="chart-wrapper"><canvas id="chartQuarterly"></canvas></div>
+  </div>
 </div>
 
-<!-- USER METRICS CHARTS -->
-<h2 class="section-title">User Metrics</h2>
+<!-- Margin Charts -->
+<h2 class="section-title">Margin Expansion Story</h2>
 <div class="charts-container">
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>MAUs &amp; Premium Subscribers (Annual, Millions)</h3>
-            <button class="help-btn" onclick="openModal('mau')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="mauChart"></canvas></div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>Annual Gross, Operating &amp; Net Margins</h3>
+      <button class="help-btn" onclick="openModal('margins')">?</button>
     </div>
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Subscriber Conversion Rate (Premium / MAU %)</h3>
-            <button class="help-btn" onclick="openModal('conversion')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="conversionChart"></canvas></div>
+    <div class="chart-wrapper"><canvas id="chartMargins"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>Quarterly Gross Margin Expansion</h3>
+      <button class="help-btn" onclick="openModal('grossmargin')">?</button>
     </div>
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Premium ARPU Trend (Quarterly, &#8364;/month)</h3>
-            <button class="help-btn" onclick="openModal('arpu')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="arpuChart"></canvas></div>
-    </div>
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Quarterly Net Adds (MAU &amp; Subscribers, Millions)</h3>
-            <button class="help-btn" onclick="openModal('netAdds')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="netAddsChart"></canvas></div>
-    </div>
+    <div class="chart-wrapper"><canvas id="chartGrossMarginQ"></canvas></div>
+  </div>
 </div>
 
-<!-- PROFITABILITY CHARTS -->
-<h2 class="section-title">Profitability &amp; Operating Leverage</h2>
+<!-- User Charts -->
+<h2 class="section-title">User Growth &amp; Engagement</h2>
 <div class="charts-container">
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>EPS Diluted (Quarterly, &#8364;)</h3>
-            <button class="help-btn" onclick="openModal('eps')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="epsChart"></canvas></div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>MAU vs Premium Subscribers (Annual)</h3>
+      <button class="help-btn" onclick="openModal('mau')">?</button>
     </div>
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Operating Leverage: Revenue vs. OpEx Growth (Annual YoY %)</h3>
-            <button class="help-btn" onclick="openModal('opLeverage')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="opLeverageChart"></canvas></div>
+    <div class="chart-wrapper"><canvas id="chartUsers"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>Subscriber Conversion Rate (Subs / MAU)</h3>
+      <button class="help-btn" onclick="openModal('conversion')">?</button>
     </div>
+    <div class="chart-wrapper"><canvas id="chartConversion"></canvas></div>
+  </div>
 </div>
 
-<!-- CASH FLOW & BALANCE SHEET -->
-<h2 class="section-title">Cash Flow &amp; Balance Sheet</h2>
+<!-- Monetization & Cash Flow -->
+<h2 class="section-title">Monetization &amp; Cash Flow</h2>
 <div class="charts-container">
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Free Cash Flow (Annual, &#8364;M)</h3>
-            <button class="help-btn" onclick="openModal('fcf')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="fcfChart"></canvas></div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>Premium ARPU (EUR per month)</h3>
+      <button class="help-btn" onclick="openModal('arpu')">?</button>
     </div>
-    <div class="chart-card">
-        <div class="chart-header">
-            <h3>Cash vs. Total Debt (Annual, &#8364;M)</h3>
-            <button class="help-btn" onclick="openModal('balanceSheet')">?</button>
-        </div>
-        <div class="chart-wrapper"><canvas id="balanceSheetChart"></canvas></div>
+    <div class="chart-wrapper"><canvas id="chartARPU"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>Free Cash Flow (Annual)</h3>
+      <button class="help-btn" onclick="openModal('fcf')">?</button>
     </div>
+    <div class="chart-wrapper"><canvas id="chartFCF"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>Operating Income Inflection</h3>
+      <button class="help-btn" onclick="openModal('opincome')">?</button>
+    </div>
+    <div class="chart-wrapper"><canvas id="chartOpIncome"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>Net Income (Annual)</h3>
+      <button class="help-btn" onclick="openModal('netincome')">?</button>
+    </div>
+    <div class="chart-wrapper"><canvas id="chartNetIncome"></canvas></div>
+  </div>
 </div>
 
-<!-- DCF VALUATION -->
+<!-- DCF Valuation -->
 <h2 class="section-title">DCF Valuation</h2>
 <div class="dcf-section">
-    <div class="dcf-note">
-        Spotify reports financials in <strong>EUR</strong>. This DCF is built in EUR and converted to USD at EUR/USD = 1.05 for per-share values (stock trades on NYSE in USD). All FCF figures are in EUR millions. The intrinsic value and entry price displayed are in USD. Net cash position of &#8364;8.0B (~9% of market cap) is added to equity value.
-    </div>
-    <div class="dcf-summary">
-        <div class="dcf-card highlight">
-            <div class="dcf-label">Intrinsic Value (Base Case)</div>
-            <div class="dcf-value" id="dcfIV">$374</div>
-            <div class="dcf-change negative" id="dcfUpside">-18% downside</div>
-        </div>
-        <div class="dcf-card">
-            <div class="dcf-label">Entry Price (15% CAGR)</div>
-            <div class="dcf-value" id="dcfEntry">$202</div>
-            <div class="dcf-sublabel">Buy below for 15% annual return</div>
-        </div>
-        <div class="dcf-card">
-            <div class="dcf-label">Current Price (USD)</div>
-            <div class="dcf-value" id="dcfCurrent">$462.29</div>
-            <div class="dcf-sublabel">As of June 30, 2026</div>
-        </div>
-        <div class="dcf-card">
-            <div class="dcf-label">Prob-Weighted IV</div>
-            <div class="dcf-value" id="dcfWeighted">$387</div>
-            <div class="dcf-sublabel">25% Bull / 50% Base / 25% Bear</div>
-        </div>
-    </div>
+  <div class="dcf-philosophy" id="dcfPhilosophy"></div>
 
-    <div class="dcf-warning" id="growthWarning" style="display:none;">
-        <span class="warning-icon">&#9888;</span>
-        <span id="warningText"></span>
+  <div class="dcf-summary">
+    <div class="dcf-card highlight">
+      <div class="dcf-label">Base Intrinsic Value</div>
+      <div class="dcf-value" id="dcfIV">$473</div>
+      <div class="dcf-change positive" id="dcfUpside">+2.3% vs $462</div>
     </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Entry Price (15% CAGR)</div>
+      <div class="dcf-value" id="dcfEntry">$261</div>
+      <div class="dcf-sublabel">Buy below for 15% annual return</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Current Price (USD)</div>
+      <div class="dcf-value">$462</div>
+      <div class="dcf-sublabel">26.1x EV/FCF (FY2025)</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Prob-Weighted IV</div>
+      <div class="dcf-value" id="dcfWeighted">$485</div>
+      <div class="dcf-sublabel">25% Bull / 50% Base / 25% Bear</div>
+    </div>
+  </div>
 
-    <div class="dcf-inputs">
-        <h4>DCF Model Inputs (EUR millions)</h4>
-        <div class="dcf-inputs-grid">
-            <div class="dcf-input-card">
-                <div class="dcf-input-label">Base Year FCF</div>
-                <div class="dcf-input-value" id="baseFCF">&#8364;3.2B</div>
-                <div class="dcf-input-note">TTM free cash flow (through Q1 2026)</div>
-            </div>
-            <div class="dcf-input-card">
-                <div class="dcf-input-label">Shares Outstanding</div>
-                <div class="dcf-input-value" id="sharesOut">210.5M</div>
-                <div class="dcf-input-note">Diluted weighted average</div>
-            </div>
-            <div class="dcf-input-card">
-                <div class="dcf-input-label">Net Cash Position</div>
-                <div class="dcf-input-value" id="netDebt">&#8364;8.0B</div>
-                <div class="dcf-input-note">Cash + ST investments minus debt</div>
-            </div>
-            <div class="dcf-input-card">
-                <div class="dcf-input-label">EUR/USD Rate</div>
-                <div class="dcf-input-value">1.05</div>
-                <div class="dcf-input-note">For per-share USD conversion</div>
-            </div>
-        </div>
-        <div class="fcf-projections">
-            <h5>Projected FCF &mdash; 5-Year Forecast (EUR millions, adjustable via sliders)</h5>
-            <div class="fcf-projection-table" id="fcfProjectionTable"></div>
-        </div>
+  <div class="dcf-inputs">
+    <h4>DCF Model Inputs (EUR millions unless noted)</h4>
+    <div class="dcf-inputs-grid">
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Base Year FCF</div>
+        <div class="dcf-input-value">&euro;2,874M</div>
+        <div class="dcf-input-note">FY2025 actual FCF</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Shares Outstanding</div>
+        <div class="dcf-input-value">205.6M</div>
+        <div class="dcf-input-note">Q1 2026 post-buyback</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Net Cash Position</div>
+        <div class="dcf-input-value" style="color:#1db954;">+&euro;8,270M</div>
+        <div class="dcf-input-note">Essentially debt-free</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Market Cap (USD)</div>
+        <div class="dcf-input-value">$95.0B</div>
+        <div class="dcf-input-note">At $462.29/share</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">EV/FCF (FY2025)</div>
+        <div class="dcf-input-value">26.1x</div>
+        <div class="dcf-input-note">Enterprise multiple</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">DCF Terminal Multiple</div>
+        <div class="dcf-input-value">14.3x</div>
+        <div class="dcf-input-note">Conservative vs. 26x current</div>
+      </div>
     </div>
+    <div class="fcf-projections">
+      <h5>Projected FCF &mdash; Base Case (EUR millions, revenue-driven model)</h5>
+      <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+    </div>
+  </div>
 
-    <div class="dcf-controls">
-        <div class="slider-group">
-            <label>Year 1 Growth Rate: <span id="growthValue">17%</span></label>
-            <input type="range" id="growthSlider" min="0" max="35" value="17" step="1">
-            <div class="slider-hint" id="growthHint">Based on revenue 5yr CAGR (16.9%)</div>
-        </div>
-        <div class="slider-group">
-            <label>WACC: <span id="waccValue">10%</span></label>
-            <input type="range" id="waccSlider" min="6" max="18" value="10" step="0.5">
-        </div>
-        <div class="slider-group">
-            <label>Terminal Growth Rate: <span id="terminalValue">3%</span></label>
-            <input type="range" id="terminalSlider" min="0" max="5" value="3" step="0.5">
-        </div>
+  <div class="dcf-controls">
+    <div class="slider-group">
+      <label>Year 1 Growth Rate: <span id="growthValue">15%</span></label>
+      <input type="range" id="growthSlider" min="0" max="30" value="15" step="1">
+      <div class="slider-hint">Anchored to revenue 5yr CAGR (16.9%) and Investor Day mid-teens target</div>
     </div>
+    <div class="slider-group">
+      <label>WACC: <span id="waccValue">10%</span></label>
+      <input type="range" id="waccSlider" min="6" max="18" value="10" step="0.5">
+      <div class="slider-hint">Reflects EUR/USD exposure, royalty risk, net-cash balance sheet</div>
+    </div>
+    <div class="slider-group">
+      <label>Terminal Growth: <span id="terminalValue">3%</span></label>
+      <input type="range" id="terminalSlider" min="0" max="5" value="3" step="0.5">
+      <div class="slider-hint">Long-run nominal GDP + inflation for a global platform</div>
+    </div>
+  </div>
 
-    <div class="scenario-tabs">
-        <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
-        <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
-        <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
-    </div>
+  <div class="scenario-tabs">
+    <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+    <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+    <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+  </div>
 
-    <div class="scenario-details" id="scenarioDetails">
-        <h4>Scenario Assumptions</h4>
-        <div class="assumption-grid" id="assumptionGrid"></div>
-    </div>
+  <div class="scenario-details">
+    <h4 id="scenarioTitle">Base Case</h4>
+    <div class="scenario-narrative" id="scenarioNarrative"></div>
+    <div class="assumption-grid" id="assumptionGrid"></div>
+  </div>
 
-    <div class="sensitivity-section">
-        <h4>Sensitivity Analysis: Intrinsic Value (USD) by WACC &amp; Terminal Growth</h4>
-        <p class="sens-note">Base case FCF projections used. <span style="color:#1DB954;">Green</span> = above current price ($462), <span style="color:#ff6b6b;">Red</span> = below. Highlighted cell = base case (WACC 10%, Terminal 3%).</p>
-        <table class="sensitivity-table" id="sensitivityMatrix"></table>
-    </div>
+  <div class="sensitivity-section">
+    <h4>Sensitivity: Intrinsic Value (USD) by WACC &amp; Terminal Growth Rate</h4>
+    <table class="sensitivity-table" id="sensitivityMatrix"></table>
+  </div>
 
-    <div class="historical-growth">
-        <h4>Historical Growth Rates (CAGR) &mdash; Selected rate highlighted in green</h4>
-        <div class="growth-grid" id="growthGrid"></div>
-    </div>
+  <div class="historical-growth">
+    <h4>Historical Growth Rates (CAGR) &mdash; Context for DCF Inputs</h4>
+    <div class="growth-grid" id="growthGrid"></div>
+  </div>
 
-    <div class="dcf-download">
-        <a href="SPOT_DCF_Model.xlsx" class="download-btn" download>
-            <span class="download-icon">&#8681;</span> Download Excel DCF Model
-        </a>
-    </div>
+  <div class="dcf-download">
+    <a href="SPOT_DCF_Model.xlsx" class="download-btn" download>&#8681; Download Excel DCF Model</a>
+  </div>
 </div>
 
-<!-- MODAL -->
-<div class="modal-overlay" id="modalOverlay" onclick="handleOverlayClick(event)">
-    <div class="modal">
-        <div class="modal-header">
-            <h3 id="modalTitle">Metric Explanation</h3>
-            <button class="modal-close" onclick="closeModal()">&#215;</button>
-        </div>
-        <div class="modal-body" id="modalBody"></div>
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOverlay(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modalTitle"></h3>
+      <button class="modal-close" onclick="closeModal()">&#10005;</button>
     </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
 </div>
 
 <script>
@@ -674,7 +437,7 @@ FY2021,9668,2591,26.8,94,1.0,-34,-0.4,-1.03,277,406,180,4.29,2119,1202,2744,193.
 FY2022,11727,2926,24.9,-659,-5.6,-430,-3.7,-2.93,21,489,205,4.52,2401,1128,2483,195.8
 FY2023,13247,3397,25.7,-446,-3.4,-532,-4.0,-2.73,678,602,236,4.39,2523,1203,3114,194.7
 FY2024,15673,4724,30.1,1365,8.7,1138,7.3,5.50,2285,675,263,4.69,5525,1539,4781,207.0
-FY2025,17186,5496,32.0,2198,12.8,2212,12.9,10.51,2874,751,290,4.69,8329,1458,5258,210.5
+FY2025,17186,5496,32.0,2198,12.8,2212,12.9,10.51,2874,751,290,,8329,1458,5258,210.5
 Q3 2020,1975,489,24.8,-40,-2.0,-101,-5.1,-0.58,,320,144,4.19,,,1182,188.8
 Q4 2020,2168,575,26.5,-69,-3.2,-125,-5.8,-0.66,74,345,155,4.26,2805,,1151,189.9
 Q1 2021,2147,548,25.5,14,0.7,23,1.1,0.12,41,356,158,4.12,,,2442,190.6
@@ -700,582 +463,665 @@ Q4 2025,4531,1499,33.1,701,15.5,1174,25.9,4.43,834,751,290,4.70,8329,1458,5258,2
 Q1 2026,4533,1495,33.0,715,15.8,721,15.9,3.45,824,761,293,4.76,8010,476,5255,205.6`;
 
 // ============================================================
-// EMBEDDED ANALYSIS
+// EMBEDDED ANALYSIS JSON
 // ============================================================
 const analysis = {
-    guidance: {
-        as_of: "Q1 2026 Earnings (April 28, 2026)",
-        fiscal_year: "Q1 2026 (with full-year 2026 commentary)",
-        items: [
-            { metric: "Monthly Active Users (MAUs)", target: "759M guided / 761M actual", period: "Q1 2026", vs_prior: "beat", notes: "761M vs ~759M guidance; +10M sequential, +12% Y/Y. FY2026 target ~800M MAUs." },
-            { metric: "Premium Subscribers", target: "293M guided / 293M actual", period: "Q1 2026", vs_prior: "met", notes: "293M, +3M sequential, +9% Y/Y, in line with guidance." },
-            { metric: "Total Revenue", target: "\u20ac4.5B guided / \u20ac4,533M actual", period: "Q1 2026", vs_prior: "met", notes: "In line; ~8% reported Y/Y held back by a ~\u20ac250M FX drag; ~15% constant currency." },
-            { metric: "Gross Margin", target: "32.8% guided / 33.0% actual", period: "Q1 2026", vs_prior: "beat", notes: "33.0% vs 32.8% guidance; Premium gross margin rose to 35%; Ad-Supported margin slipped to 13%." },
-            { metric: "Operating Income", target: "\u20ac715M actual", period: "Q1 2026", vs_prior: "beat", notes: "+40% Y/Y to a 15.8% margin on controlled opex (R&D, S&M, G&A all flat-to-down Y/Y)." },
-            { metric: "Free Cash Flow", target: "\u20ac824M actual", period: "Q1 2026", vs_prior: "beat", notes: "+54% Y/Y. TTM FCF ~\u20ac3.2B. FY2026 expected to meaningfully exceed FY2025." },
-            { metric: "Exchangeable Notes", target: "Settled in cash", period: "Mar 2026", vs_prior: "resolved", notes: "US$1.5B Exchangeable Notes matured and were repaid in CASH (\u20ac1,304M), removing the dilution overhang. Debt now ~\u20ac476M leases; net cash ~\u20ac8.3B." },
-            { metric: "Long-term MAU Target", target: "~800M", period: "FY2026 year-end", vs_prior: "maintained", notes: "Management targeting ~800M MAUs by end of 2026; Investor Day held May 21, 2026 in New York." }
-        ],
-        management_commentary: "Q1 2026 delivered another quarter of profitable growth \u2014 double-digit user and FCF growth with expanding margins (operating income +40% Y/Y to a 15.8% margin; FCF +54% Y/Y). Co-CEO Alex Norstrom\u2019s 2026 \u2018Year of Raising Ambition\u2019 emphasizing that Spotify now serves over 750M people globally and sees expanded opportunities across subscriptions, advertising, audiobooks, and creator tools. Co-CEO Gustav Soderstrom highlighted AI-driven product acceleration, noting that top Spotify developers have not written manual code since December 2025, enabled by the internally-built \u2018Honk\u2019 AI development system. Executive Chairman Daniel Ek emphasized the platform\u2019s evolution: \u2018What we\u2019ve really built is a technology platform for audio and increasingly for all the ways creators connect with audiences.\u2019 CFO Christian Luiga highlighted strong cash generation (\u20ac2.9B FY2025 FCF) and noted FX headwinds remain the primary gap between reported and constant-currency performance. Management announced an Investor Day on May 21, 2026 in New York to share longer-term strategic vision and financial targets."
-    }
+  ticker: "SPOT",
+  company_name: "Spotify Technology S.A.",
+  overview: "Spotify is the world's largest audio streaming platform with 761 million monthly active users and 293 million Premium subscribers across 184 countries as of Q1 2026. The company operates a dual-revenue model — Premium subscriptions (~92% of revenue) and advertising on a free tier (~8%) — with a catalog spanning over 100 million music tracks, podcasts, audiobooks, and a growing video layer. Founded in Sweden in 2006, Spotify achieved its first full year of material operating profitability in FY2024 and accelerated that trajectory through FY2025 (€2,198M operating income, 12.8% margin) and into Q1 2026 (€715M operating income, 15.8% margin), targeting operating margins above 20% and gross margins of 35-40% by 2030.",
+  business_model: {
+    summary: "Spotify operates a two-sided marketplace connecting creators with audiences via Premium subscriptions and ad-supported free access. Premium subscriptions provide unlimited ad-free streaming of music, podcasts, and audiobooks, with Premium gross margin at 35% in Q1 2026. The ad-supported tier monetizes 483M free users through digital advertising (only ~13% gross margin). Spotify structurally expands gross margins through Marketplace programs (royalty discounts for editorial placement), audiobook bundling economics, programmatic advertising scale, and operating leverage.",
+    revenue_streams: [
+      {name: "Premium Subscriptions", percent: 92, trend: "growing"},
+      {name: "Ad-Supported (Music + Podcast Advertising)", percent: 8, trend: "stable"}
+    ]
+  },
+  competitive_position: {
+    main_competitors: ["Apple Music", "Amazon Music", "YouTube Music", "Tencent Music Entertainment", "SiriusXM/Pandora", "Deezer", "Tidal", "Audible (Amazon)"],
+    market_position: "Global paid streaming subscriber market leader with approximately 31-32% share. Significantly ahead of Apple Music (~12-13%), Amazon Music (~11%), and YouTube Music (~10%). US market share ~36%, gaining 8-10 percentage points since 2019.",
+    moat_factors: [
+      {factor: "Data-driven personalization & proprietary AI (Large Taste Model)", strength: "strong", description: "761M MAUs generate trillions of daily listening signals powering Spotify's foundational AI. Discover Weekly, AI DJ, Prompted Playlists, and SongDNA (265M+ interactions since March 2026) create personalized experiences that compound over time. Competitors cannot replicate this data advantage at equivalent scale."},
+      {factor: "Playlist ecosystem and switching costs", strength: "strong", description: "User-generated playlists, curated libraries, followed artists, and podcast subscriptions create high switching costs. Spotify Wrapped (620M+ shares in 2025) is a unique cultural asset. Jam collaborative listening at nearly 50M monthly users builds social network effects."},
+      {factor: "Brand and cultural relevance", strength: "strong", description: "Globally synonymous with audio streaming among Gen Z and Millennials. Spotify 20th Birthday Experience generated 100M engagements in six days and triggered the single biggest subscriber intake day ever recorded."},
+      {factor: "Two-sided creator marketplace at scale", strength: "moderate", description: "Over $11B paid to the music industry in 2025, $1B+ in ticket revenue for artists. Podcast profitability achieved for the second consecutive year. Audiobooks grew from 150K to 700K+ titles in two years across 22 markets. Audiobooks+ ARR on track for $100M annualized by July 2026."}
+    ],
+    weaknesses: [
+      "Structural royalty cost ceiling: Music royalties consume ~65-68% of Premium revenue, limiting gross margin vs. pure software platforms (70%+ margins). Labels hold significant leverage with €2.2B minimum guarantee obligations.",
+      "Ecosystem disadvantage vs. Apple, Amazon, Google: Competitors preload services on devices, offer bundled subscriptions, and can cross-subsidize losses. Apple's 30% App Store commission is a persistent structural cost disadvantage.",
+      "ARPU dilution from geographic mix shift: Reported Premium ARPU was only €4.76 in Q1 2026 (+1% Y/Y), as growth in lower-ARPU emerging markets and plan mix offsets developed market price increases.",
+      "App Store dependency and platform risk: Apple's restrictions on external payment links and EU DMA compliance create uneven competitive landscape across markets."
+    ]
+  },
+  growth_drivers: [
+    "Investor Day 2030 targets provide a multi-year growth framework: Mid-teens constant-currency revenue CAGR, 35-40% gross margin (from 32% in FY2025), operating margin above 20% (from 12.8%), and strong FCF growth. Long-range targets through 2035 presented at May 2026 Investor Day signal management confidence.",
+    "Gross margin expansion via multiple structural levers: Marketplace programs drove 4x higher gross profit from Marketplace 2021-2025. Audiobook bundling at lower marginal royalty cost than music. SAX programmatic advertising improving ad margins. Premium gross margin already at 35% and improving.",
+    "Substantial user whitespace: 761M MAUs with target ~800M by year-end 2026. India subscribers grew 7x since 2022 Investor Day. Sweden approaching 50% paid penetration demonstrates the global ceiling is far above current levels. Billion-subscriber ambition articulated at Investor Day.",
+    "Tiered subscription expansion and higher-ARPU products: Premium Platinum (lossless + AI, ~2x standard price) launched November 2025 in five emerging markets. Audiobooks+ on track for $100M ARR. Reserved by Spotify concert priority with Live Nation launching summer 2026. Music Pro/superfan upsell not yet deployed in the US.",
+    "Lossless audio differentiating Premium: Lossless streaming (24-bit/44.1kHz FLAC) launched September 2025 for standard Premium at no extra charge globally, closing a long-standing competitive gap with Apple Music Lossless and Amazon Music HD.",
+    "Spotify Ad Exchange (SAX): Launched April 2025; advertiser participation +142%, programmatic adoption +64%. Automated sales channels now the largest contributor to ad revenue growth. Management guided double-digit advertising growth in H2 2026.",
+    "Price increases driving ARPU recovery: US prices raised January 2026 (Individual $11.99 to $12.99). European €1/month increases in 2025. Constant-currency ARPU grew +2% in Q4 2025. Further selective increases remain a lever as value proposition expands with audiobooks and lossless.",
+    "FX headwinds finally normalizing: Q2 2026 guidance assumes only ~80 bps FX drag vs. 580-670 bps in prior quarters, making reported metrics more representative of underlying ~15% constant-currency growth."
+  ],
+  risks: {
+    business: [
+      {risk: "Music label negotiating power and royalty cost structure", severity: "high", description: "Top-3 labels (Universal, Sony, Warner) plus Merlin account for ~71% of streams. Minimum guarantees €2.2B through 2027+. MFN clauses. Gross margin ceiling of 35-40% is structurally below software peers."},
+      {risk: "MLC amended lawsuit — audiobook bundle royalties (~€410M estimated liability)", severity: "high", description: "Amended complaint filed October 2025 with jury trial demand. Spotify estimates potential liability at ~€410M for March 2024 to March 2026 if MLC prevails. Threatens the audiobook bundling thesis that drives gross margin expansion."},
+      {risk: "Intense competition from ecosystem players (Apple, Amazon, YouTube)", severity: "high", description: "Competitors can subsidize subscription costs, leverage hardware advantages, and cross-subsidize losses. Apple's 30% App Store commission is a persistent tax in key markets."},
+      {risk: "Google Cloud Platform concentration risk", severity: "high", description: "€1.53B total GCP purchase obligations (€821M due within one year). Service interruptions, pricing changes, or forced migration would significantly disrupt operations."}
+    ],
+    financial: [
+      {risk: "Foreign exchange headwinds — structural and persistent", severity: "high", description: "EUR reporting currency vs. global revenue creates persistent FX translation drag. Q1 2026 saw ~€250M negative impact on Premium revenue alone. Moderated to ~80 bps in Q2 2026 but could re-intensify if EUR strengthens."},
+      {risk: "Social charges creating earnings quality concerns", severity: "moderate", description: "Swedish payroll taxes tied to SBC value create ±€23M quarterly OpEx impact per 10% stock price change. Can mask or inflate reported operating income."},
+      {risk: "Tencent Music Entertainment (TME) mark-to-market volatility", severity: "moderate", description: "Spotify holds ~9% TME stake at fair value. TME fair value fell €975M in Q1 2026 alone (flows through OCI/equity, not P&L), but prior gains distorted net income upward in FY2025."}
+    ],
+    regulatory: [
+      {risk: "US-EU geopolitical crossfire — retaliatory risk", severity: "moderate", description: "Trump administration explicitly named Spotify as a potential retaliatory target in December 2025 if EU continues DMA enforcement against US tech. ~35% of revenue is generated in the US."},
+      {risk: "Copyright and licensing compliance across 184 markets", severity: "moderate", description: "Uncertain tax positions totaled €89M as of March 31, 2026. Royalty audit windows and complex mechanical license obligations across 184 markets create ongoing compliance risk."}
+    ],
+    execution: [
+      {risk: "Co-CEO leadership model — untested at scale", severity: "moderate", description: "Daniel Ek became Executive Chairman January 1, 2026; Alex Norstrom and Gustav Soderstrom named co-CEOs. Dual-leadership structure carries coordination risks and is untested over a full business cycle. Ek retains ~29% voting power."}
+    ]
+  },
+  recent_developments: [
+    {date: "2026-06", event: "Launched 650+ narrated magazine articles (The Atlantic, Rolling Stone, Vogue, Variety, Billboard). Self-publishing audiobook creation tools launched in beta. Social listening features expanded: opt-in Listening Activity in Messages and Request to Jam."},
+    {date: "2026-05-21", event: "Investor Day 2026 in New York (first as co-CEOs): 2030 targets — mid-teens CC revenue CAGR, 35-40% gross margin, >20% operating margin. Large Taste Model generative AI platform unveiled. Reserved by Spotify concert priority with Live Nation. Podcast Memberships. Audiobooks+ ARR on track for $100M annualized by July 2026. Audiobook catalog grew from 150K to 700K+ titles. Podcasts entered second consecutive year of profitability."},
+    {date: "2026-04-28", event: "Q1 2026 results: revenue €4,533M (+15% CC), operating income €715M (15.8% margin), FCF €824M (+54% Y/Y), MAUs 761M (+12% Y/Y), Premium Subs 293M (+9% Y/Y), gross margin 33.0%. Q2 2026 guidance operating income €630M came in ~€54M below consensus (~€684M), sending stock down ~13%."},
+    {date: "2026-03-15", event: "US$1.5B Exchangeable Notes matured and settled entirely in CASH (€1,304M). Balance sheet now essentially debt-free with ~€8.75B cash and investments. Prior dilution overhang eliminated."},
+    {date: "2026-02-10", event: "Q4 2025 all-beat earnings: 751M MAUs (record +38M net adds), 290M Premium Subs, 33.1% gross margin (record), €701M operating income (+47% Y/Y vs. €620M guided). FY2025 FCF €2.9B. Stock surged ~15% — best single day since 2019."},
+    {date: "2026-01-15", event: "US price increases: Individual $11.99 to $12.99, Duo $16.99 to $18.99, Family $19.99 to $21.99 — second US hike in two years."},
+    {date: "2025-11-13", event: "Premium Platinum launched in India, Indonesia, Saudi Arabia, South Africa, UAE — lossless 24-bit FLAC + AI features at ~2x standard Premium price. First test of multi-tier premium pricing in emerging markets."},
+    {date: "2025-10-01", event: "Mechanical Licensing Collective (MLC) filed amended complaint with jury trial demand. Estimated potential liability ~€410M for March 2024 to March 2026. Spotify contesting vigorously."},
+    {date: "2025-09-10", event: "Lossless audio (24-bit/44.1kHz FLAC) launched for standard Premium at no extra charge globally — closes long-standing gap with Apple Music Lossless and Amazon Music HD."},
+    {date: "2025", event: "Spotify Ad Exchange (SAX) launched April 2025: advertiser participation +142%, programmatic adoption +64%. Automated sales channels became largest contributor to advertising revenue growth."}
+  ],
+  guidance: {
+    as_of: "Q1 2026 Earnings (April 28, 2026) + Investor Day (May 21, 2026)",
+    fiscal_year: "Q2 2026 guidance; FY2026 directional commentary; 2030 long-range targets",
+    items: [
+      {metric: "Monthly Active Users", target: "778 million", period: "Q2 2026", vs_prior: "new", notes: "+17M sequential from 761M; +14% Y/Y. FY2026 target ~800M MAUs."},
+      {metric: "Premium Subscribers", target: "299 million", period: "Q2 2026", vs_prior: "new", notes: "+6M sequential from 293M; +9% Y/Y. Below some buy-side expectations."},
+      {metric: "Total Revenue", target: "~€4.8 billion", period: "Q2 2026", vs_prior: "new", notes: "+15% Y/Y. FX headwind expected to moderate to ~80 bps vs. ~670 bps prior quarters."},
+      {metric: "Gross Margin", target: "33.1%", period: "Q2 2026", vs_prior: "new", notes: "+160 bps Y/Y; in line with Q4 2025 record. Full-year 2026 gross margin expected to improve vs. FY2025 32.0%."},
+      {metric: "Operating Income", target: "€630 million", period: "Q2 2026", vs_prior: "new", notes: "~€54M below Wall Street consensus (~€684M). Below Q1 2026 €715M, reflecting planned marketing for 20th anniversary + AI/R&D. Full-year 2026 OI expected to exceed FY2025 €2,198M."},
+      {metric: "Revenue CAGR (long-range)", target: "Mid-teens CC", period: "2025-2030", vs_prior: "new", notes: "Investor Day 2026 target. Implies revenue approaching €30-35B+ by 2030."},
+      {metric: "Gross Margin (long-range)", target: "35-40%", period: "2030", vs_prior: "new", notes: "Up from 32% in FY2025. Path: Marketplace penetration, audiobook scale, podcast profitability, SAX advertising margins."},
+      {metric: "Operating Margin (long-range)", target: "Above 20%", period: "2030", vs_prior: "new", notes: "Up from 12.8% in FY2025. FCF 'strong' with specific long-range targets through 2035 from CFO."},
+      {metric: "Audiobooks+ ARR", target: "$100M annualized", period: "July 2026", vs_prior: "new", notes: "On track as of Investor Day. Standalone KPI for the audiobook subscription layer."},
+      {metric: "Free Cash Flow", target: "Meaningful Y/Y growth", period: "FY2026", vs_prior: "maintained", notes: "FY2025 FCF €2,874M. Q1 2026 FCF €824M (+54% Y/Y) tracking well ahead of pace."}
+    ],
+    management_commentary: "Co-CEOs Norstrom and Soderstrom framed 2026 as a year of deliberate investment in product velocity — AI features, audiobooks, video, social — while maintaining trajectory toward 2030 targets. The Q2 2026 operating income guidance of €630M (vs. €684M consensus) was explained as planned investment timing for 20th anniversary campaigns and summer product launches, not a structural change. CFO Christian Luiga emphasized full-year 2026 operating income will exceed FY2025, and FX headwinds will moderate materially in Q2 (~80 bps vs. 580-670 bps prior)."
+  },
+  bull_case: [
+    "Investor Day 2030 targets validate a long-duration compounding story: Mid-teens CC revenue CAGR, 35-40% gross margin, >20% operating margin through 2030 — with FCF targets through 2035. 70%+ increase in US customer lifetime value since 2022 demonstrates the monetization model is working.",
+    "Gross margin expansion has multiple structural and durable drivers: Marketplace programs (4x gross profit uplift 2021-2025), audiobook bundling at lower royalties, podcast profitability for second consecutive year, and SAX programmatic scale each provide independent, compounding margin uplift. Path to 38-40% blended gross margin is visible.",
+    "Data moat compounds as MAU scale approaches a billion: 761M users generating trillions of daily signals train the Large Taste Model in ways Apple Music or Amazon cannot match. SongDNA (265M+ interactions), AI DJ, Prompted Playlists create compounding engagement and switching costs.",
+    "Tiered product expansion creates new ARPU growth vectors with low marginal content cost: Premium Platinum live in five markets. Reserved by Spotify concert tickets with Live Nation (summer 2026). Audiobooks+ on track for $100M ARR. Music Pro/superfan upsell not yet deployed in the US — represents significant untapped ARPU upside.",
+    "Balance sheet strength enables sustained capital returns and optionality: Essentially debt-free with ~€8.75B cash/investments and ~€3.3B+ annualized FCF run rate. $1.02B remaining on buyback program. Ability to invest aggressively without financial constraint.",
+    "FX headwinds finally normalizing: Q2 2026 guidance assumes only ~80 bps FX drag vs. 580-670 bps in recent quarters. If EUR/USD stabilizes or EUR weakens, reported metrics could surprise significantly to the upside in H2 2026 and 2027."
+  ],
+  bear_case: [
+    "Structural royalty cost ceiling limits long-term margin potential: Labels control ~71% of streams with €2.2B minimum guarantees and MFN clauses. If labels successfully renegotiate higher royalty rates in the 2027-2028 cycle, the margin expansion thesis is at risk. Even at 2030 target 35-40% gross margin, Spotify remains well below 70%+ software peer margins.",
+    "MLC lawsuit creates a live €410M+ liability and threatens the audiobook bundling thesis: Amended complaint (October 2025, jury trial demanded) argues Spotify improperly classifies audiobook access for royalty calculation. If MLC prevails, the financial liability is material and the audiobook gross margin advantage that drives much of recent expansion could be restructured or eliminated.",
+    "Q2 2026 operating income guidance miss signals near-term investment overhang: €630M vs. €684M consensus; below Q1's €715M. Premium subscriber guidance of 299M came below some expectations; North American Premium subs reportedly declining. Pattern of quarterly misses could undermine investor confidence.",
+    "Intense competition from fully integrated ecosystem players: Apple (Music bundled with Apple One, 2B+ active devices, 30% App Store commission), Amazon (bundled with Prime), YouTube Music (Google-subsidized, video-native) all have structural cost advantages Spotify cannot match. Switching costs are lower than often assumed.",
+    "US-EU geopolitical crossfire creates underappreciated tail risk: Trump administration named Spotify explicitly as a potential retaliatory target in December 2025. As a Luxembourg company earning ~35% of revenue in the US while benefiting from EU DMA enforcement against US tech, Spotify occupies an uncomfortable geopolitical position.",
+    "Co-CEO transition is untested at scale: Daniel Ek's move to Executive Chairman removes the founder-CEO who built the company for 19 years from day-to-day decisions. Co-CEO model (Norstrom + Soderstrom) carries above-average coordination risk, coinciding with Spotify's most ambitious expansion into new product categories."
+  ]
 };
 
 // ============================================================
-// EMBEDDED DCF DATA
+// EMBEDDED DCF JSON
 // ============================================================
 const dcfData = {
-    ticker: "SPOT",
-    current_price: 462.29,
-    eur_usd_rate: 1.1392,
-    inputs: {
-        shares_outstanding: 205.6,
-        net_debt: -8270,
-        last_fcf: 3164,
-        currency: "EUR",
-        units: "millions"
+  ticker: "SPOT",
+  current_price: 462.29,
+  eur_usd_rate: 1.1396,
+  current_price_eur: 405.66,
+  inputs: {
+    shares_outstanding: 205.6,
+    total_cash_and_investments: 8746,
+    total_debt: 476,
+    net_debt: -8270,
+    last_fcf: 2874,
+    last_revenue: 17186,
+    currency: "EUR",
+    units: "millions"
+  },
+  historical_growth: {
+    revenue_3yr_cagr: 13.59,
+    revenue_5yr_cagr: 16.88,
+    eps_3yr_cagr: null,
+    eps_5yr_cagr: null,
+    equity_3yr_cagr: 51.38,
+    equity_5yr_cagr: 24.32,
+    fcf_3yr_cagr: null,
+    fcf_5yr_cagr: 73.46,
+    selected_growth_rate: 16.88,
+    growth_rate_source: "revenue_5yr_cagr"
+  },
+  assumptions: {
+    base: {
+      narrative: "Management's 2030 Investor Day targets broadly met: mid-teens revenue CAGR decelerating from ~15% in Y1 to ~8% in Y5. FCF margin improves from FY2025's 16.7% to 21.5% by Y5 as gross margin expands toward 35% and operating leverage accrues. WACC 10% reflects Spotify's EUR/USD FX exposure, royalty concentration risk, and co-CEO transition uncertainty, partially offset by a net-cash balance sheet (€8.27B).",
+      growth_rates: [15.0, 14.0, 12.0, 10.0, 8.0],
+      fcf_margins: [17.5, 18.5, 19.5, 20.5, 21.5],
+      wacc: 10.0,
+      terminal_growth: 3.0
     },
-    historical_growth: {
-        revenue_3yr_cagr: 13.6,
-        revenue_5yr_cagr: 16.9,
-        eps_3yr_cagr: null,
-        eps_5yr_cagr: null,
-        equity_3yr_cagr: 51.4,
-        equity_4yr_cagr: 40.8,
-        equity_5yr_cagr: null,
-        fcf_3yr_cagr: 488.0,
-        fcf_4yr_cagr: 79.5,
-        selected_growth_rate: 16.9,
-        growth_rate_source: "revenue_5yr_cagr",
-        growth_divergence_warning: "Equity CAGR (41-51%) and FCF CAGR (79-488%) diverge sharply from Revenue CAGR (14-17%) because Spotify only turned its first full-year operating profit in FY2024 after posting net losses through FY2023. FCF rose from a near-zero EUR 21M (FY2022) to EUR 2,874M (FY2025) / EUR 3,164M TTM. These are step-changes from a profitability inflection, not sustainable compounding. EPS CAGR is not meaningful (negative base years). Revenue CAGR (14-17%) is the most stable baseline and drives the forward projections."
+    bull: {
+      narrative: "Investor Day 2030 targets fully achieved or exceeded. Subscriber base approaches 400M by 2030; Premium Platinum upsell lifts ARPU; audiobook bundling economics intact (MLC litigation resolved favorably); SAX programmatic advertising scales to 15%+ of revenue. FCF margins approach 24% on 38-40% gross margin expansion. WACC 9% reflects strengthening competitive position and consistent execution track record.",
+      growth_rates: [18.0, 17.0, 16.0, 14.0, 12.0],
+      fcf_margins: [18.5, 20.5, 22.0, 23.0, 24.0],
+      wacc: 9.0,
+      terminal_growth: 3.5
     },
-    assumptions: {
-        base: { growth_rates: [18, 16, 14, 12, 10], fcf_margin: 17, wacc: 10, terminal_growth: 3 },
-        bull: { growth_rates: [25, 22, 20, 18, 16], fcf_margin: 20, wacc: 9, terminal_growth: 3.5 },
-        bear: { growth_rates: [10, 8, 6, 5, 4], fcf_margin: 14, wacc: 12, terminal_growth: 2 }
-    },
-    valuation: {
-        base: { intrinsic_value_usd: 454.78, upside_pct: -1.6 },
-        bull: { intrinsic_value_usd: 705.63, upside_pct: 52.6 },
-        bear: { intrinsic_value_usd: 263.29, upside_pct: -43.0 }
-    },
-    entry_price: {
-        base: { entry_price_usd: 246.56 },
-        bull: { entry_price_usd: 410.86 },
-        bear: { entry_price_usd: 122.26 }
-    },
-    sensitivity: {
-        wacc_range: [8, 9, 10, 11, 12],
-        terminal_growth_range: [2.0, 2.5, 3.0, 3.5, 4.0],
-        matrix: [
-            [542.67, 580.2, 625.24, 680.29, 749.11],
-            [468.92, 495.15, 525.76, 561.94, 605.35],
-            [413.69, 432.87, 454.79, 480.09, 509.6],
-            [370.8, 385.31, 401.64, 420.14, 441.28],
-            [336.56, 347.83, 360.35, 374.35, 390.1]
-        ]
-    },
-    probability_weighted: {
-        weighted_iv_usd: 469.62
+    bear: {
+      narrative: "Label royalty renegotiation in 2027-2028 limits gross margin expansion to 33-34%. MLC litigation liability of ~€410M materializes. Competition from Apple/Amazon/YouTube prevents meaningful ARPU growth in developed markets. Emerging market growth fails to offset developed market saturation. FCF margins stagnate at 15-17%. WACC 12% reflects sustained label risk, geopolitical headwinds, and co-CEO execution uncertainty.",
+      growth_rates: [10.0, 8.0, 6.0, 5.0, 4.0],
+      fcf_margins: [15.0, 15.5, 16.0, 16.5, 17.0],
+      wacc: 12.0,
+      terminal_growth: 2.5
     }
+  },
+  projections: {
+    base: { revenue: [19764, 22531, 25235, 27758, 29979], fcf: [3459, 4168, 4921, 5690, 6445] },
+    bull: { revenue: [20279, 23727, 27523, 31377, 35142], fcf: [3752, 4864, 6055, 7217, 8434] },
+    bear: { revenue: [18905, 20417, 21642, 22724, 23633], fcf: [2836, 3165, 3463, 3749, 4018] }
+  },
+  valuation: {
+    base: { intrinsic_value_usd: 472.98, upside_pct: 2.3, intrinsic_value_eur: 415.04 },
+    bull: { intrinsic_value_usd: 744.00, upside_pct: 60.9, intrinsic_value_eur: 652.86 },
+    bear: { intrinsic_value_usd: 249.70, upside_pct: -46.0, intrinsic_value_eur: 219.11 }
+  },
+  entry_price: {
+    base: { entry_price_usd: 261.35 },
+    bull: { entry_price_usd: 437.37 },
+    bear: { entry_price_usd: 119.46 }
+  },
+  sensitivity: {
+    wacc_range: [8, 9, 10, 11, 12],
+    terminal_growth_range: [2.0, 2.5, 3.0, 3.5, 4.0],
+    base_case_wacc: 10,
+    base_case_tg: 3.0,
+    matrix: [
+      [566, 606, 653, 712, 785],
+      [488, 516, 548, 586, 632],
+      [429, 450, 473, 500, 531],
+      [384, 399, 417, 436, 459],
+      [348, 360, 373, 388, 405]
+    ]
+  },
+  probability_weighted: {
+    weights: {bull: 0.25, base: 0.50, bear: 0.25},
+    weighted_iv_usd: 484.92,
+    upside_from_current_pct: 4.9
+  },
+  valuation_philosophy: {
+    fair_value_conclusion: "At $462.29, SPOT appears approximately fairly valued on a base case DCF (base IV $472.98, +2.3%). The bull case (+61%) requires Investor Day 2030 targets and intact audiobook bundling economics. The bear case (-46%) involves label renegotiation compressing margins and competitive attrition. The probability-weighted IV of $484.92 implies a narrow 4.9% margin of safety — a fair-price-for-quality situation, not a classic value discount.",
+    terminal_multiple_note: "Base case DCF terminal multiple: 14.3x FCF (Gordon Growth: 1/(10%-3%)). This is materially below the current 26x EV/FCF, building in a conservative structural de-rating assumption. If Spotify retains even a 20-25x multiple at Year 5, intrinsic value would be substantially higher than the base case."
+  }
 };
 
 // ============================================================
-// CSV PARSING & DATA PREP
+// CSV PARSER & DATA SETUP
 // ============================================================
 function parseCSV(csv) {
-    const lines = csv.trim().split('\n');
-    const headers = lines[0].split(',');
-    return lines.slice(1).map(line => {
-        const values = line.split(',');
-        const obj = {};
-        headers.forEach((h, i) => { obj[h.trim()] = values[i] ? values[i].trim() : ''; });
-        return obj;
-    });
+  const lines = csv.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.trim());
+  return lines.slice(1).map(line => {
+    const vals = line.split(',');
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = (vals[i] || '').trim(); });
+    return obj;
+  });
 }
 
-const data = parseCSV(csvData);
+function periodSort(p) {
+  const yr = parseInt(p.match(/\d{4}/)?.[0] || '0');
+  const sub = p.includes('Q1') ? 1 : p.includes('Q2') ? 2 : p.includes('H1') ? 3
+            : p.includes('Q3') ? 4 : p.includes('Q4') ? 5 : p.includes('H2') ? 6
+            : p.startsWith('FY') ? 7 : 0;
+  return yr * 10 + sub;
+}
 
-data.sort((a, b) => {
-    const pd = (p) => {
-        const yr = parseInt(p.match(/\d{4}/)?.[0] || '0');
-        const sub = p.includes('Q1') ? 1 : p.includes('Q2') ? 2 : p.includes('Q3') ? 3 : p.includes('Q4') ? 4 : p.startsWith('FY') ? 5 : 0;
-        return yr * 10 + sub;
-    };
-    return pd(a.Period) - pd(b.Period);
-});
+const allData = parseCSV(csvData);
+allData.sort((a, b) => periodSort(a.Period) - periodSort(b.Period));
+const fyData = allData.filter(d => d.Period.startsWith('FY'));
+const qData  = allData.filter(d => d.Period.startsWith('Q'));
 
-const fyData = data.filter(d => d.Period.startsWith('FY'));
-const qData  = data.filter(d => /^Q\d/.test(d.Period));
+function n(v) { return parseFloat(v) || 0; }
 
-function n(v) { return (v === '' || v === undefined || v === null) ? null : parseFloat(v); }
+// Colors
+const C = { green:'#1db954', green2:'#1ed760', blue:'#0984e3', purple:'#6c5ce7', warning:'#fdcb6e', danger:'#ff6b6b', teal:'#00cec9' };
+
+// Chart defaults
+Chart.defaults.color = '#888';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.05)';
+function baseOpts(extra) {
+  return Object.assign({
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false } },
+    scales: {
+      x: { ticks: { color: '#888', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+      y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+  }, extra || {});
+}
 
 // ============================================================
-// HELPERS
+// INVESTMENT OVERVIEW
 // ============================================================
-const C = {
-    green:  '#1DB954',
-    teal:   '#00d4aa',
-    blue:   '#0984e3',
-    purple: '#6c5ce7',
-    yellow: '#fdcb6e',
-    red:    '#ff6b6b',
-    orange: '#e17055'
-};
+function renderOverview() {
+  const streams = analysis.business_model.revenue_streams.map(s =>
+    `<li class="revenue-stream"><span>${s.name}</span><span class="trend-${s.trend}">${s.percent}% ${s.trend==='growing'?'&#8593;':s.trend==='declining'?'&#8595;':'&#8212;'}</span></li>`
+  ).join('');
 
-function fmtEur(v, dec) {
-    dec = dec === undefined ? 1 : dec;
-    if (v === null || isNaN(v)) return 'N/A';
-    const abs = Math.abs(v), s = v < 0 ? '-' : '';
-    return abs >= 1000 ? s + '\u20ac' + (abs/1000).toFixed(dec) + 'B' : s + '\u20ac' + abs.toFixed(0) + 'M';
-}
-function calcYoY(cur, prev) {
-    const c = parseFloat(cur), p = parseFloat(prev);
-    if (isNaN(c) || isNaN(p) || p === 0) return null;
-    return (c - p) / Math.abs(p) * 100;
+  const moat = analysis.competitive_position.moat_factors.map(m =>
+    `<li><strong style="color:${m.strength==='strong'?C.green:C.warning}">[${m.strength}]</strong> <strong>${m.factor}</strong>: ${m.description}</li>`
+  ).join('');
+
+  const weaknesses = analysis.competitive_position.weaknesses.map(w => `<li>${w}</li>`).join('');
+
+  const drivers = analysis.growth_drivers.map(d => `<li>${d}</li>`).join('');
+
+  const allRisks = [...(analysis.risks.business||[]),...(analysis.risks.financial||[]),...(analysis.risks.regulatory||[]),...(analysis.risks.execution||[])];
+  const risks = allRisks.map(r =>
+    `<li><span class="risk-${r.severity}">[${r.severity.toUpperCase()}]</span> <strong>${r.risk}</strong>: ${r.description}</li>`
+  ).join('');
+
+  const bull = analysis.bull_case.map(b => `<li>${b}</li>`).join('');
+  const bear = analysis.bear_case.map(b => `<li>${b}</li>`).join('');
+  const devs = analysis.recent_developments.map(d =>
+    `<li><strong style="color:${C.teal}">${d.date}</strong> &mdash; ${d.event}</li>`
+  ).join('');
+
+  document.getElementById('overviewGrid').innerHTML = `
+    <div class="overview-card">
+      <h3>Company Overview</h3>
+      <p>${analysis.overview}</p>
+    </div>
+    <div class="overview-card">
+      <h3>Business Model</h3>
+      <p>${analysis.business_model.summary}</p>
+      <ul>${streams}</ul>
+    </div>
+    <div class="overview-card">
+      <h3>Competitive Position</h3>
+      <p><strong>Market position:</strong> ${analysis.competitive_position.market_position}</p>
+      <p><strong>Competitors:</strong> ${analysis.competitive_position.main_competitors.join(', ')}</p>
+      <p><strong>Moat factors:</strong></p>
+      <ul>${moat}</ul>
+      <p style="margin-top:10px"><strong>Weaknesses:</strong></p>
+      <ul>${weaknesses}</ul>
+    </div>
+    <div class="overview-card">
+      <h3>Growth Drivers</h3>
+      <ul>${drivers}</ul>
+    </div>
+    <div class="overview-card risks">
+      <h3>Key Risks</h3>
+      <ul>${risks}</ul>
+    </div>
+    <div class="overview-card bull">
+      <h3>Bull Case</h3>
+      <ul>${bull}</ul>
+    </div>
+    <div class="overview-card bear">
+      <h3>Bear Case</h3>
+      <ul>${bear}</ul>
+    </div>
+    <div class="overview-card">
+      <h3>Recent Developments</h3>
+      <ul>${devs}</ul>
+    </div>
+  `;
 }
 
-const baseScaleOpts = {
-    x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-    y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
-};
-const baseLegend = { labels: { color: '#e0e0e0', font: { size: 11 } } };
+function toggleOverview() {
+  document.querySelector('.overview-toggle').classList.toggle('active');
+  document.getElementById('overviewContent').classList.toggle('active');
+}
 
 // ============================================================
 // KPI CARDS
 // ============================================================
 function renderKPIs() {
-    const lat = fyData[fyData.length - 1];
-    const prv = fyData[fyData.length - 2];
+  const fy25 = fyData.find(d => d.Period === 'FY2025');
+  const fy24 = fyData.find(d => d.Period === 'FY2024');
+  const q126 = allData.find(d => d.Period === 'Q1 2026');
+  const q125 = allData.find(d => d.Period === 'Q1 2025');
 
-    const kpis = [
-        { label: 'Revenue (FY2025)', value: fmtEur(n(lat.Revenue)), change: calcYoY(lat.Revenue, prv.Revenue), upGood: true },
-        { label: 'Gross Margin (FY2025)', value: n(lat.GrossMargin).toFixed(1) + '%', changePP: n(lat.GrossMargin) - n(prv.GrossMargin), upGood: true },
-        { label: 'Operating Margin (FY2025)', value: n(lat.OperatingMargin).toFixed(1) + '%', changePP: n(lat.OperatingMargin) - n(prv.OperatingMargin), upGood: true },
-        { label: 'Free Cash Flow (FY2025)', value: fmtEur(n(lat.FreeCashFlow)), change: calcYoY(lat.FreeCashFlow, prv.FreeCashFlow), upGood: true },
-        { label: 'Monthly Active Users', value: n(lat.MAU) + 'M', change: calcYoY(lat.MAU, prv.MAU), upGood: true },
-        { label: 'Premium Subscribers', value: n(lat.PremiumSubscribers) + 'M', change: calcYoY(lat.PremiumSubscribers, prv.PremiumSubscribers), upGood: true },
-        { label: 'Premium ARPU (\u20ac/mo)', value: '\u20ac' + (n(lat.ARPU)||4.69).toFixed(2), change: calcYoY(lat.ARPU||'4.69', prv.ARPU), upGood: true },
-        { label: 'EPS Diluted (FY2025)', value: '\u20ac' + n(lat.EPS_Diluted).toFixed(2), change: calcYoY(lat.EPS_Diluted, prv.EPS_Diluted), upGood: true }
-    ];
+  function yoy(a, b) {
+    if (!a || !b || n(b) === 0) return null;
+    return ((n(a) - n(b)) / Math.abs(n(b)) * 100).toFixed(1);
+  }
 
-    document.getElementById('kpiGrid').innerHTML = kpis.map(k => {
-        let chgText = '', chgClass = '';
-        if (k.changePP !== undefined && k.changePP !== null && !isNaN(k.changePP)) {
-            const pos = k.upGood ? k.changePP >= 0 : k.changePP <= 0;
-            chgClass = pos ? 'positive' : 'negative';
-            chgText = (k.changePP >= 0 ? '+' : '') + k.changePP.toFixed(1) + 'pp YoY';
-        } else if (k.change !== null && k.change !== undefined && !isNaN(k.change)) {
-            const pos = k.upGood ? k.change >= 0 : k.change <= 0;
-            chgClass = pos ? 'positive' : 'negative';
-            chgText = (k.change >= 0 ? '+' : '') + k.change.toFixed(1) + '% YoY';
-        }
-        return `<div class="kpi-card">
-            <div class="kpi-value">${k.value}</div>
-            <div class="kpi-label">${k.label}</div>
-            ${chgText ? `<div class="kpi-change ${chgClass}">${chgText}</div>` : ''}
-        </div>`;
-    }).join('');
+  const kpis = [
+    { label: 'FY2025 Revenue', value: '&#8364;17.2B', change: yoy(fy25.Revenue, fy24.Revenue), sub: 'vs FY2024 &#8364;15.7B' },
+    { label: 'Gross Margin', value: n(fy25.GrossMargin).toFixed(1)+'%', change: (n(fy25.GrossMargin)-n(fy24.GrossMargin)).toFixed(1), sub: 'FY2024: '+n(fy24.GrossMargin).toFixed(1)+'%', isBps: true },
+    { label: 'Operating Margin', value: n(fy25.OperatingMargin).toFixed(1)+'%', change: (n(fy25.OperatingMargin)-n(fy24.OperatingMargin)).toFixed(1), sub: 'FY2024: '+n(fy24.OperatingMargin).toFixed(1)+'%', isBps: true },
+    { label: 'Net Income', value: '&#8364;2.2B', change: yoy(fy25.NetIncome, fy24.NetIncome), sub: 'EPS &#8364;'+n(fy25.EPS_Diluted).toFixed(2) },
+    { label: 'Free Cash Flow', value: '&#8364;2.9B', change: yoy(fy25.FreeCashFlow, fy24.FreeCashFlow), sub: 'Q1 2026: &#8364;824M (+54% Y/Y)' },
+    { label: 'MAU (Q1 2026)', value: '761M', change: yoy(q126&&q126.MAU, q125&&q125.MAU), sub: 'FY2025: 751M | Target 800M by YE26' },
+    { label: 'Premium Subs (Q1 2026)', value: '293M', change: yoy(q126&&q126.PremiumSubscribers, q125&&q125.PremiumSubscribers), sub: 'FY2025: 290M' },
+    { label: 'Premium ARPU (Q1 2026)', value: '&#8364;4.76', change: yoy(q126&&q126.ARPU, q125&&q125.ARPU), sub: 'Per month; +2% CC in Q4 2025' }
+  ];
+
+  document.getElementById('kpiGrid').innerHTML = kpis.map(k => {
+    const chg = parseFloat(k.change);
+    const pos = chg >= 0;
+    const sym = k.isBps ? (pos ? '+' : '') + k.change + ' pp' : (pos ? '+' : '') + k.change + '%';
+    return `<div class="kpi-card">
+      <div class="kpi-value">${k.value}</div>
+      <div class="kpi-label">${k.label}</div>
+      ${k.change !== null ? `<div class="kpi-change ${pos?'positive':'negative'}">${sym}</div>` : ''}
+      <div class="kpi-sub">${k.sub}</div>
+    </div>`;
+  }).join('');
 }
 
 // ============================================================
 // GUIDANCE
 // ============================================================
 function renderGuidance() {
-    const g = analysis.guidance;
-    if (!g || !g.items || g.items.length === 0) {
-        document.getElementById('guidanceSection').style.display = 'none';
-        return;
-    }
-    document.getElementById('guidanceAsOf').textContent = g.as_of || '';
-    document.getElementById('guidanceFY').textContent = g.fiscal_year || '';
-    document.getElementById('guidanceGrid').innerHTML = g.items.map(item => {
-        const cls = (item.vs_prior || 'new').toLowerCase();
-        const lbl = cls.charAt(0).toUpperCase() + cls.slice(1);
-        return `<div class="guidance-card">
-            <div class="guidance-metric">${item.metric}</div>
-            <div class="guidance-target">${item.target}</div>
-            <div class="guidance-period">${item.period}</div>
-            <span class="guidance-vs-prior ${cls}">${lbl}</span>
-            ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
-        </div>`;
-    }).join('');
-    const comm = document.getElementById('guidanceCommentary');
-    if (g.management_commentary) {
-        comm.textContent = g.management_commentary;
-        comm.style.display = 'block';
-    }
+  const g = analysis.guidance;
+  document.getElementById('guidanceAsOf').textContent = g.as_of;
+  document.getElementById('guidanceFY').textContent = g.fiscal_year;
+  document.getElementById('guidanceGrid').innerHTML = g.items.map(item => `
+    <div class="guidance-card">
+      <div class="guidance-metric">${item.metric}</div>
+      <div class="guidance-target">${item.target}</div>
+      <div class="guidance-period">${item.period}</div>
+      <span class="guidance-vs-prior ${item.vs_prior}">${item.vs_prior.charAt(0).toUpperCase()+item.vs_prior.slice(1)}</span>
+      ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+    </div>
+  `).join('');
+  document.getElementById('guidanceCommentary').textContent = g.management_commentary;
 }
-
-// ============================================================
-// OVERVIEW TOGGLE
-// ============================================================
-function toggleOverview() {
-    document.querySelector('.overview-toggle').classList.toggle('active');
-    document.getElementById('overviewContent').classList.toggle('active');
-}
-
-// ============================================================
-// METRIC DESCRIPTIONS
-// ============================================================
-const metricDescriptions = {
-    revenueGP: {
-        title: 'Revenue & Gross Profit',
-        content: `<p><strong>Revenue</strong> is Spotify's total income from Premium subscriptions (89%) and Ad-Supported streaming (11%). FY2025 revenue of &#8364;17.2B reflects 9-year growth from &#8364;3.0B in FY2016.</p>
-        <div class="metric-highlight"><strong>For Spotify:</strong> Revenue is primarily driven by Premium subscriber count multiplied by ARPU. The company reports in EUR but earns in local currencies globally, creating FX translation effects. Q4 2025 saw ~580 bps of FX drag; constant-currency growth of 13% vs. reported 7%.</div>
-        <p><strong>Gross Profit</strong> is revenue after royalties paid to music labels (Universal, Sony, Warner, Merlin) and publishers, podcast content costs, and payment processing fees. Royalties consume ~67-68% of total revenue, setting a structural gross margin ceiling far below pure software businesses.</p>
-        <p><strong>What to watch:</strong></p>
-        <ul>
-            <li>Gross margin trajectory: FY2025 at 32.0% vs. 30.1% FY2024; Q4 2025 record 33.1%. Target mid-30s% via marketplace programs</li>
-            <li>Revenue growth rate: Constant-currency vs. reported divergence reveals FX headwind magnitude</li>
-            <li>Premium vs. Ad revenue mix: Premium growth signals subscriber health; Ad revenue growth shows monetization progress</li>
-        </ul>`
-    },
-    margins: {
-        title: 'Margin Trends',
-        content: `<p>Spotify's margin profile is undergoing structural expansion following its profitability inflection in FY2024 (first full year of positive operating income).</p>
-        <div class="metric-highlight"><strong>For Spotify:</strong> Gross margin is constrained by royalty costs (~67-68% of revenue), setting a structural ceiling vs. 70%+ for pure software. Operating leverage above the gross profit line is the key driver of improving bottom-line margins as fixed costs (R&D, G&A) grow slower than revenue.</div>
-        <p><strong>Key margin milestones:</strong></p>
-        <ul>
-            <li>Gross margin: FY2016 13.6% &#8594; FY2025 32.0% (record Q4 2025: 33.1%)</li>
-            <li>Operating margin: FY2025 12.8% (first full year of meaningful operating profit)</li>
-            <li>Net margin: FY2025 12.9% (includes investment mark-to-market and other non-operating items)</li>
-            <li>FCF margin: FY2025 16.7% (typically exceeds net margin due to SBC add-backs and working capital)</li>
-        </ul>
-        <p><strong>What to watch:</strong> Quarterly gross margin expansion; social charges volatility distorting operating margin; R&D as % of revenue declining due to AI efficiency gains.</p>`
-    },
-    qRevGrowth: {
-        title: 'Quarterly Revenue & YoY Growth',
-        content: `<p>Quarterly revenue shows seasonal patterns and the impact of price increases, subscriber additions, and FX movements on Spotify's reported results.</p>
-        <div class="metric-highlight"><strong>For Spotify:</strong> Q4 is typically strongest due to holiday promotional subscriber intake and peak advertising spend. Q1 tends to be sequentially weaker as advertising normalizes. Growth rates should be evaluated on both reported (EUR) and constant-currency basis given ~580-670 bps FX drag in recent quarters.</div>
-        <p><strong>What to watch:</strong></p>
-        <ul>
-            <li>Year-over-year growth rate trend: Stabilizing around 10-15% reported after 30%+ growth in 2021</li>
-            <li>Constant-currency vs. reported gap: A widening gap signals worsening FX headwinds</li>
-            <li>Ad-Supported revenue: -4% Y/Y Q4 2025 reported (+4% constant currency) reflects FX drag on monetization</li>
-        </ul>`
-    },
-    opIncome: {
-        title: 'Quarterly Operating Income',
-        content: `<p><strong>Operating Income</strong> (EBIT) is revenue minus cost of revenue and all operating expenses (R&D, S&M, G&A). Spotify turned operationally profitable in Q1 2021 and achieved full-year profitability in FY2024.</p>
-        <div class="metric-highlight"><strong>For Spotify:</strong> Operating income is distorted by social charges &mdash; payroll taxes in Sweden (~18% of employees) tied to stock-based compensation value. Every 10% move in the stock price creates approximately &#177;&#8364;30M of quarterly operating income impact. This creates reported results that can diverge significantly from underlying business performance.</div>
-        <p><strong>What to watch:</strong></p>
-        <ul>
-            <li>Underlying operating margin expansion (excluding social charges volatility)</li>
-            <li>Guidance vs. actual: Management explicitly does not forecast stock price when providing guidance</li>
-            <li>R&D cost trajectory: Declined 6-20% Y/Y in recent quarters as headcount optimization and AI tools improve efficiency</li>
-            <li>Q4 2025 operating income: &#8364;701M (+47% Y/Y) vs. &#8364;620M guidance (&#8364;67M beat partly from favorable social charges)</li>
-        </ul>`
-    },
-    mau: {
-        title: 'MAUs & Premium Subscribers',
-        content: `<p><strong>Monthly Active Users (MAUs)</strong> are all users who accessed Spotify in the last 30 days, including both free and paid tiers. <strong>Premium Subscribers</strong> are paying users on individual, duo, family, or student plans.</p>
-        <div class="metric-highlight"><strong>For Spotify:</strong> MAUs are the top of the funnel; Premium Subscribers are the monetization outcome. The gap (476M free users as of Q4 2025) represents both the conversion opportunity and the ad-supported monetization base. Management targets approximately 800M MAUs by year-end 2026.</div>
-        <p><strong>What to watch:</strong></p>
-        <ul>
-            <li>Net adds vs. guidance: Q4 2025 record 38M MAU net adds vs. 32M guidance demonstrates momentum</li>
-            <li>Geographic mix: Rest of World growth is fastest but lowest ARPU; developed market growth signals pricing power</li>
-            <li>Premium subscriber growth relative to MAU growth: Faster Premium growth = rising conversion rate</li>
-        </ul>`
-    },
-    conversion: {
-        title: 'Subscriber Conversion Rate',
-        content: `<p>The <strong>Subscriber Conversion Rate</strong> is Premium Subscribers / MAU. It measures how effectively Spotify converts free listeners into paying subscribers.</p>
-        <div class="metric-highlight"><strong>For Spotify:</strong> As of Q4 2025, the conversion rate is approximately 38.6% (290M / 751M). This rate has gradually declined as Spotify aggressively expanded into lower-income emerging markets where free-tier usage dominates, but where Premium ARPU is also structurally lower.</div>
-        <p><strong>What to watch:</strong></p>
-        <ul>
-            <li>Rising conversion rate = improving premium value proposition and monetization efficiency</li>
-            <li>Falling rate may reflect geographic mix shift (more emerging market users) rather than premium value decline</li>
-            <li>Audiobooks bundling, music videos (111 markets), and AI features widen the free-vs-paid value gap, supporting conversion</li>
-            <li>Audiobook Access Tier in the US creates a standalone audiobook subscription option, potentially attracting new premium converts</li>
-        </ul>`
-    },
-    arpu: {
-        title: 'Premium ARPU (EUR/month)',
-        content: `<p><strong>Average Revenue Per User (ARPU)</strong> for Premium is total Premium revenue divided by Premium Subscribers divided by months in the period. It reflects pricing power, plan mix, and geographic composition.</p>
-        <div class="metric-highlight"><strong>For Spotify:</strong> Premium ARPU peaked near &#8364;6.20/month in 2016 and has been diluted by geographic expansion into lower-priced markets, family/student/duo plan mix, and EUR strengthening against local currencies. Constant-currency ARPU grew +2% Y/Y in Q4 2025 despite reported -3% due to USD/EUR movements.</div>
-        <p><strong>What to watch:</strong></p>
-        <ul>
-            <li>Constant-currency ARPU trend vs. reported ARPU: gap reveals FX impact magnitude</li>
-            <li>Price increase cadence: US raised to $12.99/month (Jan 2026); European markets +&#8364;1/month in 2025</li>
-            <li>Plan mix: Family plan growth dilutes per-person ARPU; individual plan growth supports it</li>
-            <li>Geographic mix: Increasing Rest of World share structurally compresses blended ARPU even as constant-currency ARPU improves</li>
-        </ul>`
-    },
-    netAdds: {
-        title: 'Quarterly Net Adds',
-        content: `<p><strong>Net Adds</strong> is the change in MAU or Premium Subscriber count quarter-over-quarter. At Spotify's scale (751M MAUs), net adds are the primary indicator of platform momentum.</p>
-        <div class="metric-highlight"><strong>For Spotify:</strong> Q4 is seasonally the strongest quarter for net adds due to holiday promotional campaigns, gift subscriptions, and new device purchases. Q1 often sees lower sequential adds as seasonal promotional effects normalize. Record Q4 2025: 38M MAU net adds vs. 32M guidance (18.75% beat).</div>
-        <p><strong>What to watch:</strong></p>
-        <ul>
-            <li>Beat/miss vs. guidance: Spotify provides explicit MAU and subscriber guidance quarterly</li>
-            <li>Seasonal patterns: Q4 seasonally strongest, Q1 typically weakest &mdash; evaluate Y/Y to control for seasonality</li>
-            <li>Premium net adds relative to MAU net adds: Premium growing faster than MAU = rising conversion rate</li>
-            <li>Emerging market contribution: Latin America and Rest of World driving growth at lower monetization but improving over time</li>
-        </ul>`
-    },
-    eps: {
-        title: 'EPS (Diluted) Trend',
-        content: `<p><strong>Diluted EPS</strong> is net income attributable to ordinary shareholders divided by diluted weighted-average shares outstanding (approximately 210M).</p>
-        <div class="metric-highlight"><strong>For Spotify:</strong> EPS was negative from FY2016 through FY2023 as the company invested in growth and content. FY2024 marked the first profitable full year (EPS &#8364;5.50). EPS is highly volatile quarter-to-quarter due to non-cash items including investment mark-to-market (Tencent Music, Affirm stakes) and social charges. FCF per share is a more reliable indicator of underlying earnings power.</div>
-        <p><strong>What to watch:</strong></p>
-        <ul>
-            <li>Trend toward consistent positive EPS: Q3 and Q4 2025 showing strong acceleration</li>
-            <li>Non-operating items create noise: Q2 2025 was negative (&#8364;-0.42) primarily due to investment losses, not operational weakness</li>
-            <li>FCF per share: FY2025 FCF &#8364;2,874M / 210.5M shares = &#8364;13.65/share (better measure of underlying earnings power)</li>
-            <li>Share count stability: ~210M shares with buybacks ($510M in 2025) providing mild accretion support</li>
-        </ul>`
-    },
-    opLeverage: {
-        title: 'Operating Leverage',
-        content: `<p><strong>Operating leverage</strong> measures how revenue growth translates to operating income improvement. When revenue grows faster than operating expenses, the business demonstrates positive operating leverage and expanding margins.</p>
-        <div class="metric-highlight"><strong>For Spotify:</strong> The company is now in a period of meaningful operating leverage. FY2025 operating income grew ~61% Y/Y (&#8364;1,365M &#8594; &#8364;2,198M) against ~10% revenue growth (&#8364;15.7B &#8594; &#8364;17.2B). R&D expense declined Y/Y in recent quarters as headcount optimization and AI tools ('Honk' system) improve efficiency.</div>
-        <p><strong>What to watch:</strong></p>
-        <ul>
-            <li>R&D as % of revenue: Should decline over time as AI tools enable same output with fewer engineers; top developers not writing code since Dec 2025</li>
-            <li>S&M efficiency: Cost per MAU acquired; global brand reduces marginal acquisition cost</li>
-            <li>G&A as % of revenue: Should decline with scale; management targeted meaningful reductions in 2023-2024</li>
-            <li>Green bars below red bars (on this chart) = revenue growing faster than OpEx = positive leverage</li>
-        </ul>`
-    },
-    fcf: {
-        title: 'Free Cash Flow',
-        content: `<p><strong>Free Cash Flow (FCF)</strong> is operating cash flow minus capital expenditures. Spotify is asset-light, so capex is minimal and FCF closely tracks operating income adjusted for working capital and non-cash items (SBC add-back is material).</p>
-        <div class="metric-highlight"><strong>For Spotify:</strong> FCF inflected dramatically: &#8364;21M (FY2022) &#8594; &#8364;678M (FY2023) &#8594; &#8364;2,285M (FY2024) &#8594; &#8364;2,874M (FY2025). This trajectory demonstrates platform operating leverage once profitability was established. Management expects FY2026 FCF to meaningfully exceed &#8364;2.9B.</div>
-        <p><strong>What to watch:</strong></p>
-        <ul>
-            <li>FCF margin: FY2025 at 16.7%; trajectory toward 20%+ is a key bull case assumption</li>
-            <li>FCF vs. GAAP net income: FCF tends to be higher due to SBC add-back; in Q2 2025 GAAP was negative while FCF was &#8364;700M</li>
-            <li>Capital allocation: Buybacks ($510M in 2025), potential M&A, or continued balance sheet buildup (&#8364;9.5B in cash + ST investments)</li>
-            <li>Exchangeable Notes ($1.5B due March 2026): Refinancing risk is minimal given &#8364;9.5B liquidity; settlement method (cash vs. equity) to watch</li>
-        </ul>`
-    },
-    balanceSheet: {
-        title: 'Cash vs. Total Debt',
-        content: `<p>The balance sheet shows Spotify's cash and equivalents vs. total debt (primarily Exchangeable Notes). The net cash position is a key component of the DCF equity value calculation.</p>
-        <div class="metric-highlight"><strong>For Spotify:</strong> As of Q4 2025, Spotify holds &#8364;5.3B in cash + &#8364;4.2B in short-term investments = &#8364;9.5B total liquidity against &#8364;1.5B in Exchangeable Notes due March 2026. Net cash position of &#8364;8.0B (~9% of market cap) provides significant downside protection and financial flexibility.</div>
-        <p><strong>What to watch:</strong></p>
-        <ul>
-            <li>Exchangeable Notes maturity (March 2026): Cash repayment is neutral to mildly positive; equity settlement signals dilution intent</li>
-            <li>Cash generation trajectory: &#8364;2.9B annual FCF enables meaningful buybacks, content M&A, or further balance sheet buildup</li>
-            <li>Cash vs. debt evolution: Note in FY2017 Spotify had &#8364;944M debt and only &#8364;477M cash; dramatic reversal demonstrates FCF power of the platform at scale</li>
-        </ul>`
-    }
-};
 
 // ============================================================
 // CHARTS
 // ============================================================
 function renderCharts() {
-    // 1. Revenue & Gross Profit Annual
-    new Chart(document.getElementById('revenueGPChart').getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels: fyData.map(d => d.Period),
-            datasets: [
-                { label: 'Revenue (\u20acM)', data: fyData.map(d => n(d.Revenue)), backgroundColor: 'rgba(29,185,84,0.7)', borderColor: C.green, borderWidth: 1 },
-                { label: 'Gross Profit (\u20acM)', data: fyData.map(d => n(d.GrossProfit)), backgroundColor: 'rgba(0,212,170,0.7)', borderColor: C.teal, borderWidth: 1 }
-            ]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: baseLegend }, scales: baseScaleOpts }
-    });
+  const fyL = fyData.map(d => d.Period);
+  const qL  = qData.map(d => d.Period);
 
-    // 2. Margin Trends Annual
-    new Chart(document.getElementById('marginsChart').getContext('2d'), {
-        type: 'line',
-        data: {
-            labels: fyData.map(d => d.Period),
-            datasets: [
-                { label: 'Gross Margin %', data: fyData.map(d => n(d.GrossMargin)), borderColor: C.green, backgroundColor: 'rgba(29,185,84,0.1)', tension: 0.3, fill: false, pointRadius: 4 },
-                { label: 'Operating Margin %', data: fyData.map(d => n(d.OperatingMargin)), borderColor: C.blue, backgroundColor: 'rgba(9,132,227,0.1)', tension: 0.3, fill: false, pointRadius: 4 },
-                { label: 'Net Margin %', data: fyData.map(d => n(d.NetMargin)), borderColor: C.purple, backgroundColor: 'rgba(108,92,231,0.1)', tension: 0.3, fill: false, pointRadius: 4 },
-                { label: 'FCF Margin %', data: fyData.map(d => { const r=n(d.Revenue),f=n(d.FreeCashFlow); return (r&&f)?parseFloat((f/r*100).toFixed(1)):null; }), borderColor: C.yellow, backgroundColor: 'rgba(253,203,110,0.1)', tension: 0.3, fill: false, pointRadius: 4 }
-            ]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: baseLegend }, scales: { x: baseScaleOpts.x, y: { ticks: { color: '#888', callback: v => v+'%' }, grid: { color: 'rgba(255,255,255,0.05)' } } } }
-    });
+  // 1. Annual Revenue + YoY Growth
+  new Chart(document.getElementById('chartRevenue'), {
+    type: 'bar',
+    data: {
+      labels: fyL,
+      datasets: [
+        { label: 'Revenue (&#8364;M)', data: fyData.map(d => n(d.Revenue)),
+          backgroundColor: fyData.map((_,i) => i>=fyData.length-1 ? 'rgba(29,185,84,0.9)' : 'rgba(29,185,84,0.45)'),
+          borderColor: C.green, borderWidth: 1, yAxisID: 'y' },
+        { label: 'YoY Growth %', data: fyData.map((d,i) => i===0?null:((n(d.Revenue)-n(fyData[i-1].Revenue))/n(fyData[i-1].Revenue)*100)),
+          type: 'line', borderColor: C.warning, backgroundColor: 'transparent',
+          pointBackgroundColor: C.warning, tension: 0.4, yAxisID: 'y2' }
+      ]
+    },
+    options: { ...baseOpts(), scales: {
+      x: { ticks:{color:'#888',font:{size:10}}, grid:{color:'rgba(255,255,255,0.05)'} },
+      y: { ticks:{color:'#888',callback:v=>'&#8364;'+(v/1000).toFixed(0)+'B'}, grid:{color:'rgba(255,255,255,0.05)'} },
+      y2: { position:'right', ticks:{color:C.warning,callback:v=>v.toFixed(0)+'%'}, grid:{drawOnChartArea:false} }
+    }}
+  });
 
-    // 3. Quarterly Revenue + YoY growth (combo chart)
-    const qRevYoY = qData.map((d, i) => {
-        const yr = parseInt(d.Period.match(/\d{4}/)[0]);
-        const qn = d.Period.replace(/\d{4}/,'');
-        const prev = qData.find((p, pi) => pi < i && p.Period.replace(/\d{4}/,'') === qn && parseInt(p.Period.match(/\d{4}/)[0]) === yr - 1);
-        return prev ? parseFloat(calcYoY(d.Revenue, prev.Revenue).toFixed(1)) : null;
-    });
-    new Chart(document.getElementById('qRevGrowthChart').getContext('2d'), {
-        data: {
-            labels: qData.map(d => d.Period),
-            datasets: [
-                { type: 'bar', label: 'Revenue (\u20acM)', data: qData.map(d => n(d.Revenue)), backgroundColor: 'rgba(29,185,84,0.6)', yAxisID: 'y' },
-                { type: 'line', label: 'YoY Growth %', data: qRevYoY, borderColor: C.yellow, backgroundColor: 'rgba(253,203,110,0.1)', pointRadius: 3, tension: 0.3, yAxisID: 'y2' }
-            ]
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: baseLegend },
-            scales: {
-                x: baseScaleOpts.x,
-                y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-                y2: { position: 'right', ticks: { color: '#fdcb6e', callback: v => v+'%' }, grid: { display: false } }
-            }
-        }
-    });
+  // 2. Quarterly Revenue
+  new Chart(document.getElementById('chartQuarterly'), {
+    type: 'line',
+    data: { labels: qL, datasets: [{
+      label: 'Quarterly Revenue (&#8364;M)', data: qData.map(d => n(d.Revenue)),
+      borderColor: C.green, backgroundColor: 'rgba(29,185,84,0.1)', fill: true, tension: 0.3, pointRadius: 3
+    }]},
+    options: baseOpts({ scales: {
+      x: { ticks:{color:'#888',font:{size:9},maxRotation:45}, grid:{color:'rgba(255,255,255,0.05)'} },
+      y: { ticks:{color:'#888',callback:v=>'&#8364;'+v+'M'}, grid:{color:'rgba(255,255,255,0.05)'} }
+    }})
+  });
 
-    // 4. Quarterly Operating Income
-    new Chart(document.getElementById('opIncomeChart').getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels: qData.map(d => d.Period),
-            datasets: [{
-                label: 'Operating Income (\u20acM)',
-                data: qData.map(d => n(d.OperatingIncome)),
-                backgroundColor: qData.map(d => n(d.OperatingIncome) >= 0 ? 'rgba(29,185,84,0.7)' : 'rgba(255,107,107,0.7)'),
-                borderColor: qData.map(d => n(d.OperatingIncome) >= 0 ? C.green : C.red),
-                borderWidth: 1
-            }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: baseLegend }, scales: baseScaleOpts }
-    });
+  // 3. Annual Margins
+  new Chart(document.getElementById('chartMargins'), {
+    type: 'line',
+    data: { labels: fyL, datasets: [
+      { label: 'Gross Margin %', data: fyData.map(d=>n(d.GrossMargin)), borderColor: C.green, backgroundColor: 'rgba(29,185,84,0.1)', fill:true, tension:0.3, pointRadius:4 },
+      { label: 'Operating Margin %', data: fyData.map(d=>n(d.OperatingMargin)), borderColor: C.blue, backgroundColor:'transparent', tension:0.3, pointRadius:4 },
+      { label: 'Net Margin %', data: fyData.map(d=>n(d.NetMargin)), borderColor: C.purple, backgroundColor:'transparent', tension:0.3, pointRadius:4 }
+    ]},
+    options: { ...baseOpts(), plugins: {
+      legend:{labels:{color:'#e0e0e0',font:{size:11}}},
+      tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.parsed.y.toFixed(1)+'%'}}
+    }, scales: {
+      x:{ticks:{color:'#888',font:{size:10}},grid:{color:'rgba(255,255,255,0.05)'}},
+      y:{ticks:{color:'#888',callback:v=>v.toFixed(0)+'%'},grid:{color:'rgba(255,255,255,0.05)'}}
+    }}
+  });
 
-    // 5. MAU & Premium Subscribers Annual
-    new Chart(document.getElementById('mauChart').getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels: fyData.map(d => d.Period),
-            datasets: [
-                { label: 'MAU (M)', data: fyData.map(d => n(d.MAU)), backgroundColor: 'rgba(29,185,84,0.7)', borderColor: C.green, borderWidth: 1 },
-                { label: 'Premium Subscribers (M)', data: fyData.map(d => n(d.PremiumSubscribers)), backgroundColor: 'rgba(0,212,170,0.7)', borderColor: C.teal, borderWidth: 1 }
-            ]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: baseLegend }, scales: baseScaleOpts }
-    });
+  // 4. Quarterly Gross Margin
+  new Chart(document.getElementById('chartGrossMarginQ'), {
+    type: 'bar',
+    data: { labels: qL, datasets: [{
+      label: 'Gross Margin %', data: qData.map(d=>n(d.GrossMargin)),
+      backgroundColor: qData.map(d => n(d.GrossMargin)>=32 ? 'rgba(29,185,84,0.85)' : n(d.GrossMargin)>=28 ? 'rgba(29,185,84,0.55)' : 'rgba(29,185,84,0.3)'),
+      borderColor: C.green, borderWidth: 1
+    }]},
+    options: { ...baseOpts(), scales: {
+      x: {ticks:{color:'#888',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.05)'}},
+      y: {min:20,ticks:{color:'#888',callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.05)'}}
+    }, plugins: {
+      legend:{labels:{color:'#e0e0e0',font:{size:11}}},
+      tooltip:{callbacks:{label:ctx=>'Gross Margin: '+ctx.parsed.y.toFixed(1)+'%'}}
+    }}
+  });
 
-    // 6. Subscriber Conversion Rate Annual
-    new Chart(document.getElementById('conversionChart').getContext('2d'), {
-        type: 'line',
-        data: {
-            labels: fyData.map(d => d.Period),
-            datasets: [{
-                label: 'Premium / MAU %',
-                data: fyData.map(d => { const m=n(d.MAU),p=n(d.PremiumSubscribers); return (m&&p)?parseFloat((p/m*100).toFixed(1)):null; }),
-                borderColor: C.purple, backgroundColor: 'rgba(108,92,231,0.15)', tension: 0.3, fill: true, pointRadius: 5
-            }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: baseLegend }, scales: { x: baseScaleOpts.x, y: { ticks: { color: '#888', callback: v => v+'%' }, grid: { color: 'rgba(255,255,255,0.05)' }, min: 30, max: 45 } } }
-    });
+  // 5. MAU vs Premium Subs
+  new Chart(document.getElementById('chartUsers'), {
+    type: 'bar',
+    data: { labels: fyL, datasets: [
+      { label: 'MAU (millions)', data: fyData.map(d=>n(d.MAU)), backgroundColor:'rgba(29,185,84,0.4)', borderColor:C.green, borderWidth:1 },
+      { label: 'Premium Subscribers (millions)', data: fyData.map(d=>n(d.PremiumSubscribers)), backgroundColor:'rgba(9,132,227,0.6)', borderColor:C.blue, borderWidth:1 }
+    ]},
+    options: baseOpts({ scales: {
+      x:{ticks:{color:'#888',font:{size:10}},grid:{color:'rgba(255,255,255,0.05)'}},
+      y:{ticks:{color:'#888',callback:v=>v+'M'},grid:{color:'rgba(255,255,255,0.05)'}}
+    }})
+  });
 
-    // 7. Premium ARPU Quarterly
-    new Chart(document.getElementById('arpuChart').getContext('2d'), {
-        type: 'line',
-        data: {
-            labels: qData.map(d => d.Period),
-            datasets: [{
-                label: 'ARPU (\u20ac/month)',
-                data: qData.map(d => n(d.ARPU)),
-                borderColor: C.green, backgroundColor: 'rgba(29,185,84,0.15)', tension: 0.3, fill: true, pointRadius: 3
-            }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: baseLegend }, scales: { x: baseScaleOpts.x, y: { ticks: { color: '#888', callback: v => '\u20ac'+v }, grid: { color: 'rgba(255,255,255,0.05)' }, min: 3.5, max: 7 } } }
-    });
+  // 6. Subscriber Conversion Rate
+  new Chart(document.getElementById('chartConversion'), {
+    type: 'line',
+    data: { labels: fyL, datasets: [{
+      label: 'Premium Subs / MAU (%)',
+      data: fyData.map(d => n(d.PremiumSubscribers)&&n(d.MAU) ? (n(d.PremiumSubscribers)/n(d.MAU)*100) : null),
+      borderColor: C.teal, backgroundColor:'rgba(0,206,201,0.1)', fill:true, tension:0.4, pointRadius:5, pointBackgroundColor:C.teal
+    }]},
+    options: { ...baseOpts(), scales: {
+      x:{ticks:{color:'#888',font:{size:10}},grid:{color:'rgba(255,255,255,0.05)'}},
+      y:{min:35,max:45,ticks:{color:'#888',callback:v=>v.toFixed(0)+'%'},grid:{color:'rgba(255,255,255,0.05)'}}
+    }, plugins:{
+      legend:{labels:{color:'#e0e0e0',font:{size:11}}},
+      tooltip:{callbacks:{label:ctx=>'Conversion: '+ctx.parsed.y.toFixed(1)+'%'}}
+    }}
+  });
 
-    // 8. Quarterly Net Adds
-    const mauNA = qData.map((d,i) => i===0 ? null : n(d.MAU) - n(qData[i-1].MAU));
-    const subNA = qData.map((d,i) => i===0 ? null : n(d.PremiumSubscribers) - n(qData[i-1].PremiumSubscribers));
-    new Chart(document.getElementById('netAddsChart').getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels: qData.map(d => d.Period),
-            datasets: [
-                { label: 'MAU Net Adds (M)', data: mauNA, backgroundColor: 'rgba(29,185,84,0.7)', borderColor: C.green, borderWidth: 1 },
-                { label: 'Subscriber Net Adds (M)', data: subNA, backgroundColor: 'rgba(0,212,170,0.7)', borderColor: C.teal, borderWidth: 1 }
-            ]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: baseLegend }, scales: baseScaleOpts }
-    });
+  // 7. ARPU
+  const fyArpu = fyData.filter(d => d.ARPU && d.ARPU !== '');
+  new Chart(document.getElementById('chartARPU'), {
+    type: 'line',
+    data: { labels: fyArpu.map(d=>d.Period), datasets: [{
+      label: 'Premium ARPU (&#8364;/month)', data: fyArpu.map(d=>n(d.ARPU)),
+      borderColor: C.warning, backgroundColor:'rgba(253,203,110,0.1)', fill:true, tension:0.3, pointRadius:5, pointBackgroundColor:C.warning
+    }]},
+    options: { ...baseOpts(), scales: {
+      x:{ticks:{color:'#888',font:{size:10}},grid:{color:'rgba(255,255,255,0.05)'}},
+      y:{min:4.0,max:7.0,ticks:{color:'#888',callback:v=>'&#8364;'+v.toFixed(2)},grid:{color:'rgba(255,255,255,0.05)'}}
+    }, plugins:{
+      legend:{labels:{color:'#e0e0e0',font:{size:11}}},
+      tooltip:{callbacks:{label:ctx=>'ARPU: &#8364;'+ctx.parsed.y.toFixed(2)+'/month'}}
+    }}
+  });
 
-    // 9. EPS Quarterly
-    new Chart(document.getElementById('epsChart').getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels: qData.map(d => d.Period),
-            datasets: [{
-                label: 'EPS Diluted (\u20ac)',
-                data: qData.map(d => n(d.EPS_Diluted)),
-                backgroundColor: qData.map(d => n(d.EPS_Diluted) >= 0 ? 'rgba(29,185,84,0.7)' : 'rgba(255,107,107,0.7)'),
-                borderColor: qData.map(d => n(d.EPS_Diluted) >= 0 ? C.green : C.red),
-                borderWidth: 1
-            }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: baseLegend }, scales: baseScaleOpts }
-    });
+  // 8. FCF
+  new Chart(document.getElementById('chartFCF'), {
+    type: 'bar',
+    data: { labels: fyL, datasets: [{
+      label: 'Free Cash Flow (&#8364;M)', data: fyData.map(d=>n(d.FreeCashFlow)),
+      backgroundColor: fyData.map(d => n(d.FreeCashFlow)>=0 ? 'rgba(29,185,84,0.7)' : 'rgba(255,107,107,0.7)'),
+      borderColor: fyData.map(d => n(d.FreeCashFlow)>=0 ? C.green : C.danger), borderWidth:1
+    }]},
+    options: baseOpts({ scales: {
+      x:{ticks:{color:'#888',font:{size:10}},grid:{color:'rgba(255,255,255,0.05)'}},
+      y:{ticks:{color:'#888',callback:v=>'&#8364;'+(v/1000).toFixed(1)+'B'},grid:{color:'rgba(255,255,255,0.05)'}}
+    }})
+  });
 
-    // 10. Operating Leverage Annual (Revenue growth vs OpEx growth)
-    const fyRevGr = fyData.map((d,i) => i===0 ? null : parseFloat(calcYoY(d.Revenue, fyData[i-1].Revenue).toFixed(1)));
-    const fyOpExGr = fyData.map((d,i) => {
-        if (i===0) return null;
-        const opEx = n(d.Revenue)-n(d.GrossProfit)-n(d.OperatingIncome);
-        const pOpEx = n(fyData[i-1].Revenue)-n(fyData[i-1].GrossProfit)-n(fyData[i-1].OperatingIncome);
-        return (opEx&&pOpEx) ? parseFloat(calcYoY(opEx, pOpEx).toFixed(1)) : null;
-    });
-    new Chart(document.getElementById('opLeverageChart').getContext('2d'), {
-        type: 'line',
-        data: {
-            labels: fyData.map(d => d.Period),
-            datasets: [
-                { label: 'Revenue Growth %', data: fyRevGr, borderColor: C.green, backgroundColor: 'transparent', tension: 0.3, pointRadius: 5 },
-                { label: 'OpEx Growth %', data: fyOpExGr, borderColor: C.red, backgroundColor: 'transparent', tension: 0.3, pointRadius: 5, borderDash: [5,5] }
-            ]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: baseLegend }, scales: { x: baseScaleOpts.x, y: { ticks: { color: '#888', callback: v => v+'%' }, grid: { color: 'rgba(255,255,255,0.05)' } } } }
-    });
+  // 9. Operating Income
+  new Chart(document.getElementById('chartOpIncome'), {
+    type: 'bar',
+    data: { labels: fyL, datasets: [{
+      label: 'Operating Income (&#8364;M)', data: fyData.map(d=>n(d.OperatingIncome)),
+      backgroundColor: fyData.map(d => n(d.OperatingIncome)>=0 ? 'rgba(9,132,227,0.7)' : 'rgba(255,107,107,0.6)'),
+      borderColor: fyData.map(d => n(d.OperatingIncome)>=0 ? C.blue : C.danger), borderWidth:1
+    }]},
+    options: baseOpts({ scales: {
+      x:{ticks:{color:'#888',font:{size:10}},grid:{color:'rgba(255,255,255,0.05)'}},
+      y:{ticks:{color:'#888',callback:v=>'&#8364;'+v+'M'},grid:{color:'rgba(255,255,255,0.05)'}}
+    }})
+  });
 
-    // 11. Free Cash Flow Annual
-    new Chart(document.getElementById('fcfChart').getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels: fyData.map(d => d.Period),
-            datasets: [{
-                label: 'Free Cash Flow (\u20acM)',
-                data: fyData.map(d => n(d.FreeCashFlow)),
-                backgroundColor: fyData.map(d => n(d.FreeCashFlow) >= 0 ? 'rgba(29,185,84,0.7)' : 'rgba(255,107,107,0.7)'),
-                borderColor: fyData.map(d => n(d.FreeCashFlow) >= 0 ? C.green : C.red),
-                borderWidth: 1
-            }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: baseLegend }, scales: baseScaleOpts }
-    });
-
-    // 12. Cash vs Debt Annual
-    const bsD = fyData.filter(d => d.CashAndEquivalents !== '' || d.TotalDebt !== '');
-    new Chart(document.getElementById('balanceSheetChart').getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels: bsD.map(d => d.Period),
-            datasets: [
-                { label: 'Cash & Equivalents (\u20acM)', data: bsD.map(d => n(d.CashAndEquivalents)), backgroundColor: 'rgba(29,185,84,0.7)', borderColor: C.green, borderWidth: 1 },
-                { label: 'Total Debt (\u20acM)', data: bsD.map(d => n(d.TotalDebt)||0), backgroundColor: 'rgba(255,107,107,0.6)', borderColor: C.red, borderWidth: 1 }
-            ]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: baseLegend }, scales: baseScaleOpts }
-    });
+  // 10. Net Income
+  new Chart(document.getElementById('chartNetIncome'), {
+    type: 'bar',
+    data: { labels: fyL, datasets: [{
+      label: 'Net Income (&#8364;M)', data: fyData.map(d=>n(d.NetIncome)),
+      backgroundColor: fyData.map(d => n(d.NetIncome)>=0 ? 'rgba(108,92,231,0.7)' : 'rgba(255,107,107,0.6)'),
+      borderColor: fyData.map(d => n(d.NetIncome)>=0 ? C.purple : C.danger), borderWidth:1
+    }]},
+    options: baseOpts({ scales: {
+      x:{ticks:{color:'#888',font:{size:10}},grid:{color:'rgba(255,255,255,0.05)'}},
+      y:{ticks:{color:'#888',callback:v=>'&#8364;'+v+'M'},grid:{color:'rgba(255,255,255,0.05)'}}
+    }})
+  });
 }
 
 // ============================================================
-// MODAL
+// HELP MODALS
 // ============================================================
+const metricDescriptions = {
+  revenue: { title: 'Revenue', content: `
+    <p><strong>Revenue</strong> is Spotify's total income from Premium subscriptions (~92%) and Ad-Supported (~8%) segments combined. Reported in EUR millions.</p>
+    <div class="metric-highlight"><strong>For Spotify:</strong> Revenue is generated across 50+ currencies but reported in EUR. EUR/USD movements created a 580-670 basis point drag on reported growth in 2024-2025. Always evaluate constant-currency growth alongside reported figures — underlying constant-currency growth was ~15-18% while reported growth appeared much slower.</div>
+    <p><strong>What to watch:</strong></p>
+    <ul>
+      <li>Constant-currency Premium revenue growth (target: mid-teens per Investor Day 2030)</li>
+      <li>FX drag moderation: Q2 2026 guided at ~80 bps vs. ~670 bps prior — a major tailwind for reported metrics</li>
+      <li>Premium vs. Ad-Supported revenue mix — Premium should grow faster and carries higher margin</li>
+      <li>Revenue per MAU as a monetization efficiency proxy</li>
+    </ul>` },
+  quarterly: { title: 'Quarterly Revenue Trend', content: `
+    <p><strong>Quarterly Revenue</strong> shows Spotify's sequential growth trajectory and seasonal patterns.</p>
+    <div class="metric-highlight"><strong>Seasonality:</strong> Q1 is typically the weakest quarter for advertising revenue. Q4 benefits from holiday advertising spending. Premium subscription revenue is relatively smooth, with subscriber growth slightly back-half weighted. Q1 2026 at €4,533M matched Q4 2025 (€4,531M) — a break from normal Q1 seasonality, indicating underlying strength.</div>
+    <p><strong>What to watch:</strong></p>
+    <ul>
+      <li>Q2 2026 guided at ~€4.8B (+15% Y/Y) — first quarter where FX headwinds normalize to ~80 bps</li>
+      <li>Sequential growth in each quarter — are periods building on each other?</li>
+      <li>Q4 typically strongest due to holiday advertising; watch for acceleration vs. prior year's Q4</li>
+    </ul>` },
+  margins: { title: 'Gross, Operating & Net Margins', content: `
+    <p>The <strong>margin inflection story</strong> is the single most important financial narrative for Spotify — the company was chronically unprofitable through FY2023 and has undergone a structural transformation.</p>
+    <div class="metric-highlight"><strong>The inflection:</strong> Gross margin: 25% (FY2016-2023) &rarr; 30.1% (FY2024) &rarr; 32.0% (FY2025) &rarr; 33.0% (Q1 2026). Operating margin: chronic losses &rarr; 8.7% (FY2024) &rarr; 12.8% (FY2025) &rarr; 15.8% (Q1 2026). 2030 targets: 35-40% gross, &gt;20% operating.</div>
+    <p><strong>What to watch:</strong></p>
+    <ul>
+      <li>Gross margin is the leading indicator — driven by Marketplace programs, audiobook bundling, and SAX advertising scale</li>
+      <li>Operating margin will track gross margin with a lag as opex grows slower than revenue</li>
+      <li>Net margin is distorted by TME fair-value swings (non-cash) and social charges — use operating margin for core profitability assessment</li>
+      <li>MLC litigation adverse outcome would force royalty reclassification, potentially reversing audiobook-driven gross margin gains</li>
+    </ul>` },
+  grossmargin: { title: 'Quarterly Gross Margin', content: `
+    <p><strong>Quarterly gross margin</strong> is the most important metric for evaluating Spotify's structural margin expansion thesis quarter by quarter.</p>
+    <div class="metric-highlight"><strong>Key thresholds:</strong> Q4 2025 and Q1 2026 both hit record 33.1%/33.0% — versus the ~25% floor that persisted for years. Q2 2026 guided at 33.1%. The 2030 bar is 35-40%. Darker bars in the chart = higher margin quarters.</div>
+    <p><strong>What to watch:</strong></p>
+    <ul>
+      <li>Does gross margin hold above 33% through 2026 regardless of revenue seasonality?</li>
+      <li>Any sequential regression below 32% would be a yellow flag on the Marketplace thesis</li>
+      <li>Q1 is seasonally weak for advertising (lower margin than Premium) yet Q1 2026 held at 33.0% — a positive signal</li>
+      <li>MLC litigation outcome could force royalty reclassification and reverse audiobook-driven gross margin gains</li>
+    </ul>` },
+  mau: { title: 'MAU vs Premium Subscribers', content: `
+    <p><strong>Monthly Active Users (MAU)</strong> = total platform scale (both free ad-supported and paid Premium users who engaged in any 30-day period).</p>
+    <p><strong>Premium Subscribers</strong> = paying users generating ~92% of revenue.</p>
+    <div class="metric-highlight"><strong>For Spotify:</strong> The free tier is a permanent, intentional part of the business model — not just a trial mechanism. 761M MAUs vs. 293M Premium Subs means 468M free users represent both untapped conversion optionality and the monetization challenge for the advertising segment. India subscribers grew 7x since 2022 Investor Day.</div>
+    <p><strong>What to watch:</strong></p>
+    <ul>
+      <li>MAU growth of +12% Y/Y in Q1 2026 — FY2026 target ~800M MAUs</li>
+      <li>India, Southeast Asia, and Africa as fastest-growing MAU markets (lower ARPU but higher volume)</li>
+      <li>North American and European Premium net adds — reportedly declining in North America in Q1 2026 per Music Business Worldwide</li>
+      <li>Free-to-paid conversion rate as a monetization efficiency indicator (see separate chart)</li>
+    </ul>` },
+  conversion: { title: 'Subscriber Conversion Rate (Subs / MAU)', content: `
+    <p><strong>Conversion Rate</strong> = Premium Subscribers &divide; MAU, expressed as a percentage. It measures what fraction of total platform users are paying subscribers.</p>
+    <div class="metric-highlight"><strong>For Spotify:</strong> Conversion has held around 38-40% for several years. The mild downward trend reflects deliberate MAU expansion in lower-income markets where conversion naturally takes longer — not churn or pricing problems in core markets. Sweden approaching 50% conversion demonstrates the potential ceiling for a mature market.</div>
+    <p><strong>What to watch:</strong></p>
+    <ul>
+      <li>Stabilization vs. structural decline: Is the ratio stable as new lower-ARPU markets grow?</li>
+      <li>Premium Lite (ad-free, lower-price) as a potential new conversion bridge tier in emerging markets</li>
+      <li>Audiobooks+ and Premium Platinum upsell paths could eventually create a "super-Premium" cohort</li>
+      <li>India: high-MAU, rapidly converting market following 7x subscriber growth since 2022 Investor Day</li>
+    </ul>` },
+  arpu: { title: 'Premium ARPU (EUR/month)', content: `
+    <p><strong>Average Revenue Per User (ARPU)</strong> = Quarterly Premium Revenue &divide; Average Premium Subscribers &divide; 3 months. Reported in EUR per month.</p>
+    <div class="metric-highlight"><strong>For Spotify:</strong> ARPU is structurally compressed by geographic mix — growth in lower-ARPU emerging markets (Latin America, Southeast Asia) dilutes the blended rate below what developed market users pay. FX creates additional translation pressure (~€250M drag on Premium revenue in Q1 2026 alone). Constant-currency ARPU grew +2% in Q4 2025 — the real underlying price signal.</div>
+    <p><strong>What to watch:</strong></p>
+    <ul>
+      <li>Constant-currency ARPU growth is more meaningful than reported ARPU due to FX distortion</li>
+      <li>US price increases ($11.99 &rarr; $12.99 Individual in January 2026) should lift US ARPU meaningfully</li>
+      <li>Premium Platinum launch at ~2x standard price — early ARPU uplift in test markets</li>
+      <li>Plan mix: Family and Student plans dilute ARPU vs. Individual; audiobooks bundling may offset this over time</li>
+    </ul>` },
+  fcf: { title: 'Free Cash Flow', content: `
+    <p><strong>Free Cash Flow (FCF)</strong> = Operating Cash Flow minus Capital Expenditures. Spotify's FCF inflection is one of the most dramatic structural improvements in large-cap tech history.</p>
+    <div class="metric-highlight"><strong>FCF trajectory:</strong> &euro;21M (FY2022) &rarr; &euro;678M (FY2023) &rarr; &euro;2,285M (FY2024) &rarr; &euro;2,874M (FY2025) &rarr; &euro;824M in Q1 2026 alone (+54% Y/Y). Annualizing Q1 2026 implies &gt;&euro;3.3B run rate.</div>
+    <p><strong>What to watch:</strong></p>
+    <ul>
+      <li>FY2025 FCF margin: 16.7% of revenue — path toward &gt;20% operating margin target implies FCF margin likely converges toward 20%+</li>
+      <li>Q1 is typically strongest FCF quarter due to royalty accrual timing; Q2-Q4 will be lower but should be meaningfully positive</li>
+      <li>Working capital dynamics: royalty accruals and prepayments to labels create periodic FCF lumps</li>
+      <li>Capital allocation: $1.02B remaining on buyback program; ~€8.75B in cash and short-term investments for optionality</li>
+    </ul>` },
+  opincome: { title: 'Operating Income', content: `
+    <p><strong>Operating Income</strong> = Revenue minus all operating expenses (COGS, R&D, Sales &amp; Marketing, G&A). The cleanest measure of Spotify's core business profitability, stripped of non-cash TME fair-value swings and FX effects on financial items.</p>
+    <div class="metric-highlight"><strong>The inflection:</strong> FY2021 was first year of positive operating income (€94M, 1% margin). FY2024 saw the breakout to €1,365M (8.7%). FY2025 accelerated to €2,198M (12.8%). Q1 2026: €715M (15.8%). 2030 target: &gt;20% operating margin.</div>
+    <p><strong>What to watch:</strong></p>
+    <ul>
+      <li>Q2 2026 guided at €630M (vs. €715M in Q1) — planned investment timing, not structural regression</li>
+      <li>Social charges tied to Swedish payroll taxes on SBC: ±€23M per 10% stock price change</li>
+      <li>R&D expense fell 13% Y/Y in Q1 2026 as AI-assisted development (internal Honk system) increases productivity</li>
+      <li>Full-year 2026 operating income guided to exceed FY2025 €2,198M despite the Q2 step-down</li>
+    </ul>` },
+  netincome: { title: 'Net Income', content: `
+    <p><strong>Net Income</strong> includes non-operating items that can significantly distort Spotify's underlying profitability. Prefer operating income and FCF for core business assessment.</p>
+    <div class="metric-highlight"><strong>Key distortions:</strong> Tencent Music Entertainment (TME) stake (~9%) is carried at fair value — TME fair value fell €975M in Q1 2026 (flows through OCI/equity, not P&L normally), but prior quarters saw large non-cash gains flowing through net income. Q3 2025 net income was €899M on only €582M of operating income due to TME revaluation. Exchangeable Notes discount accretion also created P&L noise.</div>
+    <p><strong>What to watch:</strong></p>
+    <ul>
+      <li>P/E of 37.7x at $462 based on FY2025 net income — appears more reasonable on an adjusted operating earnings basis (ex-TME gains)</li>
+      <li>The shift to consistent positive net income (FY2024-2025) represents a structural change — Spotify is no longer a "growth story priced on EV/Revenue"</li>
+      <li>FY2025 net income €2,212M includes meaningful TME fair-value gains; treat cautiously for run-rate purposes</li>
+    </ul>` }
+};
+
 function openModal(key) {
-    const desc = metricDescriptions[key];
-    if (!desc) return;
-    document.getElementById('modalTitle').textContent = desc.title;
-    document.getElementById('modalBody').innerHTML = desc.content;
-    document.getElementById('modalOverlay').classList.add('active');
-    document.body.style.overflow = 'hidden';
+  const d = metricDescriptions[key];
+  if (!d) return;
+  document.getElementById('modalTitle').textContent = d.title;
+  document.getElementById('modalBody').innerHTML = d.content;
+  document.getElementById('modalOverlay').classList.add('active');
+  document.body.style.overflow = 'hidden';
 }
 function closeModal() {
-    document.getElementById('modalOverlay').classList.remove('active');
-    document.body.style.overflow = '';
+  document.getElementById('modalOverlay').classList.remove('active');
+  document.body.style.overflow = '';
 }
-function handleOverlayClick(e) {
-    if (e.target === document.getElementById('modalOverlay')) closeModal();
+function closeModalOverlay(e) {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
@@ -1284,183 +1130,202 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal()
 // ============================================================
 let currentScenario = 'base';
 
-function renderDCFInputs() {
-    const inp = dcfData.inputs;
-    document.getElementById('baseFCF').textContent = '\u20ac' + (inp.last_fcf/1000).toFixed(1) + 'B';
-    document.getElementById('sharesOut').textContent = inp.shares_outstanding.toFixed(1) + 'M';
-    const nd = inp.net_debt;
-    const el = document.getElementById('netDebt');
-    el.textContent = (nd < 0 ? '+' : '') + '\u20ac' + (Math.abs(nd)/1000).toFixed(1) + 'B net cash';
-    el.style.color = '#1DB954';
-    renderFCFProjections();
+function initDCF() {
+  const phil = dcfData.valuation_philosophy;
+  document.getElementById('dcfPhilosophy').innerHTML =
+    `<strong style="color:#1db954">Valuation note:</strong> ${phil.fair_value_conclusion} <em>${phil.terminal_multiple_note}</em>`;
+
+  document.getElementById('growthSlider').value  = dcfData.assumptions.base.growth_rates[0];
+  document.getElementById('waccSlider').value    = dcfData.assumptions.base.wacc;
+  document.getElementById('terminalSlider').value = dcfData.assumptions.base.terminal_growth;
+
+  renderFCFProjections();
+  renderHistoricalGrowth();
+  renderSensitivityMatrix();
+  switchScenario('base');
 }
 
 function renderFCFProjections() {
-    const startGrowth = parseFloat(document.getElementById('growthSlider')?.value || dcfData.historical_growth.selected_growth_rate);
-    const baseFCF = dcfData.inputs.last_fcf;
-    const endGrowth = 10;
-    const rates = [];
-    for (let i = 0; i < 5; i++) {
-        rates.push(startGrowth > endGrowth ? startGrowth - (startGrowth - endGrowth) * (i / 4) : startGrowth);
-    }
-    let fcf = baseFCF;
-    const vals = [baseFCF];
-    for (let i = 0; i < 5; i++) { fcf = fcf * (1 + rates[i]/100); vals.push(fcf); }
-    const fmt = (v) => Math.abs(v) >= 1000 ? '\u20ac' + (v/1000).toFixed(1) + 'B' : '\u20ac' + v.toFixed(0) + 'M';
-    let html = '<div class="fcf-projection-item header">Base</div><div class="fcf-projection-item header">Year 1</div><div class="fcf-projection-item header">Year 2</div><div class="fcf-projection-item header">Year 3</div><div class="fcf-projection-item header">Year 4</div><div class="fcf-projection-item header">Year 5</div>';
-    html += `<div class="fcf-projection-item"><div class="fcf-val">${fmt(vals[0])}</div><div class="growth-rate">&mdash;</div></div>`;
-    for (let i = 1; i <= 5; i++) {
-        html += `<div class="fcf-projection-item"><div class="fcf-val">${fmt(vals[i])}</div><div class="growth-rate">+${rates[i-1].toFixed(0)}%</div></div>`;
-    }
-    document.getElementById('fcfProjectionTable').innerHTML = html;
+  const sc  = currentScenario || 'base';
+  const ass = dcfData.assumptions[sc];
+  const pr  = dcfData.projections[sc];
+
+  function fmtEur(v) { return Math.abs(v)>=1000 ? '&euro;'+(v/1000).toFixed(1)+'B' : '&euro;'+v.toFixed(0)+'M'; }
+
+  let html = `
+    <div class="fcf-proj-item hdr">Base (FY25)</div>
+    <div class="fcf-proj-item hdr">Year 1</div>
+    <div class="fcf-proj-item hdr">Year 2</div>
+    <div class="fcf-proj-item hdr">Year 3</div>
+    <div class="fcf-proj-item hdr">Year 4</div>
+    <div class="fcf-proj-item hdr">Year 5</div>
+    <div class="fcf-proj-item">
+      <div class="fv">${fmtEur(dcfData.inputs.last_fcf)}</div>
+      <div class="gr">FCF actual</div>
+    </div>
+  `;
+
+  for (let i = 0; i < 5; i++) {
+    html += `<div class="fcf-proj-item">
+      <div class="fv">${fmtEur(pr.fcf[i])}</div>
+      <div class="gr">+${ass.growth_rates[i]}% rev / ${ass.fcf_margins[i]}% FCF</div>
+    </div>`;
+  }
+
+  document.getElementById('fcfProjectionTable').innerHTML = html;
 }
 
-function calculateDCF(startGrowth, wacc, termGrowth) {
-    const years = 5, fcf = dcfData.inputs.last_fcf;
-    const endGrowth = 10;
-    let pvFCF = 0, projFCF = fcf;
-    for (let i = 0; i < years; i++) {
-        const yg = startGrowth > endGrowth ? startGrowth - (startGrowth - endGrowth)*(i/4) : startGrowth;
-        projFCF *= (1 + yg/100);
-        pvFCF += projFCF / Math.pow(1 + wacc/100, i+1);
-    }
-    const wD = wacc/100, tD = termGrowth/100;
-    if (wD <= tD) return { iv: 0, entryPrice: 0 };
-    const tv = projFCF * (1 + tD) / (wD - tD);
-    const pvTV = tv / Math.pow(1 + wD, years);
-    const ev = pvFCF + pvTV;
-    const eqEur = ev - dcfData.inputs.net_debt;
-    const ivEur = eqEur / dcfData.inputs.shares_outstanding;
-    const ivUsd = ivEur * dcfData.eur_usd_rate;
-    const tvPerShareUsd = (tv / dcfData.inputs.shares_outstanding) * dcfData.eur_usd_rate;
-    const entry = tvPerShareUsd / Math.pow(1.15, years);
-    return { iv: ivUsd, entryPrice: entry };
+function calculateDCF(startGrowth, wacc, terminalGrowth) {
+  const sc = currentScenario || 'base';
+  const margins = dcfData.assumptions[sc].fcf_margins;
+  const revBase  = dcfData.inputs.last_revenue;
+  const endGrowth = 8;
+  let pvFCF = 0, rev = revBase, lastFCF = 0;
+
+  for (let i = 0; i < 5; i++) {
+    const yg = startGrowth > endGrowth ? startGrowth - (startGrowth - endGrowth) * (i / 4) : startGrowth;
+    rev = rev * (1 + yg / 100);
+    const fcf = rev * (margins[i] / 100);
+    pvFCF += fcf / Math.pow(1 + wacc / 100, i + 1);
+    lastFCF = fcf;
+  }
+
+  const tv    = lastFCF * (1 + terminalGrowth / 100) / (wacc / 100 - terminalGrowth / 100);
+  const pvTV  = tv / Math.pow(1 + wacc / 100, 5);
+  const ev    = pvFCF + pvTV;
+  const equity = ev - dcfData.inputs.net_debt; // net_debt is negative (cash), subtracting negative = adding
+  const ivEur  = equity / dcfData.inputs.shares_outstanding;
+  const ivUsd  = ivEur * dcfData.eur_usd_rate;
+  const entryUsd = (tv / dcfData.inputs.shares_outstanding * dcfData.eur_usd_rate) / Math.pow(1.15, 5);
+
+  return { iv: ivUsd, entryPrice: entryUsd };
 }
 
 window.updateDCFDisplay = function() {
-    const growth = parseFloat(document.getElementById('growthSlider').value);
-    const wacc = parseFloat(document.getElementById('waccSlider').value);
-    const terminal = parseFloat(document.getElementById('terminalSlider').value);
-    document.getElementById('growthValue').textContent = growth + '%';
-    document.getElementById('waccValue').textContent = wacc + '%';
-    document.getElementById('terminalValue').textContent = terminal + '%';
-    renderFCFProjections();
-    const result = calculateDCF(growth, wacc, terminal);
-    document.getElementById('dcfIV').textContent = '$' + result.iv.toFixed(0);
-    document.getElementById('dcfEntry').textContent = '$' + result.entryPrice.toFixed(0);
-    const upside = ((result.iv - dcfData.current_price) / dcfData.current_price * 100);
-    const uEl = document.getElementById('dcfUpside');
-    uEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(0) + '% ' + (upside >= 0 ? 'upside' : 'downside');
-    uEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
-    document.getElementById('dcfWeighted').textContent = '$' + dcfData.probability_weighted.weighted_iv_usd.toFixed(0);
-    const grid = document.getElementById('assumptionGrid');
-    if (grid) {
-        grid.innerHTML = `
-            <div class="assumption-item"><div class="label">Growth Rate (Y1)</div><div class="value">${growth}%</div></div>
-            <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc}%</div></div>
-            <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${terminal}%</div></div>
-            <div class="assumption-item"><div class="label">Intrinsic Value (USD)</div><div class="value" style="color:#1DB954;">$${result.iv.toFixed(0)}</div></div>
-            <div class="assumption-item"><div class="label">Entry Price (15% CAGR)</div><div class="value" style="color:#1DB954;">$${result.entryPrice.toFixed(0)}</div></div>`;
-    }
+  const growth   = parseFloat(document.getElementById('growthSlider').value);
+  const wacc     = parseFloat(document.getElementById('waccSlider').value);
+  const terminal = parseFloat(document.getElementById('terminalSlider').value);
+
+  document.getElementById('growthValue').textContent   = growth + '%';
+  document.getElementById('waccValue').textContent     = wacc + '%';
+  document.getElementById('terminalValue').textContent = terminal + '%';
+
+  const result = calculateDCF(growth, wacc, terminal);
+
+  document.getElementById('dcfIV').textContent    = '$' + result.iv.toFixed(0);
+  document.getElementById('dcfEntry').textContent = '$' + result.entryPrice.toFixed(0);
+
+  const upside = ((result.iv - dcfData.current_price) / dcfData.current_price * 100);
+  const el = document.getElementById('dcfUpside');
+  el.textContent  = (upside >= 0 ? '+' : '') + upside.toFixed(1) + '% vs $' + dcfData.current_price.toFixed(0);
+  el.className    = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+  document.getElementById('dcfWeighted').textContent = '$' + dcfData.probability_weighted.weighted_iv_usd.toFixed(0);
+
+  // Update assumption grid
+  const grid = document.getElementById('assumptionGrid');
+  if (grid && grid.dataset.live === 'true') {
+    const ass = dcfData.assumptions[currentScenario];
+    const val = dcfData.valuation[currentScenario];
+    const ent = dcfData.entry_price[currentScenario];
+    renderAssumptionGrid(ass, val, ent);
+  }
 };
 
+function renderAssumptionGrid(ass, val, ent) {
+  document.getElementById('assumptionGrid').innerHTML = `
+    <div class="assumption-item"><div class="alabel">Y1 Growth</div><div class="avalue">${ass.growth_rates[0]}%</div></div>
+    <div class="assumption-item"><div class="alabel">Y5 Growth</div><div class="avalue">${ass.growth_rates[4]}%</div></div>
+    <div class="assumption-item"><div class="alabel">Y1 FCF Margin</div><div class="avalue">${ass.fcf_margins[0]}%</div></div>
+    <div class="assumption-item"><div class="alabel">Y5 FCF Margin</div><div class="avalue">${ass.fcf_margins[4]}%</div></div>
+    <div class="assumption-item"><div class="alabel">WACC</div><div class="avalue">${ass.wacc}%</div></div>
+    <div class="assumption-item"><div class="alabel">Terminal Growth</div><div class="avalue">${ass.terminal_growth}%</div></div>
+    <div class="assumption-item"><div class="alabel">Intrinsic Value</div><div class="avalue" style="color:#1db954">$${val.intrinsic_value_usd.toFixed(0)}</div></div>
+    <div class="assumption-item"><div class="alabel">Entry (15% CAGR)</div><div class="avalue" style="color:#1db954">$${ent.entry_price_usd.toFixed(0)}</div></div>
+  `;
+  document.getElementById('assumptionGrid').dataset.live = 'true';
+}
+
 window.switchScenario = function(scenario) {
-    currentScenario = scenario;
-    document.querySelectorAll('.scenario-tab').forEach(t => t.classList.toggle('active', t.dataset.scenario === scenario));
-    const a = dcfData.assumptions[scenario];
-    const v = dcfData.valuation[scenario];
-    document.getElementById('growthSlider').value = a.growth_rates[0];
-    document.getElementById('waccSlider').value = a.wacc;
-    document.getElementById('terminalSlider').value = a.terminal_growth;
-    renderFCFProjections();
-    document.getElementById('assumptionGrid').innerHTML = `
-        <div class="assumption-item"><div class="label">Year 1 Growth</div><div class="value">${a.growth_rates[0]}%</div></div>
-        <div class="assumption-item"><div class="label">Year 5 Growth</div><div class="value">${a.growth_rates[4]}%</div></div>
-        <div class="assumption-item"><div class="label">FCF Margin</div><div class="value">${a.fcf_margin}%</div></div>
-        <div class="assumption-item"><div class="label">WACC</div><div class="value">${a.wacc}%</div></div>
-        <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${a.terminal_growth}%</div></div>
-        <div class="assumption-item"><div class="label">Intrinsic Value (USD)</div><div class="value" style="color:#1DB954;">$${v.intrinsic_value_usd.toFixed(0)}</div></div>`;
-    updateDCFDisplay();
+  currentScenario = scenario;
+  document.querySelectorAll('.scenario-tab').forEach(t => t.classList.toggle('active', t.dataset.scenario === scenario));
+
+  const ass = dcfData.assumptions[scenario];
+  const val = dcfData.valuation[scenario];
+  const ent = dcfData.entry_price[scenario];
+
+  document.getElementById('scenarioTitle').textContent   = scenario.charAt(0).toUpperCase() + scenario.slice(1) + ' Case';
+  document.getElementById('scenarioNarrative').textContent = ass.narrative;
+
+  document.getElementById('growthSlider').value   = ass.growth_rates[0];
+  document.getElementById('waccSlider').value     = ass.wacc;
+  document.getElementById('terminalSlider').value = ass.terminal_growth;
+
+  renderFCFProjections();
+  renderAssumptionGrid(ass, val, ent);
+  window.updateDCFDisplay();
 };
 
 function renderHistoricalGrowth() {
-    const g = dcfData.historical_growth;
-    const sel = g.growth_rate_source;
-    const metrics = [
-        { key: 'revenue_3yr_cagr', label: 'Revenue 3Y CAGR' },
-        { key: 'revenue_5yr_cagr', label: 'Revenue 5Y CAGR' },
-        { key: 'eps_3yr_cagr', label: 'EPS 3Y CAGR' },
-        { key: 'eps_5yr_cagr', label: 'EPS 5Y CAGR' },
-        { key: 'equity_3yr_cagr', label: 'Equity 3Y CAGR' },
-        { key: 'equity_4yr_cagr', label: 'Equity 4Y CAGR' },
-        { key: 'fcf_3yr_cagr', label: 'FCF 3Y CAGR' },
-        { key: 'fcf_4yr_cagr', label: 'FCF 4Y CAGR' }
-    ];
-    document.getElementById('growthGrid').innerHTML = metrics.map(m => {
-        const r = g[m.key];
-        const isSel = m.key === sel;
-        if (r === null || r === undefined) {
-            return `<div class="growth-item ${isSel?'selected':''}"><div class="metric">${m.label}</div><div class="rate na">N/A*</div></div>`;
-        }
-        return `<div class="growth-item ${isSel?'selected':''}">
-            <div class="metric">${m.label}</div>
-            <div class="rate ${r>=0?'positive':'negative'}">${r>=0?'+':''}${r.toFixed(1)}%</div>
-        </div>`;
-    }).join('');
+  const g = dcfData.historical_growth;
+  const metrics = [
+    { key: 'revenue_3yr_cagr',  label: 'Revenue 3Y CAGR' },
+    { key: 'revenue_5yr_cagr',  label: 'Revenue 5Y CAGR ★', selected: true },
+    { key: 'eps_3yr_cagr',      label: 'EPS 3Y CAGR',     note: 'N/A (losses)' },
+    { key: 'eps_5yr_cagr',      label: 'EPS 5Y CAGR',     note: 'N/A (losses)' },
+    { key: 'equity_3yr_cagr',   label: 'Equity 3Y CAGR' },
+    { key: 'equity_5yr_cagr',   label: 'Equity 5Y CAGR' },
+    { key: 'fcf_3yr_cagr',      label: 'FCF 3Y CAGR',     note: 'N/A (trough)' },
+    { key: 'fcf_5yr_cagr',      label: 'FCF 5Y CAGR' }
+  ];
+
+  document.getElementById('growthGrid').innerHTML = metrics.map(m => {
+    const rate = g[m.key];
+    if (rate === null || rate === undefined) {
+      return `<div class="growth-item"><div class="gmetric">${m.label}</div><div class="grate na">${m.note || 'N/A'}</div></div>`;
+    }
+    return `<div class="growth-item ${m.selected ? 'selected' : ''}">
+      <div class="gmetric">${m.label}</div>
+      <div class="grate ${rate>=0?'pos':'neg'}">${rate>=0?'+':''}${rate.toFixed(1)}%</div>
+    </div>`;
+  }).join('');
 }
 
 function renderSensitivityMatrix() {
-    const s = dcfData.sensitivity;
-    const cp = dcfData.current_price;
-    let html = '<tr><th>WACC \\ Term G</th>';
-    s.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
-    html += '</tr>';
-    s.wacc_range.forEach((wacc, i) => {
-        html += `<tr><th>${wacc}%</th>`;
-        s.matrix[i].forEach((val, j) => {
-            const isHL = wacc === dcfData.assumptions.base.wacc && s.terminal_growth_range[j] === dcfData.assumptions.base.terminal_growth;
-            const cls = val >= cp ? 'above-current' : 'below-current';
-            html += `<td class="${isHL ? 'highlight' : cls}">$${val.toFixed(0)}</td>`;
-        });
-        html += '</tr>';
+  const s  = dcfData.sensitivity;
+  const cp = dcfData.current_price;
+
+  let html = '<tr><th>WACC \\ Term G</th>';
+  s.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+  html += '</tr>';
+
+  s.wacc_range.forEach((wacc, i) => {
+    html += `<tr><th>${wacc}%</th>`;
+    s.matrix[i].forEach((val, j) => {
+      const isHL  = wacc === s.base_case_wacc && s.terminal_growth_range[j] === s.base_case_tg;
+      const cls   = isHL ? 'hl' : (val >= cp ? 'above' : 'below');
+      html += `<td class="${cls}">$${val}</td>`;
     });
-    document.getElementById('sensitivityMatrix').innerHTML = html;
-}
+    html += '</tr>';
+  });
 
-function initDCF() {
-    if (!dcfData || !dcfData.valuation) return;
-    document.getElementById('dcfCurrent').textContent = '$' + dcfData.current_price.toFixed(0);
-    if (dcfData.historical_growth.growth_divergence_warning) {
-        document.getElementById('growthWarning').style.display = 'flex';
-        document.getElementById('warningText').textContent = dcfData.historical_growth.growth_divergence_warning;
-    }
-    const base = dcfData.assumptions.base;
-    document.getElementById('growthSlider').value = Math.round(dcfData.historical_growth.selected_growth_rate);
-    document.getElementById('waccSlider').value = base.wacc;
-    document.getElementById('terminalSlider').value = base.terminal_growth;
-    document.getElementById('growthValue').textContent = Math.round(dcfData.historical_growth.selected_growth_rate) + '%';
-    document.getElementById('waccValue').textContent = base.wacc + '%';
-    document.getElementById('terminalValue').textContent = base.terminal_growth + '%';
-    document.getElementById('growthHint').textContent = 'Based on ' + dcfData.historical_growth.growth_rate_source.replace(/_/g, ' ');
-    renderDCFInputs();
-    renderHistoricalGrowth();
-    renderSensitivityMatrix();
-    switchScenario('base');
+  document.getElementById('sensitivityMatrix').innerHTML = html;
 }
-
-// Bind slider events
-['growthSlider','waccSlider','terminalSlider'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) { el.oninput = window.updateDCFDisplay; el.onchange = window.updateDCFDisplay; }
-});
 
 // ============================================================
 // INIT
 // ============================================================
+renderOverview();
 renderKPIs();
 renderGuidance();
 renderCharts();
 initDCF();
+
+// Bind sliders
+['growthSlider','waccSlider','terminalSlider'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) { el.addEventListener('input', window.updateDCFDisplay); el.addEventListener('change', window.updateDCFDisplay); }
+});
 </script>
 </body>
 </html>
