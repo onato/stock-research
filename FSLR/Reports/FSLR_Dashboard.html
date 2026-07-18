@@ -1,0 +1,1660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>First Solar (FSLR) Financial Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4aa, #00b894);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        .header p { color: #888; font-size: 1.1rem; }
+        .header .sub { font-size: 0.9rem; margin-top: 6px; color: #666; }
+
+        /* Investment Overview */
+        .overview-section { max-width: 1400px; margin: 0 auto 30px; }
+        .overview-toggle {
+            width: 100%;
+            background: rgba(0,212,170,0.1);
+            border: 1px solid rgba(0,212,170,0.3);
+            border-radius: 12px;
+            padding: 16px 24px;
+            color: #00d4aa;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+        .overview-toggle:hover { background: rgba(0,212,170,0.2); }
+        .overview-toggle .arrow { transition: transform 0.3s ease; }
+        .overview-toggle.active .arrow { transform: rotate(180deg); }
+        .overview-content {
+            display: none;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            padding: 30px;
+            margin-top: -12px;
+        }
+        .overview-content.active { display: block; }
+        .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+        .overview-card {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .overview-card h3 {
+            color: #00d4aa;
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .overview-card p { margin-bottom: 12px; line-height: 1.6; }
+        .overview-card ul { list-style: none; padding: 0; margin: 0; }
+        .overview-card li {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            line-height: 1.5;
+        }
+        .overview-card li:last-child { border-bottom: none; }
+        .overview-card.bull h3 { color: #00d4aa; }
+        .overview-card.bear h3 { color: #ff6b6b; }
+        .overview-card.risks h3 { color: #fdcb6e; }
+        .risk-high { color: #ff6b6b; font-weight: 600; }
+        .risk-moderate { color: #fdcb6e; font-weight: 600; }
+        .risk-low { color: #00d4aa; font-weight: 600; }
+        .revenue-stream { display: flex; justify-content: space-between; align-items: center; }
+        .revenue-stream .percent { color: #00d4aa; font-weight: 600; }
+        .trend-growing { color: #00d4aa; font-size: 0.8rem; }
+        .trend-stable { color: #888; font-size: 0.8rem; }
+        .trend-declining { color: #ff6b6b; font-size: 0.8rem; }
+
+        /* KPI Cards */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .kpi-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0,212,170,0.2); }
+        .kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+        .kpi-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        .kpi-change { font-size: 0.9rem; margin-top: 5px; }
+        .kpi-change.positive { color: #00d4aa; }
+        .kpi-change.negative { color: #ff6b6b; }
+        .kpi-sub { font-size: 0.75rem; color: #666; margin-top: 3px; }
+
+        /* Guidance Section */
+        .guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+        .guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .guidance-header h3 {
+            color: #fff;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .guidance-header h3::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, #00d4aa, #00b894);
+            border-radius: 2px;
+        }
+        .guidance-meta { font-size: 0.85rem; color: #888; }
+        .guidance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .guidance-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 18px;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.2s ease;
+        }
+        .guidance-card:hover { transform: translateY(-2px); }
+        .guidance-metric { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+        .guidance-target { font-size: 1.4rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; }
+        .guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
+        .guidance-vs-prior { display: inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+        .guidance-vs-prior.raised { background: rgba(0,212,170,0.15); color: #00d4aa; }
+        .guidance-vs-prior.lowered { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+        .guidance-vs-prior.maintained { background: rgba(255,255,255,0.1); color: #888; }
+        .guidance-vs-prior.new { background: rgba(99,102,241,0.15); color: #818cf8; }
+        .guidance-notes { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
+        .guidance-commentary {
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            padding: 16px 20px;
+            border-left: 3px solid #00d4aa;
+            font-style: italic;
+            color: #b0b0b0;
+            line-height: 1.6;
+        }
+        .guidance-commentary::before { content: '"'; font-size: 1.5rem; color: #00d4aa; margin-right: 4px; }
+
+        /* Charts */
+        .section-title {
+            font-size: 1.5rem;
+            color: #fff;
+            margin: 40px auto 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(0,212,170,0.3);
+            max-width: 1400px;
+        }
+        .charts-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 25px; max-width: 1400px; margin: 0 auto; }
+        .chart-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+        .chart-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+        .chart-header h3::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, #00d4aa, #00b894);
+            border-radius: 2px;
+        }
+        .help-btn {
+            width: 24px; height: 24px; border-radius: 50%;
+            background: rgba(0,212,170,0.2);
+            border: 1px solid #00d4aa;
+            color: #00d4aa;
+            font-size: 14px; font-weight: bold;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+        .help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+        .chart-wrapper { position: relative; height: 300px; }
+
+        /* Modals */
+        .modal-overlay {
+            display: none;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center; align-items: center;
+            padding: 20px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%);
+            border-radius: 16px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid rgba(0,212,170,0.3);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .modal-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .modal-header h3 { color: #00d4aa; font-size: 1.4rem; margin: 0; }
+        .modal-close {
+            width: 32px; height: 32px; border-radius: 50%;
+            background: rgba(255,107,107,0.2);
+            border: 1px solid #ff6b6b; color: #ff6b6b;
+            font-size: 20px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .modal-close:hover { background: #ff6b6b; color: #fff; }
+        .modal-body { padding: 25px; line-height: 1.7; }
+        .modal-body p { margin-bottom: 15px; }
+        .modal-body strong { color: #00d4aa; }
+        .modal-body ul { margin: 15px 0; padding-left: 20px; }
+        .modal-body li { margin-bottom: 8px; }
+        .metric-highlight {
+            background: rgba(0,212,170,0.1);
+            border-left: 3px solid #00d4aa;
+            padding: 12px 15px;
+            margin: 15px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .warning-highlight {
+            background: rgba(253,203,110,0.1);
+            border-left: 3px solid #fdcb6e;
+            padding: 12px 15px;
+            margin: 15px 0;
+            border-radius: 0 8px 8px 0;
+            color: #fdcb6e;
+        }
+
+        /* DCF Section */
+        .dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+        .dcf-fair-value-note {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 10px;
+            padding: 14px 20px;
+            margin-bottom: 25px;
+            font-size: 0.9rem;
+            color: #b0b0b0;
+            line-height: 1.6;
+        }
+        .dcf-fair-value-note strong { color: #e0e0e0; }
+        .dcf-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .dcf-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.3s ease;
+        }
+        .dcf-card:hover { transform: translateY(-3px); }
+        .dcf-card.highlight { background: rgba(0,212,170,0.1); border-color: rgba(0,212,170,0.3); }
+        .dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .dcf-value { font-size: 2.2rem; font-weight: bold; color: #00d4aa; }
+        .dcf-card:not(.highlight) .dcf-value { color: #fff; }
+        .dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+        .dcf-change.positive { color: #00d4aa; }
+        .dcf-change.negative { color: #ff6b6b; }
+        .dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
+        .dcf-inputs { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.08); }
+        .dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+        .dcf-inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .dcf-input-card { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
+        .dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #00d4aa; }
+        .dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
+        .fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
+        .fcf-projection-table { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 12px; }
+        .fcf-projection-item { text-align: center; }
+        .fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
+        .fcf-projection-item .fcf-value { font-size: 1rem; color: #e0e0e0; font-weight: 500; }
+        .fcf-projection-item .growth-rate { font-size: 0.75rem; color: #00d4aa; margin-top: 2px; }
+        .dcf-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; margin-bottom: 30px; padding: 25px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
+        .slider-group { display: flex; flex-direction: column; gap: 10px; }
+        .slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+        .slider-group label span { color: #00d4aa; font-weight: 600; }
+        .slider-group input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); outline: none; }
+        .slider-group input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #00d4aa; cursor: pointer; transition: transform 0.2s; }
+        .slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        .slider-hint { font-size: 0.8rem; color: #666; }
+        .scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .scenario-tab { padding: 10px 24px; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: #888; border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s; }
+        .scenario-tab:hover { border-color: rgba(0,212,170,0.5); color: #e0e0e0; }
+        .scenario-tab.active { background: rgba(0,212,170,0.15); border-color: #00d4aa; color: #00d4aa; }
+        .scenario-details { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.08); }
+        .scenario-details h4 { color: #00d4aa; margin-bottom: 15px; }
+        .assumption-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+        .assumption-item { text-align: center; }
+        .assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+        .assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
+        .sensitivity-section { margin-bottom: 30px; }
+        .sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; }
+        .sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.03); border-radius: 8px; overflow: hidden; }
+        .sensitivity-table th, .sensitivity-table td { padding: 12px 16px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+        .sensitivity-table th { background: rgba(0,212,170,0.1); color: #00d4aa; font-weight: 600; }
+        .sensitivity-table td { color: #e0e0e0; }
+        .sensitivity-table td.highlight { background: rgba(0,212,170,0.15); color: #00d4aa; font-weight: 600; }
+        .sensitivity-table td.below-current { color: #ff6b6b; }
+        .sensitivity-table td.above-current { color: #00d4aa; }
+        .historical-growth { margin-bottom: 30px; }
+        .historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
+        .growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
+        .growth-item { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 15px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+        .growth-item .metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
+        .growth-item .rate { font-size: 1.2rem; font-weight: 600; }
+        .growth-item .rate.positive { color: #00d4aa; }
+        .growth-item .rate.negative { color: #ff6b6b; }
+        .growth-item .rate.na { color: #888; font-size: 0.95rem; }
+        .growth-item.selected { border-color: #00d4aa; background: rgba(0,212,170,0.1); }
+        .dcf-notes { margin-bottom: 30px; }
+        .dcf-notes h4 { color: #e0e0e0; margin-bottom: 12px; }
+        .dcf-note-item { background: rgba(255,255,255,0.02); border-radius: 8px; padding: 12px 16px; margin-bottom: 10px; border-left: 3px solid rgba(0,212,170,0.4); font-size: 0.85rem; color: #b0b0b0; line-height: 1.6; }
+
+        @media (max-width: 768px) {
+            .charts-container { grid-template-columns: 1fr; }
+            .overview-grid { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.8rem; }
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+            .fcf-projection-table { grid-template-columns: repeat(3, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>First Solar, Inc. (FSLR)</h1>
+    <p>CdTe Thin-Film Solar Module Manufacturer | Utility-Scale | Nasdaq: FSLR</p>
+    <p class="sub">Data as of FY2025 Annual | Dashboard generated July 6, 2026</p>
+</div>
+
+<!-- INVESTMENT OVERVIEW -->
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid" id="overviewGrid">
+            <!-- populated by JS -->
+        </div>
+    </div>
+</div>
+
+<!-- KPI CARDS -->
+<div class="kpi-grid" id="kpiGrid">
+    <!-- populated by JS -->
+</div>
+
+<!-- GUIDANCE SECTION -->
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf"></span> | <span id="guidanceFY"></span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<!-- ANNUAL PERFORMANCE CHARTS -->
+<h2 class="section-title">Annual Financial Performance (FY2016 – FY2025)</h2>
+<div class="charts-container">
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Revenue &amp; Net Income</h3>
+            <button class="help-btn" onclick="openModal('revenue')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="revenueNetIncomeChart"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Gross Margin % — Cyclicality</h3>
+            <button class="help-btn" onclick="openModal('grossMargin')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="grossMarginChart"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Diluted EPS</h3>
+            <button class="help-btn" onclick="openModal('eps')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="epsChart"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Free Cash Flow — Buildout Then Breakout</h3>
+            <button class="help-btn" onclick="openModal('fcf')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="fcfChart"></canvas></div>
+    </div>
+
+</div>
+
+<!-- QUARTERLY CHARTS -->
+<h2 class="section-title">Quarterly Trend (Q1 2023 – Q1 2026)</h2>
+<div class="charts-container">
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Quarterly Revenue</h3>
+            <button class="help-btn" onclick="openModal('qRevenue')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="quarterlyRevenueChart"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Quarterly Diluted EPS</h3>
+            <button class="help-btn" onclick="openModal('qEps')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="quarterlyEpsChart"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Quarterly Gross Margin %</h3>
+            <button class="help-btn" onclick="openModal('qGrossMargin')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="quarterlyGrossMarginChart"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shareholders' Equity</h3>
+            <button class="help-btn" onclick="openModal('equity')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="equityChart"></canvas></div>
+    </div>
+
+</div>
+
+<!-- DCF VALUATION -->
+<h2 class="section-title">DCF Valuation</h2>
+<div class="dcf-section">
+
+    <div class="dcf-fair-value-note">
+        <strong>Valuation note:</strong> The base case intrinsic value ($227.19) is approximately in line with the current price ($224.57), consistent with a fairly-valued stock. The unusually wide spread between bull ($366) and bear ($117) cases reflects the <strong>binary Section 45X legislative risk</strong> — roughly 75–80% of FY2026 guided EBITDA is the U.S. government manufacturing tax credit. A strong bull outcome (232 tariffs + full 45X execution + ITC patent win) is transformational; a bear outcome (45X erosion + weak 232 + SE Asia write-downs) compresses earnings rapidly. The sanity check passed at 16x implied P/E, 2.56x P/B, and 11.3x EV/EBITDA — all within historical norms.
+    </div>
+
+    <div class="dcf-summary">
+        <div class="dcf-card highlight">
+            <div class="dcf-label">Intrinsic Value (Base)</div>
+            <div class="dcf-value" id="dcfIV">$227</div>
+            <div class="dcf-change positive" id="dcfUpside">+1.2% upside</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Entry Price (15% CAGR)</div>
+            <div class="dcf-value" id="dcfEntry">$121</div>
+            <div class="dcf-sublabel">Buy below for 15% annual return</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Current Price</div>
+            <div class="dcf-value" id="dcfCurrent">$225</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Prob-Weighted IV</div>
+            <div class="dcf-value" id="dcfWeighted">$234</div>
+            <div class="dcf-sublabel">25% Bull / 50% Base / 25% Bear</div>
+        </div>
+    </div>
+
+    <div class="dcf-inputs">
+        <h4>DCF Model Inputs</h4>
+        <div class="dcf-inputs-grid">
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Base Year FCF</div>
+                <div class="dcf-input-value" id="baseFCF">$1,200M</div>
+                <div class="dcf-input-note">FY2025 normalised ($1,187M actual)</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Shares Outstanding</div>
+                <div class="dcf-input-value" id="sharesOut">107.3M</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Net Cash</div>
+                <div class="dcf-input-value" id="netDebt" style="color:#00d4aa;">+$2,305M</div>
+                <div class="dcf-input-note">Net cash — no net debt</div>
+            </div>
+        </div>
+        <div class="fcf-projections">
+            <h5>Projected FCF — 5 Years (Base Scenario)</h5>
+            <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+        </div>
+    </div>
+
+    <div class="dcf-controls">
+        <div class="slider-group">
+            <label>Growth Rate (Y1): <span id="growthValue">11.56%</span></label>
+            <input type="range" id="growthSlider" min="0" max="35" value="11.56" step="0.5">
+            <div class="slider-hint" id="growthHint">Based on equity 5yr CAGR</div>
+        </div>
+        <div class="slider-group">
+            <label>WACC: <span id="waccValue">11%</span></label>
+            <input type="range" id="waccSlider" min="6" max="18" value="11" step="0.5">
+        </div>
+        <div class="slider-group">
+            <label>Terminal Growth: <span id="terminalValue">2.5%</span></label>
+            <input type="range" id="terminalSlider" min="0" max="5" value="2.5" step="0.5">
+        </div>
+    </div>
+
+    <div class="scenario-tabs">
+        <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+        <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+        <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+    </div>
+
+    <div class="scenario-details" id="scenarioDetails">
+        <h4>Assumptions</h4>
+        <div class="assumption-grid" id="assumptionGrid"></div>
+    </div>
+
+    <div class="sensitivity-section">
+        <h4>Sensitivity Analysis: Intrinsic Value by WACC &amp; Terminal Growth</h4>
+        <table class="sensitivity-table" id="sensitivityMatrix"></table>
+    </div>
+
+    <div class="historical-growth">
+        <h4>Historical Growth Rates (CAGR)</h4>
+        <div class="growth-grid" id="growthGrid"></div>
+    </div>
+
+    <div class="dcf-notes">
+        <h4>Key Model Notes</h4>
+        <div id="dcfNotesList"></div>
+    </div>
+
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&#215;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// EMBEDDED CSV DATA
+// ============================================================
+const csvData = `Period,Revenue,GrossProfit,GrossMargin,OperatingIncome,NetIncome,EPS,OCF,Capex,FreeCashFlow,ShareholdersEquity,CashAndEquivalents,SharesOutstanding
+FY2016,2904.6,638.4,22.0,-568.2,-416.1,-4.05,206.8,229.5,-22.7,5218.3,1347.2,104.0
+FY2017,2941.3,548.9,18.7,177.9,-165.6,-1.59,1340.7,514.4,826.3,5098.7,2268.5,104.5
+FY2018,2244.0,392.2,17.5,40.1,144.3,1.36,-326.8,739.8,-1066.6,5212.4,1403.6,104.9
+FY2019,3063.1,549.2,17.9,-161.8,-114.9,-1.09,174.2,668.7,-494.5,5096.8,1352.7,105.4
+FY2020,2711.3,680.7,25.1,317.5,398.4,3.73,37.1,416.6,-379.5,5520.9,1227.0,106.0
+FY2021,2923.4,730.0,25.0,586.8,468.7,4.38,237.6,540.3,-302.7,5959.6,1450.7,106.3
+FY2022,2619.3,69.9,2.7,-27.2,-44.2,-0.41,873.4,903.6,-30.2,5836.1,1481.3,106.6
+FY2023,3318.6,1300.7,39.2,857.3,830.8,7.74,602.3,1386.8,-784.5,6687.5,1947.0,106.8
+FY2024,4206.3,1857.9,44.2,1394.4,1292.0,12.02,1218.0,1526.1,-308.1,7977.6,1621.4,107.1
+FY2025,5219.4,2120.3,40.6,1596.9,1528.2,14.21,2057.1,869.9,1187.2,9538.0,2803.5,107.3
+Q1 2023,548.3,112.1,20.4,18.0,42.6,0.4,-34.6,371.0,-405.6,5868.7,906.6,106.8
+Q2 2023,810.7,310.4,38.3,168.5,170.6,1.59,,,,6039.6,829.9,106.8
+Q3 2023,801.1,376.2,47.0,273.0,268.4,2.5,,,,6302.4,1493.0,106.8
+Q4 2023,1158.5,502.0,43.3,397.8,349.2,3.25,,,,6687.5,1947.0,106.8
+Q1 2024,794.1,346.0,43.6,243.1,236.6,2.2,267.7,413.5,-145.7,6902.5,1682.1,107.0
+Q2 2024,1010.5,498.9,49.4,372.5,349.4,3.25,,,,7255.4,1702.9,107.0
+Q3 2024,887.7,445.3,50.2,322.0,313.0,2.91,,,,7593.6,1005.1,107.1
+Q4 2024,1514.0,567.7,37.5,456.8,393.0,3.66,,,,7977.6,1621.4,107.1
+Q1 2025,844.6,344.4,40.8,221.2,209.5,1.95,-608.0,206.0,-813.9,8187.3,837.6,107.2
+Q2 2025,1097.2,499.9,45.6,361.6,341.9,3.18,,,,8546.1,1124.7,107.2
+Q3 2025,1594.9,610.7,38.3,466.1,455.9,4.24,,,,9015.3,1992.2,107.3
+Q4 2025,1682.7,665.3,39.5,548.0,520.9,4.84,,,,9538.0,2803.5,107.3
+Q1 2026,1044.2,486.1,46.6,345.3,346.6,3.22,-214.9,118.5,-333.4,9878.6,2363.0,107.5`;
+
+// ============================================================
+// EMBEDDED ANALYSIS JSON
+// ============================================================
+const analysis = {
+  "ticker": "FSLR",
+  "company_name": "First Solar, Inc.",
+  "analysis_date": "2026-07-06",
+  "overview": "First Solar is the only large-scale, commercially proven thin-film photovoltaic (CdTe) module manufacturer in the United States, supplying utility-scale solar developers exclusively through direct long-term contracts. The company's unique domestic manufacturing footprint, independence from Chinese crystalline silicon supply chains, and substantial Section 45X Advanced Manufacturing Production Tax Credit entitlements distinguish it structurally from all global peers. Operating through a single Modules segment, First Solar generated $5.22B in revenue in FY2025 and is guiding for $4.9–5.2B in FY2026 with approximately $2.1–2.2B of 45X credits embedded in gross profit.",
+  "business_model": {
+    "summary": "First Solar manufactures and sells thin-film CdTe solar modules to utility-scale power plant developers, IPPs, and electric utilities under long-dated, fixed-volume supply contracts. Revenue is almost entirely transactional module sales; the company exited project development and is now a pure-play module manufacturer. A critical and distinctive feature is the U.S. Section 45X Advanced Manufacturing Production Tax Credit, which functions as a per-watt production subsidy (~$0.17/W for thin-film modules) recognised directly in gross profit, making reported margins structurally different from traditional manufacturers.",
+    "revenue_streams": [
+      {"name": "Module Sales (CdTe thin-film)", "percent": 95, "trend": "growing"},
+      {"name": "O&M / Other Services", "percent": 5, "trend": "declining"}
+    ]
+  },
+  "competitive_position": {
+    "main_competitors": ["JinkoSolar (JKS)", "LONGi Green Energy", "Canadian Solar (CSIQ)", "Trina Solar", "JA Solar", "Qcells (Hanwha)"],
+    "market_position": "Dominant producer of CdTe thin-film modules globally and the sole large-scale U.S.-headquartered module manufacturer.",
+    "moat_factors": [
+      {"factor": "Proprietary CdTe technology & IP", "strength": "strong", "description": "Decades of exclusive R&D in CdTe thin-film; 22.1%+ lab cell efficiency records. TOPCon patent portfolio enforced via ITC Section 337 investigations against 10 c-Si competitors."},
+      {"factor": "Domestic U.S. manufacturing & 45X tax credit", "strength": "very strong", "description": "~$0.17/W Section 45X credit per module produced — a structural cost advantage unavailable to import-dependent rivals. ~14 GW U.S. capacity by end-2026 generates ~$2.1–2.2B annually."},
+      {"factor": "Supply chain independence from China", "strength": "strong", "description": "CdTe uses cadmium telluride, not polysilicon or Chinese-sourced cells. Exempts First Solar from FEOC restrictions, anti-dumping/CVD duties, and Section 232 polysilicon tariffs."},
+      {"factor": "Long-term contracted backlog", "strength": "strong", "description": "47.9 GW / $14.4B contracted backlog as of Q1 2026, with U.S. domestic production substantially committed through 2028."},
+      {"factor": "Switching costs / customer stickiness", "strength": "moderate", "description": "Long-term supply contracts, engineering specs tied to CdTe performance, and domestic-content bonus qualification create meaningful customer stickiness."}
+    ],
+    "weaknesses": [
+      "Single-product (CdTe modules), single-customer-segment (utility-scale) concentration",
+      "CdTe efficiency (20-23%) trails leading monocrystalline TOPCon c-Si (24-26%)",
+      "Southeast Asia capacity structurally uncompetitive for U.S. export due to tariffs",
+      "45X credit concentration: majority of EBITDA is a government subsidy — binary policy risk",
+      "No residential or commercial rooftop exposure"
+    ]
+  },
+  "growth_drivers": [
+    "Capacity ramp to ~14 GW U.S. by end-2026 and ~17.7 GW U.S. by end-2027 (South Carolina finishing facility), driving ~17–18 GW sold in 2026",
+    "CuRe (Copper Replacement) technology adders: launched at Perrysburg 2026, offering up to 8% more lifetime specific energy yield vs. c-Si, with $600M of technology adjuster revenue in backlog primarily 2027–2028",
+    "Section 45X credits scaling from $1.6B (FY2025) to $2.1–2.2B (FY2026) and $2.5B+ by 2027 as U.S. capacity reaches 14–18 GW",
+    "Perovskite next-generation thin-film: 1 GW pilot line at Perrysburg targeted for 2027; Oxford PV licensing agreement and Evolar AB acquisition support tandem cell R&D",
+    "TOPCon patent monetisation: ITC Section 337 investigation against 10 c-Si module importers; exclusion order or licensing could reduce competition or generate royalties",
+    "Section 232 polysilicon tariff: pending presidential decision could impose substantial additional duties on Chinese-supply-chain modules, widening First Solar's cost advantage",
+    "India domestic market growth: Tamil Nadu 3.3 GW factory selling into Indian utility market; record Q1 2026 India sales",
+    "Data centre / AI power demand driving utility-scale renewable procurement by hyperscalers"
+  ],
+  "risks": {
+    "business": [
+      {"risk": "45X credit policy dependence", "severity": "high", "description": "45X credits account for an estimated majority of EBITDA. Preserved through OBBBA (signed July 4, 2025) with phase-down to 75% in 2030 and sunset in 2032. Any further legislative revision would materially impair profitability."},
+      {"risk": "Customer concentration in utility-scale market", "severity": "moderate", "description": "Sells exclusively to a small universe of large utility-scale developers and IPPs. Over 8 GW of clean power projects cancelled in Q1 2026 amid IRA uncertainty."},
+      {"risk": "ASP / pricing pressure", "severity": "moderate", "description": "Contracted backlog provides near-term price visibility, but new bookings are subject to market pricing. India sales at $0.20/W vs. U.S. at $0.34–0.35/W illustrate geographic pricing disparity."},
+      {"risk": "Technology obsolescence", "severity": "moderate", "description": "CdTe efficiency lags leading c-Si products. Rapid c-Si efficiency gains could erode the energy yield arguments for CdTe."},
+      {"risk": "Southeast Asia capacity stranded", "severity": "moderate", "description": "Malaysia and Vietnam facilities at reduced utilisation. South Carolina finishing facility designed to convert semi-finished SE Asia modules into 45X-qualifying product; ramp underway."}
+    ],
+    "regulatory": [
+      {"risk": "IRA / 45X credit legislative risk", "severity": "high", "description": "OBBBA phases 45X credits to 75% in 2030, 50% in 2031, 25% in 2032, then zero. Future Congresses could accelerate phase-down."},
+      {"risk": "Section 232 polysilicon tariff uncertainty", "severity": "moderate", "description": "Pending presidential decision on Section 232 investigation. Strong outcome is a significant bull catalyst; weak outcome disappoints bookings and sentiment."},
+      {"risk": "TOPCon patent litigation outcome", "severity": "moderate", "description": "ITC Section 337 investigation against 10 c-Si producers. China's CNIPA invalidated one core patent in May 2026. ITC determination expected 11–15 months from March 2026."}
+    ],
+    "macro": [
+      {"risk": "Tariff escalation / trade policy reversal", "severity": "moderate", "description": "First Solar benefits from existing trade protections. Reversal allowing low-cost Chinese c-Si modules into the U.S. market would undercut ASPs. Section 201 safeguard tariffs expired February 2026."},
+      {"risk": "Interconnection bottlenecks", "severity": "moderate", "description": "Interconnection queue delays and permitting slowdowns. 8+ GW cancelled in Q1 2026 could defer deliveries and reduce bookings pace."}
+    ]
+  },
+  "bull_case": [
+    "45X credit engine approaching peak output: ~14 GW U.S. by end-2026 and ~18 GW by 2027 could generate $2.4–2.5B annually — a near-permanent structural profit advantage unavailable to any import-dependent competitor.",
+    "Section 232 polysilicon tariff could be transformational: a strong 232 tariff would raise competitor cost structures dramatically, allow ASP increases, accelerate bookings, and fully utilise Southeast Asia capacity via the South Carolina finishing facility.",
+    "CuRe technology adders + TOPCon patent monetisation represent unrecognised upside: $600M in backlog technology adjusters (primarily 2027–2028); successful ITC exclusion order could eliminate or tax all competing imports.",
+    "Perovskite tandem cells could extend First Solar's technology leadership beyond the 2030s, with a 1 GW pilot in 2027 bridging current CdTe and next-gen products.",
+    "Strong balance sheet ($2.0B net cash) and no dividend obligation provide strategic optionality. At ~$225 (July 2026) the stock trades near the low end of the 52-week range."
+  ],
+  "bear_case": [
+    "45X dependence is a single-point-of-failure: ~75–80% of guided EBITDA is a U.S. government subsidy. Any legislative revision could rapidly collapse both the earnings multiple and earnings base simultaneously.",
+    "Securities class action lawsuit (filed June 2026) alleges management misled investors about tariff policy impacts and production utilisation risks during Feb 2025–Feb 2026.",
+    "Southeast Asia capacity carries significant optionality cost: Malaysia and Vietnam at reduced utilisation with no clear timeline; weak 232 outcome could necessitate permanent restructuring charges or facility write-downs.",
+    "Backlog replenishment rate is decelerating: annualised new signings of ~7–8 GW vs. ~17–18 GW sold means the backlog is being drawn down at 2–2.5x the replenishment rate — post-2028 revenue cliff risk.",
+    "CdTe efficiency (22–23%) trails leading c-Si products; if TOPCon or heterojunction competitors achieve >24% commercial module efficiency at competitive prices with FEOC-compliant supply chains, ASP premiums compress."
+  ],
+  "recent_developments": [
+    {"date": "2026-Q2", "event": "Securities class action lawsuit filed (June 23, 2026) in EDNY alleging misleading statements about tariff policy impacts; class period Feb 26, 2025 – Feb 24, 2026. Lead plaintiff deadline August 24, 2026."},
+    {"date": "2026-Q1", "event": "Q1 2026 record results: revenue $1.04B (+24% YoY), diluted EPS $3.22 (+65%), adjusted EBITDA $520M (50% margin). US facility utilisation 96%. Backlog 47.9 GW / $14.4B. FY2026 guidance reaffirmed."},
+    {"date": "2026-Q1", "event": "ITC Section 337 investigation instituted (March 2026) against 10 crystalline-silicon module manufacturers for TOPCon patent infringement. Determination expected in 11–15 months."},
+    {"date": "2026-Q1", "event": "CuRe (Copper Replacement) technology successfully launched at Perrysburg, Ohio. Offers up to 8% more lifetime specific energy yield vs. c-Si."},
+    {"date": "2026-Q1", "event": "China CNIPA invalidated First Solar's core TOPCon patent (all 17 claims) in May 2026 following JinkoSolar challenge. U.S. Patent & Trademark Office had rejected similar challenges in January 2026."},
+    {"date": "2025-Q4", "event": "Louisiana $1.1B AI-enabled 3.5 GW factory inaugurated November 2025 (ahead of schedule). U.S. nameplate capacity reached ~10.5 GW by end-2025, scaling to 14 GW by end-2026."},
+    {"date": "2025-Q4", "event": "FY2025 full year results: revenue $5.22B (+24% YoY), diluted EPS $14.21, gross margin ~41%. Section 45X credits of ~$1.6B recognised."},
+    {"date": "2025-H2", "event": "One Big Beautiful Bill Act (OBBBA) signed July 4, 2025. Section 45X manufacturing credits preserved through 2032 (phase to 75% in 2030, 50% in 2031, 25% in 2032)."},
+    {"date": "2026-H1", "event": "Oxford PV licensing agreement signed for perovskite tandem technology; 1 GW perovskite pilot line at Perrysburg targeted for 2027."},
+    {"date": "2026-H1", "event": "South Carolina finishing facility in Gaffney under construction (equipment installation underway Q1 2026); designed to process SE Asia semi-finished modules into 45X-qualifying domestic product; full ramp 2027."}
+  ],
+  "guidance": {
+    "as_of": "Q1 2026 Earnings (April 30, 2026)",
+    "fiscal_year": "FY2026",
+    "items": [
+      {"metric": "Net Sales", "target": "$4.9B–$5.2B", "period": "FY2026", "vs_prior": "maintained", "notes": "Reaffirmed from Q4 2025 earnings. Modest decline vs. FY2025 $5.22B at midpoint, reflecting SE Asia underutilisation and timing of domestic capacity ramp."},
+      {"metric": "Adjusted EBITDA", "target": "$2.6B–$2.8B", "period": "FY2026", "vs_prior": "raised", "notes": "Upper end raised at Q1 2026; reflects improved gross margin from CuRe adders and 45X credit growth."},
+      {"metric": "Gross Profit", "target": "$2.4B–$2.6B (~49.5% gross margin)", "period": "FY2026", "vs_prior": "raised", "notes": "Includes $2.10B–$2.19B of Section 45X tax credits and $115M–$155M of ramp and underutilisation charges."},
+      {"metric": "Section 45X Tax Credits", "target": "$2.10B–$2.19B", "period": "FY2026", "vs_prior": "raised", "notes": "Significant YoY increase reflecting ramp of Alabama and Louisiana U.S. factories. Q2 2026 45X guidance $330M–$400M."},
+      {"metric": "Volume Sold", "target": "17.0–18.2 GW", "period": "FY2026", "vs_prior": "maintained", "notes": "Up from ~16 GW in FY2025. U.S. production ~3 GW/quarter; international ~1.3 GW/quarter at reduced utilisation."},
+      {"metric": "Diluted EPS", "target": "$14.00–$15.00", "period": "FY2026", "vs_prior": "maintained", "notes": "Management cited Pillar Two global minimum tax uncertainty as caveat; EBITDA is primary guided metric."},
+      {"metric": "Capital Expenditures", "target": "$0.8B–$1.0B", "period": "FY2026", "vs_prior": "maintained", "notes": "Primarily toward South Carolina finishing facility and Ohio R&D (perovskite pilot). Step-down from peak capex cycle (~$1.5B in FY2024)."},
+      {"metric": "Net Cash (Year-End)", "target": "$1.7B–$2.3B", "period": "FY2026", "vs_prior": "maintained", "notes": "Q1 2026 net cash $2.0B at high end. Operating cash outflow in Q1 driven by working capital, not earnings quality."},
+      {"metric": "R&D Expense", "target": "$285M–$290M", "period": "FY2026", "vs_prior": "raised", "notes": "Includes ~$100M of perovskite development costs; elevated vs. prior years."},
+      {"metric": "Q2 2026 Adjusted EBITDA", "target": "$400M–$500M", "period": "Q2 2026", "vs_prior": "new", "notes": "Step-down from Q1's $520M reflecting international underutilisation charges expected sequentially."}
+    ],
+    "management_commentary": "CEO Mark Widmar highlighted that differentiated CdTe technology, domestic manufacturing, and supply chain independence from China are 'increasingly valued by customers.' The company described domestic production as 'substantially committed through 2028,' enabling pricing selectivity in new bookings. Management expressed willingness to enter licensing discussions with any party using First Solar's TOPCon IP, including Tesla. On Southeast Asia, management characterised outcomes as ranging from 'full capacity operation to possible shutdown' depending on the Section 232 tariff decision."
+  }
+};
+
+// ============================================================
+// EMBEDDED DCF JSON
+// ============================================================
+const dcfData = {
+  "ticker": "FSLR",
+  "company_name": "First Solar, Inc.",
+  "valuation_date": "2026-07-06",
+  "current_price": 224.57,
+  "inputs": {
+    "shares_outstanding": 107.3,
+    "cash": 2803.5,
+    "total_debt": 498.8,
+    "net_debt": -2304.7,
+    "last_fcf": 1200.0,
+    "currency": "USD",
+    "units": "millions"
+  },
+  "historical_growth": {
+    "revenue_3yr_cagr": 25.84,
+    "revenue_5yr_cagr": 14.00,
+    "eps_3yr_cagr": null,
+    "eps_5yr_cagr": 30.67,
+    "equity_3yr_cagr": 17.79,
+    "equity_5yr_cagr": 11.56,
+    "fcf_3yr_cagr": null,
+    "fcf_5yr_cagr": null,
+    "selected_growth_rate": 11.56,
+    "growth_rate_source": "equity_5yr_cagr",
+    "growth_divergence_warning": null
+  },
+  "assumptions": {
+    "base": {
+      "growth_rates": [15, 20, 15, 8, 5],
+      "growth_narrative": "Y1 +15%: FY2026 capacity ramp to 14 GW US (Alabama ramp + Louisiana full-year), CuRe technology launch. Y2 +20%: FY2027 full 14 GW + South Carolina finishing facility beginning to contribute, CuRe adders from backlog ($600M through 2028), 45X credits reaching ~$2.4–2.5B. Y3 +15%: US capacity approaching 17.7 GW, India volume growth. Y4 +8%: 45X phase-down begins (75% of full credit from 2030), moderation. Y5 +5%: Steady-state deceleration toward terminal.",
+      "fcf_margin": 23.0,
+      "wacc": 11,
+      "terminal_growth": 2.5
+    },
+    "bull": {
+      "growth_rates": [25, 28, 20, 12, 8],
+      "growth_narrative": "Strong Section 232 polysilicon tariff drives US market pricing power and accelerates bookings. ITC TOPCon patent exclusion order reduces competition. 45X credits preserved and growing toward $2.5B+. Southeast Asia capacity fully utilised via SC finishing facility. Perovskite pilot validates next-gen roadmap.",
+      "fcf_margin": 27.0,
+      "wacc": 9,
+      "terminal_growth": 2.5
+    },
+    "bear": {
+      "growth_rates": [5, 5, 0, -5, -5],
+      "growth_narrative": "Partial 45X erosion: future legislation reduces effective credit by 20–30%. Weak 232 outcome; SE Asia stays underutilised with write-downs. Securities class action creates management distraction. Booking pace declines — post-2028 revenue cliff materialises earlier than expected.",
+      "fcf_margin": 15.0,
+      "wacc": 13,
+      "terminal_growth": 1.5
+    }
+  },
+  "valuation": {
+    "base": {"intrinsic_value": 227.19, "upside": 1.2},
+    "bull": {"intrinsic_value": 366.04, "upside": 63.0},
+    "bear": {"intrinsic_value": 116.61, "upside": -48.1}
+  },
+  "entry_price": {
+    "base": {"entry_price": 120.67, "entry_discount_from_current": -46.3},
+    "bull": {"entry_price": 203.63},
+    "bear": {"entry_price": 48.83}
+  },
+  "sensitivity": {
+    "wacc_range": [8, 9, 10, 11, 12],
+    "terminal_growth_range": [1.5, 2.0, 2.5, 3.0, 3.5],
+    "matrix": [
+      [302, 321, 344, 371, 404],
+      [264, 277, 293, 311, 333],
+      [234, 244, 256, 269, 284],
+      [211, 219, 227, 237, 248],
+      [192, 198, 205, 212, 221]
+    ]
+  },
+  "probability_weighted": {
+    "weights": {"bull": 0.25, "base": 0.50, "bear": 0.25},
+    "weighted_iv": 234.26
+  },
+  "key_model_notes": [
+    "45X credit dependency: ~75–80% of FY2026 guided EBITDA is the Section 45X manufacturing credit ($2.1–2.2B). This is a LEGISLATIVE SINGLE-POINT-OF-FAILURE — WACC carries a +1.5% premium in base case and +2.5% in bear case to price this structural risk.",
+    "Backlog provides revenue visibility through 2030 (47.9 GW / $14.4B contracted as of Q1 2026), but replenishment rate (~7–8 GW/yr new bookings vs 17–18 GW/yr sold) implies post-2028 revenue cliff risk if booking pace does not recover.",
+    "45X phase-down in OBBBA: credits reduce to 75% in 2030, 50% in 2031, 25% in 2032, then zero. This drives FCF compression in Y4–Y5 of base case and informs the below-consensus terminal growth rate of 2.5%.",
+    "FCF CAGR historically is not computable (negative for FY2016–FY2024 due to deliberate $5B+ capacity expansion). FY2025 $1,187M FCF is the first normalised year; $1,200M DCF base validated against guided FY2026 EBITDA $2.6–2.8B less guided capex $0.8–1.0B.",
+    "Net cash position of $2,304.7M is added to enterprise value, materially boosting intrinsic value vs. a leveraged peer. Total debt is primarily the India manufacturing facility credit."
+  ]
+};
+
+// ============================================================
+// CSV PARSER
+// ============================================================
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => obj[h.trim()] = values[i] ? values[i].trim() : '');
+        return obj;
+    });
+}
+
+const allData = parseCSV(csvData);
+
+// Sort helper
+function parseDate(p) {
+    const year = parseInt(p.match(/\d{4}/)?.[0] || '0');
+    const isQ1 = p.includes('Q1'), isQ2 = p.includes('Q2'), isQ3 = p.includes('Q3'), isQ4 = p.includes('Q4');
+    const isH1 = p.includes('H1'), isH2 = p.includes('H2');
+    const isFY = p.startsWith('FY');
+    const sub = isQ1 ? 1 : isQ2 ? 2 : isH1 ? 3 : isQ3 ? 4 : isQ4 ? 5 : isH2 ? 6 : isFY ? 7 : 0;
+    return year * 10 + sub;
+}
+allData.sort((a, b) => parseDate(a.Period) - parseDate(b.Period));
+
+const fyData = allData.filter(d => d.Period.startsWith('FY'));
+const qData = allData.filter(d => d.Period.startsWith('Q'));
+
+// ============================================================
+// COLOUR PALETTE & CHART DEFAULTS
+// ============================================================
+const colors = {
+    primary: '#00d4aa',
+    secondary: '#00b894',
+    tertiary: '#0984e3',
+    quaternary: '#6c5ce7',
+    warning: '#fdcb6e',
+    danger: '#ff6b6b'
+};
+
+Chart.defaults.color = '#888';
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+
+function baseScales(yLabel) {
+    return {
+        x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' }, title: yLabel ? { display: true, text: yLabel, color: '#666' } : undefined }
+    };
+}
+
+function baseOpts(yLabel) {
+    return {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { labels: { color: '#e0e0e0', font: { size: 11 } } },
+            tooltip: { mode: 'index', intersect: false }
+        },
+        scales: baseScales(yLabel)
+    };
+}
+
+// ============================================================
+// INVESTMENT OVERVIEW
+// ============================================================
+function renderOverview() {
+    const grid = document.getElementById('overviewGrid');
+    const a = analysis;
+
+    // Revenue streams
+    const streamsHtml = a.business_model.revenue_streams.map(s => `
+        <li><span class="revenue-stream">
+            <span>${s.name}</span>
+            <span><span class="percent">${s.percent}%</span> <span class="trend-${s.trend}">[${s.trend}]</span></span>
+        </span></li>`).join('');
+
+    // Moat factors
+    const moatHtml = (a.competitive_position.moat_factors || []).map(m =>
+        `<li><strong>${m.factor}</strong> <span class="risk-${m.strength === 'very strong' ? 'low' : m.strength === 'strong' ? 'low' : 'moderate'}">[${m.strength}]</span> — ${m.description}</li>`
+    ).join('');
+
+    // All risk categories merged
+    const allRisks = [
+        ...(a.risks.business || []),
+        ...(a.risks.regulatory || []),
+        ...(a.risks.financial || []),
+        ...(a.risks.macro || [])
+    ];
+    const risksHtml = allRisks.map(r =>
+        `<li><span class="risk-${r.severity.startsWith('high') ? 'high' : r.severity.startsWith('low') ? 'low' : 'moderate'}">[${r.severity}]</span> <strong>${r.risk}</strong> — ${r.description}</li>`
+    ).join('');
+
+    const growthHtml = (a.growth_drivers || []).map(g => `<li>${g}</li>`).join('');
+    const bullHtml = (a.bull_case || []).map(b => `<li>${b}</li>`).join('');
+    const bearHtml = (a.bear_case || []).map(b => `<li>${b}</li>`).join('');
+    const weaknessHtml = (a.competitive_position.weaknesses || []).map(w => `<li>${w}</li>`).join('');
+    const recentHtml = (a.recent_developments || []).map(r =>
+        `<li><strong>${r.date}:</strong> ${r.event}</li>`
+    ).join('');
+
+    grid.innerHTML = `
+        <div class="overview-card">
+            <h3>Company Overview</h3>
+            <p>${a.overview}</p>
+        </div>
+        <div class="overview-card">
+            <h3>Business Model</h3>
+            <p>${a.business_model.summary}</p>
+            <ul>${streamsHtml}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Competitive Position</h3>
+            <p><strong>Competitors:</strong> ${a.competitive_position.main_competitors.join(', ')}</p>
+            <p><strong>Moat Factors:</strong></p>
+            <ul>${moatHtml}</ul>
+            <p style="margin-top:12px;"><strong>Weaknesses:</strong></p>
+            <ul>${weaknessHtml}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Growth Drivers</h3>
+            <ul>${growthHtml}</ul>
+        </div>
+        <div class="overview-card risks">
+            <h3>Key Risks</h3>
+            <ul>${risksHtml}</ul>
+        </div>
+        <div class="overview-card bull">
+            <h3>Bull Case</h3>
+            <ul>${bullHtml}</ul>
+        </div>
+        <div class="overview-card bear">
+            <h3>Bear Case</h3>
+            <ul>${bearHtml}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Recent Developments</h3>
+            <ul>${recentHtml}</ul>
+        </div>
+    `;
+}
+
+function toggleOverview() {
+    const btn = document.querySelector('.overview-toggle');
+    const content = document.getElementById('overviewContent');
+    btn.classList.toggle('active');
+    content.classList.toggle('active');
+}
+
+// ============================================================
+// KPI CARDS
+// ============================================================
+function fmtM(v) {
+    const n = parseFloat(v);
+    if (isNaN(n)) return 'N/A';
+    if (Math.abs(n) >= 1000) return '$' + (n / 1000).toFixed(2) + 'B';
+    return '$' + n.toFixed(0) + 'M';
+}
+function fmtPct(v) { return parseFloat(v).toFixed(1) + '%'; }
+function fmtEPS(v) { return '$' + parseFloat(v).toFixed(2); }
+function calcYoY(cur, prev) {
+    if (!prev || !cur || parseFloat(prev) === 0) return null;
+    return ((parseFloat(cur) - parseFloat(prev)) / Math.abs(parseFloat(prev)) * 100).toFixed(1);
+}
+
+function renderKPIs() {
+    const fy25 = fyData.find(d => d.Period === 'FY2025');
+    const fy24 = fyData.find(d => d.Period === 'FY2024');
+
+    const kpis = [
+        { label: 'Revenue', value: fmtM(fy25.Revenue), yoy: calcYoY(fy25.Revenue, fy24.Revenue), modal: 'revenue' },
+        { label: 'Net Income', value: fmtM(fy25.NetIncome), yoy: calcYoY(fy25.NetIncome, fy24.NetIncome), modal: 'netIncome' },
+        { label: 'Diluted EPS', value: fmtEPS(fy25.EPS), yoy: calcYoY(fy25.EPS, fy24.EPS), modal: 'eps' },
+        { label: 'Gross Margin', value: fmtPct(fy25.GrossMargin), yoy: (parseFloat(fy25.GrossMargin) - parseFloat(fy24.GrossMargin)).toFixed(1) + 'pp', isRaw: true, modal: 'grossMargin' },
+        { label: 'Free Cash Flow', value: fmtM(fy25.FreeCashFlow), yoy: null, sub: 'First +ve year post-buildout', modal: 'fcf' },
+        { label: "Shareholders' Equity", value: fmtM(fy25.ShareholdersEquity), yoy: calcYoY(fy25.ShareholdersEquity, fy24.ShareholdersEquity), modal: 'equity' }
+    ];
+
+    const grid = document.getElementById('kpiGrid');
+    grid.innerHTML = kpis.map(k => {
+        let changeHtml = '';
+        if (k.isRaw && k.yoy) {
+            const isPos = parseFloat(k.yoy) >= 0;
+            changeHtml = `<div class="kpi-change ${isPos ? 'positive' : 'negative'}">${isPos ? '+' : ''}${k.yoy} YoY</div>`;
+        } else if (k.yoy !== null && k.yoy !== undefined) {
+            const isPos = parseFloat(k.yoy) >= 0;
+            changeHtml = `<div class="kpi-change ${isPos ? 'positive' : 'negative'}">${isPos ? '+' : ''}${k.yoy}% YoY</div>`;
+        }
+        const subHtml = k.sub ? `<div class="kpi-sub">${k.sub}</div>` : '';
+        return `<div class="kpi-card" onclick="openModal('${k.modal}')" style="cursor:pointer;">
+            <div class="kpi-value">${k.value}</div>
+            <div class="kpi-label">${k.label}</div>
+            ${changeHtml}
+            ${subHtml}
+        </div>`;
+    }).join('');
+}
+
+// ============================================================
+// GUIDANCE
+// ============================================================
+function renderGuidance() {
+    const g = analysis.guidance;
+    if (!g || !g.items || g.items.length === 0) {
+        document.getElementById('guidanceSection').style.display = 'none';
+        return;
+    }
+    document.getElementById('guidanceAsOf').textContent = g.as_of || '';
+    document.getElementById('guidanceFY').textContent = g.fiscal_year || '';
+
+    const grid = document.getElementById('guidanceGrid');
+    grid.innerHTML = g.items.map(item => {
+        const rawVs = (item.vs_prior || 'new').toLowerCase();
+        const vsClass = rawVs.startsWith('raised') ? 'raised' : rawVs.startsWith('lower') ? 'lowered' : rawVs === 'maintained' ? 'maintained' : 'new';
+        const vsLabel = vsClass.charAt(0).toUpperCase() + vsClass.slice(1);
+        return `<div class="guidance-card">
+            <div class="guidance-metric">${item.metric}</div>
+            <div class="guidance-target">${item.target}</div>
+            <div class="guidance-period">${item.period}</div>
+            <span class="guidance-vs-prior ${vsClass}">${vsLabel}</span>
+            ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+        </div>`;
+    }).join('');
+
+    const comm = document.getElementById('guidanceCommentary');
+    if (g.management_commentary) {
+        comm.textContent = g.management_commentary;
+        comm.style.display = 'block';
+    } else {
+        comm.style.display = 'none';
+    }
+}
+
+// ============================================================
+// CHARTS
+// ============================================================
+function renderCharts() {
+    const fyLabels = fyData.map(d => d.Period.replace('FY', 'FY '));
+
+    // 1. Revenue + Net Income combo
+    new Chart(document.getElementById('revenueNetIncomeChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                {
+                    label: 'Revenue ($M)',
+                    data: fyData.map(d => parseFloat(d.Revenue)),
+                    backgroundColor: 'rgba(0,212,170,0.6)',
+                    borderColor: colors.primary,
+                    borderWidth: 1,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Net Income ($M)',
+                    data: fyData.map(d => parseFloat(d.NetIncome)),
+                    type: 'line',
+                    borderColor: colors.warning,
+                    backgroundColor: 'rgba(253,203,110,0.15)',
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    fill: false,
+                    tension: 0.3,
+                    yAxisID: 'y2'
+                }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } }, tooltip: { mode: 'index', intersect: false } },
+            scales: {
+                x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' }, title: { display: true, text: 'Revenue ($M)', color: '#666' } },
+                y2: { position: 'right', ticks: { color: '#888' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Net Income ($M)', color: '#666' } }
+            }
+        }
+    });
+
+    // 2. Gross Margin %
+    const gmColors = fyData.map(d => {
+        const gm = parseFloat(d.GrossMargin);
+        if (gm < 10) return 'rgba(255,107,107,0.8)';
+        if (gm < 25) return 'rgba(253,203,110,0.8)';
+        return 'rgba(0,212,170,0.8)';
+    });
+    new Chart(document.getElementById('grossMarginChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'Gross Margin %',
+                data: fyData.map(d => parseFloat(d.GrossMargin)),
+                backgroundColor: gmColors,
+                borderColor: gmColors.map(c => c.replace('0.8', '1')),
+                borderWidth: 1
+            }]
+        },
+        options: {
+            ...baseOpts('Gross Margin %'),
+            plugins: {
+                legend: { labels: { color: '#e0e0e0', font: { size: 11 } } },
+                tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1) + '%' } },
+                annotation: {
+                    annotations: {
+                        line22: {
+                            type: 'line',
+                            yMin: 2.7, yMax: 2.7,
+                            borderColor: '#ff6b6b',
+                            borderWidth: 1,
+                            borderDash: [4, 4]
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // 3. EPS
+    const epsColors = fyData.map(d => parseFloat(d.EPS) >= 0 ? 'rgba(0,212,170,0.7)' : 'rgba(255,107,107,0.7)');
+    new Chart(document.getElementById('epsChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'Diluted EPS ($)',
+                data: fyData.map(d => parseFloat(d.EPS)),
+                backgroundColor: epsColors,
+                borderColor: epsColors.map(c => c.replace('0.7', '1')),
+                borderWidth: 1
+            }]
+        },
+        options: {
+            ...baseOpts('EPS ($)'),
+            plugins: {
+                legend: { labels: { color: '#e0e0e0', font: { size: 11 } } },
+                tooltip: { callbacks: { label: ctx => 'EPS: $' + ctx.parsed.y.toFixed(2) } }
+            }
+        }
+    });
+
+    // 4. FCF
+    const fcfColors = fyData.map(d => parseFloat(d.FreeCashFlow) >= 0 ? 'rgba(0,212,170,0.75)' : 'rgba(255,107,107,0.6)');
+    new Chart(document.getElementById('fcfChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'Free Cash Flow ($M)',
+                data: fyData.map(d => parseFloat(d.FreeCashFlow)),
+                backgroundColor: fcfColors,
+                borderColor: fcfColors.map(c => c.replace('0.75', '1').replace('0.6', '1')),
+                borderWidth: 1
+            }]
+        },
+        options: {
+            ...baseOpts('FCF ($M)'),
+            plugins: {
+                legend: { labels: { color: '#e0e0e0', font: { size: 11 } } },
+                tooltip: { callbacks: { label: ctx => 'FCF: $' + ctx.parsed.y.toFixed(0) + 'M' } }
+            }
+        }
+    });
+
+    // ---- QUARTERLY CHARTS ----
+    const qLabels = qData.map(d => d.Period);
+
+    // 5. Quarterly Revenue
+    new Chart(document.getElementById('quarterlyRevenueChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: qLabels,
+            datasets: [{
+                label: 'Revenue ($M)',
+                data: qData.map(d => parseFloat(d.Revenue)),
+                borderColor: colors.primary,
+                backgroundColor: 'rgba(0,212,170,0.1)',
+                borderWidth: 2,
+                pointRadius: 4,
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: baseOpts('Revenue ($M)')
+    });
+
+    // 6. Quarterly EPS
+    const qEpsColors = qData.map(d => parseFloat(d.EPS) >= 0 ? colors.primary : colors.danger);
+    new Chart(document.getElementById('quarterlyEpsChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: qLabels,
+            datasets: [{
+                label: 'Diluted EPS ($)',
+                data: qData.map(d => parseFloat(d.EPS)),
+                backgroundColor: qData.map(d => parseFloat(d.EPS) >= 0 ? 'rgba(0,212,170,0.7)' : 'rgba(255,107,107,0.7)'),
+                borderColor: qEpsColors,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            ...baseOpts('EPS ($)'),
+            plugins: {
+                legend: { labels: { color: '#e0e0e0', font: { size: 11 } } },
+                tooltip: { callbacks: { label: ctx => 'EPS: $' + ctx.parsed.y.toFixed(2) } }
+            }
+        }
+    });
+
+    // 7. Quarterly Gross Margin
+    new Chart(document.getElementById('quarterlyGrossMarginChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: qLabels,
+            datasets: [{
+                label: 'Gross Margin %',
+                data: qData.map(d => parseFloat(d.GrossMargin)),
+                borderColor: colors.tertiary,
+                backgroundColor: 'rgba(9,132,227,0.1)',
+                borderWidth: 2,
+                pointRadius: 4,
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            ...baseOpts('Gross Margin %'),
+            plugins: {
+                legend: { labels: { color: '#e0e0e0', font: { size: 11 } } },
+                tooltip: { callbacks: { label: ctx => ctx.parsed.y.toFixed(1) + '%' } }
+            }
+        }
+    });
+
+    // 8. Shareholders' Equity (annual)
+    new Chart(document.getElementById('equityChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: "Shareholders' Equity ($M)",
+                data: fyData.map(d => parseFloat(d.ShareholdersEquity)),
+                borderColor: colors.quaternary,
+                backgroundColor: 'rgba(108,92,231,0.1)',
+                borderWidth: 2,
+                pointRadius: 4,
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: baseOpts("Equity ($M)")
+    });
+}
+
+// ============================================================
+// METRIC DESCRIPTIONS (Help Modals)
+// ============================================================
+const metricDescriptions = {
+    revenue: {
+        title: "Revenue",
+        content: `
+            <p><strong>Revenue</strong> is the total net sales from First Solar's module manufacturing business.</p>
+            <div class="metric-highlight">
+                <strong>For First Solar:</strong> Revenue is almost entirely transactional module sales to utility-scale solar developers under long-term fixed-volume contracts. The company exited project development and is now a pure-play manufacturer. FY2025 revenue was $5.22B, up 24% YoY.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Revenue is driven by GW of modules sold multiplied by average selling price (ASP). In FY2025 FSLR sold ~16 GW; FY2026 guide is 17.0–18.2 GW.</li>
+                <li>U.S. ASPs (~$0.34–0.35/W) are substantially higher than India (~$0.20/W) or global market (~$0.08–0.10/W), reflecting trade protection.</li>
+                <li>47.9 GW / $14.4B contracted backlog (as of Q1 2026) provides visibility through 2030, but new bookings are running below sell-through rate — watch quarterly bookings disclosures.</li>
+                <li>FY2026 guidance of $4.9B–$5.2B represents a modest step-down at midpoint, reflecting Southeast Asia underutilisation during the South Carolina facility ramp.</li>
+            </ul>
+        `
+    },
+    netIncome: {
+        title: "Net Income",
+        content: `
+            <p><strong>Net Income</strong> is total earnings after all costs, interest, and taxes.</p>
+            <div class="metric-highlight">
+                <strong>For First Solar:</strong> Net income surged from a near-breakeven -$44M in FY2022 to $830M (FY2023), $1,292M (FY2024), and $1,528M (FY2025). This trajectory is primarily driven by the Section 45X Advanced Manufacturing Production Tax Credit, which is recognised directly in gross profit (~$0.17/W on U.S.-produced modules).
+            </div>
+            <div class="warning-highlight">
+                <strong>Key context:</strong> The 45X credit accounts for an estimated 75–80% of guided FY2026 EBITDA ($2.1–2.2B of $2.6–2.8B). Net income is therefore highly sensitive to legislative changes — far more than a typical manufacturer.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Pillar Two global minimum tax uncertainty is why management withheld EPS guidance at Q4 2025 earnings but reinstated it at Q1 2026 ($14.00–$15.00).</li>
+                <li>45X credits are monetised via tax credit transfer agreements at ~$0.955 on the dollar — a 4.5% discount to face value.</li>
+                <li>FY2022's near-zero net income (-$44M) reflected rising input costs and supply chain disruptions before 45X credits took effect — not a structural problem.</li>
+            </ul>
+        `
+    },
+    grossMargin: {
+        title: "Gross Margin % — Cyclicality & 45X Context",
+        content: `
+            <p><strong>Gross Margin</strong> is gross profit as a percentage of revenue. For First Solar, this includes the Section 45X production tax credit recognised as a direct reduction to cost of sales.</p>
+            <div class="metric-highlight">
+                <strong>The 45X effect:</strong> Before the 45X credit (FY2022 and prior), First Solar's gross margin ranged from 17–25%. The credit added ~15–20 percentage points of structural margin. FY2026 guidance is ~49.5% gross margin — more than double the pre-45X baseline.
+            </div>
+            <div class="warning-highlight">
+                <strong>FY2022 collapse (2.7%):</strong> Not a business failure — cost inflation from supply chain disruptions, rising glass and transportation costs, and project delivery timing compressed margins sharply in one year. The recovery to 39% in FY2023 as 45X credits began flowing was dramatic.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Gross margin above 40% is achievable with full U.S. capacity utilisation and healthy 45X flows.</li>
+                <li>Watch ramp and underutilisation charges ($115M–$155M guided for FY2026) which reflect Southeast Asia facilities running below capacity.</li>
+                <li>CuRe technology adder revenue (from backlog) will begin boosting margins in H2 2026 through 2028.</li>
+                <li>45X phase-down from 2030 (75%, 50%, 25%, zero by 2033) will compress gross margins post-2030 unless offset by ASP increases or cost reductions.</li>
+            </ul>
+        `
+    },
+    eps: {
+        title: "Diluted EPS",
+        content: `
+            <p><strong>Diluted EPS</strong> is net income attributable to common shareholders divided by fully diluted share count.</p>
+            <div class="metric-highlight">
+                <strong>For First Solar:</strong> EPS went from -$4.05 (FY2016) through multiple loss years to $14.21 in FY2025 — a remarkable recovery driven by the 45X credit ramp and capacity build-out completing. FY2026 guidance is $14.00–$15.00.
+            </div>
+            <p><strong>Historical context:</strong></p>
+            <ul>
+                <li>Losses in FY2016, FY2017, FY2019 reflected project-development write-downs and the transition to a pure-play manufacturer.</li>
+                <li>FY2022's -$0.41 EPS was a single-year cost shock, not structural deterioration.</li>
+                <li>The 5-year EPS CAGR (FY2020–FY2025) is ~30%, but this is somewhat flattered by the 45X credit ramp. Equity CAGR (11.6%) is a more conservative anchor for the DCF.</li>
+                <li>Share count has been extremely stable (~104–107M diluted shares over 10 years) — FSLR does not dilute shareholders significantly and does not currently buy back shares.</li>
+            </ul>
+        `
+    },
+    fcf: {
+        title: "Free Cash Flow — Understanding the Buildout Context",
+        content: `
+            <p><strong>Free Cash Flow</strong> is operating cash flow minus capital expenditures. Positive FCF = the business is generating cash above maintenance and growth investment.</p>
+            <div class="warning-highlight">
+                <strong>CRITICAL CONTEXT:</strong> First Solar's FCF was negative in FY2016–FY2021 and FY2023–FY2024. This was NOT a sign of financial distress. The company was deliberately investing $5B+ in new manufacturing capacity across four Ohio plants, Alabama, Louisiana, and Tamil Nadu, India. Peak capex was $1.53B in FY2024.
+            </div>
+            <div class="metric-highlight">
+                <strong>FY2025 breakout:</strong> FCF turned strongly positive (+$1,187M) in FY2025 as the buildout completed and capex normalised to $0.87B. This is the first normalised year and is the base for the DCF model. FY2026 capex guidance is $0.8–1.0B (primarily South Carolina finishing facility), substantially lower than peak.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>FY2026 FCF will be lower than FY2025 due to South Carolina finishing facility capex and working capital timing.</li>
+                <li>The Q1 2025 and Q1 2026 operating cash outflows (-$608M and -$215M respectively) reflect working capital build, not earnings weakness — CFO explicitly confirmed this.</li>
+                <li>Once South Carolina ramp completes (2027), FCF should sustainably exceed $1.5B+ per year at base case assumptions.</li>
+                <li>Historical FCF CAGR is not meaningful for valuation purposes due to the negative base years — the DCF uses a $1,200M normalised FCF base.</li>
+            </ul>
+        `
+    },
+    qRevenue: {
+        title: "Quarterly Revenue",
+        content: `
+            <p>Quarterly revenue shows the within-year seasonality and sequential growth trajectory of First Solar's module deliveries.</p>
+            <div class="metric-highlight">
+                <strong>Seasonality pattern:</strong> Q4 is typically the strongest quarter as developers accelerate project completion before year-end (tax credit deadlines, construction windows). Q1 is often the weakest. FY2024's Q4 ($1.51B) and FY2025's Q4 ($1.68B) both show this pattern clearly.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Q1 2026 revenue of $1.04B was +24% YoY — strong despite the seasonal dip, driven by record U.S. facility utilisation (96%) and growing India sales.</li>
+                <li>FY2026 guidance of $4.9–5.2B implies quarterly average of ~$1.2–1.3B with H2 weighting (Alabama ramp + SC facility contribution).</li>
+                <li>Watch for any guidance downgrades if Southeast Asia underutilisation is worse than modelled or if project cancellations accelerate.</li>
+            </ul>
+        `
+    },
+    qEps: {
+        title: "Quarterly Diluted EPS",
+        content: `
+            <p>Quarterly EPS tracks the earnings power of the business at a granular level and reveals whether the annual trajectory is sustainable.</p>
+            <div class="metric-highlight">
+                <strong>For First Solar:</strong> Quarterly EPS has grown from $0.40 (Q1 2023) to $3.22 (Q1 2026), reflecting the progressive ramp of U.S. manufacturing capacity and 45X credit accruals.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Q4 typically shows the highest EPS due to revenue seasonality (FY2025 Q4: $4.84).</li>
+                <li>Q2 2026 EBITDA guidance of $400M–$500M (vs. Q1's $520M) implies some sequential moderation from international underutilisation charges.</li>
+                <li>Full-year FY2026 EPS guidance of $14.00–$15.00 implies roughly flat to FY2025 ($14.21) — the 45X credit growth is largely offset by ramp costs and R&D investment in perovskite.</li>
+                <li>EPS can be volatile quarter-to-quarter due to timing of 45X credit recognition, volume mix (U.S. vs. India), and technology adjuster deliveries.</li>
+            </ul>
+        `
+    },
+    qGrossMargin: {
+        title: "Quarterly Gross Margin %",
+        content: `
+            <p>Quarterly gross margin shows how module pricing, product mix (CuRe vs. standard), geographic mix (U.S. vs. India), and 45X credit timing interact within each quarter.</p>
+            <div class="metric-highlight">
+                <strong>Q3 2024 peak (50.2%):</strong> The highest reported gross margin reflects high U.S. production utilisation, favourable mix, and 45X credits flowing fully. FY2026 guidance of ~49.5% implies a sustained improvement from FY2025's 40.6%.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Ramp and underutilisation charges from Southeast Asia factories can suppress margin in any quarter by $30–50M.</li>
+                <li>CuRe technology adders (higher revenue per GW) will begin flowing through in H2 2026 and accelerate in 2027–2028, supporting gross margin expansion.</li>
+                <li>India gross margin is structurally lower (India ASP ~$0.20/W vs. U.S. ~$0.34/W) and no 45X credits apply — watch India volume mix carefully.</li>
+            </ul>
+        `
+    },
+    equity: {
+        title: "Shareholders' Equity",
+        content: `
+            <p><strong>Shareholders' Equity</strong> is the book value of the business — assets minus liabilities. It represents the theoretical liquidation value attributable to common shareholders and is the anchor for book value per share (P/B ratio).</p>
+            <div class="metric-highlight">
+                <strong>For First Solar:</strong> Equity has grown consistently from $5.1B (FY2017) to $9.5B (FY2025) — an 11.6% 5-year CAGR. This steady growth without the distortion of buybacks (FSLR does not buy back shares aggressively) makes equity CAGR a reliable growth anchor for the DCF model.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Book value per share is ~$88.89 (FY2025) vs. current price ~$225 — P/B of ~2.5x. The DCF model implies 2.56x P/B, consistent with historical range (avg 1.83x, max 2.94x).</li>
+                <li>The steady equity accumulation reflects a capital-intensive manufacturing business investing heavily in factory infrastructure — not a capital-light software model.</li>
+                <li>Equity would compress if 45X credits are reduced and retained earnings decline; watch for any commentary on capital return plans (dividends or buybacks).</li>
+                <li>The $2.3B net cash position ($2.8B gross cash, $0.5B debt) is embedded in the equity figure and drives the DCF's net cash adjustment.</li>
+            </ul>
+        `
+    }
+};
+
+function openModal(key) {
+    const desc = metricDescriptions[key];
+    if (!desc) return;
+    document.getElementById('modalTitle').textContent = desc.title;
+    document.getElementById('modalBody').innerHTML = desc.content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ============================================================
+// DCF SECTION
+// ============================================================
+function formatDCFNum(n) {
+    const abs = Math.abs(n);
+    if (abs >= 1000) return '$' + (n / 1000).toFixed(1) + 'B';
+    return '$' + n.toFixed(0) + 'M';
+}
+
+function calculateDCF(startGrowth, wacc, terminalGrowth) {
+    const years = 5;
+    const fcf = dcfData.inputs.last_fcf;
+    const endGrowth = 10;
+    let pvFCF = 0;
+    let projectedFCF = fcf;
+
+    for (let i = 0; i < years; i++) {
+        const yearGrowth = startGrowth > endGrowth
+            ? startGrowth - (startGrowth - endGrowth) * (i / 4)
+            : startGrowth;
+        projectedFCF *= (1 + yearGrowth / 100);
+        pvFCF += projectedFCF / Math.pow(1 + wacc / 100, i + 1);
+    }
+
+    const terminalFCF = projectedFCF * (1 + terminalGrowth / 100);
+    const terminalValue = terminalFCF / (wacc / 100 - terminalGrowth / 100);
+    const pvTerminal = terminalValue / Math.pow(1 + wacc / 100, years);
+
+    const enterpriseValue = pvFCF + pvTerminal;
+    const equityValue = enterpriseValue - dcfData.inputs.net_debt;
+    const iv = equityValue / dcfData.inputs.shares_outstanding;
+    const terminalPerShare = terminalValue / dcfData.inputs.shares_outstanding;
+    const entryPrice = terminalPerShare / Math.pow(1.15, years);
+
+    return { iv, entryPrice };
+}
+
+function renderFCFProjections() {
+    const startGrowth = parseFloat(document.getElementById('growthSlider').value);
+    const baseFCF = dcfData.inputs.last_fcf;
+    const endGrowth = 10;
+
+    const growthRates = [];
+    for (let i = 0; i < 5; i++) {
+        const rate = startGrowth > endGrowth
+            ? startGrowth - (startGrowth - endGrowth) * (i / 4)
+            : startGrowth;
+        growthRates.push(rate);
+    }
+
+    let fcf = baseFCF;
+    const fcfValues = [baseFCF];
+    for (let i = 0; i < 5; i++) {
+        fcf = fcf * (1 + growthRates[i] / 100);
+        fcfValues.push(fcf);
+    }
+
+    let html = '';
+    ['Base', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'].forEach(h => {
+        html += `<div class="fcf-projection-item header">${h}</div>`;
+    });
+    html += `<div class="fcf-projection-item"><div class="fcf-value">${formatDCFNum(fcfValues[0])}</div><div class="growth-rate">-</div></div>`;
+    for (let i = 1; i <= 5; i++) {
+        html += `<div class="fcf-projection-item">
+            <div class="fcf-value">${formatDCFNum(fcfValues[i])}</div>
+            <div class="growth-rate">+${growthRates[i - 1].toFixed(0)}%</div>
+        </div>`;
+    }
+    document.getElementById('fcfProjectionTable').innerHTML = html;
+}
+
+window.updateDCFDisplay = function () {
+    const growth = parseFloat(document.getElementById('growthSlider').value);
+    const wacc = parseFloat(document.getElementById('waccSlider').value);
+    const terminal = parseFloat(document.getElementById('terminalSlider').value);
+
+    document.getElementById('growthValue').textContent = growth.toFixed(1) + '%';
+    document.getElementById('waccValue').textContent = wacc + '%';
+    document.getElementById('terminalValue').textContent = terminal + '%';
+
+    renderFCFProjections();
+
+    const result = calculateDCF(growth, wacc, terminal);
+
+    document.getElementById('dcfIV').textContent = '$' + result.iv.toFixed(0);
+    document.getElementById('dcfEntry').textContent = '$' + result.entryPrice.toFixed(0);
+
+    const upside = (result.iv - dcfData.current_price) / dcfData.current_price * 100;
+    const upsideEl = document.getElementById('dcfUpside');
+    upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(1) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+    upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+    document.getElementById('dcfWeighted').textContent = '$' + dcfData.probability_weighted.weighted_iv.toFixed(0);
+
+    const grid = document.getElementById('assumptionGrid');
+    if (grid) {
+        grid.innerHTML = `
+            <div class="assumption-item"><div class="label">Y1 Growth Rate</div><div class="value">${growth.toFixed(1)}%</div></div>
+            <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc}%</div></div>
+            <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${terminal}%</div></div>
+            <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa;">$${result.iv.toFixed(0)}</div></div>
+            <div class="assumption-item"><div class="label">Entry Price (15% CAGR)</div><div class="value" style="color:#00d4aa;">$${result.entryPrice.toFixed(0)}</div></div>
+        `;
+    }
+};
+
+window.switchScenario = function (scenario) {
+    document.querySelectorAll('.scenario-tab').forEach(t => t.classList.toggle('active', t.dataset.scenario === scenario));
+
+    const assumptions = dcfData.assumptions[scenario];
+    const valuation = dcfData.valuation[scenario];
+    const entryData = dcfData.entry_price[scenario];
+
+    document.getElementById('growthSlider').value = assumptions.growth_rates[0];
+    document.getElementById('waccSlider').value = assumptions.wacc;
+    document.getElementById('terminalSlider').value = assumptions.terminal_growth;
+
+    document.getElementById('assumptionGrid').innerHTML = `
+        <div class="assumption-item"><div class="label">Year 1 Growth</div><div class="value">${assumptions.growth_rates[0]}%</div></div>
+        <div class="assumption-item"><div class="label">Year 5 Growth</div><div class="value">${assumptions.growth_rates[4]}%</div></div>
+        <div class="assumption-item"><div class="label">FCF Margin Target</div><div class="value">${assumptions.fcf_margin}%</div></div>
+        <div class="assumption-item"><div class="label">WACC</div><div class="value">${assumptions.wacc}%</div></div>
+        <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${assumptions.terminal_growth}%</div></div>
+        <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa;">$${valuation.intrinsic_value.toFixed(0)}</div></div>
+        <div class="assumption-item"><div class="label">Entry Price</div><div class="value" style="color:#00d4aa;">$${entryData.entry_price.toFixed(0)}</div></div>
+        <div class="assumption-item" style="grid-column: 1 / -1;"><div class="label">Narrative</div><div class="value" style="font-size:0.85rem;color:#b0b0b0;text-align:left;line-height:1.5;">${assumptions.growth_narrative}</div></div>
+    `;
+
+    window.updateDCFDisplay();
+};
+
+function renderHistoricalGrowth() {
+    const hg = dcfData.historical_growth;
+    const sel = hg.growth_rate_source;
+
+    const metrics = [
+        { key: 'revenue_3yr_cagr', label: 'Revenue 3Y' },
+        { key: 'revenue_5yr_cagr', label: 'Revenue 5Y' },
+        { key: 'eps_5yr_cagr', label: 'EPS 5Y' },
+        { key: 'equity_3yr_cagr', label: 'Equity 3Y' },
+        { key: 'equity_5yr_cagr', label: 'Equity 5Y' },
+        { key: 'fcf_3yr_cagr', label: 'FCF 3Y' },
+        { key: 'fcf_5yr_cagr', label: 'FCF 5Y' }
+    ];
+
+    document.getElementById('growthGrid').innerHTML = metrics.map(m => {
+        const rate = hg[m.key];
+        const isSelected = m.key === sel;
+        if (rate === null || rate === undefined) {
+            return `<div class="growth-item ${isSelected ? 'selected' : ''}">
+                <div class="metric">${m.label}</div>
+                <div class="rate na">N/A</div>
+                <div style="font-size:0.7rem;color:#555;margin-top:4px;">neg. base year</div>
+            </div>`;
+        }
+        const colorClass = rate >= 0 ? 'positive' : 'negative';
+        return `<div class="growth-item ${isSelected ? 'selected' : ''}">
+            <div class="metric">${m.label}${isSelected ? ' &#9733;' : ''}</div>
+            <div class="rate ${colorClass}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div>
+        </div>`;
+    }).join('');
+}
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const cp = dcfData.current_price;
+    const baseWacc = dcfData.assumptions.base.wacc;
+    const baseTG = dcfData.assumptions.base.terminal_growth;
+
+    let html = '<tr><th>WACC \\ Term&nbsp;G</th>';
+    sens.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+    html += '</tr>';
+
+    sens.wacc_range.forEach((wacc, i) => {
+        html += `<tr><th>${wacc}%</th>`;
+        sens.matrix[i].forEach((val, j) => {
+            const isHL = wacc === baseWacc && sens.terminal_growth_range[j] === baseTG;
+            const colorClass = isHL ? 'highlight' : val >= cp ? 'above-current' : 'below-current';
+            html += `<td class="${colorClass}">$${val}</td>`;
+        });
+        html += '</tr>';
+    });
+    document.getElementById('sensitivityMatrix').innerHTML = html;
+}
+
+function renderDCFNotes() {
+    const notes = dcfData.key_model_notes || [];
+    document.getElementById('dcfNotesList').innerHTML = notes.map(n => `<div class="dcf-note-item">${n}</div>`).join('');
+}
+
+function initDCF() {
+    document.getElementById('dcfCurrent').textContent = '$' + dcfData.current_price.toFixed(0);
+    document.getElementById('dcfWeighted').textContent = '$' + dcfData.probability_weighted.weighted_iv.toFixed(0);
+
+    document.getElementById('baseFCF').textContent = formatDCFNum(dcfData.inputs.last_fcf);
+    const shares = dcfData.inputs.shares_outstanding;
+    document.getElementById('sharesOut').textContent = shares.toFixed(1) + 'M';
+
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    renderDCFNotes();
+
+    // Initialise sliders
+    document.getElementById('growthSlider').value = dcfData.historical_growth.selected_growth_rate;
+    document.getElementById('waccSlider').value = dcfData.assumptions.base.wacc;
+    document.getElementById('terminalSlider').value = dcfData.assumptions.base.terminal_growth;
+
+    // Bind events
+    ['growthSlider', 'waccSlider', 'terminalSlider'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.oninput = window.updateDCFDisplay;
+            el.onchange = window.updateDCFDisplay;
+        }
+    });
+
+    switchScenario('base');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+renderOverview();
+renderKPIs();
+renderGuidance();
+renderCharts();
+initDCF();
+</script>
+</body>
+</html>
