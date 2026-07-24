@@ -38,6 +38,15 @@ Read the extracted text files in `./{ticker}/Extracted/` to understand:
 
 Based on your analysis, select 6-8 KPI cards and 8-12 charts that best tell the story of this business. Group charts into logical sections.
 
+**Log-scale toggle**: Every time-series chart of an absolute quantity (revenue, profit, FCF, book value, customers, volume, etc.) must include a "Log" button in its chart header that toggles the y-axis between linear and logarithmic (see the `chartRegistry`/`toggleLogScale` pattern and `.log-toggle` CSS below). Log scale makes multi-year compounding readable — a constant growth rate plots as a straight line. Omit the button when the metric is a percentage/ratio (margins, churn, retention) or when any data point is zero or negative (Chart.js logarithmic axes cannot plot those values). Render the button next to the help button inside a `.chart-header-actions` wrapper:
+
+```html
+<div class="chart-header-actions">
+    <button class="log-toggle" onclick="toggleLogScale('revenueChart', this)" title="Toggle logarithmic y-axis">Log</button>
+    <button class="help-btn" onclick="openModal('revenue')">?</button>
+</div>
+```
+
 **Examples by business type** (use as guidance, not rules):
 
 - **Payments/Fintech**: Volume, take rate, active customers, transaction count, revenue per customer
@@ -493,6 +502,32 @@ body {
     background: #00d4aa;
     color: #1a1a2e;
 }
+.chart-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.log-toggle {
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #888;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.log-toggle:hover {
+    border-color: #00d4aa;
+    color: #00d4aa;
+}
+.log-toggle.active {
+    background: rgba(0, 212, 170, 0.2);
+    border-color: #00d4aa;
+    color: #00d4aa;
+}
 .chart-wrapper {
     position: relative;
     height: 300px;
@@ -741,6 +776,28 @@ const chartDefaults = {
     }
 };
 
+// Give every chart its OWN scales object (never share chartDefaults.scales by
+// reference via spread) so the log toggle changes only that chart's y-axis:
+function freshScales() {
+    return {
+        x: { ...chartDefaults.scales.x },
+        y: { ...chartDefaults.scales.y }
+    };
+}
+// In each chart's options use: { ...chartDefaults, scales: freshScales(), ... }
+
+// Log-scale toggle: register every Chart.js instance by canvas id
+const chartRegistry = {};
+
+function toggleLogScale(canvasId, btn) {
+    const chart = chartRegistry[canvasId];
+    if (!chart) return;
+    const toLog = chart.options.scales.y.type !== 'logarithmic';
+    chart.options.scales.y.type = toLog ? 'logarithmic' : 'linear';
+    btn.classList.toggle('active', toLog);
+    chart.update();
+}
+
 // Color palette
 const colors = {
     primary: '#00d4aa',
@@ -827,7 +884,7 @@ If a DCF JSON file exists at `./{ticker}/Reports/{TICKER}_DCF.json`, add an inte
     <div class="dcf-card">
       <div class="dcf-label">Entry Price (15% CAGR)</div>
       <div class="dcf-value" id="dcfEntry">$95</div>
-      <div class="dcf-sublabel">Buy below for 15% annual return</div>
+      <div class="dcf-sublabel">Buy below for a 15% annual return (incl. interim FCF)</div>
     </div>
     <div class="dcf-card">
       <div class="dcf-label">Current Price</div>
@@ -1418,8 +1475,10 @@ function renderFCFProjections() {
 // Calculate DCF from slider inputs
 function calculateDCF(startGrowth, wacc, terminalGrowth) {
     const years = 5;
+    const hurdle = 0.15;
     const fcf = dcfData.inputs.last_fcf;
     let pvFCF = 0;
+    let pvFCFHurdle = 0;
     let projectedFCF = fcf;
 
     // Calculate declining growth rates (same logic as renderFCFProjections)
@@ -1432,6 +1491,7 @@ function calculateDCF(startGrowth, wacc, terminalGrowth) {
             : startGrowth;
         projectedFCF *= (1 + yearGrowth / 100);
         pvFCF += projectedFCF / Math.pow(1 + wacc/100, i + 1);
+        pvFCFHurdle += projectedFCF / Math.pow(1 + hurdle, i + 1);
     }
 
     // Terminal Value (Gordon Growth Model)
@@ -1445,14 +1505,15 @@ function calculateDCF(startGrowth, wacc, terminalGrowth) {
     const equityValue = enterpriseValue - dcfData.inputs.net_debt;
     const iv = equityValue / dcfData.inputs.shares_outstanding;
 
-    // Entry Price for 15% CAGR
-    const terminalPerShare = terminalValue / dcfData.inputs.shares_outstanding;
-    const entryPrice = terminalPerShare / Math.pow(1.15, years);
+    // Entry Price for a 15% IRR: buy today, collect Yrs 1-5 FCF, exit at fair
+    // (WACC-based) terminal value in year 5. Interim FCF and terminal value are
+    // discounted at the hurdle; net cash adds to what the buyer receives.
+    const entryPrice = (pvFCFHurdle + terminalValue / Math.pow(1 + hurdle, years)
+                        - dcfData.inputs.net_debt) / dcfData.inputs.shares_outstanding;
 
     return {
         iv: iv,
         entryPrice: entryPrice,
-        terminalPerShare: terminalPerShare,
         pvFCF: pvFCF,
         pvTerminal: pvTerminal,
         enterpriseValue: enterpriseValue
@@ -1663,6 +1724,7 @@ Before finishing, verify:
 - [ ] Management commentary displayed if available
 - [ ] DCF Valuation section appears at the bottom (if DCF JSON exists)
 - [ ] DCF sliders update IV and Entry Price in real-time
+- [ ] Entry price = PV(interim FCF @15%) + PV(terminal value @15%) − net debt, per share — not terminal value alone
 - [ ] Sensitivity matrix shows correct values with color coding
 - [ ] Historical growth rates displayed with selected rate highlighted
 - [ ] Scenario tabs (Bull/Base/Bear) switch correctly
@@ -1671,6 +1733,8 @@ Before finishing, verify:
 - [ ] Dashboard works when opened as a local file (file://)
 - [ ] KPI cards show relevant metrics with YoY changes
 - [ ] Charts are grouped into logical sections
+- [ ] Absolute-value time-series charts have a working Log/linear y-axis toggle (skipped for percentage metrics and series with zero/negative values)
+- [ ] Toggling Log on one chart does not change any other chart (each chart has its own scales object via freshScales())
 - [ ] Help modals explain metrics in company-specific context
 - [ ] All CSS and JS is embedded (only Chart.js CDN is external)
 - [ ] Responsive design works on mobile

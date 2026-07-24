@@ -80,8 +80,22 @@ For each scenario (Base/Bull/Bear):
 6. Divide by Shares Outstanding = Intrinsic Value per share
 
 ### Entry Price Calculation
-Entry price to achieve 15% CAGR to terminal value:
-`Entry Price = Terminal Value per Share / (1.15)^years`
+The entry price is the price at which buying today, collecting the projected interim FCF, and exiting at fair value in year 5 earns a **15% IRR**:
+
+`Entry Price = ( Σ FCF_t / 1.15^t  +  TV_5 / 1.15^5  −  net_debt ) / shares`  (t = 1..5)
+
+- `FCF_t` = the base scenario's projected FCFs (the decelerating path, not a constant growth rate)
+- `TV_5` = the Gordon terminal value `FCF_5 * (1 + terminal_growth) / (WACC - terminal_growth)` — still computed with **WACC**, because it is the fair price a buyer pays at exit; only the discounting back to today uses the 15% hurdle
+- `− net_debt` adds net cash (net_debt is negative for net-cash companies, so subtracting it increases the entry price)
+
+Do NOT compute entry price as terminal value per share discounted at 15% alone — that ignores the interim FCF and net cash and produces an entry price far too low. Sanity property: when projected growth ≈ 15%, entry price should land modestly below intrinsic value (the 15% hurdle exceeds WACC), never at ~half of it.
+
+**Non-FCF valuation models** (BVPS-compounding insurers/holdcos, residual-income banks): the same principle applies — entry price = the price at which interim distributions plus the year-5 exit value deliver a 15% IRR. For dividend payers, add the PV (at 15%) of projected dividends to the discounted exit value. For book-value models, retained earnings are already inside the projected year-5 BVPS/exit value, so do NOT add interim earnings back — only add distributions (dividends/buyback proceeds) the exit value doesn't capture.
+
+### Valuation Disclosures
+Report per scenario alongside the valuation:
+- `terminal_pct_of_value` = PV(terminal) / Enterprise Value × 100 — flags terminal-value-dominated valuations
+- `implied_exit_multiple` = TV_5 / FCF_5 (= (1+g_term)/(WACC−g_term)) — compare against the current EV/FCF multiple and flag when the implied exit multiple exceeds today's (the model is then assuming multiple expansion)
 
 ## Step 5: Sensitivity Analysis
 
@@ -162,7 +176,9 @@ Write to `./{ticker}/Reports/{TICKER}_DCF.json`:
       "enterprise_value": 1829427,
       "equity_value": 1894427,
       "intrinsic_value": 122.22,
-      "upside": -34.1
+      "upside": -34.1,
+      "terminal_pct_of_value": 73.9,
+      "implied_exit_multiple": 14.7
     },
     "bull": {
       "intrinsic_value": 195.50,
@@ -175,11 +191,14 @@ Write to `./{ticker}/Reports/{TICKER}_DCF.json`:
   },
 
   "entry_price": {
+    "hurdle_rate": 0.15,
     "base": {
-      "terminal_value_per_share": 140.51,
       "years_to_terminal": 5,
-      "entry_price": 69.84,
-      "entry_discount_from_current": -62.3
+      "pv_interim_fcf_at_hurdle": 417472,
+      "pv_terminal_at_hurdle": 1082773,
+      "net_debt": -65000,
+      "entry_price": 100.98,
+      "entry_discount_from_current": -45.6
     }
   },
 
@@ -341,21 +360,29 @@ ws.write_formula('B31', '=B29-B30', number_fmt)
 ws.write('A32', 'INTRINSIC VALUE/SHARE', label_fmt)
 ws.write_formula('B32', '=B31/B6', result_fmt)
 
-# --- ENTRY PRICE (Row 34-36) ---
-ws.write('A34', 'ENTRY PRICE (15% CAGR Target)', section_fmt)
+# --- ENTRY PRICE (Row 34-38) ---
+# Entry price = price paying which earns a 15% IRR: PV of Yrs 1-5 FCF at 15%
+# + PV of terminal value at 15%, less net debt, per share.
+ws.write('A34', 'ENTRY PRICE (15% IRR Target)', section_fmt)
 
-ws.write('A35', 'Terminal Value per Share')
-ws.write_formula('B35', '=B27/B6', currency_fmt)
+ws.write('A35', 'PV of Yrs 1-5 FCF @15%')
+ws.write_formula('B35', '=NPV(0.15,C20:G20)', number_fmt)  # NPV discounts C20 one period, G20 five — exactly right
 
-ws.write('A36', 'Entry Price (15% CAGR)')
-ws.write_formula('B36', '=B35/(1.15^5)', result_fmt)
+ws.write('A36', 'PV of Terminal Value @15%')
+ws.write_formula('B36', '=B27/(1.15^5)', number_fmt)
 
-# --- UPSIDE/DOWNSIDE (Row 38) ---
-ws.write('A38', 'Upside to IV')
-ws.write_formula('B38', '=(B32-B5)/B5', percent_fmt)
+ws.write('A37', 'Less: Net Debt')
+ws.write_formula('B37', '=B9', number_fmt)
 
-ws.write('A39', 'Upside to Entry Price')
-ws.write_formula('B39', '=(B5-B36)/B5', percent_fmt)
+ws.write('A38', 'Entry Price (15% CAGR)')
+ws.write_formula('B38', '=(B35+B36-B37)/B6', result_fmt)
+
+# --- UPSIDE/DOWNSIDE (Row 40-41) ---
+ws.write('A40', 'Upside to IV')
+ws.write_formula('B40', '=(B32-B5)/B5', percent_fmt)
+
+ws.write('A41', 'Upside to Entry Price')
+ws.write_formula('B41', '=(B5-B38)/B5', percent_fmt)
 
 # ============================================
 # SHEET 2: Sensitivity Analysis
@@ -438,7 +465,7 @@ The spreadsheet uses **formulas throughout** so you can:
    - Present values
    - Terminal value
    - Intrinsic value per share
-   - Entry price (15% CAGR target)
+   - Entry price (15% IRR target: interim FCF + terminal value at 15%, less net debt)
    - Upside/downside percentages
 
 3. **Sensitivity table** recalculates IV across different WACC and terminal growth combinations
@@ -451,7 +478,8 @@ Before finishing, verify:
 - [ ] Base/Bull/Bear scenarios have distinct, reasonable assumptions
 - [ ] Terminal value uses perpetuity growth formula
 - [ ] Net debt calculated correctly (Debt - Cash)
-- [ ] Entry price correctly discounts terminal value at 15% CAGR
+- [ ] Entry price includes PV of interim FCF at 15%, PV of terminal value at 15%, and net-debt adjustment (per share) — not terminal value alone; it sits below IV but not dramatically below when growth ≈ hurdle
+- [ ] terminal_pct_of_value and implied_exit_multiple reported per scenario; flagged if exit multiple exceeds current EV/FCF
 - [ ] Sensitivity matrix covers WACC +/-2% and terminal growth +/-1%
 - [ ] JSON output is valid and complete
 - [ ] Excel file generates without errors

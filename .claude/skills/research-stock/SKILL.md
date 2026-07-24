@@ -179,8 +179,9 @@ Dashboard must include:
 2. Self-contained HTML with embedded CSS/JS (only Chart.js CDN is external)
 3. KPI cards with current values and YoY changes
 4. Chart.js visualizations tailored to the business model
-5. Help buttons (?) with company-specific metric explanations
-6. Derived metrics (growth rates, margins, ratios relevant to THIS company)
+5. Log-scale toggle ("Log" button) on absolute-value time-series charts (skip percentage metrics and series with zero/negative values — see dashboard-generator.md for the pattern)
+6. Help buttons (?) with company-specific metric explanations
+7. Derived metrics (growth rates, margins, ratios relevant to THIS company)
 
 Output: ./$ARGUMENTS/Reports/{TICKER}_Dashboard.html
 
@@ -209,8 +210,10 @@ Use the dcf-analyst agent instructions in `.claude/agents/dcf-analyst.md` to:
    - Subtract net debt, divide by shares for intrinsic value
 
 4. **Entry Price Calculation**
-   - Calculate price to achieve 15% CAGR to terminal value
-   - `Entry Price = Terminal Value per Share / (1.15)^5`
+   - Entry price = the price at which buying today, collecting 5 years of projected FCF, and exiting at fair value in year 5 earns a 15% IRR
+   - `Entry Price = ( Σ FCF_t / 1.15^t  +  TV_5 / 1.15^5  −  net_debt ) / shares` (t = 1..5, using the scenario's projected FCF path; TV_5 is the Gordon terminal value computed with WACC)
+   - Do NOT discount only the terminal value — that ignores the interim FCF the investor receives and the net cash on the balance sheet, and produces an entry price far too low
+   - Sanity property: when projected growth ≈ 15%, entry price lands modestly below intrinsic value (because the 15% hurdle exceeds WACC) — never at ~half of it
 
 5. **Sensitivity Analysis**
    - Matrix of IV across WACC (+/-2%) and Terminal Growth (+/-1%)
@@ -242,7 +245,7 @@ curl -s "https://query1.finance.yahoo.com/v8/finance/chart/$ARGUMENTS?range=1d&i
 3. If the prices differ by more than 5%, update the DCF JSON:
    - Set `current_price` to the Yahoo Finance price
    - Recalculate `upside` for all three scenarios: `((intrinsic_value / new_price) - 1) * 100`
-   - Recalculate `probability_weighted.weighted_iv` is unchanged (it's based on intrinsic values, not current price) — but verify the `entry_price.base.entry_discount_from_current` is updated: `((current_price - entry_price) / current_price) * -100`
+   - Recalculate `probability_weighted.weighted_iv` is unchanged (it's based on intrinsic values, not current price) — but verify the `entry_price.base.entry_discount_from_current` is updated: `((current_price - entry_price) / current_price) * -100`. The `entry_price` value itself does not depend on current price, so it never needs recomputing on price drift.
    - Write the updated JSON back to the file
 
 4. If the prices match within 5%, no changes needed — log that the price was verified.
