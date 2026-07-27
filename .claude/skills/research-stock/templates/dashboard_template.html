@@ -197,6 +197,32 @@
             background: {{PRIMARY_COLOR}};
             color: #1a1a2e;
         }
+        .chart-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .log-toggle {
+            padding: 3px 10px;
+            border-radius: 12px;
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #888;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .log-toggle:hover {
+            border-color: {{PRIMARY_COLOR}};
+            color: {{PRIMARY_COLOR}};
+        }
+        .log-toggle.active {
+            background: rgba(0, 212, 170, 0.2);
+            border-color: {{PRIMARY_COLOR}};
+            color: {{PRIMARY_COLOR}};
+        }
         .chart-wrapper {
             position: relative;
             height: 300px;
@@ -353,6 +379,27 @@
                 }
             }
         };
+
+        // Each chart needs its own scales object (not a shared reference)
+        // so toggling one chart's y-axis type doesn't affect the others.
+        function freshScales() {
+            return {
+                x: { ...chartDefaults.scales.x },
+                y: { ...chartDefaults.scales.y }
+            };
+        }
+
+        // Registry of Chart.js instances, keyed by canvas id, for the log-scale toggle
+        const chartRegistry = {};
+
+        function toggleLogScale(canvasId, btn) {
+            const chart = chartRegistry[canvasId];
+            if (!chart) return;
+            const toLog = chart.options.scales.y.type !== 'logarithmic';
+            chart.options.scales.y.type = toLog ? 'logarithmic' : 'linear';
+            btn.classList.toggle('active', toLog);
+            chart.update();
+        }
 
         // Metric descriptions for help modals
         const metricDescriptions = {
@@ -599,69 +646,52 @@
 
         function renderCharts(labels) {
             const chartsContainer = document.getElementById('chartsContainer');
-            let chartsHtml = '';
 
-            // Revenue chart
-            if (data[0].Revenue) {
-                chartsHtml += createChartCard('revenueChart', 'Revenue', 'revenue');
-            }
+            // isPercent metrics (margins, ratios) never get a log toggle;
+            // other metrics get one only if every value is positive
+            // (Chart.js logarithmic axes cannot plot zero or negative values).
+            const chartConfigs = [
+                { id: 'revenueChart', title: 'Revenue', helpKey: 'revenue', column: 'Revenue', type: 'line', color: colors.primary },
+                { id: 'grossMarginChart', title: 'Gross Margin (%)', helpKey: 'grossProfit', column: 'GrossMargin', type: 'line', color: colors.secondary, isPercent: true },
+                { id: 'operatingIncomeChart', title: 'Operating Income', helpKey: 'operatingIncome', column: 'OperatingIncome', type: 'bar', color: colors.tertiary },
+                { id: 'netIncomeChart', title: 'Net Income', helpKey: 'netIncome', column: 'NetIncome', type: 'bar', color: colors.quaternary },
+                { id: 'epsChart', title: 'Earnings Per Share', helpKey: 'eps', column: 'EPS', type: 'line', color: colors.warning },
+                { id: 'fcfChart', title: 'Free Cash Flow', helpKey: 'freeCashFlow', column: 'FreeCashFlow', type: 'bar', color: colors.primary }
+            ].filter(c => data[0][c.column]);
 
-            // Gross Margin chart
-            if (data[0].GrossMargin) {
-                chartsHtml += createChartCard('grossMarginChart', 'Gross Margin (%)', 'grossProfit');
-            }
+            chartConfigs.forEach(c => {
+                c.values = data.map(d => parseFloat(d[c.column]));
+                c.allowLog = !c.isPercent && c.values.every(v => v > 0);
+            });
 
-            // Operating Income chart
-            if (data[0].OperatingIncome) {
-                chartsHtml += createChartCard('operatingIncomeChart', 'Operating Income', 'operatingIncome');
-            }
-
-            // Net Income chart
-            if (data[0].NetIncome) {
-                chartsHtml += createChartCard('netIncomeChart', 'Net Income', 'netIncome');
-            }
-
-            // EPS chart
-            if (data[0].EPS) {
-                chartsHtml += createChartCard('epsChart', 'Earnings Per Share', 'eps');
-            }
-
-            // Free Cash Flow chart
-            if (data[0].FreeCashFlow) {
-                chartsHtml += createChartCard('fcfChart', 'Free Cash Flow', 'freeCashFlow');
-            }
-
-            chartsContainer.innerHTML = chartsHtml;
+            chartsContainer.innerHTML = chartConfigs
+                .map(c => createChartCard(c.id, c.title, c.helpKey, c.allowLog))
+                .join('');
 
             // Create the actual charts
-            if (data[0].Revenue) {
-                createLineChart('revenueChart', labels, data.map(d => parseFloat(d.Revenue)), colors.primary);
-            }
-            if (data[0].GrossMargin) {
-                createLineChart('grossMarginChart', labels, data.map(d => parseFloat(d.GrossMargin)), colors.secondary);
-            }
-            if (data[0].OperatingIncome) {
-                createBarChart('operatingIncomeChart', labels, data.map(d => parseFloat(d.OperatingIncome)), colors.tertiary);
-            }
-            if (data[0].NetIncome) {
-                createBarChart('netIncomeChart', labels, data.map(d => parseFloat(d.NetIncome)), colors.quaternary);
-            }
-            if (data[0].EPS) {
-                createLineChart('epsChart', labels, data.map(d => parseFloat(d.EPS)), colors.warning);
-            }
-            if (data[0].FreeCashFlow) {
-                createBarChart('fcfChart', labels, data.map(d => parseFloat(d.FreeCashFlow)), colors.primary);
-            }
+            chartConfigs.forEach(c => {
+                if (c.type === 'line') {
+                    createLineChart(c.id, labels, c.values, c.color);
+                } else {
+                    createBarChart(c.id, labels, c.values, c.color);
+                }
+            });
         }
 
-        function createChartCard(id, title, helpKey) {
+        function createChartCard(id, title, helpKey, allowLog = false) {
+            const logBtn = allowLog
+                ? `<button class="log-toggle" onclick="toggleLogScale('${id}', this)" title="Toggle logarithmic y-axis">Log</button>`
+                : '';
             return `
                 <div class="chart-card">
                     <div class="chart-header">
                         <div class="chart-header-left">
                             <h3>${title}</h3>
                         </div>
-                        <button class="help-btn" onclick="openModal('${helpKey}')">?</button>
+                        <div class="chart-header-actions">
+                            ${logBtn}
+                            <button class="help-btn" onclick="openModal('${helpKey}')">?</button>
+                        </div>
                     </div>
                     <div class="chart-wrapper">
                         <canvas id="${id}"></canvas>
@@ -672,7 +702,7 @@
 
         function createLineChart(canvasId, labels, dataPoints, color) {
             const ctx = document.getElementById(canvasId).getContext('2d');
-            new Chart(ctx, {
+            chartRegistry[canvasId] = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: labels,
@@ -689,6 +719,7 @@
                 },
                 options: {
                     ...chartDefaults,
+                    scales: freshScales(),
                     plugins: {
                         ...chartDefaults.plugins,
                         legend: { display: false }
@@ -699,7 +730,7 @@
 
         function createBarChart(canvasId, labels, dataPoints, color) {
             const ctx = document.getElementById(canvasId).getContext('2d');
-            new Chart(ctx, {
+            chartRegistry[canvasId] = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: labels,
@@ -712,6 +743,7 @@
                 },
                 options: {
                     ...chartDefaults,
+                    scales: freshScales(),
                     plugins: {
                         ...chartDefaults.plugins,
                         legend: { display: false }
