@@ -1,0 +1,2280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Amazon.com (AMZN) Financial Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 20px;
+}
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+}
+.header h1 {
+    font-size: 2.5rem;
+    background: linear-gradient(90deg, #00d4aa, #00b894);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+}
+.header p { color: #888; font-size: 1.1rem; }
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.kpi-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0, 212, 170, 0.2); }
+.kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+.kpi-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.kpi-change { font-size: 0.9rem; margin-top: 5px; }
+.kpi-change.positive { color: #00d4aa; }
+.kpi-change.negative { color: #ff6b6b; }
+.kpi-sublabel { font-size: 0.75rem; color: #666; margin-top: 4px; }
+
+/* Guidance Section */
+.guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+.guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 8px; }
+.guidance-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.guidance-header h3::before {
+    content: ''; display: inline-block; width: 4px; height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px;
+}
+.guidance-meta { font-size: 0.85rem; color: #888; }
+.guidance-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+.guidance-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.2s ease;
+}
+.guidance-card:hover { transform: translateY(-2px); }
+.guidance-metric { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.guidance-target { font-size: 1.4rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; }
+.guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
+.guidance-vs-prior { display: inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+.guidance-vs-prior.raised { background: rgba(0, 212, 170, 0.15); color: #00d4aa; }
+.guidance-vs-prior.lowered { background: rgba(255, 107, 107, 0.15); color: #ff6b6b; }
+.guidance-vs-prior.maintained,
+.guidance-vs-prior.maintainedraised { background: rgba(255, 255, 255, 0.1); color: #888; }
+.guidance-vs-prior.new { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
+.guidance-notes { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
+.guidance-commentary {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    padding: 16px 20px;
+    border-left: 3px solid #00d4aa;
+    font-style: italic;
+    color: #b0b0b0;
+    line-height: 1.6;
+}
+.guidance-commentary::before { content: '"'; font-size: 1.5rem; color: #00d4aa; margin-right: 4px; }
+
+.section-title {
+    font-size: 1.5rem;
+    color: #fff;
+    margin: 40px auto 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid rgba(0, 212, 170, 0.3);
+    max-width: 1400px;
+}
+.section-subtitle {
+    max-width: 1400px;
+    margin: -10px auto 20px;
+    color: #888;
+    font-size: 0.9rem;
+}
+.charts-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 25px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+.chart-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    padding: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.chart-card.full-width { grid-column: 1 / -1; }
+.chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+.chart-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.chart-header h3::before {
+    content: ''; display: inline-block; width: 4px; height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px;
+}
+.help-btn {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: rgba(0, 212, 170, 0.2);
+    border: 1px solid #00d4aa; color: #00d4aa;
+    font-size: 14px; font-weight: bold; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s ease;
+}
+.help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.chart-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.log-toggle {
+    padding: 3px 10px; border-radius: 12px; background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2); color: #888;
+    font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;
+}
+.log-toggle:hover { border-color: #00d4aa; color: #00d4aa; }
+.log-toggle.active { background: rgba(0, 212, 170, 0.2); border-color: #00d4aa; color: #00d4aa; }
+.view-toggle {
+    padding: 3px 10px; border-radius: 12px; background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2); color: #888;
+    font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;
+}
+.view-toggle:hover { border-color: #0984e3; color: #0984e3; }
+.view-toggle.active { background: rgba(9, 132, 227, 0.2); border-color: #0984e3; color: #0984e3; }
+.chart-wrapper { position: relative; height: 320px; }
+.chart-wrapper.tall { height: 380px; }
+
+.modal-overlay {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.7); z-index: 1000; justify-content: center; align-items: center; padding: 20px;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+    background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%);
+    border-radius: 16px; max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto;
+    border: 1px solid rgba(0, 212, 170, 0.3);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.modal-header {
+    padding: 20px 25px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.modal-header h3 { color: #00d4aa; font-size: 1.4rem; margin: 0; }
+.modal-close {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(255, 107, 107, 0.2); border: 1px solid #ff6b6b; color: #ff6b6b;
+    font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.modal-close:hover { background: #ff6b6b; color: #fff; }
+.modal-body { padding: 25px; line-height: 1.7; }
+.modal-body p { margin-bottom: 15px; }
+.modal-body strong { color: #00d4aa; }
+.modal-body ul { margin: 15px 0; padding-left: 20px; }
+.modal-body li { margin-bottom: 8px; }
+.metric-highlight {
+    background: rgba(0, 212, 170, 0.1); border-left: 3px solid #00d4aa;
+    padding: 12px 15px; margin: 15px 0; border-radius: 0 8px 8px 0;
+}
+
+/* Investment Overview Section */
+.overview-section { max-width: 1400px; margin: 0 auto 30px; }
+.overview-toggle {
+    width: 100%; background: rgba(0, 212, 170, 0.1); border: 1px solid rgba(0, 212, 170, 0.3);
+    border-radius: 12px; padding: 16px 24px; color: #00d4aa; font-size: 1.1rem; font-weight: 600;
+    cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease;
+}
+.overview-toggle:hover { background: rgba(0, 212, 170, 0.2); }
+.overview-toggle .arrow { transition: transform 0.3s ease; }
+.overview-toggle.active .arrow { transform: rotate(180deg); }
+.overview-content {
+    display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: none; border-radius: 0 0 12px 12px; padding: 30px; margin-top: -12px;
+}
+.overview-content.active { display: block; }
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+.overview-card { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.overview-card h3 { color: #00d4aa; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+.overview-card p { margin-bottom: 12px; line-height: 1.6; }
+.overview-card ul { list-style: none; padding: 0; margin: 0; }
+.overview-card li { padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); line-height: 1.5; }
+.overview-card li:last-child { border-bottom: none; }
+.overview-card.bull h3 { color: #00d4aa; }
+.overview-card.bear h3 { color: #ff6b6b; }
+.overview-card.risks h3 { color: #fdcb6e; }
+.risk-high { color: #ff6b6b; font-weight: 600; }
+.risk-moderate { color: #fdcb6e; font-weight: 600; }
+.risk-low { color: #00d4aa; font-weight: 600; }
+.revenue-stream { display: flex; justify-content: space-between; align-items: center; }
+.revenue-stream .percent { color: #00d4aa; font-weight: 600; }
+.trend-growing { color: #00d4aa; }
+.trend-stable { color: #888; }
+.trend-declining { color: #ff6b6b; }
+
+/* DCF Valuation Section */
+.dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+.dcf-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+.dcf-card {
+    background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 24px; text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1); transition: transform 0.3s ease;
+}
+.dcf-card:hover { transform: translateY(-3px); }
+.dcf-card.highlight { background: rgba(0, 212, 170, 0.1); border-color: rgba(0, 212, 170, 0.3); }
+.dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.dcf-value { font-size: 2.2rem; font-weight: bold; color: #00d4aa; }
+.dcf-card:not(.highlight) .dcf-value { color: #fff; }
+.dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+.dcf-change.positive { color: #00d4aa; }
+.dcf-change.negative { color: #ff6b6b; }
+.dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
+.dcf-warning {
+    background: rgba(253, 203, 110, 0.15); border: 1px solid rgba(253, 203, 110, 0.4);
+    border-radius: 8px; padding: 12px 16px; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; color: #fdcb6e;
+}
+.dcf-caveat {
+    background: rgba(255, 107, 107, 0.1); border: 1px solid rgba(255, 107, 107, 0.35);
+    border-radius: 10px; padding: 16px 20px; margin-bottom: 25px; color: #ffb3b3; line-height: 1.6;
+}
+.dcf-caveat strong { color: #ff8f8f; }
+.dcf-caveat ul { margin: 10px 0 0 20px; }
+.dcf-caveat li { margin-bottom: 6px; }
+.warning-icon { font-size: 1.2rem; }
+.dcf-inputs { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+.dcf-inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.dcf-input-card { background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 12px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.05); }
+.dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #00d4aa; }
+.dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
+.fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
+.fcf-projection-table {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px;
+    background: rgba(0, 0, 0, 0.2); border-radius: 8px; padding: 12px;
+}
+.fcf-projection-item { text-align: center; }
+.fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
+.fcf-projection-item .fcf-value { font-size: 1rem; color: #e0e0e0; font-weight: 500; }
+.fcf-projection-item .growth-rate { font-size: 0.75rem; color: #00d4aa; margin-top: 2px; }
+.dcf-controls {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px;
+    margin-bottom: 30px; padding: 25px; background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.slider-group { display: flex; flex-direction: column; gap: 10px; }
+.slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+.slider-group label span { color: #00d4aa; font-weight: 600; }
+.slider-group input[type="range"] {
+    -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); outline: none;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #00d4aa; cursor: pointer; transition: transform 0.2s;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.slider-hint { font-size: 0.8rem; color: #666; }
+.scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+.scenario-tab {
+    padding: 10px 24px; border: 1px solid rgba(255, 255, 255, 0.2); background: transparent; color: #888;
+    border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s;
+}
+.scenario-tab:hover { border-color: rgba(0, 212, 170, 0.5); color: #e0e0e0; }
+.scenario-tab.active { background: rgba(0, 212, 170, 0.15); border-color: #00d4aa; color: #00d4aa; }
+.scenario-details { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; margin-bottom: 30px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.scenario-details h4 { color: #00d4aa; margin-bottom: 15px; }
+.scenario-narrative { color: #b0b0b0; font-size: 0.9rem; line-height: 1.6; margin-bottom: 18px; }
+.assumption-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+.assumption-item { text-align: center; }
+.assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+.assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
+.sensitivity-section { margin-bottom: 30px; }
+.sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; }
+.sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255, 255, 255, 0.03); border-radius: 8px; overflow: hidden; }
+.sensitivity-table th, .sensitivity-table td { padding: 12px 16px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); }
+.sensitivity-table th { background: rgba(0, 212, 170, 0.1); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td { color: #e0e0e0; }
+.sensitivity-table td.highlight { background: rgba(0, 212, 170, 0.15); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td.below-current { color: #ff6b6b; }
+.sensitivity-table td.above-current { color: #00d4aa; }
+.historical-growth { margin-bottom: 30px; }
+.historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
+.growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
+.growth-item { background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 15px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); }
+.growth-item .metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
+.growth-item .rate { font-size: 1.2rem; font-weight: 600; }
+.growth-item .rate.positive { color: #00d4aa; }
+.growth-item .rate.negative { color: #ff6b6b; }
+.growth-item .rate.neutral { color: #888; }
+.growth-item.selected { border-color: #00d4aa; background: rgba(0, 212, 170, 0.1); }
+.dcf-download { text-align: center; margin-top: 30px; }
+.download-btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px;
+    background: rgba(0, 212, 170, 0.15); border: 1px solid #00d4aa; border-radius: 8px;
+    color: #00d4aa; text-decoration: none; font-weight: 600; transition: all 0.2s;
+}
+.download-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.download-icon { font-size: 1.2rem; }
+
+@media (max-width: 768px) {
+    .charts-container { grid-template-columns: 1fr; }
+    .overview-grid { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.8rem; }
+    .fcf-projection-table { grid-template-columns: repeat(3, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Amazon.com, Inc. (AMZN) Financial Dashboard</h1>
+    <p id="dateRange">FY2016 - Q1 2026 | E-commerce, Cloud (AWS), Advertising &amp; Logistics</p>
+</div>
+
+<!-- Investment Overview -->
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid" id="overviewGrid"></div>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<!-- Guidance -->
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf">Q1 2026 Earnings</span> | <span id="guidanceFY">FY2026</span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<!-- Segment / Revenue Charts -->
+<h2 class="section-title">Segment Revenue &amp; Profitability</h2>
+<p class="section-subtitle">North America is the largest segment by revenue, but AWS drives the majority of consolidated operating profit. International only turned profitable in FY2022's aftermath (FY2024/25).</p>
+<div class="charts-container">
+    <div class="chart-card full-width">
+        <div class="chart-header">
+            <h3>Revenue by Segment (Annual)</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('segRevChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('segRev')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper tall"><canvas id="segRevChart"></canvas></div>
+    </div>
+    <div class="chart-card full-width">
+        <div class="chart-header">
+            <h3>Revenue by Segment (Quarterly)</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('segRevQChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('segRev')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper tall"><canvas id="segRevQChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Operating Income by Segment (Annual)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('segOpInc')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="segOpIncChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Operating Margin Trend</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('opMargin')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="opMarginChart"></canvas></div>
+    </div>
+</div>
+
+<!-- AWS Focus -->
+<h2 class="section-title">AWS: The Margin &amp; Growth Engine</h2>
+<p class="section-subtitle">AWS is 18% of revenue but over half of consolidated operating income. Q1 2026's 28% YoY growth is the fastest in 15 quarters -- the core AI reacceleration story.</p>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>AWS Revenue (Quarterly)</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('awsRevChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('awsRev')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="awsRevChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>AWS YoY Growth Rate (%, Quarterly)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('awsGrowth')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="awsGrowthChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>AWS vs North America Operating Margin</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('awsMargin')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="awsMarginChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>AWS Share of Consolidated Operating Income</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('awsShare')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="awsShareChart"></canvas></div>
+    </div>
+</div>
+
+<!-- Cash Flow / Capex Supercycle -->
+<h2 class="section-title">The Capex Supercycle: OCF vs CapEx vs FCF</h2>
+<p class="section-subtitle">The single most important chart on this dashboard: ~$200B guided 2026 capex for AI/AWS data centers has crushed free cash flow even as operating cash flow keeps climbing.</p>
+<div class="charts-container">
+    <div class="chart-card full-width">
+        <div class="chart-header">
+            <h3>Operating Cash Flow vs CapEx vs Free Cash Flow (Annual)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('fcfSupercycle')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper tall"><canvas id="cashFlowChart"></canvas></div>
+    </div>
+    <div class="chart-card full-width">
+        <div class="chart-header">
+            <h3>Operating Cash Flow vs CapEx vs Free Cash Flow (Quarterly)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('fcfSupercycle')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper tall"><canvas id="cashFlowQChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>CapEx as % of Revenue</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('capexIntensity')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="capexIntensityChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Cash / (Debt) Position</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('netCash')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="netCashChart"></canvas></div>
+    </div>
+</div>
+
+<!-- Earnings & Balance Sheet -->
+<h2 class="section-title">Earnings &amp; Balance Sheet Trajectory</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Income (Annual)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('netIncome')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="netIncomeChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Diluted EPS (Split-Adjusted)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('eps')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="epsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shareholders' Equity</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('equityChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('equity')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="equityChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Total Revenue (Annual)</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('totalRevChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('revenue')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="totalRevChart"></canvas></div>
+    </div>
+</div>
+
+<!-- DCF Valuation -->
+<h2 class="section-title">DCF Valuation</h2>
+
+<div class="dcf-section">
+  <div class="dcf-caveat">
+    <strong>Key model caveat -- read before trusting the numbers below:</strong> This is a consolidated revenue &times; FCF-margin DCF. It does NOT explicitly separate AWS (28% growth, ~35% operating margin) from thin-margin retail. A sum-of-the-parts valuation (AWS priced as a standalone cloud-infra business, advertising priced as an ad business, retail priced at its own thin margin) would very likely produce a materially higher intrinsic value than this single blended model shows.
+    <ul>
+      <li>All three scenarios (Bull/Base/Bear) show negative upside vs. the current price of $232.11 -- including the Bull case (-4.8%).</li>
+      <li>The probability-weighted IV ($119.73) implies the market is underwriting a scenario more optimistic than even this model's Bull case, i.e., faster AI monetization and higher terminal FCF margins than assumed here.</li>
+      <li>FY2025 FCF ($11.2B) is a capex-cycle trough and is not used directly as the DCF base -- see the FCF-margin normalization path in the assumptions below.</li>
+    </ul>
+  </div>
+
+  <div class="dcf-summary">
+    <div class="dcf-card highlight">
+      <div class="dcf-label">Intrinsic Value</div>
+      <div class="dcf-value" id="dcfIV">$108</div>
+      <div class="dcf-change negative" id="dcfUpside">-54% downside</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Entry Price (15% IRR)</div>
+      <div class="dcf-value" id="dcfEntry">$86</div>
+      <div class="dcf-sublabel">Buy below for a 15% annual return (incl. interim FCF)</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Current Price</div>
+      <div class="dcf-value" id="dcfCurrent">$232</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Prob-Weighted IV</div>
+      <div class="dcf-value" id="dcfWeighted">$120</div>
+      <div class="dcf-sublabel">25% Bull / 50% Base / 25% Bear</div>
+    </div>
+  </div>
+
+  <div class="dcf-warning" id="growthWarning" style="display: none;">
+    <span class="warning-icon">&#9888;</span>
+    <span id="warningText"></span>
+  </div>
+
+  <div class="dcf-inputs">
+    <h4>DCF Model Inputs</h4>
+    <div class="dcf-inputs-grid">
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">FY2025 FCF (trough)</div>
+        <div class="dcf-input-value" id="baseFCF">$11.2B</div>
+        <div class="dcf-input-note">Not used directly -- see revenue x margin-path model</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Shares Outstanding</div>
+        <div class="dcf-input-value" id="sharesOut">10.75B</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Net Cash / (Debt)</div>
+        <div class="dcf-input-value" id="netDebt">+$24.0B</div>
+        <div class="dcf-input-note">Positive = net cash (incl. marketable securities)</div>
+      </div>
+    </div>
+    <div class="fcf-projections">
+      <h5>Projected FCF (5-Year, Base Case Revenue x Margin-Path Model)</h5>
+      <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+    </div>
+  </div>
+
+  <div class="dcf-controls">
+    <div class="slider-group">
+      <label>Growth Rate: <span id="growthValue">11.7%</span></label>
+      <input type="range" id="growthSlider" min="0" max="30" value="11.7" step="0.5" oninput="updateDCFDisplay()">
+      <div class="slider-hint" id="growthHint">Based on revenue 3yr CAGR</div>
+    </div>
+    <div class="slider-group">
+      <label>WACC: <span id="waccValue">9.5%</span></label>
+      <input type="range" id="waccSlider" min="6" max="18" value="9.5" step="0.25" oninput="updateDCFDisplay()">
+    </div>
+    <div class="slider-group">
+      <label>Terminal Growth: <span id="terminalValue">2.75%</span></label>
+      <input type="range" id="terminalSlider" min="0" max="5" value="2.75" step="0.25" oninput="updateDCFDisplay()">
+    </div>
+  </div>
+
+  <div class="scenario-tabs">
+    <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+    <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+    <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+  </div>
+
+  <div class="scenario-details" id="scenarioDetails">
+    <h4>Assumptions</h4>
+    <div class="scenario-narrative" id="scenarioNarrative"></div>
+    <div class="assumption-grid" id="assumptionGrid"></div>
+  </div>
+
+  <div class="sensitivity-section">
+    <h4>Sensitivity Analysis: Intrinsic Value by WACC &amp; Terminal Growth (Base Case FCF Path)</h4>
+    <table class="sensitivity-table" id="sensitivityMatrix"></table>
+  </div>
+
+  <div class="historical-growth">
+    <h4>Historical Growth Rates (CAGR)</h4>
+    <div class="growth-grid" id="growthGrid"></div>
+  </div>
+
+  <div class="dcf-download">
+    <a href="AMZN_DCF_Model.xlsx" class="download-btn" download>
+      <span class="download-icon">&#8681;</span> Download Excel Model
+    </a>
+  </div>
+</div>
+
+<!-- Help Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h3 id="modalTitle">Metric Title</h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+/* =========================================================
+   EMBEDDED DATA
+   ========================================================= */
+const csvData = `Period,Revenue,NAmericaRevenue,InternationalRevenue,AWSRevenue,OperatingIncome,NAmericaOpInc,InternationalOpInc,AWSOpInc,OperatingMargin,NetIncome,EPS,OperatingCashFlow,CapEx,FreeCashFlow,CashAndEquivalents,TotalDebt,ShareholdersEquity,SharesOutstanding
+FY2016,135987.0,79785.0,43983.0,12219.0,4186.0,2361.0,-1283.0,3108.0,3.1,2371.0,0.245,17272.0,6737.0,10535.0,19334.0,7694.0,19285.0,9540.0
+FY2017,177866.0,106110.0,54297.0,17459.0,4106.0,2837.0,-3062.0,4331.0,2.3,3033.0,0.3075,18434.0,10058.0,8376.0,20522.0,24743.0,27709.0,9680.0
+FY2018,232887.0,141366.0,65866.0,25655.0,12421.0,7267.0,-2142.0,7296.0,5.3,10073.0,1.007,30723.0,11323.0,19400.0,31750.0,23495.0,43549.0,9820.0
+FY2019,280522.0,170773.0,74723.0,35026.0,14541.0,7033.0,-1693.0,9201.0,5.2,11588.0,1.1505,38514.0,12689.0,25825.0,36092.0,23414.0,62060.0,9960.0
+FY2020,386064.0,236282.0,104412.0,45370.0,22899.0,8651.0,717.0,13531.0,5.9,21331.0,2.09,66064.0,35044.0,31020.0,42122.0,31816.0,93404.0,10060.0
+FY2021,469822.0,279833.0,127787.0,62202.0,24879.0,7271.0,-924.0,18532.0,5.3,33364.0,3.24,46327.0,55396.0,-9069.0,36220.0,48744.0,138245.0,10175.0
+Q1 2022,116444.0,69244.0,28759.0,18441.0,3669.0,-1568.0,-1281.0,6518.0,3.2,-3844.0,-0.38,-2790.0,13742.0,-16532.0,36393.0,47556.0,134001.0,10171.0
+Q2 2022,121234.0,74430.0,27065.0,19739.0,3317.0,-627.0,-1771.0,5715.0,2.7,-2028.0,-0.2,8965.0,14098.0,-5133.0,37478.0,58053.0,131402.0,10183.0
+Q3 2022,127101.0,78843.0,27720.0,20538.0,2525.0,-412.0,-2466.0,5403.0,2.0,2872.0,0.28,11404.0,15041.0,-3637.0,34947.0,58919.0,137489.0,10198.0
+FY2022,513983.0,315880.0,118007.0,80096.0,12248.0,-2847.0,-7746.0,22841.0,2.4,-2722.0,-0.27,46752.0,58321.0,-11569.0,53888.0,67150.0,146043.0,10242.0
+Q1 2023,127358.0,76881.0,29123.0,21354.0,4774.0,898.0,-1247.0,5123.0,3.7,3172.0,0.31,4788.0,13070.0,-8282.0,49343.0,67084.0,154526.0,10258.0
+Q2 2023,134383.0,82546.0,29697.0,22140.0,7681.0,3211.0,-895.0,5365.0,5.7,6750.0,0.65,16476.0,10412.0,6064.0,49529.0,63092.0,168602.0,10313.0
+Q3 2023,143083.0,87887.0,32137.0,23059.0,11188.0,4307.0,-95.0,6976.0,7.8,9879.0,0.94,21217.0,11298.0,9919.0,49605.0,61098.0,182973.0,10330.0
+FY2023,574785.0,352828.0,131200.0,90757.0,36852.0,14877.0,-2656.0,24631.0,6.4,30425.0,2.9,84946.0,48133.0,36813.0,73387.0,58314.0,201875.0,10383.0
+Q1 2024,143313.0,86341.0,31935.0,25037.0,15307.0,4983.0,903.0,9421.0,10.7,10431.0,0.98,18989.0,13935.0,5054.0,72852.0,57634.0,216661.0,10403.0
+Q2 2024,147977.0,90033.0,31663.0,26281.0,14672.0,5065.0,273.0,9334.0,9.9,13485.0,1.26,25281.0,16393.0,8888.0,71178.0,54889.0,236447.0,10490.0
+Q3 2024,158877.0,95537.0,35888.0,27452.0,17411.0,5663.0,1301.0,10447.0,11.0,15328.0,1.43,25971.0,21278.0,4693.0,75091.0,54890.0,259151.0,10511.0
+FY2024,637959.0,387497.0,142906.0,107556.0,68593.0,24967.0,3792.0,39834.0,10.8,59248.0,5.53,115877.0,77658.0,38219.0,78779.0,52623.0,285970.0,10593.0
+Q1 2025,155667.0,92887.0,33513.0,29267.0,18405.0,5841.0,1017.0,11547.0,11.8,17127.0,1.59,17015.0,24255.0,-7240.0,66207.0,53374.0,305867.0,10613.0
+Q2 2025,167702.0,100068.0,36761.0,30873.0,19171.0,7517.0,1494.0,10160.0,11.4,18164.0,1.68,32515.0,31368.0,1147.0,57741.0,50718.0,333775.0,10660.0
+Q3 2025,180169.0,106267.0,40896.0,33006.0,17422.0,4789.0,1199.0,11434.0,9.7,21187.0,1.95,35525.0,34228.0,1297.0,66922.0,50742.0,369631.0,10687.0
+FY2025,716924.0,426305.0,161894.0,128725.0,79975.0,29619.0,4750.0,45606.0,11.2,77670.0,7.17,139514.0,128320.0,11194.0,86810.0,65648.0,411065.0,10731.0
+Q1 2026,181519.0,104143.0,39789.0,37587.0,23852.0,8267.0,1424.0,14161.0,13.1,30255.0,2.78,26032.0,43234.0,-17202.0,101816.0,119074.0,441914.0,10754.0`;
+
+const analysis = {
+  "ticker": "AMZN",
+  "company_name": "Amazon.com, Inc.",
+  "analysis_date": "2026-07-26",
+  "overview": "Amazon is a global e-commerce, cloud computing, digital advertising, and logistics conglomerate operating three reportable segments: North America, International, and Amazon Web Services (AWS). The company serves consumers, third-party sellers, developers/enterprises, content creators, and advertisers, monetizing through direct retail sales, seller commissions, cloud infrastructure services, subscriptions (Prime), and advertising. Amazon is now in the midst of an unprecedented AI/cloud capex cycle (~$200B guided for 2026) to build out Trainium custom silicon and data center capacity for AWS and generative AI partners such as Anthropic and OpenAI.",
+  "business_model": {
+    "summary": "Amazon monetizes a low-margin, high-volume retail flywheel (own inventory + third-party marketplace) alongside two high-margin, fast-growing businesses: AWS cloud infrastructure (18% of sales, ~35% operating margin) and advertising (embedded in 'Other Services'). Prime subscriptions and fast/free shipping drive customer retention and cross-sell into higher-margin services.",
+    "revenue_streams": [
+      {"name": "Online stores (1P retail)", "percent": 37, "trend": "stable"},
+      {"name": "Physical stores", "percent": 3, "trend": "stable"},
+      {"name": "Third-party seller services", "percent": 25, "trend": "growing"},
+      {"name": "AWS", "percent": 18, "trend": "growing"},
+      {"name": "Advertising services", "percent": 9, "trend": "growing"},
+      {"name": "Subscription services (Prime, etc.)", "percent": 7, "trend": "growing"},
+      {"name": "Other (physical stores subset, other)", "percent": 1, "trend": "stable"}
+    ],
+    "customer_type": "B2C (consumers via online/physical stores), B2B (third-party sellers, advertisers, content creators), and enterprise/developer (AWS cloud customers of all sizes, from startups to governments)",
+    "geographic_mix": "North America 59% of net sales, International 23%, AWS 18% (FY2025); AWS and advertising revenue are the primary margin drivers even though North America retail is the largest revenue segment"
+  },
+  "competitive_position": {
+    "main_competitors": ["Walmart", "Microsoft (Azure)", "Google (Cloud, Search, YouTube ads)", "Alibaba/Shopify (e-commerce)", "Meta (advertising)", "Target", "Temu/Shein (low-cost e-commerce)"],
+    "market_position": "Leading U.S. e-commerce retailer (~38-40% of U.S. online retail spend) and the largest global cloud infrastructure provider by revenue (AWS holds roughly 29-30% of the IaaS/cloud market, ahead of Azure and Google Cloud), with a fast-growing #3-4 position in digital advertising behind Google and Meta.",
+    "moat_factors": [
+      {"factor": "Scale/cost advantage", "strength": "strong", "description": "Massive fulfillment network, logistics scale, and purchasing power enable low prices and fast delivery that smaller competitors struggle to match"},
+      {"factor": "Prime ecosystem lock-in", "strength": "strong", "description": "200M+ Prime members bundle shipping, video, music, and other benefits, driving frequency and reducing price sensitivity; Prime members spend significantly more than non-members"},
+      {"factor": "AWS switching costs", "strength": "strong", "description": "Enterprise cloud workloads are costly and complex to migrate once built on AWS-specific services; broad service catalog and custom silicon (Graviton, Trainium) create additional lock-in"},
+      {"factor": "Data/network effects (marketplace)", "strength": "moderate", "description": "Third-party marketplace increases selection which attracts more consumers, which attracts more sellers, reinforcing scale"},
+      {"factor": "Capital intensity as barrier to entry", "strength": "moderate", "description": "The scale of capex required to compete in cloud/AI infrastructure (Amazon guiding ~$200B for 2026) raises barriers for smaller cloud entrants"}
+    ],
+    "weaknesses": [
+      "Thin retail operating margins make North America/International segments highly sensitive to cost inflation, tariffs, and labor costs",
+      "Heavy reliance on AWS operating income (over 55% of consolidated FY2025 operating income) for consolidated profitability",
+      "Regulatory and antitrust scrutiny (FTC, EU DMA) constrains pricing and marketplace practices",
+      "AI infrastructure race requires enormous, front-loaded capex with uncertain long-term ROI and depreciation risk from fast hardware obsolescence",
+      "Dependence on a small number of hyperscale AI customers (Anthropic, OpenAI) for a portion of incremental AWS growth introduces concentration/counterparty risk"
+    ]
+  },
+  "growth_drivers": [
+    "AWS reacceleration: Q1 2026 AWS growth hit 28% YoY (fastest in 15 quarters) on a ~$150B annualized run-rate, driven by generative AI workloads (Bedrock, Trainium) and easing capacity constraints",
+    "AI infrastructure monetization via multi-year compute commitments from Anthropic (up to $25B additional investment, $100B+ AWS commitment, up to 5GW of Trainium capacity) and OpenAI ($38B, later expanded toward $100B+ cloud deal)",
+    "Custom silicon economics: Trainium2 (sold out) and newly-shipping Trainium3 offer 30-40% better price-performance than GPUs, improving AWS AI gross margins versus Nvidia-dependent competitors",
+    "Advertising growth: sponsored ads, streaming/Prime Video ads, and retail media continue to grow faster than overall retail, adding high-margin revenue with minimal incremental capex",
+    "Same-day/fast delivery and quick commerce investments expanding grocery and perishables share",
+    "International segment margin inflection (operating margin improving as investments in India, and other newer geographies mature)",
+    "Amazon Leo (formerly Project Kuiper) satellite broadband targeting mid-2026 commercial launch, opening a new connectivity revenue stream and expanding AWS's edge/network reach",
+    "Physical/local commerce and healthcare initiatives (Amazon Pharmacy, One Medical) as longer-term optionality"
+  ],
+  "risks": {
+    "business": [
+      {"risk": "Intense, multi-front competition", "severity": "high", "description": "Faces competitors across retail (Walmart, Temu, Shein), cloud (Azure, Google Cloud), and advertising (Google, Meta), any of which could erode share or force price/margin concessions"},
+      {"risk": "AWS customer concentration in AI deals", "severity": "moderate", "description": "A meaningful share of incremental AWS growth is now tied to a handful of large AI-model companies (Anthropic, OpenAI) whose own funding, competitive position, or compute needs could shift"},
+      {"risk": "Execution risk on massive capex buildout", "severity": "high", "description": "Guided ~$200B 2026 capex (vs. $128B cash capex in 2025) creates risk of overbuilding capacity, faster-than-expected equipment obsolescence (5-year server life already shortened once), or stranded assets if AI demand growth disappoints"},
+      {"risk": "Workforce restructuring/AGI unit layoffs", "severity": "moderate", "description": "July 2026 AGI unit layoffs and ~30,000 corporate job cuts since late 2025 reflect strategic pivot risk and could signal uncertainty in AI research strategy or cost discipline pressure"}
+    ],
+    "financial": [
+      {"risk": "Free cash flow compression from capex", "severity": "high", "description": "FY2025 free cash flow fell to $11.2B (from $38.2B in FY2024) as cash capex surged to $128.3B; further capex escalation in 2026 (~$200B guided) could pressure FCF further before AI revenue scales"},
+      {"risk": "Foreign exchange exposure", "severity": "moderate", "description": "International segment (23% of sales) and foreign currency balances (~$29.7B) create earnings volatility from USD strength/weakness"},
+      {"risk": "Non-operating earnings volatility from equity stakes", "severity": "moderate", "description": "Large non-cash mark-to-market swings from Anthropic and Rivian equity/warrant positions (e.g., $15.2B gain in FY2025, $16.8B gain in Q1 2026) distort GAAP net income and complicate valuation"}
+    ],
+    "regulatory": [
+      {"risk": "Antitrust and FTC litigation", "severity": "high", "description": "Settled a $2.5B FTC Prime 'dark patterns' case in Q3 2025 (record settlement); a separate FTC/state antitrust monopolization case regarding marketplace practices remains an ongoing overhang along with EU DMA obligations"},
+      {"risk": "Global data/privacy and AI regulation", "severity": "moderate", "description": "Expanding data localization, AI governance, and consumer protection rules across jurisdictions raise compliance costs and could restrict product/ad-targeting practices"},
+      {"risk": "Tariff and trade policy", "severity": "high", "description": "China-sourced goods (a large share of third-party seller inventory) face elevated U.S. tariffs; margin compression is being passed through in price increases, risking unit volume declines and seller attrition to other marketplaces"}
+    ],
+    "macro": [
+      {"risk": "Consumer discretionary spending sensitivity", "severity": "moderate", "description": "Retail segments remain exposed to inflation, labor market softness, and recessionary pressure on discretionary purchases"},
+      {"risk": "Interest rate/capital cost sensitivity", "severity": "moderate", "description": "Amazon raised substantial new long-term debt in 2026 (~$53B proceeds in Q1) to help fund AI capex; higher-for-longer rates raise financing costs and the discount rate applied to future AI-driven cash flows"},
+      {"risk": "Semiconductor/memory chip supply and cost", "severity": "moderate", "description": "Management explicitly flagged memory chip resource/supply volatility as a factor affecting results and cost of AI infrastructure buildout"}
+    ]
+  },
+  "macro_factors": {
+    "industry_outlook": "Global e-commerce penetration continues to grow at low-to-mid single digits, while cloud infrastructure and generative AI compute demand are growing at a much faster rate (20-30%+), making AWS the primary swing factor for Amazon's consolidated growth and margin trajectory over the next several years",
+    "cyclicality": "Moderate - North America/International retail segments have some consumer discretionary cyclicality (offset by Prime/grocery staples), while AWS is more resilient given multi-year enterprise contracts, though AI-related capex creates its own boom/bust capital cycle risk",
+    "interest_rate_sensitivity": "Moderate - increasing given large recent debt issuance to fund AI capex; higher rates raise WACC/discount rates applied to long-duration AI infrastructure investments and modestly raise interest expense",
+    "key_input_costs": ["Semiconductors/GPUs and AI accelerators (Nvidia, Trainium components)", "Electricity/power for data centers", "Transportation and fuel", "Labor (fulfillment and corporate)", "Memory chips", "Real estate/construction for data centers and fulfillment centers"]
+  },
+  "recent_developments": [
+    {"date": "2026-Q1", "event": "Net sales grew 17% YoY to $181.5B; operating income rose 30% to $23.9B (13.1% margin, a record); diluted EPS of $2.78 boosted by a ~$16.8B pre-tax gain tied to the Anthropic investment"},
+    {"date": "2026-Q1", "event": "AWS revenue grew 28% YoY to $37.6B (fastest growth in 15 quarters), reaching a ~$150B annualized run rate; AWS AI revenue run-rate exceeded $15B"},
+    {"date": "2026-04", "event": "Amazon committed up to an additional $25B investment in Anthropic alongside a $100B+, multi-year AWS compute commitment (up to 5GW of Trainium capacity), building on its prior ~$8B Anthropic stake"},
+    {"date": "2026-01/2026-Q1", "event": "Amazon invested ~$50B in OpenAI and expanded a cloud services agreement toward a $100B+ AWS deal, following a foundational $38B, seven-year cloud agreement signed in November 2025"},
+    {"date": "2026-04/2026-03", "event": "Trainium3 began shipping (30-40% better price-performance than Trainium2) and is reportedly nearly fully subscribed; Trainium2 reported as sold out, underscoring AI compute demand outstripping supply"},
+    {"date": "2026-07", "event": "Amazon guided 2026 capital expenditures to roughly $200B (vs. ~$131.8B cash capex in FY2025), directed primarily at AWS data centers, power, custom silicon, and networking"},
+    {"date": "2026-07", "event": "Amazon cut an undisclosed number of jobs in its Artificial General Intelligence (AGI) unit, pivoting away from frontier model research toward customer-facing/enterprise AI deployment; brings cumulative corporate layoffs to ~30,000 since October 2025 (~10% of corporate headcount)"},
+    {"date": "2026-04", "event": "Amazon Leo (formerly Project Kuiper) satellite broadband entered enterprise beta with Verizon, AT&T, Vodafone, JetBlue, and NASA as partners; commercial launch targeted for mid-2026, though satellite count trails FCC's July 2026 deployment milestone, requiring 22+ additional contracted launches"},
+    {"date": "2025-09", "event": "Amazon agreed to a record $2.5B FTC settlement ($1B penalty + $1.5B consumer restitution) resolving Prime enrollment/cancellation 'dark patterns' allegations, three days into trial"},
+    {"date": "2025-Q4/FY2025", "event": "FY2025 results: net sales $716.9B (+12%), operating income $80.0B (+16.6%), net income $77.7B; however free cash flow fell to $11.2B (from $38.2B in FY2024) as cash capex surged to $128.3B, reflecting the early stage of the AI infrastructure buildout"},
+    {"date": "2026-Q2 (upcoming)", "event": "Q2 2026 earnings scheduled for July 30, 2026; company guided net sales of $194-199B (+17% at midpoint) and operating income of $20-24B, including ~$1B of incremental Amazon Leo costs and continued investment in quick commerce and sharper international pricing"}
+  ],
+  "guidance": {
+    "as_of": "Q1 2026 Earnings (April 29, 2026)",
+    "fiscal_year": "FY2026",
+    "items": [
+      {
+        "metric": "Q2 2026 Net Sales",
+        "target": "$194.0B - $199.0B",
+        "period": "Q2 2026",
+        "vs_prior": "raised",
+        "notes": "Implies 11-14% YoY growth (~180bps unfavorable-to-neutral FX depending on rate moves); benefits from Prime Day timing and continued AWS/advertising strength"
+      },
+      {
+        "metric": "Q2 2026 Operating Income",
+        "target": "$20.0B - $24.0B",
+        "period": "Q2 2026",
+        "vs_prior": "maintained",
+        "notes": "Includes ~$1B of incremental year-over-year Amazon Leo costs as satellite constellation scales toward mid-2026 commercial launch, plus continued investment in quick commerce and sharper international pricing"
+      },
+      {
+        "metric": "FY2026 Capital Expenditures",
+        "target": "~$200B",
+        "period": "FY2026",
+        "vs_prior": "raised",
+        "notes": "Up roughly 50%+ from ~$131.8B in FY2025 cash capex; directed primarily at AWS data centers, power, custom silicon (Trainium/Graviton), and networking to meet AI/cloud demand; company explicitly expects capex to keep rising in 2026 per the FY2025 10-K"
+      },
+      {
+        "metric": "AWS growth trajectory",
+        "target": "Continued acceleration (no specific numeric target given)",
+        "period": "FY2026",
+        "vs_prior": "raised",
+        "notes": "Management highlighted 28% Q1 2026 AWS growth as the fastest in 15 quarters and said demand for AI compute (Trainium2/3) continues to outstrip available capacity"
+      }
+    ],
+    "management_commentary": "CEO Andy Jassy has emphasized that AWS growth reacceleration validates the AI infrastructure investment thesis, with Trainium chips providing a price-performance advantage that supports margin expansion even amid heavy capex. CFO Brian Olsavsky has flagged short-term free cash flow pressure as an expected, deliberate trade-off for long-term AWS/AI capacity, and cited memory chip supply, tariff policy, and FX as key uncertainties for 2026 guidance."
+  },
+  "bull_case": [
+    "AWS reacceleration (28% growth in Q1 2026, fastest in 15 quarters) validates massive AI capex and positions Amazon as a top-tier AI infrastructure provider via custom Trainium silicon with better price-performance economics than GPU-dependent peers",
+    "Multi-year, multi-billion-dollar compute commitments from Anthropic and OpenAI provide unusually high revenue visibility for AWS's AI backlog and reduce reliance on speculative demand",
+    "Retail segment profitability has structurally improved (record 13.1% consolidated operating margin in Q1 2026) through fulfillment network regionalization, advertising monetization, and cost discipline",
+    "Advertising remains a high-margin, fast-growing revenue stream with minimal incremental capital intensity, diversifying earnings away from thin-margin retail",
+    "Optionality from Amazon Leo satellite broadband, healthcare, and other emerging bets could open new addressable markets over the next 3-5 years",
+    "Strong analyst sentiment (consensus 'Strong Buy,' average price target implying meaningful upside) reflects confidence in the AI-driven re-rating of AWS"
+  ],
+  "bear_case": [
+    "Free cash flow has collapsed (from $38.2B in FY2024 to $11.2B in FY2025) as capex surges toward ~$200B in 2026; if AI revenue monetization lags the buildout, returns on invested capital could disappoint and pressure the stock's premium valuation",
+    "Heavy dependence on a small number of AI customers (Anthropic, OpenAI) for incremental AWS growth introduces concentration risk if those companies' funding, strategy, or compute needs shift, or if they diversify to competing clouds",
+    "Tariff-driven cost inflation on China-sourced third-party inventory is compressing seller margins and could reduce marketplace selection, pricing competitiveness, or unit volumes in North America/International retail",
+    "Regulatory and antitrust overhang remains elevated after the record $2.5B FTC Prime settlement, with an unresolved broader antitrust case and EU DMA compliance obligations that could constrain marketplace and Prime practices",
+    "Rapid AGI unit layoffs and repeated corporate workforce reductions (~30,000 since October 2025) may signal strategic uncertainty in Amazon's AI research approach and elevated execution risk during a critical capital-intensive period",
+    "Non-cash equity gains (Anthropic, Rivian) are inflating headline GAAP net income and EPS, making reported earnings growth look stronger than underlying operating cash generation"
+  ]
+};
+
+const dcfData = {
+  "ticker": "AMZN",
+  "company_name": "Amazon.com, Inc.",
+  "valuation_date": "2026-07-26",
+  "current_price": 232.11,
+  "price_currency": "USD",
+  "price_basis": "Verified live from Yahoo Finance 2026-07-26.",
+  "inputs": {
+    "shares_outstanding": 10754,
+    "cash_and_equivalents": 101816,
+    "marketable_securities": 41273,
+    "total_debt": 119074,
+    "net_debt": -24015,
+    "net_debt_basis": "Net cash including marketable securities: total_debt (119,074, per Q1-2026 10-Q balance sheet long-term debt) - (cash 101,816 + marketable securities 41,273) = -24,015 (net CASH position). Amazon's Q1-2026 10-Q reports combined cash+equivalents+marketable securities of $143.1B, which is the more accurate liquid-asset base for a company that actively invests excess cash in short/intermediate marketable debt securities rather than holding it all as cash. A cash-only net debt (excluding the $41.3B of marketable securities) would be +17,258 (net debt); using net cash (-24,015) is more representative of true balance sheet strength and is the basis used throughout this model.",
+    "last_fcf": 11194,
+    "last_fcf_note": "FY2025 FCF of $11.2B is a capex-cycle trough (128.3B cash capex, up from 77.7B in FY2024) and is NOT used directly as the DCF FCF base -- see fcf_modeling_note below.",
+    "currency": "USD",
+    "units": "millions",
+    "fiscal_year_end": "December 31",
+    "latest_period": "FY2025 (annual) + Q1 2026 (quarterly, for balance sheet)"
+  },
+  "fcf_modeling_note": "Amazon's FY2025 FCF ($11.2B, 1.6% margin) and FY2024 FCF ($38.2B, 6.0% margin) both understate normalized earning power and are unsuitable as a naive 'take last year and grow it' DCF base. FY2025 is a deliberate investment trough (guided ~$200B 2026 capex vs $131.8B FY2025 cash capex) for AWS/AI data centers, Trainium silicon, and power infrastructure. Rather than growing a single base-year FCF figure, this model projects revenue (10-11% base growth decelerating per the 5yr/3yr revenue CAGR of 13.2%/11.7%) and applies an FCF-margin path that starts depressed (2.5% base case Year 1, reflecting continued heavy 2026-27 capex) and normalizes toward 8.5% of revenue by Year 5 as the AI capex cycle matures and AWS operating leverage flows through. This is conservative relative to Amazon's operating cash flow margin trajectory (14.8% FY2023 -> 18.2% FY2024 -> 19.5% FY2025, still rising), which implies FCF margin could recover toward 8-10%+ once capex intensity falls back from the current 17.9% of revenue toward a more normal 11-13% post-buildout run rate. Historical (pre-AI-supercycle) FCF margins of 6.0-9.2% (FY2019-FY2024, excluding FY2021-22 pandemic-hangover troughs and the FY2025-26 AI buildout trough) anchor the plausible range for Year 5 normalization.",
+  "historical_growth": {
+    "revenue_3yr_cagr": 11.7,
+    "revenue_5yr_cagr": 13.2,
+    "eps_3yr_cagr": null,
+    "eps_5yr_cagr": 28.0,
+    "eps_cagr_note": "EPS 3yr CAGR is undefined: FY2022 EPS was -$0.27 (negative base, driven by a large non-cash Rivian mark-to-market loss), making a CAGR calculation meaningless. EPS 5yr CAGR (FY2020 $2.09 -> FY2025 $7.17 = 28.0%) is inflated by (a) the low FY2020 base, (b) large non-cash equity-stake gains/losses (Rivian, Anthropic) that swing GAAP EPS well outside underlying operating earnings power, and (c) FY2022's negative print mechanically flattering the subsequent recovery. EPS growth is not used as a DCF driver for these reasons.",
+    "equity_3yr_cagr": 41.2,
+    "equity_5yr_cagr": 34.5,
+    "fcf_3yr_cagr": null,
+    "fcf_5yr_cagr": null,
+    "fcf_cagr_note": "FCF CAGR is not meaningful: FCF was negative in FY2021 (-$9.1B) and FY2022 (-$11.6B, pandemic-era fulfillment overbuild) and troughed again in FY2025 ($11.2B, AI capex buildout). No clean positive start/end pair spans a representative period. FY2016-FY2025 raw FCF path: [10535, 8376, 19400, 25825, 31020, -9069, -11569, 36813, 38219, 11194] $M.",
+    "selected_growth_rate": 11.7,
+    "growth_rate_source": "revenue_3yr_cagr (with 5yr cagr of 13.2% as corroborating upper bound)",
+    "growth_divergence_warning": "Equity CAGR (41.2% 3yr / 34.5% 5yr) diverges massively (>200%) from revenue CAGR (11.7%/13.2%). This is NOT treated as a red flag on revenue quality -- it reflects that Amazon retains 100% of net income (no dividends, minimal buybacks in this window) while GAAP net income has been inflated by large non-cash equity-stake gains (Rivian warrants, Anthropic investment mark-ups: +$15.2B in FY2025, +$16.8B in Q1 2026 alone) that compound book value far faster than the underlying operating business. Per standard practice, equity CAGR is REJECTED as the growth driver here and revenue CAGR is used instead, consistent with the task-level guidance for this ticker."
+  },
+  "valuation_philosophy": {
+    "approach": "Revenue-Driven Margin-Normalization DCF (capex-cycle trough business)",
+    "summary": "Amazon is mid-way through an unprecedented, multi-year AI/cloud infrastructure buildout (~$200B guided 2026 capex, up from $131.8B in FY2025 and $77.7B in FY2024) directed at AWS data centers, power, and custom Trainium silicon to serve surging generative-AI compute demand (Anthropic, OpenAI multi-year commitments in the $100B+ range each). This capex program has temporarily crushed free cash flow (from $38.2B FY2024 to $11.2B FY2025) even as operating cash flow margin continues to climb (14.8% -> 18.2% -> 19.5% over FY2023-FY2025) and AWS growth has reaccelerated to 28% YoY (Q1 2026, fastest in 15 quarters). Rather than anchoring on either the depressed FY2025 FCF or the prior FY2024 'peak,' the model projects revenue growth (decelerating from the ~11-15% historical CAGR range toward terminal growth) and an FCF-margin path that stays depressed through the heavy-capex years (Y1-Y2) before normalizing toward historically-precedented margins (6-12%, depending on scenario) by Year 5 as the AI capex cycle matures and revenue from AI workloads (AWS AI run-rate already exceeding $15B) scales against a moderating capital base.",
+    "fcf_margin_path": {
+      "base_pct_of_revenue": [
+        2.5,
+        4.5,
+        6.0,
+        7.5,
+        8.5
+      ],
+      "bull_pct_of_revenue": [
+        4.5,
+        7.0,
+        9.0,
+        10.5,
+        12.0
+      ],
+      "bear_pct_of_revenue": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0
+      ],
+      "rationale": "Base Y5 margin of 8.5% sits within the pre-AI-supercycle historical range (FY2019 9.2%, FY2020 8.0%, FY2023 6.4%, FY2024 6.0%) and is conservative relative to the rising OCF margin trend (19.5% and climbing) net of a capex intensity that management/analysts broadly expect to normalize from FY2025's 17.9%-of-revenue peak back toward an 11-13% steady state post-buildout (FY2023 was 8.4%). Bull case assumes AI monetization (AWS AI run-rate, advertising) drives margin above the pre-AI-supercycle historical range as operating leverage compounds. Bear case assumes capex intensity stays structurally elevated (AI overbuild / slower depreciation runoff) and retail margin pressure (tariffs, competition) persists, capping FCF margin well below history."
+    },
+    "wacc_rationale": {
+      "base_wacc_pct": 9.5,
+      "bull_wacc_pct": 8.75,
+      "bear_wacc_pct": 10.75,
+      "note": "Mega-cap, investment-grade balance sheet, low historical beta support a WACC toward the low end of the typical 8-11% large-cap range. A modest premium above the very largest mega-caps (e.g., AAPL/MSFT ~8-8.5%) is applied given elevated near-term execution risk on the ~$200B AI capex program (equipment obsolescence risk, AI-demand-mismatch risk, and ~$53B of new debt issued in Q1 2026 to help fund the buildout, raising interest-rate sensitivity). Bull case assumes execution de-risks (AI capacity monetizes on schedule); bear case assumes capex overbuild proves value-destructive, raising the discount rate applied to more uncertain, further-out cash flows."
+    }
+  },
+  "assumptions": {
+    "base": {
+      "revenue_growth_rates": [
+        10.5,
+        10.0,
+        9.5,
+        9.0,
+        8.5
+      ],
+      "fcf_margin_pct_of_revenue": [
+        2.5,
+        4.5,
+        6.0,
+        7.5,
+        8.5
+      ],
+      "growth_narrative": "Revenue growth decelerates from ~10.5% (Y1, roughly in line with Q2-2026 guidance of 11-14% and consensus deceleration) toward 8.5% by Y5, consistent with the 3yr/5yr revenue CAGR of 11.7%/13.2% moderating as the business matures. FCF margin stays depressed through Y1-Y2 (2.5%/4.5%) reflecting continued ~$200B+ capex intensity, then recovers toward 6.0%/7.5%/8.5% in Y3-Y5 as AWS/AI capacity monetizes and capex intensity normalizes from the FY2025-26 buildout peak.",
+      "wacc": 9.5,
+      "terminal_growth": 2.75
+    },
+    "bull": {
+      "revenue_growth_rates": [
+        15.0,
+        14.5,
+        13.5,
+        12.5,
+        11.5
+      ],
+      "fcf_margin_pct_of_revenue": [
+        4.5,
+        7.0,
+        9.0,
+        10.5,
+        12.0
+      ],
+      "growth_narrative": "AWS/AI reacceleration sustains (28% Q1-2026 AWS growth persists/extends on Anthropic/OpenAI multi-year compute commitments and Trainium3 price-performance advantage); advertising continues compounding at a high-margin, low-capex rate; retail margin structurally improves (record 13.1% Q1-2026 consolidated operating margin extends). FCF margin recovers faster and to a higher terminal level (12% by Y5) as AI capacity utilization and depreciation runoff both work in Amazon's favor ahead of schedule.",
+      "wacc": 8.75,
+      "terminal_growth": 3.25
+    },
+    "bear": {
+      "revenue_growth_rates": [
+        7.0,
+        6.5,
+        6.0,
+        5.5,
+        5.0
+      ],
+      "fcf_margin_pct_of_revenue": [
+        1.0,
+        2.0,
+        3.0,
+        4.0,
+        5.0
+      ],
+      "growth_narrative": "AI infrastructure overbuild risk materializes: AWS demand growth decelerates as AI compute capacity outpaces monetizable workloads, equipment depreciation/obsolescence accelerates, and a portion of the ~$200B+ capex program proves to generate sub-hurdle returns. Simultaneously, tariff-driven cost inflation and intensifying competition (Temu/Shein, Walmart) compress thin retail margins further. FCF margin stays structurally suppressed (5% by Y5, below even the pre-AI-supercycle historical range) as elevated capex intensity persists longer than the base case assumes.",
+      "wacc": 10.75,
+      "terminal_growth": 2.0
+    }
+  },
+  "projections": {
+    "base": {
+      "years": [
+        "Y1",
+        "Y2",
+        "Y3",
+        "Y4",
+        "Y5"
+      ],
+      "revenue": [
+        792201,
+        871421,
+        954206,
+        1040085,
+        1128492
+      ],
+      "fcf": [
+        19805,
+        39214,
+        57252,
+        78006,
+        95922
+      ],
+      "discount_factors": [
+        0.9132,
+        0.834,
+        0.7617,
+        0.6956,
+        0.6352
+      ],
+      "pv_fcf": [
+        18087,
+        32705,
+        43606,
+        54259,
+        60932
+      ]
+    },
+    "bull": {
+      "years": [
+        "Y1",
+        "Y2",
+        "Y3",
+        "Y4",
+        "Y5"
+      ],
+      "revenue": [
+        824463,
+        944010,
+        1071451,
+        1205382,
+        1344001
+      ],
+      "fcf": [
+        37101,
+        66081,
+        96431,
+        126565,
+        161280
+      ],
+      "discount_factors": [
+        0.9195,
+        0.8456,
+        0.7775,
+        0.715,
+        0.6574
+      ],
+      "pv_fcf": [
+        34116,
+        55875,
+        74977,
+        90489,
+        106031
+      ]
+    },
+    "bear": {
+      "years": [
+        "Y1",
+        "Y2",
+        "Y3",
+        "Y4",
+        "Y5"
+      ],
+      "revenue": [
+        767109,
+        816971,
+        865989,
+        913618,
+        959299
+      ],
+      "fcf": [
+        7671,
+        16339,
+        25980,
+        36545,
+        47965
+      ],
+      "discount_factors": [
+        0.9029,
+        0.8153,
+        0.7362,
+        0.6647,
+        0.6002
+      ],
+      "pv_fcf": [
+        6926,
+        13321,
+        19125,
+        24291,
+        28788
+      ]
+    }
+  },
+  "valuation": {
+    "note": "Net debt = -24,015 (net CASH position including marketable securities), so equity value = enterprise value + 24,015.",
+    "base": {
+      "sum_pv_fcf": 209590,
+      "terminal_value": 1460143,
+      "pv_terminal": 927523,
+      "enterprise_value": 1137113,
+      "net_debt": -24015,
+      "equity_value": 1161128,
+      "intrinsic_value": 107.97,
+      "upside": -53.5,
+      "terminal_pct_of_value": 81.6,
+      "implied_exit_multiple": 15.2
+    },
+    "bull": {
+      "sum_pv_fcf": 361488,
+      "terminal_value": 3027668,
+      "pv_terminal": 1990499,
+      "enterprise_value": 2351987,
+      "net_debt": -24015,
+      "equity_value": 2376002,
+      "intrinsic_value": 220.94,
+      "upside": -4.8,
+      "terminal_pct_of_value": 84.6,
+      "implied_exit_multiple": 18.8
+    },
+    "bear": {
+      "sum_pv_fcf": 92452,
+      "terminal_value": 559134,
+      "pv_terminal": 335581,
+      "enterprise_value": 428033,
+      "net_debt": -24015,
+      "equity_value": 452048,
+      "intrinsic_value": 42.04,
+      "upside": -81.9,
+      "terminal_pct_of_value": 78.4,
+      "implied_exit_multiple": 11.7
+    },
+    "current_ev_fcf_comparison": {
+      "current_ev": 2472096,
+      "current_ev_fcf_trough_fy2025": 220.8,
+      "current_ev_fcf_pre_supercycle_fy2024": 64.7,
+      "note": "Current EV/FCF is 220.8x on trough FY2025 FCF ($11.2B) -- a meaningless multiple given the denominator is artificially depressed by the capex supercycle, not a genuine earnings signal. Using FY2024 pre-supercycle FCF ($38.2B) as a rough proxy, current EV/FCF is ~64.7x. All three scenarios' implied exit multiples (11.7x-18.8x, applied to a much larger, margin-normalized Year-5 FCF base) sit well BELOW this pre-supercycle proxy multiple, meaning the model does NOT assume multiple expansion versus history -- it assumes FCF normalizes toward a level the market is already effectively pricing via its willingness to hold AMZN through the trough."
+    }
+  },
+  "entry_price": {
+    "hurdle_rate": 0.15,
+    "note": "Entry Price = ( sum(FCF_t / 1.15^t, t=1..5) + Gordon_TV_5 / 1.15^5 - net_debt ) / shares. TV_5 computed at WACC (fair year-5 exit value); only discounting back to today uses the 15% hurdle. net_debt = -24,015 (net cash), so equity value = discounted flows + 24,015.",
+    "base": {
+      "years_to_terminal": 5,
+      "pv_interim_fcf_at_hurdle": 176808,
+      "pv_terminal_at_hurdle": 725949,
+      "net_debt": -24015,
+      "entry_price": 86.18,
+      "entry_discount_from_current": -62.9,
+      "interpretation": "Base-case entry price ($86.18) is 62.9% below the current price of $232.11. At current prices, a buyer holding through Year 5 and exiting at the base-case Gordon terminal value would earn well below a 15% IRR -- consistent with the base intrinsic value ($107.97) also sitting far below the current price."
+    },
+    "bull": {
+      "years_to_terminal": 5,
+      "pv_interim_fcf_at_hurdle": 298182,
+      "pv_terminal_at_hurdle": 1505286,
+      "net_debt": -24015,
+      "entry_price": 169.94,
+      "entry_discount_from_current": -26.8,
+      "interpretation": "Bull-case entry price ($169.94) is 26.8% below current price. Even if the bull scenario (sustained AWS/AI reacceleration, faster margin normalization) materializes, today's price does not yet offer a 15% IRR entry point -- though the gap is much narrower than in the base/bear cases."
+    },
+    "bear": {
+      "years_to_terminal": 5,
+      "pv_interim_fcf_at_hurdle": 80849,
+      "pv_terminal_at_hurdle": 277989,
+      "net_debt": -24015,
+      "entry_price": 35.6,
+      "entry_discount_from_current": -84.7,
+      "interpretation": "Bear-case entry price ($35.60) is 84.7% below current price, reflecting that a bear scenario (AI capex overbuild, margin compression) would require a dramatically lower entry point to clear a 15% hurdle."
+    }
+  },
+  "sensitivity": {
+    "basis": "Base-case FCF path (revenue growth 10.5/10.0/9.5/9.0/8.5%, FCF margin 2.5/4.5/6.0/7.5/8.5% of revenue). Net debt = -24,015 (net cash). Values in USD per share.",
+    "wacc_range": [
+      7.5,
+      8.5,
+      9.5,
+      10.5,
+      11.5
+    ],
+    "terminal_growth_range": [
+      1.75,
+      2.25,
+      2.75,
+      3.25,
+      3.75
+    ],
+    "matrix": [
+      [
+        133.0,
+        144.0,
+        157.4,
+        174.0,
+        194.9
+      ],
+      [
+        111.8,
+        119.4,
+        128.4,
+        139.0,
+        151.9
+      ],
+      [
+        96.1,
+        101.6,
+        108.0,
+        115.3,
+        124.0
+      ],
+      [
+        84.1,
+        88.2,
+        92.9,
+        98.2,
+        104.3
+      ],
+      [
+        74.5,
+        77.7,
+        81.3,
+        85.3,
+        89.8
+      ]
+    ]
+  },
+  "probability_weighted": {
+    "weights": {
+      "bull": 0.25,
+      "base": 0.5,
+      "bear": 0.25
+    },
+    "weighted_iv": 119.73,
+    "upside_from_current_pct": -48.4,
+    "weight_rationale": "Standard 50/25/25 base/bull/bear weighting. Even the probability-weighted IV ($119.73) sits well below the current price ($232.11), implying the market is pricing a scenario more optimistic than this model's bull case (IV $220.94, essentially in line with current price) -- i.e., the market appears to be underwriting sustained AWS/AI reacceleration AND faster-than-historical FCF margin normalization simultaneously. This should be read as a signal that AMZN's current valuation depends heavily on the AI capex program paying off faster and at a higher terminal margin than this model's bull case assumes, not as a mechanical 'sell' signal -- see caveats below."
+  },
+  "model_caveats": [
+    "This is a mechanical revenue x FCF-margin DCF; it does not explicitly model the AWS/Advertising/Retail segment mix shift that is the actual driver of Amazon's margin structure. A sum-of-the-parts approach (separately valuing AWS at a cloud-infra multiple, advertising at an ad-business multiple, and retail at a thin-margin multiple) would likely produce a materially higher valuation, since AWS alone (28% growth, ~35% operating margin) is worth a premium multiple on a standalone basis that a single consolidated FCF-margin path understates.",
+    "All three scenarios show negative upside vs. the current $232.11 price, including the bull case (-4.8%). This does not necessarily mean AMZN is overvalued -- it means a consolidated-FCF DCF using historically-grounded margin assumptions is a conservative lens for a company mid-cycle in transforming its margin structure via AWS/AI/advertising mix shift. Investors should weight this DCF alongside segment-level (SOTP) and multiples-based cross-checks.",
+    "The ~$200B FY2026 capex guide is unprecedented in scale; if AI compute demand growth disappoints or Trainium economics underperform, the base/bear cases could still prove optimistic on how quickly FCF margin normalizes.",
+    "Net debt is modeled as net CASH of -$24,015M (including $41.3B of marketable securities). If capex continues to be debt-funded at the pace seen in Q1 2026 (~$53B raised), this net-cash cushion could erode over the projection period; this model treats net debt as a static Day-0 balance sheet item per the standard DCF methodology."
+  ],
+  "sanity_check": {
+    "ran": true,
+    "passed": true,
+    "checked_date": "2026-07-26",
+    "implied_multiples": {
+      "pe": 15.1,
+      "pb": 2.82,
+      "p_sales": 1.62
+    },
+    "historical_averages": {
+      "pe_avg_positive_eps_years": 83.5,
+      "pe_min": 32.2,
+      "pe_max": 190.1,
+      "pb_avg": 12.84,
+      "pb_max": 20.43,
+      "p_sales_avg": 3.16,
+      "p_sales_max": 4.24,
+      "note": "FY-end Dec closes, split-adjusted; FY2022 excluded from P/E (negative EPS)"
+    },
+    "trip_reasons": [],
+    "diagnosis": "No over-valuation trip. Base-case IV $107.97 implies 15.1x P/E and 2.8x P/B on FY2025 actuals \u2014 far BELOW the 10yr averages (83.5x P/E, 12.8x P/B) and below even the 10yr minimums (32.2x, 5.9x). The consolidated revenue-times-FCF-margin DCF is conservative relative to any multiple the market has paid for AMZN in a decade; the gap reflects the sum-of-the-parts limitation documented in model_caveats (AWS at ~35% margin growing 28% would command a premium multiple standalone).",
+    "fix_applied": null
+  }
+};
+
+/* =========================================================
+   CSV PARSING & SORTING
+   ========================================================= */
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => obj[h.trim()] = values[i]?.trim());
+        return obj;
+    });
+}
+
+const data = parseCSV(csvData);
+
+data.sort((a, b) => {
+    const parseDate = (p) => {
+        const year = parseInt(p.match(/\d{4}/)?.[0] || '0');
+        const isQ1 = p.includes('Q1');
+        const isQ2 = p.includes('Q2');
+        const isQ3 = p.includes('Q3');
+        const isQ4 = p.includes('Q4');
+        const isFY = p.startsWith('FY');
+        const subOrder = isQ1 ? 1 : isQ2 ? 2 : isQ3 ? 4 : isQ4 ? 5 : isFY ? 7 : 0;
+        return year * 10 + subOrder;
+    };
+    return parseDate(a.Period) - parseDate(b.Period);
+});
+
+const fyData = data.filter(d => d.Period.startsWith('FY'));
+const qData = data.filter(d => !d.Period.startsWith('FY'));
+const latestFY = fyData[fyData.length - 1];
+const prevFY = fyData[fyData.length - 2];
+const latestQ = qData[qData.length - 1]; // Q1 2026
+const yoyQ = qData.find(d => d.Period === 'Q1 2025'); // Q1 2025 for YoY
+
+/* =========================================================
+   HELPERS
+   ========================================================= */
+const colors = {
+    primary: '#00d4aa',
+    secondary: '#00b894',
+    tertiary: '#0984e3',
+    quaternary: '#6c5ce7',
+    warning: '#fdcb6e',
+    danger: '#ff6b6b',
+    na: '#0984e3',
+    intl: '#fdcb6e',
+    aws: '#00d4aa'
+};
+
+function calcYoYChange(current, previous) {
+    if (previous === undefined || current === undefined || previous === null || current === null) return null;
+    const c = parseFloat(current), p = parseFloat(previous);
+    if (isNaN(c) || isNaN(p) || p === 0) return null;
+    return ((c - p) / Math.abs(p) * 100).toFixed(1);
+}
+function formatChange(change, suffix) {
+    if (change === null) return 'N/A';
+    const sign = change >= 0 ? '+' : '';
+    return `${sign}${change}%${suffix || ' YoY'}`;
+}
+function getChangeClass(change) {
+    if (change === null) return '';
+    return change >= 0 ? 'positive' : 'negative';
+}
+function fmtB(v) {
+    const n = parseFloat(v);
+    if (isNaN(n)) return 'N/A';
+    return '$' + (n / 1000).toFixed(1) + 'B';
+}
+function fmtM(v) {
+    const n = parseFloat(v);
+    if (isNaN(n)) return 'N/A';
+    return '$' + n.toFixed(0) + 'M';
+}
+
+/* =========================================================
+   KPI CARDS
+   ========================================================= */
+function renderKPIs() {
+    const revYoYQ = calcYoYChange(latestQ.Revenue, yoyQ.Revenue);
+    const revYoYFY = calcYoYChange(latestFY.Revenue, prevFY.Revenue);
+    const awsYoYQ = calcYoYChange(latestQ.AWSRevenue, yoyQ.AWSRevenue);
+    const opMarginDeltaQ = (parseFloat(latestQ.OperatingMargin) - parseFloat(yoyQ.OperatingMargin)).toFixed(1);
+    const niYoYFY = calcYoYChange(latestFY.NetIncome, prevFY.NetIncome);
+    const epsYoYQ = calcYoYChange(latestQ.EPS, yoyQ.EPS);
+    const fcfYoYFY = calcYoYChange(latestFY.FreeCashFlow, prevFY.FreeCashFlow);
+    const capexPctRevFY = (parseFloat(latestFY.CapEx) / parseFloat(latestFY.Revenue) * 100).toFixed(1);
+
+    const kpis = [
+        {
+            label: 'Q1 2026 Net Sales',
+            value: fmtB(latestQ.Revenue),
+            change: revYoYQ,
+            changeText: formatChange(revYoYQ, ' YoY (Q1)')
+        },
+        {
+            label: 'FY2025 Net Sales',
+            value: fmtB(latestFY.Revenue),
+            change: revYoYFY,
+            changeText: formatChange(revYoYFY, ' YoY (FY)')
+        },
+        {
+            label: 'AWS Revenue Growth (Q1 2026)',
+            value: '+' + awsYoYQ + '%',
+            change: parseFloat(awsYoYQ),
+            changeText: 'Fastest in 15 quarters',
+            forceClass: 'positive'
+        },
+        {
+            label: 'Q1 2026 Operating Margin',
+            value: latestQ.OperatingMargin + '%',
+            change: parseFloat(opMarginDeltaQ),
+            changeText: (opMarginDeltaQ >= 0 ? '+' : '') + opMarginDeltaQ + 'pp YoY (record)'
+        },
+        {
+            label: 'FY2025 Net Income',
+            value: fmtB(latestFY.NetIncome),
+            change: niYoYFY,
+            changeText: formatChange(niYoYFY, ' YoY (FY)')
+        },
+        {
+            label: 'Q1 2026 Diluted EPS',
+            value: '$' + parseFloat(latestQ.EPS).toFixed(2),
+            change: epsYoYQ,
+            changeText: formatChange(epsYoYQ, ' YoY (Q1, incl. Anthropic gain)')
+        },
+        {
+            label: 'FY2025 Free Cash Flow',
+            value: fmtB(latestFY.FreeCashFlow),
+            change: fcfYoYFY,
+            changeText: formatChange(fcfYoYFY, ' YoY -- capex crush')
+        },
+        {
+            label: 'FY2025 CapEx / Revenue',
+            value: capexPctRevFY + '%',
+            change: null,
+            changeText: '~$200B guided for FY2026',
+            forceClass: 'negative'
+        }
+    ];
+
+    const grid = document.getElementById('kpiGrid');
+    grid.innerHTML = kpis.map(k => `
+        <div class="kpi-card">
+            <div class="kpi-value">${k.value}</div>
+            <div class="kpi-label">${k.label}</div>
+            <div class="kpi-change ${k.forceClass || getChangeClass(k.change)}">${k.changeText}</div>
+        </div>
+    `).join('');
+}
+
+/* =========================================================
+   OVERVIEW SECTION
+   ========================================================= */
+function toggleOverview() {
+    const btn = document.querySelector('.overview-toggle');
+    const content = document.getElementById('overviewContent');
+    btn.classList.toggle('active');
+    content.classList.toggle('active');
+}
+
+function renderOverview() {
+    const grid = document.getElementById('overviewGrid');
+    const bm = analysis.business_model;
+    const cp = analysis.competitive_position;
+
+    const revenueStreamsHtml = bm.revenue_streams.map(rs => `
+        <li class="revenue-stream">
+            <span>${rs.name} <em class="trend-${rs.trend}">(${rs.trend})</em></span>
+            <span class="percent">${rs.percent}%</span>
+        </li>
+    `).join('');
+
+    const moatHtml = cp.moat_factors.map(m => `
+        <li><strong>${m.factor}</strong> (${m.strength}): ${m.description}</li>
+    `).join('');
+
+    const growthHtml = analysis.growth_drivers.map(g => `<li>${g}</li>`).join('');
+
+    const allRisks = [
+        ...analysis.risks.business.map(r => ({...r, cat: 'Business'})),
+        ...analysis.risks.financial.map(r => ({...r, cat: 'Financial'})),
+        ...analysis.risks.regulatory.map(r => ({...r, cat: 'Regulatory'})),
+        ...analysis.risks.macro.map(r => ({...r, cat: 'Macro'}))
+    ];
+    const risksHtml = allRisks.map(r => `
+        <li><span class="risk-${r.severity}">[${r.severity.toUpperCase()}]</span> <strong>${r.risk}</strong> (${r.cat}): ${r.description}</li>
+    `).join('');
+
+    const bullHtml = analysis.bull_case.map(b => `<li>${b}</li>`).join('');
+    const bearHtml = analysis.bear_case.map(b => `<li>${b}</li>`).join('');
+    const devHtml = analysis.recent_developments.map(d => `<li><strong>${d.date}:</strong> ${d.event}</li>`).join('');
+
+    grid.innerHTML = `
+        <div class="overview-card">
+            <h3>Company Overview</h3>
+            <p>${analysis.overview}</p>
+        </div>
+        <div class="overview-card">
+            <h3>Business Model</h3>
+            <p>${bm.summary}</p>
+            <ul>${revenueStreamsHtml}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Competitive Position</h3>
+            <p><strong>Competitors:</strong> ${cp.main_competitors.join(', ')}</p>
+            <p>${cp.market_position}</p>
+            <p><strong>Moat:</strong></p>
+            <ul>${moatHtml}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Growth Drivers</h3>
+            <ul>${growthHtml}</ul>
+        </div>
+        <div class="overview-card risks">
+            <h3>Key Risks</h3>
+            <ul>${risksHtml}</ul>
+        </div>
+        <div class="overview-card bull">
+            <h3>Bull Case</h3>
+            <ul>${bullHtml}</ul>
+        </div>
+        <div class="overview-card bear">
+            <h3>Bear Case</h3>
+            <ul>${bearHtml}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Recent Developments</h3>
+            <ul>${devHtml}</ul>
+        </div>
+    `;
+}
+
+/* =========================================================
+   GUIDANCE SECTION
+   ========================================================= */
+function renderGuidance() {
+    if (!analysis.guidance || !analysis.guidance.items || analysis.guidance.items.length === 0) {
+        document.getElementById('guidanceSection').style.display = 'none';
+        return;
+    }
+    const guidance = analysis.guidance;
+    document.getElementById('guidanceAsOf').textContent = guidance.as_of || '';
+    document.getElementById('guidanceFY').textContent = guidance.fiscal_year || '';
+
+    const grid = document.getElementById('guidanceGrid');
+    grid.innerHTML = guidance.items.map(item => {
+        const vsClass = item.vs_prior ? item.vs_prior.toLowerCase().replace(/[^a-z]/g, '') : 'new';
+        const vsLabel = item.vs_prior ? item.vs_prior.charAt(0).toUpperCase() + item.vs_prior.slice(1) : 'New';
+        return `
+            <div class="guidance-card">
+                <div class="guidance-metric">${item.metric}</div>
+                <div class="guidance-target">${item.target}</div>
+                <div class="guidance-period">${item.period}</div>
+                <span class="guidance-vs-prior ${vsClass}">${vsLabel}</span>
+                ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+
+    const commentary = document.getElementById('guidanceCommentary');
+    if (guidance.management_commentary) {
+        commentary.textContent = guidance.management_commentary;
+        commentary.style.display = 'block';
+    } else {
+        commentary.style.display = 'none';
+    }
+}
+
+/* =========================================================
+   CHART DEFAULTS
+   ========================================================= */
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: { labels: { color: '#e0e0e0', font: { size: 11 } } },
+        tooltip: {
+            callbacks: {
+                label: function(ctx) {
+                    let label = ctx.dataset.label || '';
+                    if (label) label += ': ';
+                    if (ctx.parsed.y !== null) label += '$' + ctx.parsed.y.toLocaleString() + 'M';
+                    return label;
+                }
+            }
+        }
+    },
+    scales: {
+        x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+function freshScales() {
+    return {
+        x: { ...chartDefaults.scales.x },
+        y: { ...chartDefaults.scales.y }
+    };
+}
+
+const chartRegistry = {};
+function toggleLogScale(canvasId, btn) {
+    const chart = chartRegistry[canvasId];
+    if (!chart) return;
+    const toLog = chart.options.scales.y.type !== 'logarithmic';
+    chart.options.scales.y.type = toLog ? 'logarithmic' : 'linear';
+    btn.classList.toggle('active', toLog);
+    chart.update();
+}
+
+/* =========================================================
+   CHARTS
+   ========================================================= */
+function renderCharts() {
+    const fyLabels = fyData.map(d => d.Period);
+    const qLabels = qData.map(d => d.Period);
+
+    // Segment Revenue (Annual, stacked)
+    chartRegistry['segRevChart'] = new Chart(document.getElementById('segRevChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'North America', data: fyData.map(d => parseFloat(d.NAmericaRevenue)), backgroundColor: colors.na, stack: 's' },
+                { label: 'International', data: fyData.map(d => parseFloat(d.InternationalRevenue)), backgroundColor: colors.intl, stack: 's' },
+                { label: 'AWS', data: fyData.map(d => parseFloat(d.AWSRevenue)), backgroundColor: colors.aws, stack: 's' }
+            ]
+        },
+        options: {
+            ...chartDefaults,
+            scales: { ...freshScales(), x: { ...freshScales().x, stacked: true }, y: { ...freshScales().y, stacked: true } }
+        }
+    });
+
+    // Segment Revenue (Quarterly, stacked)
+    chartRegistry['segRevQChart'] = new Chart(document.getElementById('segRevQChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: qLabels,
+            datasets: [
+                { label: 'North America', data: qData.map(d => parseFloat(d.NAmericaRevenue)), backgroundColor: colors.na, stack: 's' },
+                { label: 'International', data: qData.map(d => parseFloat(d.InternationalRevenue)), backgroundColor: colors.intl, stack: 's' },
+                { label: 'AWS', data: qData.map(d => parseFloat(d.AWSRevenue)), backgroundColor: colors.aws, stack: 's' }
+            ]
+        },
+        options: {
+            ...chartDefaults,
+            scales: { ...freshScales(), x: { ...freshScales().x, stacked: true }, y: { ...freshScales().y, stacked: true } }
+        }
+    });
+
+    // Operating Income by Segment (Annual)
+    chartRegistry['segOpIncChart'] = new Chart(document.getElementById('segOpIncChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'North America', data: fyData.map(d => parseFloat(d.NAmericaOpInc)), backgroundColor: colors.na },
+                { label: 'International', data: fyData.map(d => parseFloat(d.InternationalOpInc)), backgroundColor: colors.intl },
+                { label: 'AWS', data: fyData.map(d => parseFloat(d.AWSOpInc)), backgroundColor: colors.aws }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+
+    // Operating Margin Trend (consolidated + AWS + NA)
+    const awsMarginFY = fyData.map(d => (parseFloat(d.AWSOpInc) / parseFloat(d.AWSRevenue) * 100).toFixed(1));
+    const naMarginFY = fyData.map(d => (parseFloat(d.NAmericaOpInc) / parseFloat(d.NAmericaRevenue) * 100).toFixed(1));
+    chartRegistry['opMarginChart'] = new Chart(document.getElementById('opMarginChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'Consolidated', data: fyData.map(d => parseFloat(d.OperatingMargin)), borderColor: colors.quaternary, backgroundColor: 'transparent', borderWidth: 2, tension: 0.3 },
+                { label: 'AWS', data: awsMarginFY, borderColor: colors.aws, backgroundColor: 'transparent', borderWidth: 2, tension: 0.3 },
+                { label: 'North America', data: naMarginFY, borderColor: colors.na, backgroundColor: 'transparent', borderWidth: 2, tension: 0.3 }
+            ]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}%` } } },
+            scales: freshScales()
+        }
+    });
+
+    // AWS Revenue Quarterly
+    chartRegistry['awsRevChart'] = new Chart(document.getElementById('awsRevChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: qLabels,
+            datasets: [{ label: 'AWS Revenue', data: qData.map(d => parseFloat(d.AWSRevenue)), backgroundColor: colors.aws }]
+        },
+        options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } }, scales: freshScales() }
+    });
+
+    // AWS YoY Growth %
+    const awsYoY = qData.map((d, i) => {
+        const yearAgo = qData.find(x => x.Period === periodMinusYear(d.Period));
+        return yearAgo ? parseFloat(calcYoYChange(d.AWSRevenue, yearAgo.AWSRevenue)) : null;
+    });
+    chartRegistry['awsGrowthChart'] = new Chart(document.getElementById('awsGrowthChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: qLabels,
+            datasets: [{ label: 'AWS YoY Growth %', data: awsYoY, borderColor: colors.aws, backgroundColor: 'rgba(0,212,170,0.1)', borderWidth: 2, tension: 0.3, fill: true, spanGaps: true }]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `AWS Growth: ${ctx.parsed.y}%` } } },
+            scales: freshScales()
+        }
+    });
+
+    // AWS vs NA margin quarterly
+    const awsMarginQ = qData.map(d => (parseFloat(d.AWSOpInc) / parseFloat(d.AWSRevenue) * 100).toFixed(1));
+    const naMarginQ = qData.map(d => (parseFloat(d.NAmericaOpInc) / parseFloat(d.NAmericaRevenue) * 100).toFixed(1));
+    chartRegistry['awsMarginChart'] = new Chart(document.getElementById('awsMarginChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: qLabels,
+            datasets: [
+                { label: 'AWS Margin', data: awsMarginQ, borderColor: colors.aws, backgroundColor: 'transparent', borderWidth: 2, tension: 0.3 },
+                { label: 'North America Margin', data: naMarginQ, borderColor: colors.na, backgroundColor: 'transparent', borderWidth: 2, tension: 0.3 }
+            ]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}%` } } },
+            scales: freshScales()
+        }
+    });
+
+    // AWS share of consolidated operating income (annual)
+    const awsShareFY = fyData.map(d => (parseFloat(d.AWSOpInc) / parseFloat(d.OperatingIncome) * 100).toFixed(1));
+    chartRegistry['awsShareChart'] = new Chart(document.getElementById('awsShareChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{ label: 'AWS Share of Op. Income', data: awsShareFY, backgroundColor: colors.aws }]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `AWS Share: ${ctx.parsed.y}%` } } },
+            scales: freshScales()
+        }
+    });
+
+    // OCF vs CapEx vs FCF (Annual)
+    chartRegistry['cashFlowChart'] = new Chart(document.getElementById('cashFlowChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'Operating Cash Flow', data: fyData.map(d => parseFloat(d.OperatingCashFlow)), backgroundColor: colors.tertiary, type: 'bar' },
+                { label: 'CapEx', data: fyData.map(d => -parseFloat(d.CapEx)), backgroundColor: colors.danger, type: 'bar' },
+                { label: 'Free Cash Flow', data: fyData.map(d => parseFloat(d.FreeCashFlow)), borderColor: colors.primary, backgroundColor: 'transparent', type: 'line', borderWidth: 3, tension: 0.3, pointRadius: 4 }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+
+    // OCF vs CapEx vs FCF (Quarterly)
+    chartRegistry['cashFlowQChart'] = new Chart(document.getElementById('cashFlowQChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: qLabels,
+            datasets: [
+                { label: 'Operating Cash Flow', data: qData.map(d => parseFloat(d.OperatingCashFlow)), backgroundColor: colors.tertiary, type: 'bar' },
+                { label: 'CapEx', data: qData.map(d => -parseFloat(d.CapEx)), backgroundColor: colors.danger, type: 'bar' },
+                { label: 'Free Cash Flow', data: qData.map(d => parseFloat(d.FreeCashFlow)), borderColor: colors.primary, backgroundColor: 'transparent', type: 'line', borderWidth: 3, tension: 0.3, pointRadius: 3 }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+
+    // CapEx as % of Revenue
+    const capexPct = fyData.map(d => (parseFloat(d.CapEx) / parseFloat(d.Revenue) * 100).toFixed(1));
+    chartRegistry['capexIntensityChart'] = new Chart(document.getElementById('capexIntensityChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [{ label: 'CapEx % of Revenue', data: capexPct, borderColor: colors.danger, backgroundColor: 'rgba(255,107,107,0.1)', borderWidth: 2, tension: 0.3, fill: true }]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `CapEx/Revenue: ${ctx.parsed.y}%` } } },
+            scales: freshScales()
+        }
+    });
+
+    // Net Cash/(Debt)
+    const netCash = fyData.map(d => (parseFloat(d.CashAndEquivalents) - parseFloat(d.TotalDebt)));
+    chartRegistry['netCashChart'] = new Chart(document.getElementById('netCashChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{ label: 'Net Cash / (Debt)', data: netCash, backgroundColor: netCash.map(v => v >= 0 ? colors.primary : colors.danger) }]
+        },
+        options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } }, scales: freshScales() }
+    });
+
+    // Net Income (Annual)
+    chartRegistry['netIncomeChart'] = new Chart(document.getElementById('netIncomeChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{ label: 'Net Income', data: fyData.map(d => parseFloat(d.NetIncome)), backgroundColor: fyData.map(d => parseFloat(d.NetIncome) >= 0 ? colors.quaternary : colors.danger) }]
+        },
+        options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } }, scales: freshScales() }
+    });
+
+    // EPS
+    chartRegistry['epsChart'] = new Chart(document.getElementById('epsChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [{ label: 'Diluted EPS', data: fyData.map(d => parseFloat(d.EPS)), borderColor: colors.warning, backgroundColor: 'rgba(253,203,110,0.1)', borderWidth: 2, tension: 0.3, fill: true, pointRadius: 4 }]
+        },
+        options: {
+            ...chartDefaults,
+            plugins: { ...chartDefaults.plugins, legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `EPS: $${ctx.parsed.y}` } } },
+            scales: freshScales()
+        }
+    });
+
+    // Shareholders Equity
+    chartRegistry['equityChart'] = new Chart(document.getElementById('equityChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [{ label: "Shareholders' Equity", data: fyData.map(d => parseFloat(d.ShareholdersEquity)), borderColor: colors.secondary, backgroundColor: 'rgba(0,184,148,0.1)', borderWidth: 2, tension: 0.3, fill: true, pointRadius: 4 }]
+        },
+        options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } }, scales: freshScales() }
+    });
+
+    // Total Revenue
+    chartRegistry['totalRevChart'] = new Chart(document.getElementById('totalRevChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [{ label: 'Total Revenue', data: fyData.map(d => parseFloat(d.Revenue)), borderColor: colors.primary, backgroundColor: 'rgba(0,212,170,0.1)', borderWidth: 2, tension: 0.3, fill: true, pointRadius: 4 }]
+        },
+        options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } }, scales: freshScales() }
+    });
+}
+
+function periodMinusYear(period) {
+    const m = period.match(/Q(\d) (\d{4})/);
+    if (!m) return null;
+    return `Q${m[1]} ${parseInt(m[2]) - 1}`;
+}
+
+/* =========================================================
+   METRIC DESCRIPTIONS (HELP MODALS)
+   ========================================================= */
+const metricDescriptions = {
+    segRev: {
+        title: "Revenue by Segment",
+        content: `
+            <p>Amazon reports three segments: <strong>North America</strong> (retail + advertising + subscriptions in the US/Canada/Mexico), <strong>International</strong> (same model outside NA), and <strong>AWS</strong> (cloud infrastructure).</p>
+            <div class="metric-highlight">
+                <strong>For Amazon:</strong> North America is the largest segment by revenue (59% of FY2025 sales) but AWS -- only 18% of revenue -- generates over half of consolidated operating income. Watch the revenue MIX shift toward AWS and advertising (embedded in each segment's "other" line) as the key margin driver.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>AWS revenue growth reacceleration (28% YoY in Q1 2026)</li>
+                <li>International's continuing margin inflection after years of losses</li>
+                <li>North America retail growth relative to overall e-commerce market growth</li>
+            </ul>
+        `
+    },
+    segOpInc: {
+        title: "Operating Income by Segment",
+        content: `
+            <p><strong>Segment operating income</strong> shows how much profit each of Amazon's three reportable segments contributes before corporate items.</p>
+            <div class="metric-highlight">
+                <strong>For Amazon:</strong> International was operating-loss-making from FY2016 through FY2022 (peak loss of -$7.7B in FY2022) and only turned durably profitable in FY2023-2024. AWS has been consistently and heavily profitable throughout, funding investment in the loss-making segments during the buildout years.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Whether International's newly-positive operating income is sustainable or slips back negative amid tariff/FX pressure</li>
+                <li>AWS operating income growth rate relative to AWS revenue growth (operating leverage)</li>
+            </ul>
+        `
+    },
+    opMargin: {
+        title: "Operating Margin Trend (Consolidated vs Segment)",
+        content: `
+            <p><strong>Operating Margin</strong> = Operating Income / Revenue. This chart compares consolidated margin against AWS's much higher margin and North America's much thinner retail margin.</p>
+            <div class="metric-highlight">
+                <strong>For Amazon:</strong> AWS margins run roughly 30-38%, dramatically higher than North America's low-to-high single digits (peaking near 8% in FY2024). Consolidated margin is essentially a blend weighted by revenue mix -- as AWS becomes a larger share of the mix, consolidated margin should structurally rise, all else equal.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Consolidated margin hit a record 13.1% in Q1 2026 -- watch whether this holds as capex-related depreciation ramps</li>
+                <li>Any compression in AWS margin from AI infrastructure depreciation outpacing AI revenue</li>
+            </ul>
+        `
+    },
+    awsRev: {
+        title: "AWS Revenue",
+        content: `
+            <p><strong>AWS (Amazon Web Services)</strong> revenue includes cloud computing, storage, database, machine learning, and generative AI services sold to enterprises, governments, and developers.</p>
+            <div class="metric-highlight">
+                <strong>For Amazon:</strong> AWS reached a ~$150B annualized run-rate in Q1 2026, with an AI-specific revenue run-rate already exceeding $15B. AWS is the primary reason to own Amazon stock today -- it is both the fastest-growing and highest-margin segment.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Sequential dollar growth (a better signal than YoY % at this scale)</li>
+                <li>Capacity constraints easing (management has repeatedly cited demand outstripping available Trainium/GPU capacity)</li>
+            </ul>
+        `
+    },
+    awsGrowth: {
+        title: "AWS YoY Growth Rate",
+        content: `
+            <p>This chart shows AWS revenue growth versus the same quarter one year prior, by quarter.</p>
+            <div class="metric-highlight">
+                <strong>For Amazon:</strong> AWS growth decelerated from the 30-40%+ range in 2021-2022 down to the high-teens by 2023-2024 as post-pandemic cloud optimization played out, then REACCELERATED to 28% in Q1 2026 -- the fastest pace in 15 quarters. This reacceleration, driven by generative AI workloads (Bedrock, Trainium) and easing capacity constraints, is the central bull thesis for the stock.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Whether the reacceleration trend continues into Q2/Q3 2026 (next earnings July 30, 2026)</li>
+                <li>Comparison to Azure and Google Cloud growth rates to gauge relative share gains</li>
+            </ul>
+        `
+    },
+    awsMargin: {
+        title: "AWS vs North America Operating Margin",
+        content: `
+            <p>Compares AWS's cloud infrastructure operating margin against North America's thin retail operating margin.</p>
+            <div class="metric-highlight">
+                <strong>For Amazon:</strong> AWS margin structure (~30-38%) reflects high fixed-cost infrastructure with strong operating leverage once utilization scales, similar to other hyperscalers (Azure, Google Cloud). North America's low margin (0-8%) reflects the thin-margin nature of retail/logistics, subsidized historically by 1-day/free shipping investments.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>AWS margin trajectory as AI infrastructure depreciation (shorter useful life for GPUs/Trainium vs traditional servers) flows through the P&L</li>
+                <li>North America margin sustainability amid tariffs and quick-commerce investment spend</li>
+            </ul>
+        `
+    },
+    awsShare: {
+        title: "AWS Share of Consolidated Operating Income",
+        content: `
+            <p>Shows what percentage of Amazon's total operating income comes from AWS alone.</p>
+            <div class="metric-highlight">
+                <strong>For Amazon:</strong> AWS has generated more than half of consolidated operating income in most recent years despite being less than a fifth of revenue -- a stark illustration of why investors value Amazon increasingly like a cloud/AI infrastructure company rather than a pure retailer.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Whether retail segment margin improvement (record Q1 2026 consolidated margin) starts to dilute AWS's dominant profit share -- a genuinely positive sign of retail health</li>
+                <li>Any AWS margin compression from AI capex depreciation that would mechanically raise this ratio's volatility</li>
+            </ul>
+        `
+    },
+    fcfSupercycle: {
+        title: "Operating Cash Flow vs CapEx vs Free Cash Flow -- The Capex Supercycle",
+        content: `
+            <p><strong>Free Cash Flow</strong> = Operating Cash Flow - Capital Expenditures. This is the single most important chart for understanding Amazon's stock today.</p>
+            <div class="metric-highlight">
+                <strong>For Amazon:</strong> Operating cash flow has climbed steadily (OCF margin: 14.8% FY2023 &rarr; 18.2% FY2024 &rarr; 19.5% FY2025), showing the underlying business is healthier than ever. But CapEx has exploded from $77.7B (FY2024) to $128.3B (FY2025), guided toward ~$200B for FY2026, crushing FY2025 FCF to just $11.2B. Q1 2026 FCF was actually NEGATIVE (-$17.2B) as the AI buildout intensified further.
+            </div>
+            <p><strong>Why FCF is deliberately negative right now:</strong> Management (CFO Brian Olsavsky) has explicitly framed this as a deliberate trade-off -- investing heavily today in AWS/AI data centers, power, and custom Trainium silicon to capture multi-year compute commitments from Anthropic and OpenAI. This mirrors past Amazon capex cycles (e.g., FY2021-2022 fulfillment overbuild) where FCF troughed before recovering as the new capacity monetized.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Whether AWS revenue growth (28% in Q1 2026) continues accelerating fast enough to justify the capex</li>
+                <li>Signs of FCF recovery in 2027+ as the capex cycle matures and depreciation stabilizes</li>
+                <li>How much of the capex is debt-funded (Amazon raised ~$53B in new debt in Q1 2026 alone)</li>
+            </ul>
+        `
+    },
+    capexIntensity: {
+        title: "CapEx as % of Revenue",
+        content: `
+            <p>Capital expenditures scaled by revenue shows how capital-intensive the business has become relative to its own growth.</p>
+            <div class="metric-highlight">
+                <strong>For Amazon:</strong> CapEx intensity has surged from a historical 8-13% of revenue range to 17.9% in FY2025, and is set to rise further in FY2026 given the ~$200B guide against a revenue base growing "only" ~11-17%. This is the clearest quantitative signal of how unprecedented the current AI infrastructure buildout is versus Amazon's own history.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Whether capex intensity peaks in 2026 and begins normalizing toward the historical 11-13% range, as management has signaled it eventually should</li>
+                <li>Comparisons to hyperscaler peers (Microsoft, Google) also running elevated AI capex programs</li>
+            </ul>
+        `
+    },
+    netCash: {
+        title: "Net Cash / (Debt) Position",
+        content: `
+            <p><strong>Net Cash/(Debt)</strong> = Cash &amp; Equivalents - Total Debt. A positive figure means the company holds more cash than debt.</p>
+            <div class="metric-highlight">
+                <strong>For Amazon:</strong> Amazon issued roughly $53B in new long-term debt in Q1 2026 alone to help fund the AI capex buildout, causing total debt to jump sharply. Including the $41.3B of marketable securities (which the DCF model treats as cash-equivalent), Amazon remains in a net CASH position (+$24.0B) as of Q1 2026, but this cushion could erode if debt-funded capex continues at this pace.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Continued reliance on debt issuance to fund the ~$200B FY2026 capex program</li>
+                <li>Credit rating agency commentary on leverage given the scale of the buildout</li>
+            </ul>
+        `
+    },
+    netIncome: {
+        title: "Net Income",
+        content: `
+            <p><strong>Net Income</strong> is Amazon's bottom-line GAAP profit after all expenses, including a large and growing non-operating component.</p>
+            <div class="metric-highlight">
+                <strong>For Amazon:</strong> Recent net income has been significantly boosted by non-cash, mark-to-market gains on equity/warrant stakes in Anthropic and Rivian -- e.g., a $15.2B gain in FY2025 and a $16.8B gain in Q1 2026 alone. These gains inflate headline net income and EPS well above what underlying operating cash generation would suggest.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Separate operating income (a cleaner signal) from net income when assessing quarter-to-quarter "beats"</li>
+                <li>Volatility in non-operating "other income/expense" tied to Rivian and Anthropic stake valuations</li>
+            </ul>
+        `
+    },
+    eps: {
+        title: "Diluted EPS (Split-Adjusted)",
+        content: `
+            <p><strong>Diluted EPS</strong> = Net Income / Diluted Weighted-Average Shares Outstanding. All historical figures here are adjusted for Amazon's 20-for-1 stock split effective June 2022.</p>
+            <div class="metric-highlight">
+                <strong>For Amazon:</strong> EPS swung negative in FY2022 (-$0.27) due to a large non-cash Rivian mark-to-market loss, then rebounded sharply -- partly on genuine operating improvement and partly on non-cash equity-stake gains (Anthropic, Rivian). Because of this volatility, EPS 3-year CAGR is undefined (negative starting base) and 5-year CAGR (28%) is not used as a DCF growth driver in this model.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Split-adjust any external EPS figures you compare against (pre-June-2022 GAAP filings report un-split EPS ~20x higher)</li>
+                <li>Strip out one-time equity-stake gains/losses when judging underlying earnings power</li>
+            </ul>
+        `
+    },
+    equity: {
+        title: "Shareholders' Equity",
+        content: `
+            <p><strong>Shareholders' Equity</strong> (book value) = Total Assets - Total Liabilities. Amazon retains 100% of net income (pays no dividend, minimal historical buybacks), so equity growth largely tracks cumulative retained earnings.</p>
+            <div class="metric-highlight">
+                <strong>For Amazon:</strong> Equity has compounded at a 41.2% 3yr CAGR / 34.5% 5yr CAGR -- dramatically faster than the 11.7%/13.2% revenue CAGR. This divergence is a red flag for naive book-value-based valuation: it largely reflects non-cash equity-stake mark-ups (Anthropic, Rivian) rather than organic operating value creation, which is why this DCF model uses revenue CAGR, not equity CAGR, as its growth driver.
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Equity growth continuing to outpace revenue/FCF growth is a sign to discount book-value-based valuation approaches for this stock</li>
+            </ul>
+        `
+    },
+    revenue: {
+        title: "Total Revenue",
+        content: `
+            <p><strong>Revenue</strong> (Net Sales) is the sum of all three segments: North America, International, and AWS.</p>
+            <div class="metric-highlight">
+                <strong>For Amazon:</strong> Revenue has compounded at an 11.7% 3-year CAGR / 13.2% 5-year CAGR and is the primary growth driver used in this DCF model (equity CAGR is rejected as misleading -- see the growth divergence warning in the DCF section below).
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Mix shift toward AWS/advertising (higher margin) versus retail (lower margin) within total revenue growth</li>
+                <li>Guidance beats/misses each quarter (Q2 2026 guided at $194-199B, +11-14% YoY)</li>
+            </ul>
+        `
+    }
+};
+
+/* =========================================================
+   MODAL FUNCTIONS
+   ========================================================= */
+function openModal(key) {
+    const metric = metricDescriptions[key];
+    if (!metric) return;
+    document.getElementById('modalTitle').textContent = metric.title;
+    document.getElementById('modalBody').innerHTML = metric.content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+/* =========================================================
+   DCF SECTION
+   ========================================================= */
+let currentScenario = 'base';
+
+function initDCF() {
+    if (!dcfData || !dcfData.valuation) return;
+
+    document.getElementById('dcfCurrent').textContent = '$' + dcfData.current_price.toFixed(0);
+
+    if (dcfData.historical_growth.growth_divergence_warning) {
+        document.getElementById('growthWarning').style.display = 'flex';
+        document.getElementById('warningText').textContent = dcfData.historical_growth.growth_divergence_warning;
+    }
+
+    const base = dcfData.assumptions.base;
+    document.getElementById('growthSlider').value = dcfData.historical_growth.selected_growth_rate;
+    document.getElementById('waccSlider').value = base.wacc;
+    document.getElementById('terminalSlider').value = base.terminal_growth;
+
+    document.getElementById('growthValue').textContent = dcfData.historical_growth.selected_growth_rate + '%';
+    document.getElementById('waccValue').textContent = base.wacc + '%';
+    document.getElementById('terminalValue').textContent = base.terminal_growth + '%';
+
+    document.getElementById('growthHint').textContent = 'Based on ' + dcfData.historical_growth.growth_rate_source.replace(/_/g, ' ');
+
+    // Net debt / cash display
+    const netDebtEl = document.getElementById('netDebt');
+    const nd = dcfData.inputs.net_debt;
+    if (nd < 0) {
+        netDebtEl.textContent = '+$' + (Math.abs(nd) / 1000).toFixed(1) + 'B';
+        netDebtEl.style.color = '#00d4aa';
+    } else {
+        netDebtEl.textContent = '-$' + (nd / 1000).toFixed(1) + 'B';
+        netDebtEl.style.color = '#ff6b6b';
+    }
+
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    switchScenario('base');
+}
+
+// Use the model's own pre-computed FCF-margin path per scenario for the projection table
+function renderFCFProjections(scenario) {
+    const proj = dcfData.projections[scenario];
+    const assumptions = dcfData.assumptions[scenario];
+    const currency = '$';
+
+    const formatFCF = (n) => {
+        if (Math.abs(n) >= 1000) return currency + (n / 1000).toFixed(1) + 'B';
+        return currency + n.toFixed(0) + 'M';
+    };
+
+    let html = `
+        <div class="fcf-projection-item header">Base (FY25)</div>
+        <div class="fcf-projection-item header">Year 1</div>
+        <div class="fcf-projection-item header">Year 2</div>
+        <div class="fcf-projection-item header">Year 3</div>
+        <div class="fcf-projection-item header">Year 4</div>
+        <div class="fcf-projection-item header">Year 5</div>
+    `;
+    html += `<div class="fcf-projection-item">
+        <div class="fcf-value">${formatFCF(dcfData.inputs.last_fcf)}</div>
+        <div class="growth-rate">trough</div>
+    </div>`;
+    for (let i = 0; i < 5; i++) {
+        html += `<div class="fcf-projection-item">
+            <div class="fcf-value">${formatFCF(proj.fcf[i])}</div>
+            <div class="growth-rate">${assumptions.fcf_margin_path[i]}% margin</div>
+        </div>`;
+    }
+    document.getElementById('fcfProjectionTable').innerHTML = html;
+}
+
+// Calculate DCF from slider inputs using revenue x FCF-margin-path methodology
+function calculateDCF(scenario, startGrowth, wacc, terminalGrowth) {
+    const years = 5;
+    const hurdle = 0.15;
+    const assumptions = dcfData.assumptions[scenario];
+    const marginPath = assumptions.fcf_margin_path;
+    let revenue = parseFloat(latestFY.Revenue);
+    let pvFCF = 0;
+    let pvFCFHurdle = 0;
+    let fcfYear5 = 0;
+
+    // decelerating growth from slider start toward scenario's Y5 growth rate
+    const endGrowth = assumptions.growth_rates[4];
+    for (let i = 0; i < years; i++) {
+        const yearGrowth = startGrowth > endGrowth
+            ? startGrowth - (startGrowth - endGrowth) * (i / 4)
+            : startGrowth;
+        revenue *= (1 + yearGrowth / 100);
+        const fcf = revenue * (marginPath[i] / 100);
+        if (i === years - 1) fcfYear5 = fcf;
+        pvFCF += fcf / Math.pow(1 + wacc / 100, i + 1);
+        pvFCFHurdle += fcf / Math.pow(1 + hurdle, i + 1);
+    }
+
+    const terminalFCF = fcfYear5 * (1 + terminalGrowth / 100);
+    const terminalValue = terminalFCF / (wacc / 100 - terminalGrowth / 100);
+    const pvTerminal = terminalValue / Math.pow(1 + wacc / 100, years);
+
+    const enterpriseValue = pvFCF + pvTerminal;
+    const equityValue = enterpriseValue - dcfData.inputs.net_debt;
+    const iv = equityValue / dcfData.inputs.shares_outstanding;
+
+    const entryPrice = (pvFCFHurdle + terminalValue / Math.pow(1 + hurdle, years) - dcfData.inputs.net_debt) / dcfData.inputs.shares_outstanding;
+
+    return { iv, entryPrice, pvFCF, pvTerminal, enterpriseValue };
+}
+
+window.updateDCFDisplay = function() {
+    const growth = parseFloat(document.getElementById('growthSlider').value);
+    const wacc = parseFloat(document.getElementById('waccSlider').value);
+    const terminal = parseFloat(document.getElementById('terminalSlider').value);
+
+    document.getElementById('growthValue').textContent = growth + '%';
+    document.getElementById('waccValue').textContent = wacc + '%';
+    document.getElementById('terminalValue').textContent = terminal + '%';
+
+    renderFCFProjections(currentScenario);
+
+    const result = calculateDCF(currentScenario, growth, wacc, terminal);
+
+    document.getElementById('dcfIV').textContent = '$' + result.iv.toFixed(0);
+    document.getElementById('dcfEntry').textContent = '$' + result.entryPrice.toFixed(0);
+
+    const upside = ((result.iv - dcfData.current_price) / dcfData.current_price * 100);
+    const upsideEl = document.getElementById('dcfUpside');
+    upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(0) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+    upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+    document.getElementById('dcfWeighted').textContent = '$' + dcfData.probability_weighted.weighted_iv.toFixed(0);
+
+    const grid = document.getElementById('assumptionGrid');
+    if (grid) {
+        grid.innerHTML = `
+            <div class="assumption-item"><div class="label">Growth Rate (Y1)</div><div class="value">${growth}%</div></div>
+            <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc}%</div></div>
+            <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${terminal}%</div></div>
+            <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa;">$${result.iv.toFixed(0)}</div></div>
+            <div class="assumption-item"><div class="label">Entry Price</div><div class="value" style="color:#00d4aa;">$${result.entryPrice.toFixed(0)}</div></div>
+        `;
+    }
+};
+
+window.switchScenario = function(scenario) {
+    currentScenario = scenario;
+
+    document.querySelectorAll('.scenario-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.scenario === scenario);
+    });
+
+    const assumptions = dcfData.assumptions[scenario];
+    const valuation = dcfData.valuation[scenario];
+
+    document.getElementById('growthSlider').value = assumptions.growth_rates[0];
+    document.getElementById('waccSlider').value = assumptions.wacc;
+    document.getElementById('terminalSlider').value = assumptions.terminal_growth;
+
+    document.getElementById('scenarioNarrative').textContent = assumptions.growth_narrative;
+
+    renderFCFProjections(scenario);
+
+    const grid = document.getElementById('assumptionGrid');
+    grid.innerHTML = `
+        <div class="assumption-item"><div class="label">Year 1 Growth</div><div class="value">${assumptions.growth_rates[0]}%</div></div>
+        <div class="assumption-item"><div class="label">Year 5 Growth</div><div class="value">${assumptions.growth_rates[4]}%</div></div>
+        <div class="assumption-item"><div class="label">Year 5 FCF Margin</div><div class="value">${assumptions.fcf_margin}%</div></div>
+        <div class="assumption-item"><div class="label">WACC</div><div class="value">${assumptions.wacc}%</div></div>
+        <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${assumptions.terminal_growth}%</div></div>
+        <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa;">$${valuation.intrinsic_value.toFixed(0)}</div></div>
+    `;
+
+    updateDCFDisplay();
+};
+
+function renderHistoricalGrowth() {
+    const growth = dcfData.historical_growth;
+    const selectedSource = growth.growth_rate_source;
+    const grid = document.getElementById('growthGrid');
+
+    const metrics = [
+        { key: 'revenue_3yr_cagr', label: 'Revenue 3Y' },
+        { key: 'revenue_5yr_cagr', label: 'Revenue 5Y' },
+        { key: 'eps_5yr_cagr', label: 'EPS 5Y' },
+        { key: 'equity_3yr_cagr', label: 'Equity 3Y' },
+        { key: 'equity_5yr_cagr', label: 'Equity 5Y' }
+    ];
+
+    grid.innerHTML = metrics.map(m => {
+        const rate = growth[m.key];
+        const isSelected = m.key === selectedSource;
+        if (rate === null || rate === undefined) {
+            return `
+                <div class="growth-item">
+                    <div class="metric">${m.label}</div>
+                    <div class="rate neutral">N/M</div>
+                </div>
+            `;
+        }
+        const colorClass = rate >= 0 ? 'positive' : 'negative';
+        return `
+            <div class="growth-item ${isSelected ? 'selected' : ''}">
+                <div class="metric">${m.label}</div>
+                <div class="rate ${colorClass}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const table = document.getElementById('sensitivityMatrix');
+    const currentPrice = dcfData.current_price;
+
+    let html = '<tr><th>WACC \\ Term G</th>';
+    sens.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+    html += '</tr>';
+
+    sens.wacc_range.forEach((wacc, i) => {
+        html += `<tr><th>${wacc}%</th>`;
+        sens.matrix[i].forEach((val, j) => {
+            const isHighlight = wacc === dcfData.assumptions.base.wacc && sens.terminal_growth_range[j] === dcfData.assumptions.base.terminal_growth;
+            const colorClass = val >= currentPrice ? 'above-current' : 'below-current';
+            html += `<td class="${isHighlight ? 'highlight' : colorClass}">$${val}</td>`;
+        });
+        html += '</tr>';
+    });
+
+    table.innerHTML = html;
+}
+
+/* =========================================================
+   INIT
+   ========================================================= */
+document.getElementById('dateRange').textContent =
+    `${fyData[0].Period} - ${latestQ.Period} | E-commerce, Cloud (AWS), Advertising & Logistics`;
+
+renderKPIs();
+renderOverview();
+renderGuidance();
+renderCharts();
+initDCF();
+
+(function() {
+    var growthSlider = document.getElementById('growthSlider');
+    var waccSlider = document.getElementById('waccSlider');
+    var terminalSlider = document.getElementById('terminalSlider');
+    if (growthSlider) { growthSlider.oninput = window.updateDCFDisplay; growthSlider.onchange = window.updateDCFDisplay; }
+    if (waccSlider) { waccSlider.oninput = window.updateDCFDisplay; waccSlider.onchange = window.updateDCFDisplay; }
+    if (terminalSlider) { terminalSlider.oninput = window.updateDCFDisplay; terminalSlider.onchange = window.updateDCFDisplay; }
+})();
+</script>
+</body>
+</html>
