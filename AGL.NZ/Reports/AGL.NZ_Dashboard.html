@@ -1,0 +1,1591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Accordant Group Limited (AGL.NZ) Financial Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 20px;
+}
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+}
+.header h1 {
+    font-size: 2.5rem;
+    background: linear-gradient(90deg, #00d4aa, #00b894);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+}
+.header p { color: #888; font-size: 1.1rem; }
+.header .subtag { color: #fdcb6e; font-size: 0.95rem; margin-top: 8px; }
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.kpi-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.kpi-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 212, 170, 0.2);
+}
+.kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+.kpi-value.negative { color: #ff6b6b; }
+.kpi-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.kpi-change { font-size: 0.9rem; margin-top: 5px; }
+.kpi-change.positive { color: #00d4aa; }
+.kpi-change.negative { color: #ff6b6b; }
+.kpi-note { font-size: 0.7rem; color: #666; margin-top: 6px; line-height: 1.3; }
+
+/* Guidance Section */
+.guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+.guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 8px; }
+.guidance-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.guidance-header h3::before {
+    content: ''; display: inline-block; width: 4px; height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px;
+}
+.guidance-meta { font-size: 0.85rem; color: #888; }
+.guidance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.guidance-card {
+    background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.1); transition: transform 0.2s ease;
+}
+.guidance-card:hover { transform: translateY(-2px); }
+.guidance-metric { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.guidance-target { font-size: 1.4rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; }
+.guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
+.guidance-vs-prior { display: inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+.guidance-vs-prior.raised { background: rgba(0, 212, 170, 0.15); color: #00d4aa; }
+.guidance-vs-prior.lowered { background: rgba(255, 107, 107, 0.15); color: #ff6b6b; }
+.guidance-vs-prior.maintained { background: rgba(255, 255, 255, 0.1); color: #888; }
+.guidance-vs-prior.new { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
+.guidance-notes { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
+.guidance-commentary {
+    background: rgba(255, 255, 255, 0.03); border-radius: 10px; padding: 16px 20px;
+    border-left: 3px solid #00d4aa; font-style: italic; color: #b0b0b0; line-height: 1.6;
+}
+.guidance-commentary::before { content: '"'; font-size: 1.5rem; color: #00d4aa; margin-right: 4px; }
+
+.section-title {
+    font-size: 1.5rem; color: #fff; margin: 40px auto 20px; padding-bottom: 10px;
+    border-bottom: 2px solid rgba(0, 212, 170, 0.3); max-width: 1400px;
+}
+.charts-container {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 25px; max-width: 1400px; margin: 0 auto;
+}
+.chart-card {
+    background: rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.chart-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.chart-header h3::before {
+    content: ''; display: inline-block; width: 4px; height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px;
+}
+.help-btn {
+    width: 24px; height: 24px; border-radius: 50%; background: rgba(0, 212, 170, 0.2);
+    border: 1px solid #00d4aa; color: #00d4aa; font-size: 14px; font-weight: bold; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;
+}
+.help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.chart-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.log-toggle {
+    padding: 3px 10px; border-radius: 12px; background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2); color: #888; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s ease;
+}
+.log-toggle:hover { border-color: #00d4aa; color: #00d4aa; }
+.log-toggle.active { background: rgba(0, 212, 170, 0.2); border-color: #00d4aa; color: #00d4aa; }
+.chart-wrapper { position: relative; height: 300px; }
+.chart-note { font-size: 0.75rem; color: #666; margin-top: 10px; line-height: 1.4; }
+
+.modal-overlay {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.7); z-index: 1000; justify-content: center; align-items: center; padding: 20px;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+    background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%); border-radius: 16px;
+    max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto;
+    border: 1px solid rgba(0, 212, 170, 0.3); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.modal-header {
+    padding: 20px 25px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.modal-header h3 { color: #00d4aa; font-size: 1.4rem; margin: 0; }
+.modal-close {
+    width: 32px; height: 32px; border-radius: 50%; background: rgba(255, 107, 107, 0.2);
+    border: 1px solid #ff6b6b; color: #ff6b6b; font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+.modal-close:hover { background: #ff6b6b; color: #fff; }
+.modal-body { padding: 25px; line-height: 1.7; }
+.modal-body p { margin-bottom: 15px; }
+.modal-body strong { color: #00d4aa; }
+.modal-body ul { margin: 15px 0; padding-left: 20px; }
+.modal-body li { margin-bottom: 8px; }
+.metric-highlight {
+    background: rgba(0, 212, 170, 0.1); border-left: 3px solid #00d4aa; padding: 12px 15px;
+    margin: 15px 0; border-radius: 0 8px 8px 0;
+}
+
+/* Investment Overview Section */
+.overview-section { max-width: 1400px; margin: 0 auto 30px; }
+.overview-toggle {
+    width: 100%; background: rgba(0, 212, 170, 0.1); border: 1px solid rgba(0, 212, 170, 0.3);
+    border-radius: 12px; padding: 16px 24px; color: #00d4aa; font-size: 1.1rem; font-weight: 600;
+    cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease;
+}
+.overview-toggle:hover { background: rgba(0, 212, 170, 0.2); }
+.overview-toggle .arrow { transition: transform 0.3s ease; }
+.overview-toggle.active .arrow { transform: rotate(180deg); }
+.overview-content {
+    display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: none; border-radius: 0 0 12px 12px; padding: 30px; margin-top: -12px;
+}
+.overview-content.active { display: block; }
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+.overview-card {
+    background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.overview-card h3 {
+    color: #00d4aa; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.overview-card p { margin-bottom: 12px; line-height: 1.6; }
+.overview-card ul { list-style: none; padding: 0; margin: 0; }
+.overview-card li { padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); line-height: 1.5; }
+.overview-card li:last-child { border-bottom: none; }
+.overview-card.bull h3 { color: #00d4aa; }
+.overview-card.bear h3 { color: #ff6b6b; }
+.overview-card.risks h3 { color: #fdcb6e; }
+.overview-card.moat h3 { color: #fdcb6e; }
+.risk-high { color: #ff6b6b; }
+.risk-moderate { color: #fdcb6e; }
+.risk-low { color: #00d4aa; }
+.revenue-stream { display: flex; justify-content: space-between; align-items: center; }
+.revenue-stream .percent { color: #00d4aa; font-weight: 600; }
+.trend-growing { color: #00d4aa; }
+.trend-stable { color: #888; }
+.trend-declining { color: #ff6b6b; }
+
+/* Segment comparison card */
+.segment-compare {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1400px; margin: 0 auto 30px;
+}
+.segment-card {
+    background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.segment-card h4 { color: #00d4aa; margin-bottom: 10px; font-size: 1rem; }
+.segment-card .seg-value { font-size: 1.6rem; font-weight: bold; color: #fff; }
+.segment-card .seg-detail { font-size: 0.85rem; color: #888; margin-top: 6px; }
+
+/* Banner */
+.model-banner {
+    max-width: 1400px; margin: 0 auto 25px; background: rgba(253, 203, 110, 0.08);
+    border: 1px solid rgba(253, 203, 110, 0.3); border-radius: 12px; padding: 22px 26px;
+}
+.model-banner h3 { color: #fdcb6e; font-size: 1.15rem; margin-bottom: 12px; }
+.model-banner p { color: #cfcfcf; line-height: 1.65; margin-bottom: 10px; font-size: 0.92rem; }
+.model-banner p:last-child { margin-bottom: 0; }
+.model-banner strong { color: #fdcb6e; }
+
+/* DCF Valuation Section */
+.dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+.dcf-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+.dcf-card {
+    background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 24px; text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1); transition: transform 0.3s ease;
+}
+.dcf-card:hover { transform: translateY(-3px); }
+.dcf-card.highlight { background: rgba(0, 212, 170, 0.1); border-color: rgba(0, 212, 170, 0.3); }
+.dcf-card.negative { background: rgba(255, 107, 107, 0.08); border-color: rgba(255, 107, 107, 0.3); }
+.dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.dcf-value { font-size: 2.2rem; font-weight: bold; color: #00d4aa; }
+.dcf-value.negative-value { color: #ff6b6b; }
+.dcf-card:not(.highlight):not(.negative) .dcf-value { color: #fff; }
+.dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+.dcf-change.positive { color: #00d4aa; }
+.dcf-change.negative { color: #ff6b6b; }
+.dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
+.dcf-warning {
+    background: rgba(253, 203, 110, 0.15); border: 1px solid rgba(253, 203, 110, 0.4); border-radius: 8px;
+    padding: 12px 16px; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; color: #fdcb6e;
+}
+.warning-icon { font-size: 1.2rem; }
+.dcf-inputs {
+    background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; margin-bottom: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+.dcf-inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.dcf-input-card {
+    background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 12px; text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #00d4aa; }
+.dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
+.fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
+.fcf-projection-table {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px;
+    background: rgba(0, 0, 0, 0.2); border-radius: 8px; padding: 12px; overflow-x: auto;
+}
+.fcf-projection-item { text-align: center; }
+.fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
+.fcf-projection-item .year { font-size: 0.75rem; color: #888; margin-bottom: 2px; }
+.fcf-projection-item .fcf-value { font-size: 1rem; color: #e0e0e0; font-weight: 500; }
+.fcf-projection-item .growth-rate { font-size: 0.75rem; color: #00d4aa; margin-top: 2px; }
+.dcf-controls {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; margin-bottom: 30px;
+    padding: 25px; background: rgba(255, 255, 255, 0.03); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.slider-group { display: flex; flex-direction: column; gap: 10px; }
+.slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+.slider-group label span { color: #00d4aa; font-weight: 600; }
+.slider-group input[type="range"] {
+    -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); outline: none;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #00d4aa;
+    cursor: pointer; transition: transform 0.2s;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.slider-hint { font-size: 0.8rem; color: #666; }
+.scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+.scenario-tab {
+    padding: 10px 24px; border: 1px solid rgba(255, 255, 255, 0.2); background: transparent; color: #888;
+    border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s;
+}
+.scenario-tab:hover { border-color: rgba(0, 212, 170, 0.5); color: #e0e0e0; }
+.scenario-tab.active { background: rgba(0, 212, 170, 0.15); border-color: #00d4aa; color: #00d4aa; }
+.scenario-details {
+    background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; margin-bottom: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.scenario-details h4 { color: #00d4aa; margin-bottom: 15px; }
+.assumption-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+.assumption-item { text-align: center; }
+.assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+.assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
+.sensitivity-section { margin-bottom: 30px; }
+.sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; }
+.sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255, 255, 255, 0.03); border-radius: 8px; overflow: hidden; }
+.sensitivity-table th, .sensitivity-table td { padding: 12px 16px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); }
+.sensitivity-table th { background: rgba(0, 212, 170, 0.1); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td { color: #e0e0e0; }
+.sensitivity-table td.highlight { background: rgba(0, 212, 170, 0.15); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td.below-current { color: #ff6b6b; }
+.sensitivity-table td.above-current { color: #00d4aa; }
+.historical-growth { margin-bottom: 30px; }
+.historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
+.growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
+.growth-item { background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 15px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); }
+.growth-item .metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
+.growth-item .rate { font-size: 1.2rem; font-weight: 600; }
+.growth-item .rate.positive { color: #00d4aa; }
+.growth-item .rate.negative { color: #ff6b6b; }
+.growth-item.selected { border-color: #00d4aa; background: rgba(0, 212, 170, 0.1); }
+.dcf-download { text-align: center; margin-top: 30px; }
+.download-btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; background: rgba(0, 212, 170, 0.15);
+    border: 1px solid #00d4aa; border-radius: 8px; color: #00d4aa; text-decoration: none; font-weight: 600; transition: all 0.2s;
+}
+.download-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.download-icon { font-size: 1.2rem; }
+
+.footer-note {
+    max-width: 1400px; margin: 30px auto 0; text-align: center; color: #555; font-size: 0.8rem; line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+    .charts-container { grid-template-columns: 1fr; }
+    .overview-grid { grid-template-columns: 1fr; }
+    .segment-compare { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.8rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Accordant Group Limited (AGL.NZ)</h1>
+    <p>NZ Staffing &amp; Recruitment Group &mdash; AWF (Blue Collar) | Madison / Absolute IT / JacksonStone &amp; Partners / Hobson Leavy (White Collar)</p>
+    <p class="subtag">FY ends 31 March &middot; Distressed cyclical, post rescue rights issue (May 2026) &middot; Current price NZ$0.166</p>
+</div>
+
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid">
+            <div class="overview-card">
+                <h3>Company Overview</h3>
+                <p id="ovOverview"></p>
+            </div>
+            <div class="overview-card">
+                <h3>Business Model</h3>
+                <p id="ovBizSummary"></p>
+                <ul id="ovRevStreams"></ul>
+            </div>
+            <div class="overview-card">
+                <h3>Competitive Position</h3>
+                <p id="ovCompetitors"></p>
+                <p><strong>Moat factors:</strong></p>
+                <ul id="ovMoat"></ul>
+            </div>
+            <div class="overview-card moat">
+                <h3>Moat Rating: None</h3>
+                <p id="ovMoatRating"></p>
+            </div>
+            <div class="overview-card">
+                <h3>Growth Drivers</h3>
+                <ul id="ovGrowth"></ul>
+            </div>
+            <div class="overview-card risks">
+                <h3>Key Risks</h3>
+                <ul id="ovRisks"></ul>
+            </div>
+            <div class="overview-card bull">
+                <h3>Bull Case</h3>
+                <ul id="ovBull"></ul>
+            </div>
+            <div class="overview-card bear">
+                <h3>Bear Case</h3>
+                <ul id="ovBear"></ul>
+            </div>
+            <div class="overview-card">
+                <h3>Recent Developments</h3>
+                <ul id="ovRecent"></ul>
+            </div>
+            <div class="overview-card">
+                <h3>Cyclicality</h3>
+                <p id="ovCyclicality"></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<div class="segment-compare" id="segmentCompare"></div>
+
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf">FY2026 Annual Report</span> | <span id="guidanceFY">FY2027</span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<h2 class="section-title">Revenue &amp; Profitability</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Revenue by Fiscal Year</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('revenueChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('revenue')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="revenueChart"></canvas></div>
+        <div class="chart-note">Revenue almost halved from the FY2023 post-COVID peak ($227.4m) to FY2026 ($165.1m) &mdash; a severe cyclical downturn, not a structural decline.</div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>H1 vs Full Year Revenue</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('h1fyChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('h1fy')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="h1fyChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>NPAT (Net Profit / Loss After Tax)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('npat')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="npatChart"></canvas></div>
+        <div class="chart-note">FY2024 loss of $10.0m includes $11.0m of non-cash goodwill impairment (Madison $6.5m, AWF $4.5m) &mdash; the underlying trading result was smaller. Red bars = net loss years.</div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>EBITDA vs Depreciation &amp; Amortisation</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('ebitda')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="ebitdaChart"></canvas></div>
+        <div class="chart-note">EBITDA step-up from FY2020 to FY2021 reflects IFRS-16 lease capitalisation (rent moved below the EBITDA line into D&amp;A and finance costs), not a genuine margin improvement.</div>
+    </div>
+</div>
+
+<h2 class="section-title">Cash Flow &amp; Owner Economics</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Owner FCF Bridge (OCF &rarr; Capex &rarr; Lease Principal)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('ownerfcf')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="fcfChart"></canvas></div>
+        <div class="chart-note">Owner FCF = Operating Cash Flow &minus; Capex &minus; IFRS-16 Lease Principal Repayments. Turned negative in FY2024-26 as the downturn bit.</div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Owner FCF Margin (% of Revenue)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('fcfmargin')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="fcfMarginChart"></canvas></div>
+        <div class="chart-note">FY2021's 8.7% margin was a COVID wage-subsidy-era anomaly, not the sustainable run rate. FY19-23 ex-COVID average is ~2.15%.</div>
+    </div>
+</div>
+
+<h2 class="section-title">Balance Sheet &amp; Leverage</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Bank Debt vs Shareholders' Equity</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('leverage')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="leverageChart"></canvas></div>
+        <div class="chart-note">FY2026 net bank debt $28.5m vs equity of only $17.9m (2.85x D/E at Sept-2025). The May-2026 rights issue reduced net debt to a pro-forma ~$24.0m, still against equity that is entirely goodwill/intangible-backed.</div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Goodwill &amp; Impairment Charges</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('goodwill')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="goodwillChart"></canvas></div>
+        <div class="chart-note">$11.0m impairment taken in FY2024 (Madison $6.5m, AWF $4.5m). Remaining $31.6m goodwill (Madison, JacksonStone) flagged as a Key Audit Matter in FY2026 &mdash; further impairment risk if recovery forecasts are missed.</div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Dividends Per Share</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('dividends')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="dpsChart"></canvas></div>
+        <div class="chart-note">No dividend paid since the FY2023 final. DPS figures are on PRE-RAISE share counts (34.3m); not comparable to the post-raise 67.7m share base.</div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shares Outstanding (Pre- vs Post-Raise)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('shares')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="sharesChart"></canvas></div>
+        <div class="chart-note">May-2026 rights issue: 33.33m new shares at $0.15 (1.269 new shares per existing share) took the count from 34.33m to 67.66m &mdash; a 97% increase in shares on issue.</div>
+    </div>
+</div>
+
+<div class="model-banner">
+    <h3>&#9888; Model Approach &mdash; Read Before the DCF Numbers Below</h3>
+    <p>This is <strong>not</strong> a quality-compounder DCF. Accordant is a distressed, post-rescue-raise cyclical with no moat (fragmented, low-switching-cost staffing market) and structurally thin margins &mdash; the best pre-downturn owner-FCF margin was under 4%, and the FY2019-23 ex-COVID average was just ~2.15% of revenue. The model is built <strong>mid-cycle</strong>: revenue recovers gradually from the FY2026 base ($165.1m) toward $195-234m over a 10-year explicit horizon (extended past the usual 5 years because margins are still maturing), and EBITDA margin ramps toward ~4.5% in the base case &mdash; anchored to the FY18/20/22/23 average, explicitly excluding both the FY2021 COVID wage-subsidy spike (8.5%) and the weak FY2019 print (2.9%).</p>
+    <p>A high <strong>17% base-case WACC</strong> (15.5% bull / 19% bear) is used, built from an 11-12% NZ small-cap base stacked with four documented structural premiums: micro-cap illiquidity (market cap ~$11.2m), extreme cyclicality (NPAT has swung ~$16m peak-to-trough on an equity base of only $20-40m), balance-sheet/leverage risk (pro-forma net debt ~$24.0m against thin interest cover of ~1.4x), and free-float/governance concentration (Hull family now 65.28% post-raise).</p>
+    <p>The result: <strong>weighted intrinsic value is negative</strong> (&minus;$0.10/share) because mature owner-FCF conversion (~2% of revenue) simply does not cover the debt load even after a full mid-cycle recovery is capitalised in perpetuity &mdash; base and bear scenarios both show negative equity value. This is corroborated independently: pro-forma <strong>tangible book value is also negative</strong> (~&minus;$21.8m once $31.6m goodwill and $13.1m other intangibles are stripped from equity). Even the <strong>bull case is worth only $0.084/share</strong> &mdash; still below the current $0.166 price. AGL at today's price is best understood as a <strong>leveraged option on a NZ labour-market cyclical recovery and further balance-sheet de-risking</strong>, not as an undervalued cash-generative business; the sanity-check multiples (not the FCF DCF) provide the more useful floor on downside.</p>
+</div>
+
+<h2 class="section-title">DCF Valuation</h2>
+<div class="dcf-section">
+    <div class="dcf-summary">
+        <div class="dcf-card negative">
+            <div class="dcf-label">Intrinsic Value (Base)</div>
+            <div class="dcf-value negative-value" id="dcfIV">&minus;$0.10</div>
+            <div class="dcf-change negative" id="dcfUpside">equity not covered by owner FCF</div>
+            <div class="dcf-sublabel">Owner FCF &mdash; after lease principal &amp; mid-cycle margin recovery</div>
+        </div>
+        <div class="dcf-card negative">
+            <div class="dcf-label">Entry Price (15% hurdle)</div>
+            <div class="dcf-value negative-value" id="dcfEntry">&minus;$0.06</div>
+            <div class="dcf-sublabel">Even a $0 entry price does not clear a 15% hurdle on base-case cash flows</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Current Price</div>
+            <div class="dcf-value" id="dcfCurrent">$0.166</div>
+        </div>
+        <div class="dcf-card negative">
+            <div class="dcf-label">Prob-Weighted IV</div>
+            <div class="dcf-value negative-value" id="dcfWeighted">&minus;$0.10</div>
+            <div class="dcf-change negative" id="dcfWeightedUpside"></div>
+            <div class="dcf-sublabel">20% Bull / 45% Base / 35% Bear &mdash; all on owner FCF</div>
+        </div>
+    </div>
+
+    <div class="dcf-warning" id="growthWarning">
+        <span class="warning-icon">&#9888;</span>
+        <span id="warningText">Revenue and equity CAGRs are both deeply negative (3yr revenue -10.1%/yr, equity -19.7%/yr) reflecting the FY23-26 downturn and FY24 goodwill impairment. Historical CAGRs are NOT used as the growth driver here &mdash; projections are built bottom-up from a mid-cycle revenue recovery path, not extrapolated from trailing trends.</span>
+    </div>
+
+    <div class="dcf-inputs">
+        <h4>DCF Model Inputs</h4>
+        <div class="dcf-inputs-grid">
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Base FCF (Owner, FY2026)</div>
+                <div class="dcf-input-value" id="baseFCF">&minus;$0.78M</div>
+                <div class="dcf-input-note" id="sbcBreakdown">$1.4M reported FCF &minus; $2.1M lease principal &minus; $0.08M SBC</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Shares Outstanding</div>
+                <div class="dcf-input-value" id="sharesOut">67.66M</div>
+                <div class="dcf-input-note" id="dilutionNote">Post rights-issue (34.33M pre-raise + 33.33M new); no further dilution assumed</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Net Bank Debt (Pro-forma)</div>
+                <div class="dcf-input-value" id="netDebt">$24.0M</div>
+                <div class="dcf-input-note">Post rights-issue paydown; IFRS-16 lease liabilities excluded (deducted via lease principal instead)</div>
+            </div>
+        </div>
+        <div class="fcf-projections">
+            <h5>Projected Owner FCF (10-Year Base Case)</h5>
+            <div class="fcf-projection-table" id="fcfProjectionTable" style="grid-template-columns: repeat(11, 1fr);"></div>
+        </div>
+    </div>
+
+    <div class="dcf-controls">
+        <div class="slider-group">
+            <label>Growth Rate (Yr 1): <span id="growthValue">3%</span></label>
+            <input type="range" id="growthSlider" min="-5" max="10" value="3" step="0.5" oninput="updateDCFDisplay()">
+            <div class="slider-hint" id="growthHint">Component-built mid-cycle revenue recovery, not historical CAGR</div>
+        </div>
+        <div class="slider-group">
+            <label>WACC: <span id="waccValue">17%</span></label>
+            <input type="range" id="waccSlider" min="12" max="22" value="17" step="0.5" oninput="updateDCFDisplay()">
+        </div>
+        <div class="slider-group">
+            <label>Terminal Growth: <span id="terminalValue">1.8%</span></label>
+            <input type="range" id="terminalSlider" min="0" max="3.5" value="1.8" step="0.1" oninput="updateDCFDisplay()">
+        </div>
+    </div>
+
+    <div class="scenario-tabs">
+        <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+        <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+        <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+    </div>
+
+    <div class="scenario-details" id="scenarioDetails">
+        <h4>Assumptions</h4>
+        <div class="assumption-grid" id="assumptionGrid"></div>
+    </div>
+
+    <div class="sensitivity-section">
+        <h4>Sensitivity Analysis: Intrinsic Value by WACC &amp; Terminal Growth (Base Case)</h4>
+        <table class="sensitivity-table" id="sensitivityMatrix"></table>
+        <div class="chart-note" style="margin-top:10px;">Every cell in this matrix is negative &mdash; there is no combination of WACC and terminal growth within a defensible range that produces a positive base-case intrinsic value. Colour coding (red = below current price) reflects this.</div>
+    </div>
+
+    <div class="historical-growth">
+        <h4>Historical Growth Rates (CAGR) &mdash; Shown for Context Only, Not Used as DCF Driver</h4>
+        <div class="growth-grid" id="growthGrid"></div>
+    </div>
+
+    <div class="dcf-download">
+        <a href="AGL.NZ_DCF_Model.xlsx" class="download-btn" download>
+            <span class="download-icon">&#8681;</span> Download Excel Model
+        </a>
+    </div>
+</div>
+
+<div class="footer-note">
+    All figures in NZD millions unless noted (EPS/DPS in cents). Data sourced from Accordant Group Limited NZX filings, FY2018-FY2026 (year ended 31 March). Dashboard is for research purposes only and does not constitute investment advice.
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// EMBEDDED DATA
+// ============================================================
+const csvData = `Period,Revenue,GrossProfit,GrossMargin,EBITDA,DepreciationAmortisation,OperatingProfit,NetFinanceCosts,NPAT,EPS_cents,OperatingCashFlow,Capex,FreeCashFlow,DividendsPaid,DPS_cents,StockBasedComp,ShareholdersEquity,TotalDebt,CashAndEquivalents,NetDebt,SharesOutstanding_m,Goodwill,ImpairmentCharges,LeasePrincipalPaid,LeaseLiabilities,PostBalanceDateNotes
+H1 2018,143.1,,,7.1,1.9,5.2,0.7,3.4,10.5,11.9,0.3,11.6,2.7,8.00,-0.02,37.9,33.5,10.3,23.2,32.6,38.6,0.0,,,
+FY2018,279.3,,,11.8,3.3,8.4,1.3,5.0,15.5,11.5,0.6,10.9,5.4,16.20,0.0,36.9,36.0,6.3,29.7,32.6,38.6,0.0,,,
+H1 2019,141.6,,,5.2,1.6,3.5,0.6,2.1,6.3,6.1,1.2,4.9,2.7,8.00,0.08,37.1,33.0,5.7,27.3,32.6,39.4,0.0,,,
+FY2019,267.8,,,7.7,3.4,4.2,1.4,2.0,6.1,9.5,2.6,6.8,5.4,16.20,0.16,34.8,33.0,6.4,26.6,33.4,39.3,0.0,,,
+H1 2020,139.2,,,6.2,3.3,2.9,1.0,1.3,4.0,6.9,0.3,6.5,2.8,8.00,0.07,34.2,36.0,7.6,28.4,33.0,45.5,0.0,1.2,14.8,
+FY2020,263.5,,,12.2,6.2,6.0,2.1,2.7,7.9,9.9,1.0,8.9,5.6,8.00,0.12,33.7,36.0,6.2,29.8,34.3,45.1,0.0,2.4,11.6,
+H1 2021,105.9,,,11.2,2.6,8.6,0.8,3.7,10.9,22.0,0.0,21.9,0.0,0.00,-0.12,37.3,15.0,5.9,9.2,34.3,38.1,7.0,1.3,9.6,
+FY2021,205.5,,,17.4,5.3,12.2,1.2,6.2,18.1,21.9,1.4,20.5,0.0,8.20,0.08,40.0,15.0,1.8,13.2,34.3,38.1,7.0,2.5,9.3,
+H1 2022,110.4,,,5.7,2.6,3.2,0.5,1.7,4.9,5.7,0.6,5.0,2.9,6.50,0.02,38.0,18.0,5.0,13.0,34.3,38.1,0.0,1.2,8.9,
+FY2022,221.5,,,10.7,4.9,5.8,1.1,3.0,8.9,10.5,0.6,9.9,5.2,12.10,0.13,36.7,18.0,5.0,13.0,34.3,38.1,0.0,2.4,7.8,
+H1 2023,123.0,,,5.9,2.3,3.6,0.7,2.1,6.2,3.9,0.2,3.7,2.0,6.50,0.10,36.9,15.0,2.5,12.5,34.3,42.6,0.0,1.1,,
+FY2023,227.4,,,9.4,4.6,4.8,1.7,2.0,5.8,4.7,0.7,4.0,4.3,9.50,0.22,34.6,23.5,2.0,21.5,34.3,42.6,0.1,2.5,7.8,
+H1 2024,112.1,,,5.4,2.4,3.0,1.4,1.2,3.4,2.9,0.1,2.9,2.0,3.00,0.13,34.8,24.5,3.4,21.1,34.3,42.6,,1.1,6.4,
+FY2024,212.4,,,-2.4,4.9,-7.4,2.8,-10.0,-29.6,2.3,0.2,2.1,2.2,3.00,0.21,22.6,26.5,2.1,24.4,34.3,31.6,11.0,2.8,7.0,
+H1 2025,88.9,,,1.8,2.3,-0.5,1.5,-1.4,-4.2,1.3,0.1,1.2,0.0,0.00,0.13,21.3,26.5,1.9,24.6,34.3,31.6,0.0,1.4,7.4,
+FY2025,165.2,,,3.4,4.6,-1.3,3.0,-2.9,-8.5,-0.6,0.2,-0.8,0.0,0.00,0.19,19.9,31.0,3.0,28.0,34.3,31.6,0.0,2.9,6.2,
+H1 2026,82.0,,,2.0,2.0,-0.1,1.5,-1.1,-3.3,2.5,0.1,2.5,0.0,0.00,0.05,18.9,28.0,1.1,26.9,34.3,31.6,0.0,1.4,10.4,
+FY2026,165.1,,,4.1,3.8,0.3,3.0,-2.1,-6.2,1.6,0.2,1.4,0.0,0.00,0.08,17.9,28.7,0.2,28.5,34.3,31.6,0.0,2.1,12.7,"Rights Offer completed 13-May-2026: 33,333,334 new shares issued at $0.15/share, raising $5.0m gross (proceeds applied to debt repayment). Post-raise shares on issue: 67,658,876 (vs 34,325,542 at 31-Mar-2026 balance date). Hull Family Trust stake increased from 53.01% to 65.28%. ASB banking facilities extended to 30-Apr-2028."`;
+
+const analysis = {
+  "companyName": "Accordant Group Limited",
+  "ticker": "AGL.NZ",
+  "sector": "Human Resources / Staffing & Recruitment Services",
+  "analysisDate": "2026-07-31",
+  "overview": "Accordant Group is a New Zealand-listed staffing and recruitment holding company (formerly AWF Madison Group, renamed October 2020) operating a multi-brand portfolio: AWF (blue-collar/industrial labour hire), Madison Recruitment and Absolute IT (white-collar temp/contract/permanent recruitment, including IT), and JacksonStone & Partners and Hobson Leavy (executive search). The Group is 100% New Zealand-domiciled, generating revenue almost entirely from temporary/contract labour placement fees with smaller permanent-placement and retained executive-search fees, and is highly geared to the NZ labour market cycle. FY2026 (year ended 31 March 2026) revenue was $165.1m (flat vs FY2025's $165.2m) with a net loss after tax of $2.1m, an improvement on FY2025's $2.9m loss but still the third straight loss-making year after a severe two-year downturn (revenue fell from $227.4m in FY2023 to $165.2m in FY2025).",
+  "businessModel": {
+    "summary": "Accordant earns margin (a spread between what it bills clients and what it pays workers/contractors) on temporary and contract labour placements, plus one-off placement fees for permanent recruitment and retained fees for executive search. The vast majority of revenue is temporary/contract-based (~80%), meaning revenue is largely transactional and reprices immediately with hours worked and headcount on assignment, not a recurring/subscription model. Two reporting segments: Blue Collar (AWF industrial/trades labour hire) and White Collar (Madison, Absolute IT, JacksonStone & Partners, Hobson Leavy - temp, contract, permanent and executive search).",
+    "revenue_streams": [
+      {"name": "Blue Collar (AWF) - temporary/contract labour hire", "percent": 47, "trend": "growing"},
+      {"name": "White Collar (Madison/Absolute IT/JacksonStone/Hobson Leavy)", "percent": 53, "trend": "declining"}
+    ]
+  },
+  "competitivePosition": {
+    "main_competitors": ["Randstad NZ", "Hays NZ", "Robert Walters NZ", "Beyond Recruitment", "Frog Recruitment", "Consult Recruitment", "Korn Ferry / global executive search firms", "in-house/direct-sourcing by large corporates and government"],
+    "moat_factors": [
+      {"factor": "Brand/reputation and multi-decade track record", "strength": "moderate", "description": "AWF (est. 1988) and Madison (est. 1998) have long operating histories, H&S accreditations and industry awards"},
+      {"factor": "National branch network / scale", "strength": "moderate", "description": "AWF's ~20-branch footprint from Kaitaia to Invercargill is a genuine cost/service advantage in blue-collar labour hire"},
+      {"factor": "Diversification across brands/sectors/role-levels", "strength": "moderate", "description": "Spanning blue-collar labour hire through to C-suite executive search cushions the Group when any single segment is weak"},
+      {"factor": "Switching costs", "strength": "weak", "description": "Recruitment is low-switching-cost and commoditised; clients multi-source across agencies freely"},
+      {"factor": "Regulatory barriers", "strength": "weak", "description": "Labour hire licensing requirements are low in NZ; new entrants and offshore players can compete relatively freely"}
+    ]
+  },
+  "growthDrivers": [
+    "Cyclical recovery in NZ labour market - unemployment appears to be peaking/plateauing with improving tender activity and business confidence through FY26",
+    "Blue-collar (AWF) momentum in civil infrastructure and logistics sectors, with 'stronger momentum' entering FY27",
+    "White-collar segment returned to a positive profit contribution in FY26 after a FY25 loss; retained/executive-search revenue up 52.8%",
+    "AI/automation investment (180+ CRM automations, candidate-facing AI agents) aimed at productivity and margin improvement",
+    "New government procurement 'economic benefit to New Zealand' test structurally favours locally-domiciled Accordant",
+    "New foothold in health-sector talent solutions (Madison) and diversification into higher-margin senior/specialist segments",
+    "Balance sheet repair via the May 2026 capital raise and extended bank facility (to April 2028) removes near-term distress overhang",
+    "Long-run structural NZ skills shortages and an ageing workforce support secular demand for staffing intermediaries"
+  ],
+  "keyRisks": [
+    {"risk": "Cyclicality of temporary labour demand", "severity": "high", "detail": "Revenue and profit are highly correlated with GDP, business confidence and unemployment; the FY23-FY25 downturn saw Group revenue fall ~27% and NPAT swing from a $2.0m profit to losses of up to $10.0m"},
+    {"risk": "NZ macro conditions and immigration/government policy", "severity": "high", "detail": "100%-NZ business with no geographic diversification, entirely exposed to the domestic economic cycle; government spending cuts post-2023 election hit public-sector revenue"},
+    {"risk": "Balance sheet and bank covenant stress", "severity": "high", "detail": "Net bank debt of $28.5m against equity of only $17.9m at FY26 year-end (D/E 2.85x) forced a dilutive rights issue in April-May 2026 to secure covenant relief"},
+    {"risk": "Dividend suspension", "severity": "moderate", "detail": "No interim or final dividend paid since FY2023, removing the income-return component of the investment case indefinitely"},
+    {"risk": "Thin margins and operating leverage", "severity": "moderate", "detail": "Segment profit margins are low single digits, meaning small revenue swings cause outsized swings in profitability"},
+    {"risk": "Competition and commoditisation", "severity": "moderate", "detail": "Fragmented, low-barrier-to-entry industry with larger global players and increasing direct-sourcing by employers"},
+    {"risk": "Goodwill impairment risk", "severity": "high", "detail": "$31.6m goodwill and $12.1m other intangibles remain on the balance sheet; Madison and JacksonStone CGUs flagged as a Key Audit Matter"},
+    {"risk": "AI/technology disruption to entry-level roles", "severity": "moderate", "detail": "AI tools are already reducing demand for entry-level IT and administrative/clerical roles, a core Madison/Absolute IT market"},
+    {"risk": "Shareholder base and register concentration", "severity": "moderate", "detail": "Hull family now holds 65.28% post-raise; non-participating shareholders were further diluted"}
+  ],
+  "recentDevelopments": [
+    {"date": "2026-07", "event": "FY2026 results: revenue $165.1m (flat YoY), net loss $2.1m (improved from $2.9m); net operating cashflow improved to $1.6m; net bank debt $28.5m; no dividend declared"},
+    {"date": "2026-05", "event": "Capital raise completed - minimum $5.0m target achieved via renounceable rights offer at $0.15/share; Hull Family Trust committed $3.25m; proceeds used to reduce bank debt"},
+    {"date": "2026-04/05", "event": "Renounceable rights offer conducted on NZX; bank agreed to extend facility terms to April 2028 with EBITDA/leverage/interest-cover covenants"},
+    {"date": "2026 (post-raise)", "event": "Board streamlined following the capital raise, with non-executive director departures"},
+    {"date": "2025-11", "event": "H1 FY26: revenue declined 8% YoY to $82.0m; net loss narrowed to $1.1m from $1.4m; white-collar segment returned to profit; D/E ratio 2.85x, up from 2.67x"},
+    {"date": "2025-05", "event": "FY2025 results: revenue $165.2m (-22% vs FY24); net loss $2.9m (improved from $10.0m); management flagged FY27 as expected year for return to prior trading levels"},
+    {"date": "2024", "event": "FY2024 net loss of $10.0m driven substantially by $11.0m non-cash goodwill impairments (Madison $6.5m, AWF $4.5m); revenue declined 6.6% to $212.4m; dividend suspended"}
+  ],
+  "bullCase": [
+    "Balance sheet risk materially reduced by the May 2026 capital raise and bank facility extension to April 2028 on improved covenant terms",
+    "Signs of cyclical bottoming - H2 FY26 showed improving momentum across AWF, Madison and JacksonStone, management citing a 'good start to FY27'",
+    "White-collar segment returned to profitability in FY26; highest-margin retained/executive-search revenue grew +52.8%, improving overall business mix",
+    "Deeply depressed valuation (market cap ~NZ$11m) offers optionality if NZ labour market conditions normalise",
+    "Diversified multi-brand model provides some natural hedge across the economic cycle and positions the Group to capture share as weaker competitors exit"
+  ],
+  "bearCase": [
+    "May 2026 capital raise was dilutive (1.269 new shares per existing share) and necessity-driven rather than growth funding; non-participating shareholders further diluted",
+    "Three consecutive years of net losses with no dividend since FY2023 mean the thesis relies on an uncertain, already twice-delayed cyclical recovery (FY27 guidance first given in FY25, now pushed to FY27/28)",
+    "Thin single-digit segment margins and high fixed/finance costs mean renewed NZ softness could quickly revisit covenant stress",
+    "$31.6m goodwill and $12.1m other intangibles sit on a $17.9m equity base; Madison/JacksonStone flagged as a Key Audit Matter for further impairment risk",
+    "Structurally challenged entry-level IT/admin segments face secular AI-driven demand erosion even as the cycle eases, with no non-NZ diversification"
+  ],
+  "moatRating": "none - Accordant operates in a fragmented, low-switching-cost, labour-intensive staffing market with no meaningful network effects, brand lock-in, or regulatory protection; its multi-brand diversification and NZ branch network provide modest scale/service advantages but do not constitute a durable competitive moat, evidenced by persistent thin margins and severe earnings cyclicality",
+  "cyclicalityNote": "Highly cyclical. Group NPAT swung from a peak of $6.2m in FY2021 (COVID-era demand surge) down to a trough net loss of $10.0m in FY2024 (which included $11.0m of non-cash goodwill impairment) - a peak-to-trough swing of roughly $16m on a business with historical shareholders' funds of only $20-37m. Revenue fell from a post-COVID peak of $227.4m in FY2023 to $165.1-165.2m in FY2025/FY26, a ~27% decline. Pre-impairment 'normal' cycle NPAT has ranged from roughly $2.0m (FY2019, FY2023 troughs) up to $6.2m (FY2021 peak), while FY2025-FY26 losses of $2.1-2.9m represent a deeper-than-typical cyclical trough."
+};
+
+const dcfData = {
+  "ticker": "AGL.NZ",
+  "company_name": "Accordant Group Limited",
+  "valuation_date": "2026-07-31",
+  "currency": "NZD",
+  "units": "millions except per-share figures",
+  "current_price": 0.166,
+  "inputs": {
+    "shares_outstanding": 67.6589,
+    "net_debt_pro_forma": 24.0,
+    "last_fcf": -0.78,
+    "reported_fcf": 1.4,
+    "sbc": 0.08,
+    "lease_principal_paid_fy26": 2.1,
+    "annual_share_growth_pct": 0.0,
+    "projected_shares": [67.6589,67.6589,67.6589,67.6589,67.6589,67.6589,67.6589,67.6589,67.6589,67.6589]
+  },
+  "historical_growth": {
+    "revenue_3yr_cagr": -10.12,
+    "revenue_5yr_cagr": -4.28,
+    "equity_3yr_cagr": -19.72,
+    "equity_5yr_cagr": -14.86,
+    "growth_rate_source": "component_build_not_historical_cagr",
+    "growth_divergence_warning": "Revenue and equity CAGRs are both deeply negative (three-year revenue -10.1%/yr, equity -19.7%/yr) reflecting the FY23-26 downturn and FY24 goodwill impairment. Historical CAGRs are NOT used as the growth driver; projections are built bottom-up from a cyclical mid-cycle revenue recovery path, not extrapolated from trailing CAGRs."
+  },
+  "assumptions": {
+    "base": {"wacc": 17.0, "terminal_growth": 1.8, "terminal_cap_multiple": 8.29, "capex_pct_of_revenue": 0.35, "lease_principal_pct_of_revenue": 1.1, "wc_capture_pct": 12, "cash_tax_rate_pct": 28.0},
+    "bull": {"wacc": 15.5, "terminal_growth": 2.0, "terminal_cap_multiple": 9.58, "capex_pct_of_revenue": 0.4, "lease_principal_pct_of_revenue": 1.1, "wc_capture_pct": 14},
+    "bear": {"wacc": 19.0, "terminal_growth": 1.5, "terminal_cap_multiple": 3.61, "capex_pct_of_revenue": 0.3, "lease_principal_pct_of_revenue": 1.2, "wc_capture_pct": 10}
+  },
+  "projections": {
+    "base": {
+      "years": ["FY2027","FY2028","FY2029","FY2030","FY2031","FY2032","FY2033","FY2034","FY2035","FY2036"],
+      "revenue": [170.05,177.71,186.59,194.99,202.79,209.88,216.18,222.23,227.79,233.48],
+      "adj_ebitda": [4.647,5.305,6.041,6.805,7.589,8.385,9.182,10.001,10.251,10.507],
+      "owner_fcf": [1.28,1.322,1.581,2.068,2.584,3.124,3.733,4.292,4.477,4.589],
+      "owner_fcf_margin": [0.75,0.74,0.85,1.06,1.27,1.49,1.73,1.93,1.97,1.97]
+    },
+    "bull": {
+      "years": ["FY2027","FY2028","FY2029","FY2030","FY2031","FY2032","FY2033","FY2034","FY2035","FY2036"],
+      "revenue": [175.01,187.26,200.36,212.39,223.01,231.93,240.04,247.24,254.17,260.52],
+      "adj_ebitda": [5.17,6.42,7.82,9.296,10.819,12.352,13.923,14.34,14.742,15.11],
+      "owner_fcf": [0.734,1.15,1.868,2.918,4.054,5.251,6.411,6.765,7.022,7.301],
+      "owner_fcf_margin": [0.42,0.61,0.93,1.37,1.82,2.26,2.67,2.74,2.76,2.8]
+    },
+    "bear": {
+      "years": ["FY2027","FY2028","FY2029","FY2030","FY2031","FY2032","FY2033","FY2034","FY2035","FY2036"],
+      "revenue": [165.1,165.93,167.58,169.26,170.95,172.66,174.39,176.13,177.01,177.9],
+      "adj_ebitda": [4.243,4.414,4.609,4.807,5.009,5.214,5.424,5.636,5.664,5.693],
+      "owner_fcf": [1.544,1.538,1.54,1.626,1.713,1.802,1.933,2.066,2.164,2.174],
+      "owner_fcf_margin": [0.94,0.93,0.92,0.96,1.0,1.04,1.11,1.17,1.22,1.22]
+    }
+  },
+  "valuation": {
+    "base": {"sum_pv_fcf": 11.057, "terminal_value_gordon": 30.732, "pv_terminal": 6.393, "enterprise_value": 17.451, "net_debt": 24.0, "equity_value": -6.549, "intrinsic_value": -0.0968, "upside": -158.3, "implied_exit_multiple": 6.7},
+    "bull": {"sum_pv_fcf": 16.654, "terminal_value_gordon": 55.165, "pv_terminal": 13.057, "enterprise_value": 29.711, "net_debt": 24.0, "equity_value": 5.711, "intrinsic_value": 0.0844, "upside": -49.1, "implied_exit_multiple": 7.56},
+    "bear": {"sum_pv_fcf": 7.38, "terminal_value_gordon": 12.611, "pv_terminal": 2.215, "enterprise_value": 9.594, "net_debt": 24.0, "equity_value": -14.406, "intrinsic_value": -0.2129, "upside": -228.3, "implied_exit_multiple": 5.8}
+  },
+  "entry_price": {
+    "hurdle_rate": 0.15,
+    "base": {"years_to_terminal": 10, "pv_interim_fcf_at_hurdle": 12.183, "pv_terminal_at_hurdle": 7.597, "net_debt": 24.0, "entry_price": -0.0624, "entry_discount_from_current": 137.6}
+  },
+  "sensitivity": {
+    "wacc_range": [15.0,16.0,17.0,18.0,19.0],
+    "terminal_growth_range": [0.8,1.3,1.8,2.3,2.8],
+    "matrix": [
+      [-0.0556,-0.0507,-0.0454,-0.0396,-0.0334],
+      [-0.0813,-0.0773,-0.073,-0.0685,-0.0635],
+      [-0.1035,-0.1003,-0.0968,-0.0931,-0.0891],
+      [-0.1229,-0.1202,-0.1174,-0.1144,-0.1112],
+      [-0.1399,-0.1377,-0.1353,-0.1329,-0.1302]
+    ]
+  },
+  "probability_weighted": {
+    "weights": {"bull": 0.2, "base": 0.45, "bear": 0.35},
+    "weighted_iv": -0.1012,
+    "weighted_upside_pct": -161.0,
+    "weighting_rationale": "Bear weighted heavily (35%) given three consecutive loss-making years, a dilutive rescue rights issue completed just three months ago, negative tangible book value, and management having twice pushed back its own 'return to normal trading' guidance. Bull given only 20% given no evidence yet of the AI/automation margin thesis materialising."
+  },
+  "horizon_years": 10
+};
+
+// ============================================================
+// PARSE CSV
+// ============================================================
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        // Handle quoted field with commas (PostBalanceDateNotes)
+        const values = [];
+        let cur = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (ch === '"') { inQuotes = !inQuotes; }
+            else if (ch === ',' && !inQuotes) { values.push(cur); cur = ''; }
+            else { cur += ch; }
+        }
+        values.push(cur);
+        const obj = {};
+        headers.forEach((h, i) => obj[h.trim()] = values[i]?.trim());
+        return obj;
+    });
+}
+
+const data = parseCSV(csvData);
+
+data.sort((a, b) => {
+    const parseDate = (p) => {
+        const year = parseInt(p.match(/\d{4}/)?.[0] || '0');
+        const isH1 = p.includes('H1');
+        const isFY = p.startsWith('FY');
+        const subOrder = isH1 ? 1 : isFY ? 2 : 0;
+        return year * 10 + subOrder;
+    };
+    return parseDate(a.Period) - parseDate(b.Period);
+});
+
+const fyData = data.filter(d => d.Period.startsWith('FY'));
+const h1Data = data.filter(d => d.Period.startsWith('H1'));
+
+const num = v => v === undefined || v === '' || v === null ? null : parseFloat(v);
+
+// ============================================================
+// UI HELPERS
+// ============================================================
+function toggleOverview() {
+    const btn = document.querySelector('.overview-toggle');
+    const content = document.getElementById('overviewContent');
+    btn.classList.toggle('active');
+    content.classList.toggle('active');
+}
+
+function openModal(key) {
+    document.getElementById('modalTitle').textContent = metricDescriptions[key].title;
+    document.getElementById('modalBody').innerHTML = metricDescriptions[key].content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+function fmt(n, decimals) {
+    if (n === null || n === undefined || isNaN(n)) return 'N/A';
+    decimals = decimals === undefined ? 1 : decimals;
+    return n.toFixed(decimals);
+}
+function fmtM(n, decimals) {
+    if (n === null || n === undefined || isNaN(n)) return 'N/A';
+    const sign = n < 0 ? '-' : '';
+    return sign + '$' + Math.abs(n).toFixed(decimals === undefined ? 1 : decimals) + 'M';
+}
+
+// ============================================================
+// RENDER OVERVIEW
+// ============================================================
+document.getElementById('ovOverview').textContent = analysis.overview;
+document.getElementById('ovBizSummary').textContent = analysis.businessModel.summary;
+document.getElementById('ovRevStreams').innerHTML = analysis.businessModel.revenue_streams.map(rs => `
+    <li class="revenue-stream"><span>${rs.name} <em class="trend-${rs.trend.split(' ')[0]}" style="font-style:normal;font-size:0.8rem;">(${rs.trend})</em></span><span class="percent">${rs.percent}%</span></li>
+`).join('');
+document.getElementById('ovCompetitors').innerHTML = '<strong>Competitors:</strong> ' + analysis.competitivePosition.main_competitors.join(', ');
+document.getElementById('ovMoat').innerHTML = analysis.competitivePosition.moat_factors.map(m => `
+    <li><strong>${m.factor}</strong> (${m.strength}): ${m.description}</li>
+`).join('');
+document.getElementById('ovMoatRating').textContent = analysis.moatRating;
+document.getElementById('ovGrowth').innerHTML = analysis.growthDrivers.map(g => `<li>${g}</li>`).join('');
+document.getElementById('ovRisks').innerHTML = analysis.keyRisks.map(r => `
+    <li><span class="risk-${r.severity}">&#9679;</span> <strong>${r.risk}</strong>: ${r.detail}</li>
+`).join('');
+document.getElementById('ovBull').innerHTML = analysis.bullCase.map(b => `<li>${b}</li>`).join('');
+document.getElementById('ovBear').innerHTML = analysis.bearCase.map(b => `<li>${b}</li>`).join('');
+document.getElementById('ovRecent').innerHTML = analysis.recentDevelopments.map(r => `<li><strong>${r.date}:</strong> ${r.event}</li>`).join('');
+document.getElementById('ovCyclicality').textContent = analysis.cyclicalityNote;
+
+// ============================================================
+// KPI CARDS
+// ============================================================
+const latestFY = fyData[fyData.length - 1]; // FY2026
+const priorFY = fyData[fyData.length - 2]; // FY2025
+const currentPrice = 0.166;
+const sharesPostRaise = 67.6589;
+const marketCap = currentPrice * sharesPostRaise;
+
+function yoyChange(cur, prior) {
+    if (cur === null || prior === null || prior === 0) return null;
+    return ((cur - prior) / Math.abs(prior) * 100);
+}
+
+const kpis = [
+    {
+        label: 'FY2026 Revenue', value: fmtM(num(latestFY.Revenue), 1),
+        change: yoyChange(num(latestFY.Revenue), num(priorFY.Revenue)),
+        note: 'Down from $227.4m FY2023 peak'
+    },
+    {
+        label: 'FY2026 NPAT (Loss)', value: fmtM(num(latestFY.NPAT), 1), negative: true,
+        change: yoyChange(num(latestFY.NPAT), num(priorFY.NPAT)),
+        note: 'Third consecutive net loss year'
+    },
+    {
+        label: 'FY2026 Owner FCF', value: fmtM(num(latestFY.OperatingCashFlow) - num(latestFY.Capex) - num(latestFY.LeasePrincipalPaid), 2), negative: true,
+        note: 'OCF - Capex - Lease Principal'
+    },
+    {
+        label: 'Net Bank Debt', value: fmtM(num(latestFY.NetDebt), 1), negative: true,
+        change: yoyChange(num(latestFY.NetDebt), num(priorFY.NetDebt)),
+        note: 'Pro-forma ~$24.0m post May-2026 raise'
+    },
+    {
+        label: "Shareholders' Equity", value: fmtM(num(latestFY.ShareholdersEquity), 1),
+        change: yoyChange(num(latestFY.ShareholdersEquity), num(priorFY.ShareholdersEquity)),
+        note: 'Pro-forma ~$22.9m post raise; tangible book negative'
+    },
+    {
+        label: 'Market Cap (Post-Raise)', value: '$' + marketCap.toFixed(1) + 'M',
+        note: '67.66m shares @ $' + currentPrice.toFixed(3)
+    },
+    {
+        label: 'Net Debt / Equity', value: fmt(num(latestFY.NetDebt) / num(latestFY.ShareholdersEquity), 2) + 'x', negative: true,
+        note: 'FY26 year-end; 2.85x reported Sept-2025'
+    },
+    {
+        label: 'Goodwill on Balance Sheet', value: fmtM(num(latestFY.Goodwill), 1),
+        note: 'Key Audit Matter (Madison, JacksonStone CGUs)'
+    }
+];
+
+document.getElementById('kpiGrid').innerHTML = kpis.map(k => `
+    <div class="kpi-card">
+        <div class="kpi-value ${k.negative ? 'negative' : ''}">${k.value}</div>
+        <div class="kpi-label">${k.label}</div>
+        ${k.change !== undefined && k.change !== null ? `<div class="kpi-change ${k.change >= 0 ? 'positive' : 'negative'}">${k.change >= 0 ? '+' : ''}${k.change.toFixed(1)}% YoY</div>` : ''}
+        ${k.note ? `<div class="kpi-note">${k.note}</div>` : ''}
+    </div>
+`).join('');
+
+// ============================================================
+// SEGMENT COMPARISON (static, FY26)
+// ============================================================
+document.getElementById('segmentCompare').innerHTML = `
+    <div class="segment-card">
+        <h4>Blue Collar (AWF) &mdash; FY2026</h4>
+        <div class="seg-value">$77.3M revenue</div>
+        <div class="seg-detail">+6.2% YoY &middot; Segment profit $2.1m (~2.7% margin) &middot; Growing momentum in civil infrastructure &amp; logistics</div>
+    </div>
+    <div class="segment-card">
+        <h4>White Collar (Madison / Absolute IT / JacksonStone / Hobson Leavy) &mdash; FY2026</h4>
+        <div class="seg-value">$87.9M revenue</div>
+        <div class="seg-detail">-5.0% YoY &middot; Segment profit $1.1m (~1.2% margin), returned to profit from FY25 loss &middot; Retained/exec-search fees +52.8%</div>
+    </div>
+`;
+
+// ============================================================
+// GUIDANCE (no formal management guidance items - render qualitative note instead)
+// ============================================================
+document.getElementById('guidanceGrid').innerHTML = `
+    <div class="guidance-card">
+        <div class="guidance-metric">Trading Outlook</div>
+        <div class="guidance-target">"Good start to FY27"</div>
+        <div class="guidance-period">FY2027 (year to 31-Mar-2027)</div>
+        <span class="guidance-vs-prior new">Qualitative</span>
+        <div class="guidance-notes">Management cited improving momentum across AWF (civil/infrastructure, logistics), Madison (temp recruitment) and JacksonStone (contracting activity) entering FY27. No formal quantitative revenue or earnings guidance issued.</div>
+    </div>
+    <div class="guidance-card">
+        <div class="guidance-metric">Return to "Normal" Trading</div>
+        <div class="guidance-target">FY27 / FY28</div>
+        <div class="guidance-period">Previously guided FY27 (in FY25 report)</div>
+        <span class="guidance-vs-prior lowered">Slipped</span>
+        <div class="guidance-notes">Management first flagged FY27 as the expected year for a return to prior trading levels in the FY2025 annual report; this timeline has since slipped to FY27/FY28, a note of caution on execution.</div>
+    </div>
+    <div class="guidance-card">
+        <div class="guidance-metric">Banking Facility</div>
+        <div class="guidance-target">Extended to April 2028</div>
+        <div class="guidance-period">Post May-2026 raise</div>
+        <span class="guidance-vs-prior raised">Secured</span>
+        <div class="guidance-notes">ASB facilities extended with covenants based on cumulative EBITDA, leverage ratio and interest cover, conditional on the capital raise succeeding (which it did).</div>
+    </div>
+    <div class="guidance-card">
+        <div class="guidance-metric">Dividend Policy</div>
+        <div class="guidance-target">Nil</div>
+        <div class="guidance-period">Ongoing since FY2023 interim</div>
+        <span class="guidance-vs-prior maintained">Suspended</span>
+        <div class="guidance-notes">No dividend guidance for resumption has been given; priority remains debt reduction and covenant compliance.</div>
+    </div>
+`;
+document.getElementById('guidanceCommentary').textContent = "Management has not issued formal quantitative revenue or profit guidance for FY2027, reflecting the ongoing uncertainty in the NZ labour market recovery. The qualitative tone from the FY2026 annual report and AGM commentary is cautiously optimistic (\"good start to FY27\", \"stronger momentum\" in AWF's pipeline), but the company's own recovery timeline has already slipped once, and no dividend resumption timeline has been indicated.";
+
+// ============================================================
+// CHART DEFAULTS
+// ============================================================
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: { labels: { color: '#e0e0e0', font: { size: 11 } } }
+    },
+    scales: {
+        x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+function freshScales() {
+    return { x: { ...chartDefaults.scales.x }, y: { ...chartDefaults.scales.y } };
+}
+const colors = {
+    primary: '#00d4aa', secondary: '#00b894', tertiary: '#0984e3',
+    quaternary: '#6c5ce7', warning: '#fdcb6e', danger: '#ff6b6b'
+};
+
+const chartRegistry = {};
+function toggleLogScale(canvasId, btn) {
+    const chart = chartRegistry[canvasId];
+    if (!chart) return;
+    const toLog = chart.options.scales.y.type !== 'logarithmic';
+    chart.options.scales.y.type = toLog ? 'logarithmic' : 'linear';
+    btn.classList.toggle('active', toLog);
+    chart.update();
+}
+
+const fyLabels = fyData.map(d => d.Period);
+
+// Revenue chart
+chartRegistry['revenueChart'] = new Chart(document.getElementById('revenueChart'), {
+    type: 'bar',
+    data: {
+        labels: fyLabels,
+        datasets: [{
+            label: 'Revenue ($M)',
+            data: fyData.map(d => num(d.Revenue)),
+            backgroundColor: colors.primary,
+            borderRadius: 4
+        }]
+    },
+    options: { ...chartDefaults, scales: freshScales(), plugins: { legend: { display: false } } }
+});
+
+// H1 vs FY chart
+chartRegistry['h1fyChart'] = new Chart(document.getElementById('h1fyChart'), {
+    type: 'bar',
+    data: {
+        labels: fyLabels,
+        datasets: [
+            { label: 'H1 Revenue', data: h1Data.map(d => num(d.Revenue)), backgroundColor: colors.tertiary, borderRadius: 4 },
+            { label: 'Full Year Revenue', data: fyData.map(d => num(d.Revenue)), backgroundColor: colors.primary, borderRadius: 4 }
+        ]
+    },
+    options: { ...chartDefaults, scales: freshScales() }
+});
+
+// NPAT chart with negative-year coloring
+chartRegistry['npatChart'] = new Chart(document.getElementById('npatChart'), {
+    type: 'bar',
+    data: {
+        labels: fyLabels,
+        datasets: [{
+            label: 'NPAT ($M)',
+            data: fyData.map(d => num(d.NPAT)),
+            backgroundColor: fyData.map(d => num(d.NPAT) < 0 ? colors.danger : colors.primary),
+            borderRadius: 4
+        }]
+    },
+    options: { ...chartDefaults, scales: freshScales(), plugins: { legend: { display: false } } }
+});
+
+// EBITDA vs D&A
+chartRegistry['ebitdaChart'] = new Chart(document.getElementById('ebitdaChart'), {
+    type: 'bar',
+    data: {
+        labels: fyLabels,
+        datasets: [
+            { label: 'EBITDA', data: fyData.map(d => num(d.EBITDA)), backgroundColor: colors.primary, borderRadius: 4 },
+            { label: 'D&A', data: fyData.map(d => num(d.DepreciationAmortisation)), backgroundColor: colors.warning, borderRadius: 4 }
+        ]
+    },
+    options: { ...chartDefaults, scales: freshScales() }
+});
+
+// Owner FCF bridge - stacked-ish grouped bars
+chartRegistry['fcfChart'] = new Chart(document.getElementById('fcfChart'), {
+    type: 'bar',
+    data: {
+        labels: fyLabels,
+        datasets: [
+            { label: 'Operating Cash Flow', data: fyData.map(d => num(d.OperatingCashFlow)), backgroundColor: colors.tertiary, borderRadius: 4 },
+            { label: 'Capex', data: fyData.map(d => -num(d.Capex)), backgroundColor: colors.warning, borderRadius: 4 },
+            { label: 'Lease Principal', data: fyData.map(d => d.LeasePrincipalPaid !== '' ? -num(d.LeasePrincipalPaid) : null), backgroundColor: colors.quaternary, borderRadius: 4 },
+            {
+                label: 'Owner FCF', type: 'line', data: fyData.map(d => {
+                    const ocf = num(d.OperatingCashFlow);
+                    const capex = num(d.Capex);
+                    const lease = d.LeasePrincipalPaid !== '' ? num(d.LeasePrincipalPaid) : 0;
+                    return ocf - capex - lease;
+                }),
+                borderColor: colors.primary, backgroundColor: colors.primary, tension: 0.2, pointRadius: 4, fill: false
+            }
+        ]
+    },
+    options: { ...chartDefaults, scales: freshScales() }
+});
+
+// FCF margin (%) - no log, has negatives
+chartRegistry['fcfMarginChart'] = new Chart(document.getElementById('fcfMarginChart'), {
+    type: 'line',
+    data: {
+        labels: fyLabels,
+        datasets: [{
+            label: 'Owner FCF Margin (%)',
+            data: fyData.map(d => {
+                const rev = num(d.Revenue);
+                const ocf = num(d.OperatingCashFlow);
+                const capex = num(d.Capex);
+                const lease = d.LeasePrincipalPaid !== '' ? num(d.LeasePrincipalPaid) : 0;
+                const sbc = num(d.StockBasedComp) || 0;
+                const ownerFcf = ocf - capex - lease - Math.max(sbc, 0);
+                return rev ? (ownerFcf / rev * 100) : null;
+            }),
+            borderColor: colors.primary, backgroundColor: 'rgba(0,212,170,0.15)', tension: 0.3, fill: true, pointRadius: 4
+        }]
+    },
+    options: { ...chartDefaults, scales: freshScales(), plugins: { legend: { display: false } } }
+});
+
+// Leverage: net debt vs equity
+chartRegistry['leverageChart'] = new Chart(document.getElementById('leverageChart'), {
+    type: 'bar',
+    data: {
+        labels: fyLabels,
+        datasets: [
+            { label: 'Net Bank Debt', data: fyData.map(d => num(d.NetDebt)), backgroundColor: colors.danger, borderRadius: 4 },
+            { label: "Shareholders' Equity", data: fyData.map(d => num(d.ShareholdersEquity)), backgroundColor: colors.primary, borderRadius: 4 }
+        ]
+    },
+    options: { ...chartDefaults, scales: freshScales() }
+});
+
+// Goodwill & impairment
+chartRegistry['goodwillChart'] = new Chart(document.getElementById('goodwillChart'), {
+    type: 'bar',
+    data: {
+        labels: fyLabels,
+        datasets: [
+            { label: 'Goodwill', data: fyData.map(d => num(d.Goodwill)), backgroundColor: colors.quaternary, borderRadius: 4 },
+            { label: 'Impairment Charge', data: fyData.map(d => d.ImpairmentCharges !== '' ? num(d.ImpairmentCharges) : 0), backgroundColor: colors.danger, borderRadius: 4 }
+        ]
+    },
+    options: { ...chartDefaults, scales: freshScales() }
+});
+
+// DPS
+chartRegistry['dpsChart'] = new Chart(document.getElementById('dpsChart'), {
+    type: 'bar',
+    data: {
+        labels: fyLabels,
+        datasets: [{
+            label: 'DPS (cents)',
+            data: fyData.map(d => num(d.DPS_cents)),
+            backgroundColor: fyData.map(d => num(d.DPS_cents) > 0 ? colors.primary : colors.danger),
+            borderRadius: 4
+        }]
+    },
+    options: { ...chartDefaults, scales: freshScales(), plugins: { legend: { display: false } } }
+});
+
+// Shares outstanding (pre vs post raise annotation via separate bar for FY2026)
+const sharesLabels = [...fyLabels, 'Post-Raise (May-26)'];
+const sharesValues = [...fyData.map(d => num(d.SharesOutstanding_m)), 67.6589];
+chartRegistry['sharesChart'] = new Chart(document.getElementById('sharesChart'), {
+    type: 'bar',
+    data: {
+        labels: sharesLabels,
+        datasets: [{
+            label: 'Shares Outstanding (M)',
+            data: sharesValues,
+            backgroundColor: sharesLabels.map(l => l.includes('Post-Raise') ? colors.warning : colors.primary),
+            borderRadius: 4
+        }]
+    },
+    options: { ...chartDefaults, scales: freshScales(), plugins: { legend: { display: false } } }
+});
+
+// ============================================================
+// HELP MODALS
+// ============================================================
+const metricDescriptions = {
+    revenue: {
+        title: "Revenue by Fiscal Year",
+        content: `
+            <p><strong>Revenue</strong> is total billings from Accordant's temporary/contract labour placements, permanent placement fees, and retained executive-search fees across AWF (blue collar) and Madison/Absolute IT/JacksonStone/Hobson Leavy (white collar).</p>
+            <div class="metric-highlight"><strong>For Accordant:</strong> ~80% of revenue is temporary/contract-based, meaning it reprices almost immediately with hours worked and headcount on assignment. There is essentially no recurring/subscription revenue, so top-line swings track the NZ labour market cycle closely and with a short lag.</div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Revenue fell from $227.4m (FY2023 peak) to $165.1m (FY2026) - a ~27% decline reflecting a severe cyclical downturn</li>
+                <li>Blue Collar (AWF) grew +6.2% in FY26 while White Collar declined -5.0%, showing divergent segment cycles</li>
+                <li>Whether revenue stabilises/grows in FY27-28 will be the single biggest driver of a re-rating, given management's own "return to normal" timeline has already slipped once</li>
+            </ul>
+        `
+    },
+    h1fy: {
+        title: "H1 vs Full Year Revenue",
+        content: `
+            <p>Accordant reports half-year (six months to 30 September) and full-year (12 months to 31 March) results. Comparing H1 to FY shows the split of trading activity and cyclical trend within each year.</p>
+            <div class="metric-highlight"><strong>For Accordant:</strong> H1 FY2026 revenue of $82.0m was down only 8% YoY, a marked improvement on the 21% decline seen in H1 FY2025 - an early signal that the downturn's pace of deterioration has slowed, even before revenue turns positive.</div>
+        `
+    },
+    npat: {
+        title: "NPAT (Net Profit / Loss After Tax)",
+        content: `
+            <p><strong>NPAT</strong> is the bottom-line result after all operating costs, finance costs, tax, and any impairment charges.</p>
+            <div class="metric-highlight"><strong>For Accordant:</strong> FY2024's $10.0m loss includes $11.0m of non-cash goodwill impairment ($6.5m Madison, $4.5m AWF) - the underlying trading loss was materially smaller. Excluding that one-off, "normal" cycle NPAT has ranged from roughly $2.0m (FY2019/FY2023 troughs) to $6.2m (FY2021 COVID-era peak). FY2025 (-$2.9m) and FY2026 (-$2.1m) losses represent a deeper-than-typical trough versus prior cycles.</div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Trend of narrowing losses (FY24 -$10.0m &rarr; FY25 -$2.9m &rarr; FY26 -$2.1m) is the clearest evidence of a bottoming cycle</li>
+                <li>A further goodwill impairment (Madison/JacksonStone flagged as a Key Audit Matter) would be a major red flag if the recovery stalls</li>
+                <li>Return to a positive NPAT would be the clearest trigger for a re-rating and eventual dividend resumption</li>
+            </ul>
+        `
+    },
+    ebitda: {
+        title: "EBITDA vs Depreciation & Amortisation",
+        content: `
+            <p><strong>EBITDA</strong> strips out depreciation, amortisation, interest and tax to show underlying operating cash generation before financing and non-cash items.</p>
+            <div class="metric-highlight"><strong>For Accordant:</strong> The step-up in EBITDA from FY2020 ($12.2m) to FY2021 ($17.4m) mostly reflects IFRS-16 lease capitalisation - operating lease/rent costs moved from operating expenses (above EBITDA) into D&amp;A and finance costs (below EBITDA), mechanically inflating EBITDA without any genuine margin improvement. This is why owner FCF (which re-deducts lease principal) is a more honest cash-generation metric than EBITDA for this company.</div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Always compare EBITDA margins pre- and post-FY2021 with the IFRS-16 distortion in mind</li>
+                <li>FY2024's negative EBITDA (-$2.4m) reflects genuine trading weakness, not the impairment (which sits below EBITDA)</li>
+            </ul>
+        `
+    },
+    ownerfcf: {
+        title: "Owner FCF Bridge",
+        content: `
+            <p><strong>Owner FCF</strong> = Operating Cash Flow &minus; Capex &minus; IFRS-16 Lease Principal Repayments.</p>
+            <div class="metric-highlight"><strong>Why deduct lease principal for Accordant:</strong> Since IFRS-16 adoption (FY2020), lease principal repayments (branch and office rent, ~$1.4-2.9m/year) appear as a financing cash outflow, not an operating one - so reported Operating Cash Flow overstates true owner cash generation unless lease principal is deducted. Accordant's branch network (AWF's ~20 sites plus white-collar offices) makes this a material, recurring cash cost, not a rounding error.</div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Owner FCF turned negative in FY2024-26 (-$0.91m, -$3.89m, -$0.78m) even though reported OCF/FCF looked less alarming - this is the more honest signal of cash stress that ultimately forced the May-2026 rescue raise</li>
+                <li>A sustained return to positive owner FCF is the clearest evidence the business can service its debt without further capital raises</li>
+            </ul>
+        `
+    },
+    fcfmargin: {
+        title: "Owner FCF Margin (% of Revenue)",
+        content: `
+            <p>Owner FCF divided by revenue, showing how much cash the business converts from each dollar of billings after capex and lease costs.</p>
+            <div class="metric-highlight"><strong>For Accordant:</strong> FY2021's 8.7% margin was a COVID wage-subsidy-era anomaly (unusually low bad-debt/working-capital drag and subsidy timing effects), not a sustainable run rate. The FY2019-23 ex-COVID average is closer to 2.15% of revenue - this thin conversion rate is the core reason the DCF concludes owner FCF cannot service the current debt load even after a full mid-cycle recovery.</div>
+        `
+    },
+    leverage: {
+        title: "Net Bank Debt vs Shareholders' Equity",
+        content: `
+            <p>Net bank debt (total bank debt less cash) compared with total shareholders' equity, showing the leverage trend through the cycle.</p>
+            <div class="metric-highlight"><strong>For Accordant:</strong> Net bank debt of $28.5m against equity of only $17.9m at the FY2026 balance date (debt/equity 2.85x reported at Sept-2025) forced the May-2026 rescue rights issue. Post-raise, pro-forma net debt fell to ~$24.0m and pro-forma equity rose to ~$22.9m - still a stretched position, especially since equity is entirely goodwill/intangible-backed (pro-forma tangible book value is negative, roughly -$21.8m).</div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Interest cover is tight - FY2026 EBITDA of $4.1m against net finance costs of $3.0m is only ~1.4x cover</li>
+                <li>Bank covenants (cumulative EBITDA, leverage ratio, interest cover) run to April 2028 - a renewed covenant scare is the explicit bear-case trigger</li>
+            </ul>
+        `
+    },
+    goodwill: {
+        title: "Goodwill & Impairment Charges",
+        content: `
+            <p>Goodwill arises from historical acquisitions (Madison, Absolute IT, JacksonStone & Partners, Hobson Leavy) and is tested annually for impairment against each cash-generating unit's (CGU) recoverable value.</p>
+            <div class="metric-highlight"><strong>For Accordant:</strong> $11.0m was impaired in FY2024 ($6.5m Madison, $4.5m AWF) as the downturn deepened forecasts. The remaining $31.6m goodwill plus ~$12.1m other intangibles were flagged as a Key Audit Matter for Madison and JacksonStone CGUs in the FY2026 audit - meaning further impairment is a live risk if the anticipated FY27/28 recovery does not materialise on schedule.</div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Goodwill/intangibles ($31.6m + $13.1m) exceed total FY26 equity ($17.9m), meaning tangible book value is already negative</li>
+                <li>Any further impairment would not affect cash flow but would further erode reported book value and could pressure bank covenants</li>
+            </ul>
+        `
+    },
+    dividends: {
+        title: "Dividends Per Share",
+        content: `
+            <p>Cash dividends declared per share, on the historical (pre-rights-issue) share count.</p>
+            <div class="metric-highlight"><strong>For Accordant:</strong> No dividend has been paid since the FY2023 final distribution - the interim was suspended from FY2024 onward as losses mounted, and no dividend has resumed through FY2026. Priority is debt reduction and covenant compliance, not shareholder returns.</div>
+            <p><strong>Company context:</strong> Because these DPS figures are all on the pre-raise share count (34.3m or fewer shares), they are not directly comparable to a hypothetical post-raise (67.7m share) DPS - any future dividend would need roughly double the historical per-share equivalent cash outlay to return the same total amount to shareholders.</p>
+        `
+    },
+    shares: {
+        title: "Shares Outstanding: Rights Issue Break",
+        content: `
+            <p>Accordant completed a renounceable rights offer on 13-May-2026, issuing 33,333,334 new shares at $0.15/share (1.269 new shares per existing share) to raise $5.0m gross, applied to bank debt repayment.</p>
+            <div class="metric-highlight"><strong>Why this matters:</strong> Shares on issue nearly doubled from 34,325,542 (the 31-Mar-2026 balance-date count, used in all historical per-share figures like EPS and DPS above) to 67,658,876 post-raise. The Hull Family Trust increased its stake from 53.01% to 65.28% by top-up funding the raise, while non-participating shareholders were further diluted.</div>
+            <p><strong>What to watch:</strong> All historical per-share metrics (EPS, DPS, book value per share) in filings before May-2026 are NOT comparable to post-raise per-share figures - always check which share count is being used. This dashboard's DCF section uses the post-raise 67.66m count throughout.</p>
+        `
+    }
+};
+
+// ============================================================
+// DCF SECTION
+// ============================================================
+let currentScenario = 'base';
+
+function initDCF() {
+    if (!dcfData || !dcfData.valuation) return;
+    document.getElementById('dcfCurrent').textContent = '$' + dcfData.current_price.toFixed(3);
+
+    const base = dcfData.assumptions.base;
+    document.getElementById('growthSlider').value = 3;
+    document.getElementById('waccSlider').value = base.wacc;
+    document.getElementById('terminalSlider').value = base.terminal_growth;
+    document.getElementById('growthValue').textContent = '3%';
+    document.getElementById('waccValue').textContent = base.wacc + '%';
+    document.getElementById('terminalValue').textContent = base.terminal_growth + '%';
+
+    renderDCFInputs();
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    updateDCFDisplay();
+    switchScenario('base');
+}
+
+function renderDCFInputs() {
+    const inputs = dcfData.inputs;
+    const currency = '$';
+    const formatNum = (n) => currency + n.toFixed(2) + 'M';
+
+    document.getElementById('baseFCF').textContent = formatNum(inputs.last_fcf);
+    document.getElementById('sbcBreakdown').textContent =
+        `${currency}${inputs.reported_fcf.toFixed(1)}M reported FCF − ${currency}${inputs.lease_principal_paid_fy26.toFixed(1)}M lease principal − ${currency}${inputs.sbc.toFixed(2)}M SBC`;
+
+    document.getElementById('sharesOut').textContent = inputs.shares_outstanding.toFixed(2) + 'M';
+    document.getElementById('dilutionNote').textContent = 'Post rights-issue (34.33M pre-raise + 33.33M new); no further dilution assumed';
+
+    document.getElementById('netDebt').textContent = formatNum(inputs.net_debt_pro_forma);
+
+    renderFCFProjections();
+}
+
+function renderFCFProjections() {
+    const proj = dcfData.projections[currentScenario];
+    const currency = '$';
+    const formatFCF = (n) => currency + n.toFixed(2) + 'M';
+
+    let html = `<div class="fcf-projection-item header">Base (FY26)</div>`;
+    proj.years.forEach(y => { html += `<div class="fcf-projection-item header">${y}</div>`; });
+
+    html += `<div class="fcf-projection-item"><div class="fcf-value">${formatFCF(dcfData.inputs.last_fcf)}</div><div class="growth-rate">-</div></div>`;
+
+    proj.owner_fcf.forEach((v, i) => {
+        const rev = proj.revenue[i];
+        const prevRev = i === 0 ? 165.1 : proj.revenue[i - 1];
+        const g = ((rev - prevRev) / prevRev * 100).toFixed(1);
+        html += `<div class="fcf-projection-item"><div class="fcf-value">${formatFCF(v)}</div><div class="growth-rate">+${g}% rev</div></div>`;
+    });
+
+    document.getElementById('fcfProjectionTable').innerHTML = html;
+}
+
+// Recompute DCF given slider overrides, using dcfData.projections[currentScenario] as the FCF path proxy
+// scaled by growth slider deltas is complex for a component-built model; instead we recompute
+// PV of the scenario's own projected owner_fcf path with the slider WACC/terminal, and adjust
+// year-1 growth via a simple revenue-linked FCF scale factor.
+function calculateDCF(growthOverride, wacc, terminalGrowth) {
+    const proj = dcfData.projections[currentScenario];
+    const years = proj.years.length;
+    const netDebt = dcfData.inputs.net_debt_pro_forma;
+    const shares = dcfData.inputs.shares_outstanding;
+    const hurdle = 0.15;
+
+    // Scale factor: shift the whole FCF path based on how far the growth slider is from the
+    // scenario's own implied year-1 growth, applied multiplicatively as a simple sensitivity lever.
+    const impliedY1Growth = ((proj.revenue[0] - 165.1) / 165.1) * 100;
+    const growthDelta = (growthOverride - impliedY1Growth) / 100;
+    const scaleFactor = Math.max(0.1, 1 + growthDelta * 0.5); // dampened sensitivity
+
+    let pvFCF = 0;
+    let pvFCFHurdle = 0;
+    let lastFCF = 0;
+    for (let i = 0; i < years; i++) {
+        const fcf = proj.owner_fcf[i] * scaleFactor;
+        lastFCF = fcf;
+        pvFCF += fcf / Math.pow(1 + wacc / 100, i + 1);
+        pvFCFHurdle += fcf / Math.pow(1 + hurdle, i + 1);
+    }
+
+    const terminalFCF = lastFCF * (1 + terminalGrowth / 100);
+    const denom = (wacc / 100 - terminalGrowth / 100);
+    const terminalValue = denom > 0.001 ? terminalFCF / denom : terminalFCF / 0.001;
+    const pvTerminal = terminalValue / Math.pow(1 + wacc / 100, years);
+
+    const enterpriseValue = pvFCF + pvTerminal;
+    const equityValue = enterpriseValue - netDebt;
+    const iv = equityValue / shares;
+
+    const terminalValueHurdle = denom > 0.001 ? terminalFCF / (hurdle - terminalGrowth / 100 > 0.001 ? (hurdle - terminalGrowth / 100) : 0.001) : terminalFCF / 0.001;
+    const entryPrice = (pvFCFHurdle + terminalValueHurdle / Math.pow(1 + hurdle, years) - netDebt) / shares;
+
+    return { iv, entryPrice, pvFCF, pvTerminal, enterpriseValue };
+}
+
+window.updateDCFDisplay = function () {
+    const growth = parseFloat(document.getElementById('growthSlider').value);
+    const wacc = parseFloat(document.getElementById('waccSlider').value);
+    const terminal = parseFloat(document.getElementById('terminalSlider').value);
+
+    document.getElementById('growthValue').textContent = growth + '%';
+    document.getElementById('waccValue').textContent = wacc + '%';
+    document.getElementById('terminalValue').textContent = terminal + '%';
+
+    renderFCFProjections();
+
+    const result = calculateDCF(growth, wacc, terminal);
+
+    const ivEl = document.getElementById('dcfIV');
+    ivEl.textContent = (result.iv < 0 ? '−$' : '$') + Math.abs(result.iv).toFixed(3);
+    ivEl.className = 'dcf-value' + (result.iv < 0 ? ' negative-value' : '');
+    const ivCard = ivEl.closest('.dcf-card');
+    ivCard.className = 'dcf-card ' + (result.iv < 0 ? 'negative' : 'highlight');
+
+    const entryEl = document.getElementById('dcfEntry');
+    entryEl.textContent = (result.entryPrice < 0 ? '−$' : '$') + Math.abs(result.entryPrice).toFixed(3);
+    entryEl.className = 'dcf-value' + (result.entryPrice < 0 ? ' negative-value' : '');
+    const entryCard = entryEl.closest('.dcf-card');
+    entryCard.className = 'dcf-card ' + (result.entryPrice < 0 ? 'negative' : '');
+
+    const upside = ((result.iv - dcfData.current_price) / dcfData.current_price * 100);
+    const upsideEl = document.getElementById('dcfUpside');
+    if (result.iv < 0) {
+        upsideEl.textContent = 'equity not covered by owner FCF';
+    } else {
+        upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(0) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+    }
+    upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+    const wiv = dcfData.probability_weighted.weighted_iv;
+    const wivEl = document.getElementById('dcfWeighted');
+    wivEl.textContent = (wiv < 0 ? '−$' : '$') + Math.abs(wiv).toFixed(2);
+    const wUpEl = document.getElementById('dcfWeightedUpside');
+    if (wUpEl) {
+        const wUp = (wiv - dcfData.current_price) / dcfData.current_price * 100;
+        wUpEl.textContent = wiv < 0 ? 'equity value negative' : ((wUp >= 0 ? '+' : '') + wUp.toFixed(0) + '% ' + (wUp >= 0 ? 'upside' : 'downside'));
+        wUpEl.className = 'dcf-change negative';
+    }
+
+    const grid = document.getElementById('assumptionGrid');
+    if (grid) {
+        grid.innerHTML = `
+            <div class="assumption-item"><div class="label">Growth Rate (Yr1)</div><div class="value">${growth}%</div></div>
+            <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc}%</div></div>
+            <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${terminal}%</div></div>
+            <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:${result.iv < 0 ? '#ff6b6b' : '#00d4aa'};">${result.iv < 0 ? '−$' : '$'}${Math.abs(result.iv).toFixed(3)}</div></div>
+            <div class="assumption-item"><div class="label">Entry Price</div><div class="value" style="color:${result.entryPrice < 0 ? '#ff6b6b' : '#00d4aa'};">${result.entryPrice < 0 ? '−$' : '$'}${Math.abs(result.entryPrice).toFixed(3)}</div></div>
+        `;
+    }
+};
+
+window.switchScenario = function (scenario) {
+    currentScenario = scenario;
+    document.querySelectorAll('.scenario-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.scenario === scenario);
+    });
+
+    const assumptions = dcfData.assumptions[scenario];
+    const valuation = dcfData.valuation[scenario];
+    const proj = dcfData.projections[scenario];
+
+    document.getElementById('growthSlider').value = ((proj.revenue[0] - 165.1) / 165.1 * 100).toFixed(1);
+    document.getElementById('waccSlider').value = assumptions.wacc;
+    document.getElementById('terminalSlider').value = assumptions.terminal_growth;
+
+    renderFCFProjections();
+
+    const grid = document.getElementById('assumptionGrid');
+    grid.innerHTML = `
+        <div class="assumption-item"><div class="label">Year 1 Revenue Growth</div><div class="value">${((proj.revenue[0] - 165.1) / 165.1 * 100).toFixed(1)}%</div></div>
+        <div class="assumption-item"><div class="label">Terminal EBITDA Margin</div><div class="value">${(proj.adj_ebitda[proj.adj_ebitda.length - 1] / proj.revenue[proj.revenue.length - 1] * 100).toFixed(1)}%</div></div>
+        <div class="assumption-item"><div class="label">Mature Owner FCF Margin</div><div class="value">${proj.owner_fcf_margin[proj.owner_fcf_margin.length - 1].toFixed(1)}%</div></div>
+        <div class="assumption-item"><div class="label">WACC</div><div class="value">${assumptions.wacc}%</div></div>
+        <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${assumptions.terminal_growth}%</div></div>
+        <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:${valuation.intrinsic_value < 0 ? '#ff6b6b' : '#00d4aa'};">${valuation.intrinsic_value < 0 ? '−$' : '$'}${Math.abs(valuation.intrinsic_value).toFixed(3)}</div></div>
+    `;
+
+    updateDCFDisplay();
+};
+
+function renderHistoricalGrowth() {
+    const growth = dcfData.historical_growth;
+    const grid = document.getElementById('growthGrid');
+
+    const metrics = [
+        { key: 'revenue_3yr_cagr', label: 'Revenue 3Y' },
+        { key: 'revenue_5yr_cagr', label: 'Revenue 5Y' },
+        { key: 'equity_3yr_cagr', label: 'Equity 3Y' },
+        { key: 'equity_5yr_cagr', label: 'Equity 5Y' }
+    ];
+
+    grid.innerHTML = metrics.map(m => {
+        const rate = growth[m.key];
+        const colorClass = rate >= 0 ? 'positive' : 'negative';
+        return `
+            <div class="growth-item">
+                <div class="metric">${m.label}</div>
+                <div class="rate ${colorClass}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div>
+            </div>
+        `;
+    }).join('') + `
+        <div class="growth-item selected">
+            <div class="metric">DCF Growth Source</div>
+            <div class="rate" style="color:#818cf8;font-size:0.9rem;">Component build (mid-cycle)</div>
+        </div>
+    `;
+}
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const table = document.getElementById('sensitivityMatrix');
+    const currentPrice = dcfData.current_price;
+
+    let html = '<tr><th>WACC \\ Term G</th>';
+    sens.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+    html += '</tr>';
+
+    sens.wacc_range.forEach((wacc, i) => {
+        html += `<tr><th>${wacc}%</th>`;
+        sens.matrix[i].forEach((val, j) => {
+            const isHighlight = wacc === dcfData.assumptions.base.wacc && sens.terminal_growth_range[j] === dcfData.assumptions.base.terminal_growth;
+            const colorClass = val >= currentPrice ? 'above-current' : 'below-current';
+            const displayVal = (val < 0 ? '−$' : '$') + Math.abs(val).toFixed(3);
+            html += `<td class="${isHighlight ? 'highlight' : colorClass}">${displayVal}</td>`;
+        });
+        html += '</tr>';
+    });
+
+    table.innerHTML = html;
+}
+
+initDCF();
+
+(function () {
+    var growthSlider = document.getElementById('growthSlider');
+    var waccSlider = document.getElementById('waccSlider');
+    var terminalSlider = document.getElementById('terminalSlider');
+    if (growthSlider) { growthSlider.oninput = window.updateDCFDisplay; growthSlider.onchange = window.updateDCFDisplay; }
+    if (waccSlider) { waccSlider.oninput = window.updateDCFDisplay; waccSlider.onchange = window.updateDCFDisplay; }
+    if (terminalSlider) { terminalSlider.oninput = window.updateDCFDisplay; terminalSlider.onchange = window.updateDCFDisplay; }
+})();
+</script>
+</body>
+</html>
