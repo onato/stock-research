@@ -8,19 +8,22 @@ SCRIPTS := .github/scripts
 STATE   := .github/state
 SCREEN  := .claude/skills/screen-investments/screen.py
 
-# Tickers per `make run`, and how many at once. Concurrency is bounded by
-# the Claude rate limit, not CPU -- 2 is safe, 4 is aggressive.
-# Override: make run N=8 J=4
-N ?= 4
-J ?= 2
-TOP ?= 15
+# How many tickers `make run` researches, and how many at once.
+# Concurrency is bounded by the Claude rate limit, not CPU -- 2 is safe,
+# 4 is aggressive and may hit the limit (the runner sleeps until it resets).
+#
+#   make run TICKERS=8 PARALLEL=4
+#
+TICKERS  ?= 4
+PARALLEL ?= 2
+LEADERBOARD ?= 15   # rows shown by `make screen`
 
 .DEFAULT_GOAL := help
 .PHONY: help run digest status screen research facts evals evals-all \
         cost gaps ledger ledger-backfill queue-prune
 
 help: ## Show this help
-	@echo "Usage: make <target> [TICKER=XYZ] [N=4] [J=2]"
+	@echo "Usage: make <target> [TICKER=XYZ] [TICKERS=4] [PARALLEL=2]"
 	@echo
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | \
 	  awk -F':.*## ' '{printf "  \033[1m%-16s\033[0m %s\n", $$1, $$2}'
@@ -29,12 +32,20 @@ help: ## Show this help
 ## The whole process
 ## --------------------------------------------------------------------------
 
-run: ## Research N tickers, score, report fixes, show the leaderboard (N=4 J=2)
+run: ## Research the next few tickers, score them, report fixes, then rank everything
 	@echo "==> baseline (so the cost delta is measurable afterwards)"
 	@python3 $(SCRIPTS)/cost_report.py --baseline $(STATE)/cost_baseline.json \
 	  >/dev/null 2>&1 || true
-	@echo "==> researching $(N) ticker(s), $(J) at a time"
-	@$(SCRIPTS)/run_loop.sh -n $(N) -j $(J)
+	@# TICKER=X researches just that one; otherwise take the next TICKERS
+	@# from the queue. Without this, `make run TICKER=X` would silently
+	@# ignore the argument and research something else entirely.
+ifdef TICKER
+	@echo "==> researching $(TICKER)"
+	@$(SCRIPTS)/run_loop.sh -j 1 $(TICKER)
+else
+	@echo "==> researching $(TICKERS) ticker(s), $(PARALLEL) at a time"
+	@$(SCRIPTS)/run_loop.sh -n $(TICKERS) -j $(PARALLEL)
+endif
 	@echo
 	@echo "==> scoring"
 	@python3 $(SCRIPTS)/run_evals.py --all >/dev/null 2>&1 || true
@@ -50,9 +61,9 @@ screen: ## Rank every ticker by upside to weighted IV, at live prices
 	@echo "=================================================================="
 	@echo " SCREENER LEADERBOARD"
 	@echo "=================================================================="
-	@python3 $(SCREEN) --live --top $(TOP) \
+	@python3 $(SCREEN) --live --top $(LEADERBOARD) \
 	  --json $(STATE)/last_screen.json 2>/dev/null \
-	  || python3 $(SCREEN) --top $(TOP)
+	  || python3 $(SCREEN) --top $(LEADERBOARD)
 
 status: ## What is researched, what is stale, what is queued
 	@python3 $(SCRIPTS)/select_ticker.py 2>&1 | grep -E '^(ticker|mode)=' | sed 's/^/  next  /'
