@@ -1,0 +1,155 @@
+name: Stock Screener
+
+# Researches one ticker per run using the research-stock skill and commits
+# the result. Driven by a weekend cron rather than by self-chaining: a
+# workflow using the default GITHUB_TOKEN cannot trigger another workflow
+# run, and a cron cannot accidentally loop.
+#
+# The schedule is COMMENTED OUT until the first manual run establishes the
+# real token cost per ticker. Uncomment the `schedule` block to go live.
+
+on:
+  # schedule:
+  #   # Every 3 hours on Saturday and Sunday (UTC). guard.py enforces the
+  #   # 8-runs-per-weekend budget, so extra ticks exit in seconds for free.
+  #   - cron: "0 */3 * * 6,0"
+
+  workflow_dispatch:
+    inputs:
+      ticker:
+        description: "Ticker to research (blank = next from the queue)"
+        required: false
+        default: ""
+      ignore_weekend:
+        description: "Run even though it is not the weekend"
+        type: boolean
+        default: true
+      ignore_budget:
+        description: "Bypass the weekend budget and do not consume a slot"
+        type: boolean
+        default: false
+
+# Never let two runs research and commit at the same time; the second would
+# hit a push conflict. Queued runs wait rather than cancel, so a tick is
+# skipped rather than a half-finished ticker being abandoned.
+concurrency:
+  group: stock-screener
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    # Generous against the ~40 min local baseline (CI re-downloads every PDF
+    # from scratch, since PDFs/ is gitignored) but well under the 6h ceiling.
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # .git is ~1.4G with full history; only the tip is needed.
+          fetch-depth: 1
+
+      - name: Check weekend + budget
+        id: guard
+        # On a scheduled run these inputs are undefined, which is falsy, so
+        # both flags resolve to empty and the full weekend+budget gate applies.
+        env:
+          IGNORE_WEEKEND: ${{ github.event_name == 'workflow_dispatch' && inputs.ignore_weekend == true }}
+          IGNORE_BUDGET: ${{ github.event_name == 'workflow_dispatch' && inputs.ignore_budget == true }}
+        run: |
+          args="--max-runs 8"
+          [ "$IGNORE_WEEKEND" = "true" ] && args="$args --ignore-weekend"
+          [ "$IGNORE_BUDGET" = "true" ] && args="$args --ignore-budget"
+          echo "guard.py $args"
+          python3 .github/scripts/guard.py $args
+
+      - name: Select ticker
+        id: select
+        if: steps.guard.outputs.proceed == 'true'
+        env:
+          OVERRIDE: ${{ github.event_name == 'workflow_dispatch' && inputs.ticker || '' }}
+        run: |
+          python3 .github/scripts/select_ticker.py --override "$OVERRIDE"
+
+      - name: Commit budget counter
+        if: steps.guard.outputs.proceed == 'true' && steps.select.outputs.ticker != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet -- .github/state/budget.json; then
+            git add .github/state/budget.json
+            git commit -m "chore(screener): claim run slot for ${{ steps.select.outputs.ticker }}"
+            git push
+          fi
+
+      - name: Install pdftotext
+        if: steps.guard.outputs.proceed == 'true' && steps.select.outputs.ticker != ''
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq poppler-utils
+          pdftotext -v
+
+      - name: Research ticker
+        if: steps.guard.outputs.proceed == 'true' && steps.select.outputs.ticker != ''
+        uses: anthropics/claude-code-action@v1
+        with:
+          # Bills against the Claude Max subscription rather than per-token
+          # API rates. Generate with `claude setup-token` locally, then
+          # `gh secret set CLAUDE_CODE_OAUTH_TOKEN`. The token expires
+          # periodically -- when runs start failing to authenticate,
+          # regenerate it and update the secret.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: "/research-stock ${{ steps.select.outputs.ticker }}"
+          claude_args: |
+            --max-turns 150
+            --allowedTools Bash,Read,Write,Edit,WebFetch,WebSearch,Glob,Grep,Task
+
+      - name: Commit research output
+        if: steps.guard.outputs.proceed == 'true' && steps.select.outputs.ticker != ''
+        env:
+          TICKER: ${{ steps.select.outputs.ticker }}
+          MODE: ${{ steps.select.outputs.mode }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # PDFs are gitignored (.gitignore = *.pdf), so this picks up only
+          # the extracted text, metrics CSV, analysis/DCF JSON and dashboard.
+          git add -A -- "$TICKER" index.html
+
+          if git diff --cached --quiet; then
+            echo "::warning::No output produced for $TICKER - research step may have failed."
+            exit 0
+          fi
+
+          git commit -m "$(printf 'feat(screener): %s research for %s\n\nAutomated run via .github/workflows/screener.yml' "$MODE" "$TICKER")"
+
+          # Rebase onto anything that landed while the job was running
+          # (the budget commit above, or a concurrent manual push).
+          git pull --rebase --autostash
+          git push
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Stock Screener"
+            echo ""
+            if [ "${{ steps.guard.outputs.proceed }}" != "true" ]; then
+              echo "**Skipped** - weekend/budget guard blocked this run."
+              echo ""
+              echo "Runs used this weekend: ${{ steps.guard.outputs.runs_used }}/${{ steps.guard.outputs.max_runs }}"
+            elif [ -z "${{ steps.select.outputs.ticker }}" ]; then
+              echo "**Nothing to do** - queue exhausted and no DCFs to refresh."
+            else
+              echo "| | |"
+              echo "|---|---|"
+              echo "| Ticker | \`${{ steps.select.outputs.ticker }}\` |"
+              echo "| Mode | ${{ steps.select.outputs.mode }} |"
+              echo "| Weekend budget | ${{ steps.guard.outputs.runs_used }}/${{ steps.guard.outputs.max_runs }} |"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
