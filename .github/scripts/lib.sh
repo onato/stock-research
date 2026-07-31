@@ -129,6 +129,66 @@ with_git_lock() {
 }
 
 # ---------------------------------------------------------------------------
+# wait_for_rate_limit <log>
+#
+# Scans a run's transcript for a rate_limit_event whose status is not
+# "allowed". If found, sleeps until the reported reset time and returns 1 so
+# the caller can retry the ticker; returns 0 when no limit was hit.
+#
+# During a long unattended drain this is the difference between surviving a
+# limit window and burning the rest of the queue on requests that cannot
+# succeed. resetsAt is a unix epoch (verified against a live event).
+#
+# The sleep is clamped: never negative, and never longer than MAX_RL_SLEEP
+# (default 2h) so a bogus timestamp cannot park the loop indefinitely.
+# ---------------------------------------------------------------------------
+wait_for_rate_limit() {
+  local log="$1"
+  local secs
+
+  [ -f "$log" ] || return 0
+
+  secs=$(python3 - "$log" "${MAX_RL_SLEEP:-7200}" <<'PY'
+import json, sys, time
+
+log, cap = sys.argv[1], int(sys.argv[2])
+reset = None
+for line in open(log, errors="replace"):
+    line = line.strip()
+    if not line.startswith("{") or "rate_limit_event" not in line:
+        continue
+    try:
+        ev = json.loads(line)
+    except json.JSONDecodeError:
+        continue
+    if ev.get("type") != "rate_limit_event":
+        continue
+    info = ev.get("rate_limit_info") or {}
+    if info.get("status") in (None, "allowed"):
+        continue
+    r = info.get("resetsAt")
+    if isinstance(r, (int, float)):
+        # Keep the furthest reset seen; a run may log several events.
+        reset = r if reset is None else max(reset, r)
+
+if reset is None:
+    print(0)
+else:
+    # +30s of slack: waking exactly at the boundary tends to get rejected.
+    print(max(0, min(cap, int(reset - time.time()) + 30)))
+PY
+  ) || return 0
+
+  [ "${secs:-0}" -gt 0 ] 2>/dev/null || return 0
+
+  printf 'RATE LIMIT hit -- sleeping %dm%02ds until reset (%s)\n' \
+    $((secs / 60)) $((secs % 60)) \
+    "$(date -v"+${secs}S" +%H:%M 2>/dev/null || date -d "+${secs} seconds" +%H:%M 2>/dev/null || echo '?')" >&2
+  sleep "$secs"
+  return 1
+}
+
+# ---------------------------------------------------------------------------
 # require_tools -- fail fast if the runtime dependencies are missing.
 # ---------------------------------------------------------------------------
 require_tools() {
