@@ -12,6 +12,7 @@
 #   .github/scripts/run_local.sh SEK.NZ          # a specific ticker
 #   .github/scripts/run_local.sh -n 5            # loop over 5 tickers
 #   .github/scripts/run_local.sh --no-push       # commit but do not push
+#   .github/scripts/run_local.sh --open          # open the dashboard when done
 #   .github/scripts/run_local.sh --ignore-budget # do not consume a slot
 #
 # The weekend restriction is deliberately NOT enforced here -- that rule
@@ -27,12 +28,14 @@ cd "$REPO_ROOT" || exit 1
 COUNT=1
 TICKER=""
 PUSH=1
+OPEN_DASH=0
 BUDGET_ARGS=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
     -n|--count)      COUNT="$2"; shift 2 ;;
     --no-push)       PUSH=0; shift ;;
+    --open)          OPEN_DASH=1; shift ;;
     --ignore-budget) BUDGET_ARGS="--ignore-budget"; shift ;;
     -h|--help)       sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*)              echo "Unknown option: $1" >&2; exit 2 ;;
@@ -84,6 +87,12 @@ for i in $(seq 1 "$COUNT"); do
   # Live progress; commits whatever was produced even on a non-zero exit.
   research_ticker "$T" || echo "Committing whatever it produced, if anything." >&2
   commit_ticker "$T" "$MODE"
+
+  # Opening is the caller's call, not the model's -- an unattended batch has
+  # nobody to show it to. `open` is blocked inside the run (see lib.sh).
+  if [ "$OPEN_DASH" = "1" ] && [ -f "$T/Reports/${T}_Dashboard.html" ]; then
+    open "$T/Reports/${T}_Dashboard.html"
+  fi
 
   # An explicit ticker is a one-shot; looping would redo the same name.
   [ -n "$TICKER" ] && break

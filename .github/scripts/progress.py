@@ -59,6 +59,10 @@ def shorten_url(u):
 
 
 def main():
+    # --tools-only drops the model's prose entirely, leaving just the tool
+    # trace. Useful once you trust the run and only want to see movement.
+    quiet_prose = "--tools-only" in sys.argv
+
     start = time.time()
     tools = 0
     model = None
@@ -90,10 +94,13 @@ def main():
                 btype = block.get("type")
                 if btype == "text":
                     text = (block.get("text") or "").strip()
-                    if text:
-                        # First line only; the model's prose can be long.
-                        first = text.split("\n", 1)[0]
-                        print(f"{stamp()} {first[:110]}", flush=True)
+                    # Narration between tool calls is the useful signal; the
+                    # model's long-form prose duplicates the dashboard and
+                    # the JSON reports, so keep only a short lead line.
+                    if text and not quiet_prose:
+                        first = text.split("\n", 1)[0].strip()
+                        if first and len(first) > 3:
+                            print(f"{stamp()} {first[:100]}", flush=True)
                 elif btype == "tool_use":
                     tools += 1
                     print(

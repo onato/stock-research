@@ -29,19 +29,35 @@ research_ticker() {
   mkdir -p "$LOG_DIR"
   start=$(date +%s)
 
+  # Appended to the skill invocation. Batch runs are unattended, so the
+  # model's usual finishing touches are wrong here: `open` pops a browser
+  # window per ticker, and a long written summary just restates the
+  # dashboard and JSON reports it already wrote to disk.
+  local batch_note="Run non-interactively as part of an unattended batch. \
+Do not open, preview, or launch any file (no \`open\`, no browser). \
+When finished, reply with at most two sentences stating the ticker and \
+the files written -- the dashboard and reports are the deliverable, so \
+do not summarize their contents."
+
   # stream-json emits one event per line as work proceeds, so a ~40min run
   # is observable instead of silent. Without it, plain -p buffers everything
   # until completion, which is indistinguishable from a hang.
   if [ "$quiet" = "--quiet" ]; then
     claude --permission-mode bypassPermissions \
+           --disallowed-tools "Bash(open *)" \
            --output-format stream-json --verbose \
-           -p "/research-stock $ticker" > "$log" 2>&1
+           -p "/research-stock $ticker
+
+$batch_note" > "$log" 2>&1
     rc=$?
   else
     set -o pipefail
     claude --permission-mode bypassPermissions \
+           --disallowed-tools "Bash(open *)" \
            --output-format stream-json --verbose \
-           -p "/research-stock $ticker" \
+           -p "/research-stock $ticker
+
+$batch_note" \
       | tee "$log" \
       | python3 "$REPO_ROOT/.github/scripts/progress.py"
     rc=$?
