@@ -43,9 +43,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-command -v claude    >/dev/null || { echo "ERROR: claude CLI not found" >&2; exit 1; }
-command -v pdftotext >/dev/null || { echo "ERROR: pdftotext not found (brew install poppler)" >&2; exit 1; }
-command -v flock     >/dev/null || FLOCK_MISSING=1   # macOS lacks flock(1); fallback below
+. "$REPO_ROOT/.github/scripts/lib.sh"
+require_tools
 
 mkdir -p "$LOG_DIR"
 
@@ -97,51 +96,27 @@ echo ""
 # Serialized commit. flock(1) is absent on stock macOS, so fall back to an
 # mkdir spinlock -- mkdir is atomic on every POSIX filesystem.
 # ---------------------------------------------------------------------------
-commit_locked() {
-  local ticker="$1" lockdir="${GIT_LOCK}.d" waited=0
-  while ! mkdir "$lockdir" 2>/dev/null; do
-    sleep 2
-    waited=$((waited + 2))
-    if [ "$waited" -gt 600 ]; then
-      echo "[$ticker] Could not acquire git lock after 10m; skipping commit." >&2
-      return 1
-    fi
-  done
-  # shellcheck disable=SC2064
-  trap "rmdir '$lockdir' 2>/dev/null" RETURN
-
-  git add -A -- "$ticker" index.html .github/state/budget.json 2>/dev/null
-  if git diff --cached --quiet; then
-    echo "[$ticker] No output produced -- nothing to commit."
-    return 0
-  fi
-  git commit -q -m "feat(screener): research for $ticker
-
-Automated parallel local run via .github/scripts/run_parallel.sh"
-  echo "[$ticker] Committed."
-  if [ "$PUSH" = "1" ]; then
-    git pull -q --rebase --autostash && git push -q && echo "[$ticker] Pushed."
-  fi
-}
-
 research_one() {
-  local ticker="$1" log="$LOG_DIR/$1.log"
+  local ticker="$1"
   echo "[$ticker] Starting..."
-  if claude --permission-mode bypassPermissions -p "/research-stock $ticker" > "$log" 2>&1; then
-    echo "[$ticker] Research finished."
-  else
-    echo "[$ticker] Research exited non-zero -- see $log" >&2
-  fi
-  commit_locked "$ticker"
+  # --quiet: several interleaved progress streams are unreadable, so the
+  # per-ticker detail goes to its log and only milestones reach the console.
+  research_ticker "$ticker" --quiet
+  with_git_lock "$ticker" commit_ticker "$ticker"
 }
 
 # Bounded fan-out: keep at most $JOBS research processes alive.
+#
+# `jobs -rp` is exact here because this shell has no other background work,
+# and each iteration blocks until a slot frees. GNU parallel would buy
+# nothing: the jobs are ~40min each, so scheduling overhead is irrelevant,
+# and the real ceiling is the Claude rate limit rather than local slots.
 for t in "${TICKERS[@]}"; do
   while [ "$(jobs -rp | wc -l)" -ge "$JOBS" ]; do sleep 2; done
   research_one "$t" &
 done
 wait
 
-rmdir "${GIT_LOCK}.d" 2>/dev/null
+rmdir "$REPO_ROOT/.github/state/git.lock.d" 2>/dev/null
 echo ""
 echo "Done. ${#TICKERS[@]} ticker(s) processed."

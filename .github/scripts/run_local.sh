@@ -40,8 +40,9 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-command -v claude     >/dev/null || { echo "ERROR: claude CLI not found" >&2; exit 1; }
-command -v pdftotext  >/dev/null || { echo "ERROR: pdftotext not found (brew install poppler)" >&2; exit 1; }
+LOG_DIR=".github/state/logs"
+. "$REPO_ROOT/.github/scripts/lib.sh"
+require_tools
 
 # Emulate $GITHUB_OUTPUT so the shared scripts work unchanged.
 GITHUB_OUTPUT="$(mktemp)"; export GITHUB_OUTPUT
@@ -80,47 +81,9 @@ for i in $(seq 1 "$COUNT"); do
   echo "Ticker: $T  (mode: $MODE)"
   echo ""
 
-  # Uses the local CLI's own auth -- no API key involved.
-  #
-  # stream-json emits one JSON event per line as the run proceeds, so progress
-  # is visible instead of a ~40min silence. The full transcript is kept in
-  # $LOG_DIR/$T.log; only a readable one-line summary per event reaches stdout.
-  mkdir -p "$LOG_DIR"
-  LOG="$LOG_DIR/$T.log"
-  START=$(date +%s)
-
-  set -o pipefail
-  claude --permission-mode bypassPermissions \
-         --output-format stream-json --verbose \
-         -p "/research-stock $T" \
-    | tee "$LOG" \
-    | python3 .github/scripts/progress.py
-  rc=$?
-  set +o pipefail
-
-  ELAPSED=$(( $(date +%s) - START ))
-  printf '\n[%s] finished in %dm%02ds (exit %d)\n' \
-    "$T" $((ELAPSED / 60)) $((ELAPSED % 60)) "$rc"
-
-  if [ "$rc" != "0" ]; then
-    echo "WARNING: research-stock exited non-zero for $T -- see $LOG" >&2
-    echo "Committing whatever it produced, if anything." >&2
-  fi
-
-  # PDFs are gitignored, so this stages only text/CSV/JSON/HTML output.
-  git add -A -- "$T" index.html .github/state/budget.json 2>/dev/null
-
-  if git diff --cached --quiet; then
-    echo "No output produced for $T -- nothing to commit."
-  else
-    git commit -q -m "feat(screener): $MODE research for $T
-
-Automated local run via .github/scripts/run_local.sh"
-    echo "Committed $T."
-    if [ "$PUSH" = "1" ]; then
-      git pull -q --rebase --autostash && git push -q && echo "Pushed."
-    fi
-  fi
+  # Live progress; commits whatever was produced even on a non-zero exit.
+  research_ticker "$T" || echo "Committing whatever it produced, if anything." >&2
+  commit_ticker "$T" "$MODE"
 
   # An explicit ticker is a one-shot; looping would redo the same name.
   [ -n "$TICKER" ] && break
