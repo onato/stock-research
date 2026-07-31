@@ -84,7 +84,8 @@ $batch_note" \
 commit_ticker() {
   local ticker="$1" mode="${2:-new}"
 
-  git add -A -- "$ticker" index.html .github/state/budget.json 2>/dev/null
+  git add -A -- "$ticker" index.html .github/state/budget.json \
+    .github/state/scores .github/evals 2>/dev/null
 
   if git diff --cached --quiet; then
     echo "[$ticker] No output produced -- nothing to commit."

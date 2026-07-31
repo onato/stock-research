@@ -50,6 +50,12 @@ while : ; do
   echo "[$TICKER] retrying after rate-limit reset (attempt $((attempt + 1)))." >&2
 done
 
+# Score the output and snapshot the prediction before committing, so the
+# scorecard and ledger row land in the same commit as the artifacts they
+# describe. Eval failures never fail the run -- they are a report, not a gate.
+python3 "$REPO_ROOT/.github/scripts/run_evals.py" "$TICKER" || true
+python3 "$REPO_ROOT/.github/scripts/ledger.py" append "$TICKER" || true
+
 # Commit whatever was produced, even on a non-zero exit -- a partial run
 # still leaves useful extracted text and metrics on disk.
 with_git_lock "$TICKER" commit_ticker "$TICKER"
