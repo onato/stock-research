@@ -81,9 +81,29 @@ for i in $(seq 1 "$COUNT"); do
   echo ""
 
   # Uses the local CLI's own auth -- no API key involved.
-  if ! claude --permission-mode bypassPermissions -p "/research-stock $T"; then
-    echo ""
-    echo "WARNING: research-stock exited non-zero for $T." >&2
+  #
+  # stream-json emits one JSON event per line as the run proceeds, so progress
+  # is visible instead of a ~40min silence. The full transcript is kept in
+  # $LOG_DIR/$T.log; only a readable one-line summary per event reaches stdout.
+  mkdir -p "$LOG_DIR"
+  LOG="$LOG_DIR/$T.log"
+  START=$(date +%s)
+
+  set -o pipefail
+  claude --permission-mode bypassPermissions \
+         --output-format stream-json --verbose \
+         -p "/research-stock $T" \
+    | tee "$LOG" \
+    | python3 .github/scripts/progress.py
+  rc=$?
+  set +o pipefail
+
+  ELAPSED=$(( $(date +%s) - START ))
+  printf '\n[%s] finished in %dm%02ds (exit %d)\n' \
+    "$T" $((ELAPSED / 60)) $((ELAPSED % 60)) "$rc"
+
+  if [ "$rc" != "0" ]; then
+    echo "WARNING: research-stock exited non-zero for $T -- see $LOG" >&2
     echo "Committing whatever it produced, if anything." >&2
   fi
 
