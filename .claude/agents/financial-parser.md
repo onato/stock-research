@@ -189,13 +189,16 @@ duckdb ./{TICKER}/Reports/{TICKER}.duckdb -c "
   VALUES ('FY2026', 161.285, -818.093, 'millions', 'NZD')"
 ```
 
-Then export the CSV so the dashboards (which embed it) keep working:
+Then export the CSV with this script — **do not hand-write a `COPY`**:
 
 ```bash
-duckdb ./{TICKER}/Reports/{TICKER}.duckdb -c "
-  COPY (SELECT * FROM core_metrics ORDER BY period)
-  TO './{TICKER}/Reports/{TICKER}_Metrics.csv' (HEADER, DELIMITER ',')"
+python3 .github/scripts/export_csv.py {TICKER}
 ```
+
+The DB uses snake_case columns; the dashboards embed CSV with CamelCase
+headers (`Period,Revenue,GrossProfit,...`). A raw `COPY (SELECT * ...)` emits
+the snake_case names and silently breaks every dashboard that reads the file.
+The script applies the mapping from `schema.py` and sorts chronologically.
 
 ### CSV details
 
