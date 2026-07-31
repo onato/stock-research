@@ -76,11 +76,12 @@ def has_reports(ticker):
     return reports.is_dir() and any(reports.iterdir())
 
 
-def pick_new():
+def pick_new(exclude=()):
+    exclude = set(exclude)
     seen = set()
     for qf in queue_files():
         for ticker in read_tickers(qf):
-            if ticker in seen:
+            if ticker in seen or ticker in exclude:
                 continue
             seen.add(ticker)
             if not has_reports(ticker):
@@ -88,16 +89,19 @@ def pick_new():
     return None
 
 
-def pick_stalest():
+def pick_stalest(exclude=()):
     """Oldest DCF by its internal `valuation_date`.
 
     Deliberately not file mtime: actions/checkout stamps every file with the
     checkout time, which would make an mtime ranking arbitrary in CI. A
     missing or unparseable date sorts first so those get refreshed soonest.
     """
+    exclude = set(exclude)
     candidates = []
     for dcf in REPO_ROOT.glob("*/Reports/*_DCF.json"):
         ticker = dcf.parent.parent.name
+        if ticker in exclude:
+            continue
         try:
             data = json.loads(dcf.read_text())
         except (json.JSONDecodeError, OSError):
@@ -126,7 +130,19 @@ def emit(ticker, mode):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--override", default="", help="Force this ticker (manual dispatch)")
+    ap.add_argument(
+        "--exclude",
+        default="",
+        help=(
+            "Comma-separated tickers to skip. Used when reserving a batch for "
+            "parallel runs: an empty Reports/ dir does not mark a ticker as "
+            "taken (that case means 'a previous run died, retry it'), so the "
+            "caller must say which names it has already handed out."
+        ),
+    )
     args = ap.parse_args()
+
+    exclude = {t.strip() for t in args.exclude.split(",") if t.strip()}
 
     override = args.override.strip()
     if override:
@@ -135,13 +151,13 @@ def main():
         print(f"Override: {override} ({mode})", file=sys.stderr)
         return 0
 
-    ticker = pick_new()
+    ticker = pick_new(exclude)
     if ticker:
         emit(ticker, "new")
         print(f"Selected NEW ticker: {ticker}", file=sys.stderr)
         return 0
 
-    ticker = pick_stalest()
+    ticker = pick_stalest(exclude)
     if ticker:
         emit(ticker, "refresh")
         print(f"Queue exhausted; refreshing stalest: {ticker}", file=sys.stderr)

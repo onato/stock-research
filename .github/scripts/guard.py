@@ -22,7 +22,9 @@ run is reported as a clean skip rather than a red X.
 """
 
 import argparse
+import contextlib
 import datetime as dt
+import fcntl
 import json
 import os
 import sys
@@ -54,6 +56,28 @@ def load_state():
 def save_state(state):
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
     STATE_FILE.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n")
+
+
+@contextlib.contextmanager
+def state_lock():
+    """Serialize the budget read-modify-write across concurrent runners.
+
+    Parallel local runs would otherwise each read the same count and write
+    back the same increment, so N runs would consume one slot instead of N.
+    The lock file is separate from the state file so the state stays a
+    plain committed JSON document.
+
+    On a GitHub runner there is only ever one process, so this is a no-op;
+    flock is advisory and uncontended there.
+    """
+    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = STATE_FILE.with_suffix(".lock")
+    with open(lock_path, "w") as fh:
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(fh, fcntl.LOCK_UN)
 
 
 def emit(proceed, reason, runs_used, max_runs):
@@ -96,34 +120,41 @@ def main():
         today = dt.datetime.now(dt.timezone.utc).date()
 
     key = weekend_key(today)
-    state = load_state()
-    runs_used = int(state.get(key, 0))
 
     if not args.ignore_weekend and today.weekday() not in (SATURDAY, SUNDAY):
         emit(
             False,
             f"Blocked: {today} is {today.strftime('%A')}, not a weekend (UTC).",
-            runs_used,
+            int(load_state().get(key, 0)),
             args.max_runs,
         )
         return 0
 
     if args.ignore_budget:
+        runs_used = int(load_state().get(key, 0))
         emit(True, f"Proceeding: budget check bypassed ({key}).", runs_used, args.max_runs)
         return 0
 
-    if runs_used >= args.max_runs:
-        emit(
-            False,
-            f"Blocked: weekend {key} has used {runs_used}/{args.max_runs} runs.",
-            runs_used,
-            args.max_runs,
-        )
-        return 0
+    # Read, check and claim atomically: with parallel runners, doing the
+    # check outside the lock would let several runs all see the same count
+    # and consume a single slot between them.
+    with state_lock():
+        state = load_state()
+        runs_used = int(state.get(key, 0))
 
-    # Claim the slot up front so a crash still costs one run.
-    state[key] = runs_used + 1
-    save_state(state)
+        if runs_used >= args.max_runs:
+            emit(
+                False,
+                f"Blocked: weekend {key} has used {runs_used}/{args.max_runs} runs.",
+                runs_used,
+                args.max_runs,
+            )
+            return 0
+
+        # Claim the slot up front so a crash still costs one run.
+        state[key] = runs_used + 1
+        save_state(state)
+
     emit(
         True,
         f"Proceeding: weekend {key} run {runs_used + 1}/{args.max_runs}.",
