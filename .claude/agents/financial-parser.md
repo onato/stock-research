@@ -130,10 +130,33 @@ Determine the scale yourself and record it explicitly:
 - Fiscal ≠ calendar year (Apple's FY ends in September); half-year reports are
   common for non-US filers.
 
-### Fallback
-If `{TICKER}.duckdb` has no `facts` rows (extractor not run, or a filing shape it
-could not parse), fall back to reading the `Extracted/*.txt` directly — but say
-so in your summary, because it means `build_facts.py` needs a new pattern.
+### Fallback — and log what was missing
+
+If the facts table has no usable candidate for a metric (extractor not run, a
+pattern that matched nothing, or a filing layout it could not parse), fall back
+to reading the `Extracted/*.txt` directly.
+
+**Then record the gap**, so the extractor can be improved instead of every
+future run paying the same fallback cost:
+
+```bash
+python3 .github/scripts/log_gap.py --ticker {TICKER} \
+  --kind missing_pattern --metric OperatingCashFlow \
+  --detail "filing wording is 'Net cash inflow from operating activities'" \
+  --example "{TICKER}_Annual_FY2026.txt:1042"
+```
+
+`--kind` is one of: `missing_pattern`, `wrong_candidate`, `ambiguous_units`,
+`period_unclear`, `layout_unparsed`, `other`.
+
+Log one entry per distinct gap — not one per file, and not one per period. The
+useful signal is *"this metric's wording isn't matched"*, which a human then
+turns into a regex in `build_facts.py`.
+
+**Do not edit `build_facts.py`, this file, or the skill yourself.** They are
+shared across concurrent runs and encode corrections learned from past
+mistakes; a subagent rewriting them mid-run risks silently losing that. Record
+the observation and move on — the log is reviewed separately.
 
 ## Output Format
 
