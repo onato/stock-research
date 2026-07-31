@@ -108,7 +108,27 @@ Store extracted text in: ./$ARGUMENTS/Extracted/
 
 **Always regenerate** - may include data from newly downloaded reports.
 
-Read the extracted text and identify key financial metrics.
+### Step 5a: Build the facts table first (fast, no model)
+
+```bash
+python3 .github/scripts/build_facts.py "$ARGUMENTS"
+```
+
+One linear pass over `Extracted/*.txt`, writing candidate values to
+`./$ARGUMENTS/Reports/$ARGUMENTS.duckdb`. Takes ~1 second for 18 filings.
+
+**This must run before the financial-parser agent is spawned.** The agent
+queries the facts table instead of grepping the filings — that search
+previously took 183 model turns and 18.2M cache-read tokens on a single
+ticker, roughly 60% of its total cost.
+
+### Step 5b: Adjudicate with the financial-parser agent
+
+The agent (`.claude/agents/financial-parser.md`) resolves competing candidates,
+determines units and currency, and writes **both** the `core_metrics` table and
+the exported CSV. `core_metrics` uses a fixed schema shared by every ticker in
+this repo (see `.github/scripts/schema.py`), which is what makes cross-ticker
+screening possible.
 
 **IMPORTANT: Include BOTH annual AND quarterly data in the CSV. Each row is one period.**
 

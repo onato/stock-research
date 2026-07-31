@@ -1,7 +1,7 @@
 ---
 name: financial-parser
 description: Parses extracted text to find key financial metrics and writes them to a CSV file
-tools: Read, Grep, Write
+tools: Bash, Read, Grep, Write
 model: sonnet
 ---
 
@@ -64,26 +64,117 @@ Look for metrics specific to the company's business model:
 - **Financial Services**: AUM, transaction volume, NIM
 - **Retail**: Same-store sales, store count
 
-## Parsing Strategies
+## Parsing Strategy: query the facts table, don't grep
 
-### Finding Numbers in Text
-- Look for tables with clear headers
-- Search for patterns like "Revenue $X.X billion" or "Net income of $XXX million"
-- Watch for YoY comparisons that may help confirm values
-- Be careful with footnotes that may adjust headline numbers
+`build_facts.py` has already scanned every extracted filing and written
+candidate values to `./{TICKER}/Reports/{TICKER}.duckdb`. **Query it. Do not
+grep the .txt files to find numbers** — that search is already done, and
+repeating it is what made this step the most expensive part of the workflow
+(183 turns and 18.2M cache-read tokens on one ticker).
 
-### Handling Units
-- Convert all values to consistent units (millions recommended)
-- Note currency (USD, GBP, EUR, etc.)
-- Watch for "(in thousands)" or "(in millions)" table headers
+Your job is **adjudication, not search**: the extractor deliberately emits
+every candidate and never decides between them.
 
-### Period Identification
-- Look for headers like "Three months ended..." or "Quarter ended..."
-- Fiscal year vs calendar year (e.g., Apple's FY ends in September)
-- Half-year reports common for non-US companies
+### Step 1 — see what was found
+
+```bash
+duckdb ./{TICKER}/Reports/{TICKER}.duckdb -c "
+  SELECT metric, count(*) n, count(DISTINCT period) periods
+  FROM facts GROUP BY metric ORDER BY n DESC"
+```
+
+### Step 2 — pull one metric's candidates with context
+
+```bash
+duckdb ./{TICKER}/Reports/{TICKER}.duckdb -c "
+  SELECT period, value_raw, source_file, line_no, confidence, context
+  FROM facts
+  WHERE metric = 'Revenue' AND confidence = 'statement_line'
+  ORDER BY period DESC, line_no"
+```
+
+`confidence` values:
+- `statement_line` — first numeric column of a financial-statement line. Prefer these.
+- `prior_year_column` — the comparative column on the same line. Its `period` is
+  NULL because the extractor will not guess which year it belongs to. Useful as a
+  **cross-check** against the value extracted from that year's own filing; a
+  mismatch means one of the two is misread.
+
+### Step 3 — resolve conflicts yourself
+
+Several candidates per metric per period is normal and expected — a figure
+appears in the primary statement, again in a note, and again in the narrative.
+Choose using the judgment rules below, preferring the audited primary statement
+over prose. **Read the `context` column** (±2 lines) rather than re-opening the
+source file; only fall back to `Read` on the .txt when the context genuinely
+does not settle it.
+
+### Step 4 — units and currency are YOUR call
+
+**The extractor never scales anything.** `value_raw` is exactly as printed, and
+`units_hint` is often NULL because filings frequently state units in a table
+header that `pdftotext` mangles.
+
+Determine the scale yourself and record it explicitly:
+- A line reading `161,285` in a filer whose statements are "(in thousands)"
+  means NZ$161.3M — a 1000× error if you get it wrong.
+- Sanity-check against magnitude: a listed company reporting `12,740,658` of
+  revenue is almost certainly in thousands, not units.
+- Write the result to the `units` and `currency` columns. **These must never be
+  left NULL** — every one of the 67 historical CSVs omitted them, which makes
+  cross-ticker screening unreliable. You are fixing that, not repeating it.
+
+### Period identification
+- Period comes from the filename (`{TICKER}_Annual_FY2024.txt` → `FY2024`), which
+  the extractor has already applied to `statement_line` rows.
+- Fiscal ≠ calendar year (Apple's FY ends in September); half-year reports are
+  common for non-US filers.
+
+### Fallback
+If `{TICKER}.duckdb` has no `facts` rows (extractor not run, or a filing shape it
+could not parse), fall back to reading the `Extracted/*.txt` directly — but say
+so in your summary, because it means `build_facts.py` needs a new pattern.
 
 ## Output Format
-Write CSV to: ./{ticker}/Reports/{TICKER}_Metrics.csv
+
+Write **both**, from the same resolved numbers:
+
+1. `./{TICKER}/Reports/{TICKER}.duckdb` → the `core_metrics` table
+2. `./{TICKER}/Reports/{TICKER}_Metrics.csv` → exported from it
+
+### The database write comes first
+
+`core_metrics` has a **fixed column set, identical for every ticker in this
+repo** — that is what makes cross-ticker screening possible. Run
+`python3 .github/scripts/schema.py` to print the exact DDL and column list.
+
+Rules:
+- **Never add a column.** A metric that is not in `core_metrics` goes in the
+  `kpis` table as `(period, name, value, unit)` — that is where
+  SubscriptionRevenue, MAU, ARR, GrossBookings, WaferShipments belong.
+- **Never drop a column.** A metric this company does not report is `NULL`.
+  A bank has no meaningful GrossProfit; the column still exists, empty.
+- **Normalize aliases into the core names.** Historical CSVs spelled the same
+  metric `EPS`/`EPSBasic`/`EPSDiluted`/`EPS_Diluted` and
+  `NetIncome`/`NetProfit`/`SBC`/`StockBasedComp`/`ShareBasedComp`. The mapping
+  lives in `.github/scripts/schema.py` (`ALIASES`) — follow it.
+- **Populate `units` and `currency` on every row** (see Step 4 above).
+
+```bash
+duckdb ./{TICKER}/Reports/{TICKER}.duckdb -c "
+  INSERT INTO core_metrics (period, revenue, net_income, units, currency)
+  VALUES ('FY2026', 161.285, -818.093, 'millions', 'NZD')"
+```
+
+Then export the CSV so the dashboards (which embed it) keep working:
+
+```bash
+duckdb ./{TICKER}/Reports/{TICKER}.duckdb -c "
+  COPY (SELECT * FROM core_metrics ORDER BY period)
+  TO './{TICKER}/Reports/{TICKER}_Metrics.csv' (HEADER, DELIMITER ',')"
+```
+
+### CSV details
 
 ### Standard CSV Structure
 ```csv
