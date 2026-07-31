@@ -203,22 +203,38 @@ Use the dcf-analyst agent instructions in `.claude/agents/dcf-analyst.md` to:
    - **Bull Case**: +5-10pp above base, aligned with bull thesis
    - **Bear Case**: -5-10pp below base, risk factors materialize
 
-3. **DCF Calculations**
-   - Project FCF for 5 years
-   - Calculate Terminal Value using Gordon Growth model
-   - Discount to present value using WACC
-   - Subtract net debt, divide by shares for intrinsic value
+3. **Owner-FCF Adjustment** (always — build the DCF on owner FCF, not reported FCF)
+   - `last_fcf = reported_fcf − SBC_incl_equity_taxes − interest_income`, applied across the whole history so growth rates use the adjusted series
+   - **SBC must include cash taxes on equity awards** (financing-activity withholding), not just the cash-flow add-back
+   - **Strip interest income whenever net cash > 1× the FCF base** — leaving it in while also adding net cash to EV counts the cash pile twice
+   - **Project forward SBC as a % of revenue**, declining gradually (e.g. 15% → 10%). Never hold SBC flat in dollars while revenue compounds — that silently assumes the comp problem solves itself
+   - Share count grows only by dilution buybacks fail to absorb: `uncovered = max(0, SBC − buyback_cash)`
+   - Charges the cost exactly once: buyback-heavy names keep a flat share count, non-repurchasers dilute
+   - If any input is missing from the metrics CSV, extract it from `Extracted/` and backfill — never skip the adjustment silently
 
-4. **Entry Price Calculation**
+4. **Build the FCF margin from components** — never carry the latest year's margin forward flat
+   - `adj_EBITDA − SBC − D&A → EBIT → ×(1−cash_tax) → +D&A − capex + working capital = owner FCF`
+   - **Working capital scales with the CHANGE in revenue** (capture ~15-20% of the YoY increase), not with revenue. Deferred-revenue tailwinds shrink hard when growth decelerates — DUOL's was 34% of FY2025 reported FCF
+   - **Ramp the cash tax rate to normal** if the latest year had a valuation-allowance release or one-off credit (DUOL: −6% guided 2026 → ~21%)
+   - Sanity-check the projected year-1 owner-FCF margin against the component build; if it is far above the latest actual, an unrepeatable one-off is being carried forward
+
+5. **DCF Calculations**
+   - Project owner FCF for 5 years from the component build
+   - Terminal Value = **lower of** Gordon Growth and a 20× terminal-FCF cap (12-15× for cyclicals); record which bound
+   - Discount to present value using WACC
+   - Subtract net debt, divide by the **year-5 projected share count** for intrinsic value
+   - Emit a memo line for value-per-share *if SBC were non-cash* — the spread shows how much the answer hangs on SBC treatment
+
+6. **Entry Price Calculation**
    - Entry price = the price at which buying today, collecting 5 years of projected FCF, and exiting at fair value in year 5 earns a 15% IRR
-   - `Entry Price = ( Σ FCF_t / 1.15^t  +  TV_5 / 1.15^5  −  net_debt ) / shares` (t = 1..5, using the scenario's projected FCF path; TV_5 is the Gordon terminal value computed with WACC)
+   - `Entry Price = ( Σ FCF_t / 1.15^t  +  TV_5 / 1.15^5  −  net_debt ) / projected_shares[5]` (t = 1..5, using the scenario's projected SBC-adjusted FCF path; TV_5 is the Gordon terminal value computed with WACC)
    - Do NOT discount only the terminal value — that ignores the interim FCF the investor receives and the net cash on the balance sheet, and produces an entry price far too low
    - Sanity property: when projected growth ≈ 15%, entry price lands modestly below intrinsic value (because the 15% hurdle exceeds WACC) — never at ~half of it
 
-5. **Sensitivity Analysis**
+7. **Sensitivity Analysis**
    - Matrix of IV across WACC (+/-2%) and Terminal Growth (+/-1%)
 
-6. **Generate Outputs**
+8. **Generate Outputs**
    - `./$ARGUMENTS/Reports/{TICKER}_DCF.json` - Embedded in dashboard
    - `./$ARGUMENTS/Reports/{TICKER}_DCF_Model.xlsx` - Downloadable Excel model
 
@@ -274,10 +290,14 @@ for t, c in zip(r['timestamp'], r['indicators']['quote'][0]['close']):
 
 For each FY row in the metrics CSV, match the FY-end month's closing price (use Dec for calendar-year FYs, Jun for June FYs, etc. — check the company's reporting calendar). For each year compute:
 
-- **P/E** = price / EPS (skip years with negative EPS)
+- **P/E** = price / (EPS − SBC_per_share) (skip years where adjusted EPS is negative)
 - **P/B** = (price × shares_outstanding) / total_equity
-- **EV/EBITDA** = (market_cap + net_debt) / EBITDA
+- **EV/EBITDA** = (market_cap + net_debt) / (EBITDA − SBC)
 - **P/Sales** = market_cap / revenue
+
+**Earnings-based multiples are computed on SBC-adjusted earnings on both sides** — historical and implied — so the comparison is apples-to-apples with the SBC-adjusted DCF. Where `StockBasedComp` is unavailable for a historical year, mark that year's adjusted multiple as unavailable rather than silently mixing adjusted and unadjusted figures.
+
+These deliberately will **not** match published P/E figures from Yahoo or stock screeners, which use GAAP EPS. Note this in the JSON so a future reader doesn't "correct" it back.
 
 Exclude any clear outlier years (cyclone, COVID write-down, one-off impairment) from the averages — but keep them in the table for visibility.
 
@@ -285,9 +305,11 @@ Exclude any clear outlier years (cyclone, COVID write-down, one-off impairment) 
 
 From the base case `intrinsic_value` in the DCF JSON, compute what multiples that IV would imply on the most recent FY actuals:
 
-- **Implied P/E** = base_IV / latest_EPS
+- **Implied P/E** = base_IV / (latest_EPS − latest_SBC_per_share)
 - **Implied P/B** = base_IV / (latest_equity / shares_outstanding)
-- **Implied EV/EBITDA** = (base_IV × shares + net_debt) / latest_EBITDA
+- **Implied EV/EBITDA** = (base_IV × shares + net_debt) / (latest_EBITDA − latest_SBC)
+
+Use the same SBC-adjusted basis as Step 8c.1 — comparing an SBC-adjusted implied multiple against an unadjusted historical average would manufacture a false trip.
 
 ### Step 8c.3: Trip detection
 
@@ -301,7 +323,7 @@ Sanity check **fails** if ANY of:
 
 If sanity check fails, identify which assumption is producing the over-valuation. Check in order:
 
-1. **Peak-earnings extrapolation**: Is `last_fcf` near the highest value in the company's FCF history? Compute the 5-8 year FCF mean and median. If `last_fcf` > 1.5× the historical median, the base year is a peak.
+1. **Peak-earnings extrapolation**: Is `last_fcf` near the highest value in the company's FCF history? Compute the 5-8 year FCF mean and median **from the SBC-adjusted series** (both sides adjusted — comparing an adjusted base against an unadjusted median would understate the peak). If `last_fcf` > 1.5× the historical median, the base year is a peak.
 2. **WACC too low for the risk profile**: Are there structural risks not in the WACC? Look at the qualitative analysis for: single-customer concentration, small-cap illiquidity (market cap < $500m), extreme cyclicality (EBITDA range > 3× in 5 years), regulatory single-point-of-failure. Each unaccounted structural risk should add 1.5-2.5% to WACC.
 3. **Growth rate too aggressive**: Are projected growth rates above the historical revenue/EBITDA CAGRs through-the-cycle (not the recent recovery CAGR)? Through-cycle growth should reflect industry volume growth, not cyclical bounce-back.
 4. **Terminal growth too high**: Is `terminal_growth` near or above long-run GDP growth for a mature business? For cyclical/agricultural businesses it should be 1.5-2.5% maximum.
@@ -310,7 +332,7 @@ If sanity check fails, identify which assumption is producing the over-valuation
 
 Pick the most defensible fix and apply it without prompting. Apply in priority order:
 
-1. **If peak-earnings extrapolation is the cause** (most common): rebuild with mid-cycle FCF. Set base case `fcf_base_year` to the mid-point of (historical median FCF, latest FCF). Add `mid_cycle_fcf` field documenting the choice. Bull case can use latest FCF × 0.85. Bear case can use historical median × 0.75.
+1. **If peak-earnings extrapolation is the cause** (most common): rebuild with mid-cycle FCF, using **SBC-adjusted figures throughout**. Set base case `fcf_base_year` to the mid-point of (historical median adjusted FCF, latest adjusted FCF). Add `mid_cycle_fcf` field documenting the choice. Bull case can use latest adjusted FCF × 0.85. Bear case can use historical median × 0.75. The SBC deduction is never reversed by this step — mid-cycling and SBC adjustment compose.
 
 2. **If structural WACC understatement is the cause**: add explicit premium components to the base WACC. Use this template (additive, on top of standard 11-12% NZ/AU small-cap WACC):
    - Single-customer concentration (>40% of revenue from one customer): +1.5-2.5%

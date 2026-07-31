@@ -877,9 +877,10 @@ If a DCF JSON file exists at `./{ticker}/Reports/{TICKER}_DCF.json`, add an inte
   <!-- Valuation Summary Cards -->
   <div class="dcf-summary">
     <div class="dcf-card highlight">
-      <div class="dcf-label">Intrinsic Value</div>
+      <div class="dcf-label">Intrinsic Value (Base)</div>
       <div class="dcf-value" id="dcfIV">$162</div>
       <div class="dcf-change positive" id="dcfUpside">+7% upside</div>
+      <div class="dcf-sublabel">Owner FCF — after SBC &amp; dilution</div>
     </div>
     <div class="dcf-card">
       <div class="dcf-label">Entry Price (15% CAGR)</div>
@@ -893,7 +894,8 @@ If a DCF JSON file exists at `./{ticker}/Reports/{TICKER}_DCF.json`, add an inte
     <div class="dcf-card">
       <div class="dcf-label">Prob-Weighted IV</div>
       <div class="dcf-value" id="dcfWeighted">$131</div>
-      <div class="dcf-sublabel">25% Bull / 50% Base / 25% Bear</div>
+      <div class="dcf-change" id="dcfWeightedUpside"></div>
+      <div class="dcf-sublabel">25% Bull / 50% Base / 25% Bear &mdash; all on owner FCF</div>
     </div>
   </div>
 
@@ -908,13 +910,14 @@ If a DCF JSON file exists at `./{ticker}/Reports/{TICKER}_DCF.json`, add an inte
     <h4>DCF Model Inputs</h4>
     <div class="dcf-inputs-grid">
       <div class="dcf-input-card">
-        <div class="dcf-input-label">Base Year FCF</div>
+        <div class="dcf-input-label">Base FCF (after SBC)</div>
         <div class="dcf-input-value" id="baseFCF">$110M</div>
-        <div class="dcf-input-note">Starting point for projections</div>
+        <div class="dcf-input-note" id="sbcBreakdown">Starting point for projections</div>
       </div>
       <div class="dcf-input-card">
         <div class="dcf-input-label">Shares Outstanding</div>
         <div class="dcf-input-value" id="sharesOut">15.5B</div>
+        <div class="dcf-input-note" id="dilutionNote"></div>
       </div>
       <div class="dcf-input-card">
         <div class="dcf-input-label">Net Debt</div>
@@ -1398,12 +1401,36 @@ function renderDCFInputs() {
         return currency + n.toFixed(0) + units;
     };
 
-    // Base FCF
+    // Base FCF — always the SBC-adjusted figure. Show the deduction explicitly
+    // so the reader can see what was taken out rather than having to infer it.
     document.getElementById('baseFCF').textContent = formatNum(inputs.last_fcf);
+    const sbcEl = document.getElementById('sbcBreakdown');
+    if (sbcEl) {
+        if (inputs.sbc_source === 'unavailable') {
+            sbcEl.innerHTML = '<span style="color:#fdcb6e">&#9888; SBC not disclosed &mdash; FCF unadjusted, IV overstated</span>';
+        } else if (inputs.sbc != null) {
+            // Show every deduction: reported FCF -> SBC (incl. equity taxes) -> interest income
+            const sbcAmt = inputs.sbc_incl_equity_taxes != null ? inputs.sbc_incl_equity_taxes : inputs.sbc;
+            let parts = `${formatNum(inputs.reported_fcf)} reported − ${formatNum(sbcAmt)} SBC`;
+            if (inputs.interest_income) parts += ` − ${formatNum(inputs.interest_income)} interest`;
+            sbcEl.textContent = parts;
+        } else {
+            sbcEl.textContent = 'Starting point for projections';
+        }
+    }
 
     // Shares outstanding
     const shares = inputs.shares_outstanding;
     document.getElementById('sharesOut').textContent = shares >= 1000 ? (shares/1000).toFixed(2) + 'B' : shares.toFixed(1) + 'M';
+
+    // Dilution note: shares only grow by the SBC buybacks fail to absorb
+    const dilEl = document.getElementById('dilutionNote');
+    if (dilEl) {
+        const g = inputs.annual_share_growth_pct;
+        dilEl.textContent = (g > 0)
+            ? `+${g.toFixed(1)}%/yr from uncovered dilution`
+            : 'Flat — buybacks absorb SBC';
+    }
 
     // Net debt (negative = net cash)
     const netDebt = inputs.net_debt;
@@ -1503,13 +1530,21 @@ function calculateDCF(startGrowth, wacc, terminalGrowth) {
     // Enterprise Value to Equity Value
     const enterpriseValue = pvFCF + pvTerminal;
     const equityValue = enterpriseValue - dcfData.inputs.net_debt;
-    const iv = equityValue / dcfData.inputs.shares_outstanding;
+
+    // Divide by the YEAR-5 share count, matching the DCF JSON. Shares grow only
+    // by the dilution buybacks fail to absorb, so this equals today's count for
+    // companies whose repurchases fully offset SBC.
+    const exitShares = (dcfData.inputs.projected_shares && dcfData.inputs.projected_shares.length === years)
+        ? dcfData.inputs.projected_shares[years - 1]
+        : dcfData.inputs.shares_outstanding * Math.pow(1 + (dcfData.inputs.annual_share_growth_pct || 0) / 100, years);
+
+    const iv = equityValue / exitShares;
 
     // Entry Price for a 15% IRR: buy today, collect Yrs 1-5 FCF, exit at fair
     // (WACC-based) terminal value in year 5. Interim FCF and terminal value are
     // discounted at the hurdle; net cash adds to what the buyer receives.
     const entryPrice = (pvFCFHurdle + terminalValue / Math.pow(1 + hurdle, years)
-                        - dcfData.inputs.net_debt) / dcfData.inputs.shares_outstanding;
+                        - dcfData.inputs.net_debt) / exitShares;
 
     return {
         iv: iv,
@@ -1548,7 +1583,15 @@ window.updateDCFDisplay = function() {
     upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
 
     // Update weighted IV
-    document.getElementById('dcfWeighted').textContent = '$' + dcfData.probability_weighted.weighted_iv.toFixed(0);
+    // Probability-weighted IV, on the same owner-FCF basis as every scenario
+    const wiv = dcfData.probability_weighted.weighted_iv;
+    document.getElementById('dcfWeighted').textContent = '$' + wiv.toFixed(0);
+    const wUpEl = document.getElementById('dcfWeightedUpside');
+    if (wUpEl) {
+        const wUp = (wiv - dcfData.current_price) / dcfData.current_price * 100;
+        wUpEl.textContent = (wUp >= 0 ? '+' : '') + wUp.toFixed(0) + '% ' + (wUp >= 0 ? 'upside' : 'downside');
+        wUpEl.className = 'dcf-change ' + (wUp >= 0 ? 'positive' : 'negative');
+    }
 
     // Update assumptions grid to reflect current slider values
     const grid = document.getElementById('assumptionGrid');
