@@ -18,12 +18,12 @@
 # -n is reached. Rate limits are handled by pausing until reset (see lib.sh),
 # so an overnight drain survives a limit window instead of failing through it.
 #
-# Per-ticker transcripts: .github/state/logs/{TICKER}.log
-# Scheduling record:      .github/state/joblog.tsv
+# Per-ticker transcripts: state/logs/{TICKER}.log
+# Scheduling record:      state/joblog.tsv
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
 JOBS=4
@@ -32,8 +32,8 @@ PUSH=1
 RESUME=""
 DRY_RUN=0
 TICKERS=()
-LOG_DIR=".github/state/logs"
-JOBLOG=".github/state/joblog.tsv"
+LOG_DIR="state/logs"
+JOBLOG="state/joblog.tsv"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -49,7 +49,7 @@ while [ $# -gt 0 ]; do
 done
 
 export PUSH LOG_DIR
-. "$REPO_ROOT/.github/scripts/lib.sh"
+. "$REPO_ROOT/scripts/lib.sh"
 require_tools
 command -v parallel >/dev/null || {
   echo "ERROR: GNU parallel not found (brew install parallel)" >&2; exit 1; }
@@ -74,7 +74,7 @@ if [ ${#TICKERS[@]} -eq 0 ]; then
   while [ "${#TICKERS[@]}" -lt "$limit" ]; do
     EXCLUDE="$(IFS=,; echo "${TICKERS[*]:-}")"
     : > "$GITHUB_OUTPUT"
-    python3 .github/scripts/select_ticker.py --override "" --exclude "$EXCLUDE" \
+    python3 scripts/select_ticker.py --override "" --exclude "$EXCLUDE" \
       >/dev/null 2>&1
     T="$(grep '^ticker=' "$GITHUB_OUTPUT" | cut -d= -f2-)"
     [ -z "$T" ] && break
@@ -107,7 +107,7 @@ START=$(date +%s)
 printf '%s\n' "${TICKERS[@]}" \
   | parallel -j "$JOBS" --joblog "$JOBLOG" $RESUME \
              --line-buffer --tagstring '[{}]' \
-             "$REPO_ROOT/.github/scripts/research_one.sh" {}
+             "$REPO_ROOT/scripts/research_one.sh" {}
 PAR_RC=$?
 
 ELAPSED=$(( $(date +%s) - START ))
@@ -123,7 +123,7 @@ if [ -f "$JOBLOG" ]; then
   if [ "${bad:-0}" -gt 0 ]; then
     echo " Failed tickers:"
     awk 'NR>1 && $7!=0 {print "   " $NF}' "$JOBLOG"
-    echo " Re-run them with: .github/scripts/run_loop.sh <TICKER>..."
+    echo " Re-run them with: scripts/run_loop.sh <TICKER>..."
   fi
 fi
 echo "=============================================="

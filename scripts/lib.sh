@@ -59,7 +59,7 @@ $batch_note" > "$log" 2>&1
 
 $batch_note" \
       | tee "$log" \
-      | python3 "$REPO_ROOT/.github/scripts/progress.py"
+      | python3 "$REPO_ROOT/scripts/progress.py"
     rc=$?
     set +o pipefail
   fi
@@ -84,8 +84,8 @@ $batch_note" \
 commit_ticker() {
   local ticker="$1" mode="${2:-new}"
 
-  git add -A -- "$ticker" index.html .github/state/budget.json \
-    .github/state/scores .github/evals 2>/dev/null
+  git add -A -- "$ticker" index.html state/budget.json \
+    state/scores evals 2>/dev/null
 
   if git diff --cached --quiet; then
     echo "[$ticker] No output produced -- nothing to commit."
@@ -94,7 +94,7 @@ commit_ticker() {
 
   git commit -q -m "feat(screener): $mode research for $ticker
 
-Automated local run via .github/scripts/"
+Automated local run via scripts/"
   echo "[$ticker] Committed."
 
   if [ "$PUSH" = "1" ]; then
@@ -111,7 +111,7 @@ Automated local run via .github/scripts/"
 # ---------------------------------------------------------------------------
 with_git_lock() {
   local ticker="$1"; shift
-  local lockdir="$REPO_ROOT/.github/state/git.lock.d"
+  local lockdir="$REPO_ROOT/state/git.lock.d"
   local waited=0
 
   while ! mkdir "$lockdir" 2>/dev/null; do

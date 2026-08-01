@@ -30,8 +30,8 @@ from pathlib import Path
 
 import dcf_fields as F
 
-LEDGER = F.REPO / ".github" / "evals" / "ledger.jsonl"
-LOCK = F.REPO / ".github" / "state" / "ledger.lock"
+LEDGER = F.REPO / "evals" / "ledger.jsonl"
+LOCK = F.REPO / "state" / "ledger.lock"
 
 
 @contextlib.contextmanager

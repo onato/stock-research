@@ -8,12 +8,12 @@
 # restriction, so this bills against the subscription rather than an API key.
 #
 # Usage:
-#   .github/scripts/run_local.sh                 # next queued ticker
-#   .github/scripts/run_local.sh SEK.NZ          # a specific ticker
-#   .github/scripts/run_local.sh -n 5            # loop over 5 tickers
-#   .github/scripts/run_local.sh --no-push       # commit but do not push
-#   .github/scripts/run_local.sh --open          # open the dashboard when done
-#   .github/scripts/run_local.sh --ignore-budget # do not consume a slot
+#   scripts/run_local.sh                 # next queued ticker
+#   scripts/run_local.sh SEK.NZ          # a specific ticker
+#   scripts/run_local.sh -n 5            # loop over 5 tickers
+#   scripts/run_local.sh --no-push       # commit but do not push
+#   scripts/run_local.sh --open          # open the dashboard when done
+#   scripts/run_local.sh --ignore-budget # do not consume a slot
 #
 # The weekend restriction is deliberately NOT enforced here -- that rule
 # existed to bound unattended cloud spend. Running by hand is already
@@ -22,7 +22,7 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
 COUNT=1
@@ -43,8 +43,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-LOG_DIR=".github/state/logs"
-. "$REPO_ROOT/.github/scripts/lib.sh"
+LOG_DIR="state/logs"
+. "$REPO_ROOT/scripts/lib.sh"
 require_tools
 
 # Emulate $GITHUB_OUTPUT so the shared scripts work unchanged.
@@ -61,7 +61,7 @@ for i in $(seq 1 "$COUNT"); do
   : > "$GITHUB_OUTPUT"
 
   # Weekend check is skipped locally; the budget still applies.
-  if ! python3 .github/scripts/guard.py --max-runs 8 --ignore-weekend $BUDGET_ARGS; then
+  if ! python3 scripts/guard.py --max-runs 8 --ignore-weekend $BUDGET_ARGS; then
     echo "Guard failed unexpectedly." >&2
     exit 1
   fi
@@ -72,7 +72,7 @@ for i in $(seq 1 "$COUNT"); do
   fi
 
   : > "$GITHUB_OUTPUT"
-  python3 .github/scripts/select_ticker.py --override "$TICKER" >/dev/null || exit 1
+  python3 scripts/select_ticker.py --override "$TICKER" >/dev/null || exit 1
   T="$(read_out ticker)"
   MODE="$(read_out mode)"
 

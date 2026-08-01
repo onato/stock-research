@@ -19,10 +19,10 @@ import pathlib
 import subprocess
 import sys
 
-REPO = pathlib.Path(__file__).resolve().parents[2]
-SCRIPTS = REPO / ".github" / "scripts"
-SCORES = REPO / ".github" / "state" / "scores"
-JOBLOG = REPO / ".github" / "state" / "joblog.tsv"
+REPO = pathlib.Path(__file__).resolve().parents[1]
+SCRIPTS = REPO / "scripts"
+SCORES = REPO / "state" / "scores"
+JOBLOG = REPO / "state" / "joblog.tsv"
 
 
 def last_batch():
@@ -36,12 +36,17 @@ def last_batch():
     if JOBLOG.exists():
         for line in JOBLOG.read_text(errors="replace").splitlines()[1:]:
             parts = line.split("\t")
-            if len(parts) >= 2 and parts[-1].strip():
-                out.append(parts[-1].strip())
+            if len(parts) < 2 or not parts[-1].strip():
+                continue
+            # The joblog's last column is the whole command
+            # ("/path/to/research_one.sh WISE.L"), not just the ticker.
+            token = parts[-1].strip().split()[-1]
+            if token and "/" not in token:
+                out.append(token)
     if out:
         return out
 
-    logs = REPO / ".github" / "state" / "logs"
+    logs = REPO / "state" / "logs"
     if logs.is_dir():
         recent = sorted(logs.glob("*.log"), key=lambda p: p.stat().st_mtime,
                         reverse=True)[:6]
@@ -79,7 +84,7 @@ def main():
 
     # ---- cost ------------------------------------------------------------
     print("\n## Cost\n")
-    baseline = REPO / ".github" / "state" / "cost_baseline.json"
+    baseline = REPO / "state" / "cost_baseline.json"
     out = run(["python3", str(SCRIPTS / "cost_report.py"),
                *(["--compare", str(baseline)] if baseline.exists() else [])])
     for line in out.splitlines():

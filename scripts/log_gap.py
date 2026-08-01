@@ -29,8 +29,8 @@ import pathlib
 import sys
 import collections
 
-REPO = pathlib.Path(__file__).resolve().parents[2]
-LOG = REPO / ".github" / "state" / "improvements.jsonl"
+REPO = pathlib.Path(__file__).resolve().parents[1]
+LOG = REPO / "state" / "improvements.jsonl"
 
 KINDS = (
     "missing_pattern",   # build_facts found no candidate for a metric that exists

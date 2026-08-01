@@ -140,7 +140,7 @@ to reading the `Extracted/*.txt` directly.
 future run paying the same fallback cost:
 
 ```bash
-python3 .github/scripts/log_gap.py --ticker {TICKER} \
+python3 scripts/log_gap.py --ticker {TICKER} \
   --kind missing_pattern --metric OperatingCashFlow \
   --detail "filing wording is 'Net cash inflow from operating activities'" \
   --example "{TICKER}_Annual_FY2026.txt:1042"
@@ -169,7 +169,7 @@ Write **both**, from the same resolved numbers:
 
 `core_metrics` has a **fixed column set, identical for every ticker in this
 repo** — that is what makes cross-ticker screening possible. Run
-`python3 .github/scripts/schema.py` to print the exact DDL and column list.
+`python3 scripts/schema.py` to print the exact DDL and column list.
 
 Rules:
 - **Never add a column.** A metric that is not in `core_metrics` goes in the
@@ -180,7 +180,7 @@ Rules:
 - **Normalize aliases into the core names.** Historical CSVs spelled the same
   metric `EPS`/`EPSBasic`/`EPSDiluted`/`EPS_Diluted` and
   `NetIncome`/`NetProfit`/`SBC`/`StockBasedComp`/`ShareBasedComp`. The mapping
-  lives in `.github/scripts/schema.py` (`ALIASES`) — follow it.
+  lives in `scripts/schema.py` (`ALIASES`) — follow it.
 - **Populate `units` and `currency` on every row** (see Step 4 above).
 
 ```bash
@@ -192,7 +192,7 @@ duckdb ./{TICKER}/Reports/{TICKER}.duckdb -c "
 Then export the CSV with this script — **do not hand-write a `COPY`**:
 
 ```bash
-python3 .github/scripts/export_csv.py {TICKER}
+python3 scripts/export_csv.py {TICKER}
 ```
 
 The DB uses snake_case columns; the dashboards embed CSV with CamelCase

@@ -2,7 +2,7 @@
 """Measure what a research run cost, and where.
 
 Optimisation needs a before/after number. This reads the stream-json
-transcripts in .github/state/logs/ and reports per-ticker cost, plus a
+transcripts in state/logs/ and reports per-ticker cost, plus a
 per-subagent breakdown -- which is how the financial-parser bottleneck
 (183 turns, 18.2M cache-read tokens, ~60% of AFC.NZ's cost) was found.
 
@@ -22,8 +22,8 @@ import sys
 import pathlib
 import collections
 
-REPO = pathlib.Path(__file__).resolve().parents[2]
-LOGS = REPO / ".github" / "state" / "logs"
+REPO = pathlib.Path(__file__).resolve().parents[1]
+LOGS = REPO / "state" / "logs"
 
 # $/token. Cache reads bill at 0.1x input; 1h-TTL writes at 2x.
 RATES = {

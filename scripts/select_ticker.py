@@ -3,7 +3,7 @@
 
 Policy: new tickers first, then refresh the stalest.
 
-1. Walk the committed queue files in `.github/queue/` in priority order and
+1. Walk the committed queue files in `queue/` in priority order and
    return the first ticker that has no `{TICKER}/Reports/` content yet.
 2. Once every queued ticker has a report, fall back to refreshing the
    existing ticker whose DCF `valuation_date` is oldest.
@@ -19,8 +19,8 @@ import os
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-QUEUE_DIR = REPO_ROOT / ".github" / "queue"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+QUEUE_DIR = REPO_ROOT / "queue"
 
 # Reuse the date parsing already used by the screen-investments skill so
 # staleness here means the same thing it does there.

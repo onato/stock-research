@@ -20,7 +20,7 @@ import collections
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import schema  # noqa: E402
 
-REPO = pathlib.Path(__file__).resolve().parents[2]
+REPO = pathlib.Path(__file__).resolve().parents[1]
 
 
 def parse_number(raw):

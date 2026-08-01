@@ -75,7 +75,7 @@ filing-regime the parser must handle):
 | SRBK | bank (no meaningful FCF), residual-income |
 | FRFHF | insurer/holdco, BVPS model, IFRS-17 break |
 
-Store as `.github/evals/golden/{TICKER}_Metrics.golden.csv`. Score the parser
+Store as `evals/golden/{TICKER}_Metrics.golden.csv`. Score the parser
 per-cell: precision/recall of non-null cells vs golden, values within 1%.
 One number per run: **cell accuracy**. This is the reward function any
 optimizer (manual or skillopt) needs.
@@ -99,7 +99,7 @@ Trend only same-judge-version scores against each other.
 A DCF is a forecast; forecasts are scored by outcomes.
 
 ### Prediction ledger
-Append-only `.github/evals/ledger.jsonl`, one row written every time a DCF is
+Append-only `evals/ledger.jsonl`, one row written every time a DCF is
 produced (DCF.json gets overwritten on re-research; the ledger never does):
 
 ```json
@@ -132,7 +132,7 @@ be backfilled later.
 Everything runs locally — no CI dependency. (The `.github/` prefix on paths is
 just where scripts/state already live; nothing here needs Actions.)
 
-- `run_evals.py {TICKER}` → writes `.github/state/scores/{TICKER}_{date}.json`
+- `run_evals.py {TICKER}` → writes `state/scores/{TICKER}_{date}.json`
   containing tier-1 results (+ tier-2 when run), `agents_sha`, and cost from
   `cost_report.py` — so quality-per-dollar is one join.
 - `research_one.sh` calls it as the last step, so `run_local.sh` /

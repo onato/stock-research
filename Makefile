@@ -4,8 +4,8 @@
 # score them, show what to fix, and rank the whole portfolio. Everything
 # else in here is one piece of that.
 
-SCRIPTS := .github/scripts
-STATE   := .github/state
+SCRIPTS := scripts
+STATE   := state
 SCREEN  := .claude/skills/screen-investments/screen.py
 
 # How many tickers `make run` researches, and how many at once.
@@ -69,7 +69,7 @@ status: ## What is researched, what is stale, what is queued
 	@python3 $(SCRIPTS)/select_ticker.py 2>&1 | grep -E '^(ticker|mode)=' | sed 's/^/  next  /'
 	@echo "  researched   $$(ls -d */Reports 2>/dev/null | wc -l | tr -d ' ') tickers"
 	@echo "  scorecards   $$(ls $(STATE)/scores/*.json 2>/dev/null | wc -l | tr -d ' ')"
-	@echo "  ledger rows  $$(wc -l < .github/evals/ledger.jsonl 2>/dev/null | tr -d ' ')"
+	@echo "  ledger rows  $$(wc -l < evals/ledger.jsonl 2>/dev/null | tr -d ' ')"
 
 ## --------------------------------------------------------------------------
 ## Pieces
@@ -87,7 +87,7 @@ evals: ## Tier-1 eval for one ticker (TICKER=AGL.NZ)
 	@test -n "$(TICKER)" || { echo "usage: make evals TICKER=AGL.NZ" >&2; exit 2; }
 	python3 $(SCRIPTS)/run_evals.py $(TICKER)
 
-evals-all: ## Tier-1 eval for every ticker; scorecards to .github/state/scores/
+evals-all: ## Tier-1 eval for every ticker; scorecards to state/scores/
 	python3 $(SCRIPTS)/run_evals.py --all
 
 cost: ## Per-ticker cost report from run transcripts

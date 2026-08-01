@@ -10,7 +10,7 @@
 #
 # Honors from the environment (run_loop.sh sets these):
 #   PUSH=0|1        push after committing (default 1)
-#   LOG_DIR         where transcripts go (default .github/state/logs)
+#   LOG_DIR         where transcripts go (default state/logs)
 #   RL_RETRIES      retries after a rate-limit pause (default 1)
 #
 # Exit status is the research exit status, so parallel's --joblog records
@@ -18,18 +18,18 @@
 
 set -uo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
 TICKER="${1:-}"
 [ -z "$TICKER" ] && { echo "usage: research_one.sh TICKER" >&2; exit 2; }
 
 : "${PUSH:=1}"
-: "${LOG_DIR:=.github/state/logs}"
+: "${LOG_DIR:=state/logs}"
 : "${RL_RETRIES:=1}"
 export PUSH LOG_DIR
 
-. "$REPO_ROOT/.github/scripts/lib.sh"
+. "$REPO_ROOT/scripts/lib.sh"
 
 attempt=0
 while : ; do
@@ -53,8 +53,8 @@ done
 # Score the output and snapshot the prediction before committing, so the
 # scorecard and ledger row land in the same commit as the artifacts they
 # describe. Eval failures never fail the run -- they are a report, not a gate.
-python3 "$REPO_ROOT/.github/scripts/run_evals.py" "$TICKER" || true
-python3 "$REPO_ROOT/.github/scripts/ledger.py" append "$TICKER" || true
+python3 "$REPO_ROOT/scripts/run_evals.py" "$TICKER" || true
+python3 "$REPO_ROOT/scripts/ledger.py" append "$TICKER" || true
 
 # Commit whatever was produced, even on a non-zero exit -- a partial run
 # still leaves useful extracted text and metrics on disk.

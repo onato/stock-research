@@ -111,7 +111,7 @@ Store extracted text in: ./$ARGUMENTS/Extracted/
 ### Step 5a: Build the facts table first (fast, no model)
 
 ```bash
-python3 .github/scripts/build_facts.py "$ARGUMENTS"
+python3 scripts/build_facts.py "$ARGUMENTS"
 ```
 
 One linear pass over `Extracted/*.txt`, writing candidate values to
@@ -127,7 +127,7 @@ ticker, roughly 60% of its total cost.
 The agent (`.claude/agents/financial-parser.md`) resolves competing candidates,
 determines units and currency, and writes **both** the `core_metrics` table and
 the exported CSV. `core_metrics` uses a fixed schema shared by every ticker in
-this repo (see `.github/scripts/schema.py`), which is what makes cross-ticker
+this repo (see `scripts/schema.py`), which is what makes cross-ticker
 screening possible.
 
 **IMPORTANT: Include BOTH annual AND quarterly data in the CSV. Each row is one period.**

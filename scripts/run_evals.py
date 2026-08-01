@@ -16,7 +16,7 @@ legitimate causes (owner-FCF adjustments break the FCF identity by design;
 NTA models have no SBC input); `skip` = inputs absent. The score counts only
 pass/fail -- warns are a review queue, not a grade.
 
-Scorecard goes to .github/state/scores/{TICKER}_{date}.json with the agent-
+Scorecard goes to state/scores/{TICKER}_{date}.json with the agent-
 prompt hash, so score changes are attributable to prompt versions.
 
 Usage:
@@ -34,7 +34,7 @@ from pathlib import Path
 import dcf_fields as F
 from schema import normalize
 
-SCORES = F.REPO / ".github" / "state" / "scores"
+SCORES = F.REPO / "state" / "scores"
 
 REL_TOL = 0.03          # identities: 3% relative slack for rounding
 WIV_TOL = 0.02          # weighted-IV recompute: 2%

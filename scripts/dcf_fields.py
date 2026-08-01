@@ -18,7 +18,7 @@ import json
 import pathlib
 import subprocess
 
-REPO = pathlib.Path(__file__).resolve().parents[2]
+REPO = pathlib.Path(__file__).resolve().parents[1]
 
 SCENARIOS = ("bear", "base", "bull")
 

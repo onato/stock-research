@@ -8,7 +8,7 @@ runner time) unless BOTH hold:
   * today is Saturday or Sunday (UTC), and
   * fewer than --max-runs runs have already happened this weekend.
 
-The counter lives in `.github/state/budget.json`, keyed by the ISO
+The counter lives in `state/budget.json`, keyed by the ISO
 year+week, so it resets by itself each weekend with no cleanup step.
 
 The count is incremented BEFORE the expensive research step, not after: a
@@ -30,8 +30,8 @@ import os
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-STATE_FILE = REPO_ROOT / ".github" / "state" / "budget.json"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+STATE_FILE = REPO_ROOT / "state" / "budget.json"
 
 SATURDAY, SUNDAY = 5, 6
 
