@@ -38,13 +38,21 @@ PATTERNS = {
     "GrossProfit": [r"^gross (profit|margin|loss)"],
     "OperatingIncome": [r"^operating (profit|loss|income)", r"^ebit\b",
                         r"^(profit|loss) from operations"],
-    "EBITDA": [r"^(adjusted )?ebitda", r"^underlying ebitda"],
+    "EBITDA": [r"\bebitda\b"],   # adjusted/underlying/normalised all qualify
     "NetIncome": [r"^(net )?(profit|loss)( after tax| for the (year|period))",
                   r"^net (income|earnings)", r"^(profit|loss) attributable to"],
     "ProfitBeforeTax": [r"^(profit|loss) before (income )?tax"],
-    "EPS": [r"^(basic|diluted).{0,25}earnings per share",
-            r"^earnings per share", r"^(basic|diluted) eps"],
-    "OperatingCashFlow": [r"net cash (from|provided by|generated).{0,20}operat",
+    # "net loss per share, basic", "basic and diluted (cents per share)",
+    # "total basic earnings per share" -- per-share is the anchor.
+    "EPS": [r"(earnings|loss|income) per (ordinary |stapled )?share",
+            r"^(basic|diluted)( and diluted)?\b.{0,30}per share",
+            r"^(basic|diluted) eps", r"per share.{0,15}(basic|diluted)"],
+    # Filers write this a dozen ways: "net cash flows from", "net cash
+    # (used in)/provided by", "cash generated from operations", "net cash
+    # inflow/(outflow) from". Match on the operating-activities anchor and
+    # allow any connector, rather than enumerating phrasings.
+    "OperatingCashFlow": [r"^(net )?cash.{0,40}operating activities",
+                          r"^cash generated (from|by) operation",
                           r"^cash flows? from operating"],
     "CapEx": [r"^(purchase|acquisition|additions?) of (property|plant|equipment|fixed)",
               r"^capital expenditure"],
@@ -61,14 +69,25 @@ PATTERNS = {
                           r"shares on issue"],
     "StockBasedComp": [r"^(stock|share).based (compensation|payment)",
                        r"^share.based payment"],
-    "EquityAwardTaxes": [r"taxes paid.{0,30}(net.share settlement|equity awards)"],
+    # Never matched on any of 64 tickers with the old wording. US filers
+    # say "taxes paid related to net share settlement"; others use
+    # "tax withholding on" or "shares withheld for taxes".
+    "EquityAwardTaxes": [r"tax(es)?.{0,40}(net.share settlement|equity award)",
+                         r"(tax withholding|withheld for tax).{0,30}(share|equity|rsu)",
+                         r"shares withheld.{0,20}tax"],
     "InterestIncome": [r"^(interest|investment|finance) income"],
     "InterestExpense": [r"^(interest|finance) (expense|costs?)"],
-    "ShareRepurchases": [r"^(repurchase|buyback|buy.back) of", r"^treasury stock"],
-    "DividendsPaid": [r"^dividends? paid", r"^dividends? (declared|per share)"],
+    # "share buybacks", "purchase of treasury shares", "repurchases of
+    # ordinary shares" -- anchor on the act, not the sentence shape.
+    "ShareRepurchases": [r"repurchase|buy.?back", r"treasury (stock|shares)"],
+    # Exclude "interest and dividends" (an income line) and dividend
+    # reinvestment plans, which are not cash returned to shareholders.
+    "DividendsPaid": [r"^dividends?( paid| declared| to equity)",
+                      r"^(payment of |paid )dividends?"],
     "DeferredRevenue": [r"^(deferred|unearned) (revenue|income)",
                         r"^contract liabilit"],
-    "CashTaxesPaid": [r"^(income )?tax(es)? paid"],
+    "CashTaxesPaid": [r"^(net |corporate |corporation )?(income )?tax(es|ation)? paid",
+                      r"^tax(es)? (paid|refunded)"],
 }
 COMPILED = {m: [re.compile(p, re.I) for p in pats] for m, pats in PATTERNS.items()}
 
@@ -76,7 +95,12 @@ COMPILED = {m: [re.compile(p, re.I) for p in pats] for m, pats in PATTERNS.items
 # Numbers may be (1,234) for negatives, or a bare '-' for nil.
 NUM = r"\(?-?[\d,]+\.?\d*\)?|—|–|-"
 LINE_RE = re.compile(
-    r"^(?P<label>[A-Za-z][A-Za-z0-9 ,.&/()'\-]{2,60}?)\s{2,}"
+    # Label cap raised 60 -> 80: real statement lines get long. "Payments
+    # for taxes related to net share settlement of equity awards" is 67
+    # characters, so EquityAwardTaxes matched nothing on any of 64 tickers
+    # -- the metric patterns were fine, this regex rejected the line first.
+    # 80 still excludes prose, which runs well past it.
+    r"^(?P<label>[A-Za-z][A-Za-z0-9 ,.&/()'\-]{2,80}?)\s{2,}"
     # Tokens must be whitespace-separated: (?:\s*NUM)+ lets the regex
     # engine re-partition long digit runs exponentially on failing lines.
     r"(?P<rest>(?:" + NUM + r")(?:\s+(?:" + NUM + r"))*)\s*$"
