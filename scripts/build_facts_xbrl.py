@@ -202,7 +202,9 @@ def main():
         used[col] = concept
         for period, val in values.items():
             if col.startswith("_"):
-                kpis.append((period, col.lstrip("_"), float(val), unit))
+                # Same scaling as core_metrics: these are money amounts
+                # (D&A, buybacks, interest income), reported in millions.
+                kpis.append((period, col.lstrip("_"), float(val) / 1e6, "millions"))
             else:
                 rows.setdefault(period, {})[col] = float(val)
 
@@ -224,12 +226,24 @@ def main():
 
     cols = schema.CORE_NAMES
     payload = []
+    # XBRL reports absolute dollars; the text path and every existing CSV
+    # use millions. Scale here so core_metrics has ONE convention -- the
+    # alternative left export_csv.py writing 45183036000 into a CSV whose
+    # dashboard embeds 45183.04, silently breaking it by 1e6.
+    #
+    # Per-share and percentage columns are scale-free and must not be
+    # touched: EPS of 1.98 is 1.98 whatever the revenue units are.
+    SCALE_FREE = {"period", "units", "currency", "eps", "dividend_per_share",
+                  "gross_margin", "operating_margin", "net_margin"}
     for period, vals in sorted(rows.items()):
         rec = {c: None for c in cols}
         rec["period"] = period
-        rec["units"] = "absolute"       # XBRL values are unscaled
+        rec["units"] = "millions"
         rec["currency"] = "USD"
-        rec.update({k: v for k, v in vals.items() if k in rec})
+        for k, v in vals.items():
+            if k not in rec:
+                continue
+            rec[k] = v / 1e6 if (k not in SCALE_FREE and v is not None) else v
         payload.append([rec[c] for c in cols])
     if payload:
         con.executemany(

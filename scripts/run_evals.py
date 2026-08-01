@@ -303,6 +303,69 @@ def check_dcf(ticker, card):
 # Pipeline health
 # ---------------------------------------------------------------------------
 
+def check_units_consistent(ticker, card):
+    """core_metrics and the exported CSV must use the same scale.
+
+    XBRL originally wrote absolute dollars while the text path and every
+    dashboard used millions, so running export_csv.py on a US ticker
+    replaced 39000.97 with 39000966000.0 and silently broke the dashboard
+    by 1e6. Both paths now write millions; this makes a regression loud.
+    """
+    reports = F.REPO / "research" / ticker / "Reports"
+    db = reports / f"{ticker}.duckdb"
+    csv_path = reports / f"{ticker}_Metrics.csv"
+    if not db.exists() or not csv_path.exists():
+        card.add("units_consistent", "skip", "no database or CSV")
+        return
+
+    try:
+        import duckdb
+        con = duckdb.connect(str(db), read_only=True)
+        rows = con.execute(
+            "SELECT period, revenue FROM core_metrics "
+            "WHERE revenue IS NOT NULL AND period LIKE 'FY%'").fetchall()
+        con.close()
+    except Exception as e:
+        card.add("units_consistent", "skip", f"db unreadable: {str(e)[:40]}")
+        return
+    if not rows:
+        card.add("units_consistent", "skip", "no revenue in core_metrics")
+        return
+    db_rev = dict(rows)
+
+    try:
+        import csv as _csv
+        with open(csv_path, newline="", errors="replace") as fh:
+            csv_rev = {r["Period"]: r.get("Revenue")
+                       for r in _csv.DictReader(fh) if r.get("Period")}
+    except Exception as e:
+        card.add("units_consistent", "skip", f"csv unreadable: {str(e)[:40]}")
+        return
+
+    for period, dbv in db_rev.items():
+        raw = csv_rev.get(period)
+        if raw in (None, ""):
+            continue
+        try:
+            cv = float(str(raw).replace(",", ""))
+        except ValueError:
+            continue
+        if cv == 0 or dbv == 0:
+            continue
+        ratio = dbv / cv
+        # Same scale within rounding; anything near a power of 1000 apart
+        # is a units mismatch rather than a data difference.
+        if 0.99 <= ratio <= 1.01:
+            card.add("units_consistent", "pass", f"{period} matches")
+            return
+        if ratio > 100 or ratio < 0.01:
+            card.add("units_consistent", "fail",
+                     f"{period}: db={dbv:,.1f} vs csv={cv:,.1f} "
+                     f"({ratio:,.0f}x) -- units mismatch")
+            return
+    card.add("units_consistent", "warn", "no comparable FY period")
+
+
 def check_health(ticker, card):
     reports = F.REPO / "research" / ticker / "Reports"
 
@@ -343,6 +406,7 @@ def evaluate(ticker):
     card = Card()
     check_metrics(ticker, card)
     check_dcf(ticker, card)
+    check_units_consistent(ticker, card)
     check_health(ticker, card)
     return {
         "ticker": ticker,
