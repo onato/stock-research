@@ -209,6 +209,12 @@ duckdb ./{TICKER}/Reports/{TICKER}.duckdb -c "
   VALUES ('FY2026', 161.285, -818.093, 'millions', 'NZD')"
 ```
 
+**Write every period to `core_metrics`, not just the annual ones.** The CSV
+must cover the same periods as the table — half-years and quarters included.
+If you write 18 periods to the CSV but only 5 to `core_metrics`, the export
+would discard 13 of them; it now refuses instead, and the run leaves the two
+out of sync. Populate the table first, then export from it.
+
 Then export the CSV with this script — **do not hand-write a `COPY`**:
 
 ```bash
