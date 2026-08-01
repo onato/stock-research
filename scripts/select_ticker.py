@@ -44,7 +44,20 @@ except ImportError:  # pragma: no cover - keeps the selector usable standalone
 # Queue files are consumed in this order. Anything else in the directory is
 # appended alphabetically, so dropping in a new exchange file works without
 # editing this list.
-PRIORITY = ["priority.txt", "nzx.txt", "asx.txt", "us_major.txt"]
+# Queue files are consumed in this order. `priority.txt` holds current
+# holdings and the watchlist, so those stay ahead of any broad sweep.
+# Home markets come next (most familiar, smallest, easiest to verify),
+# then the larger international lists. Anything not named here is
+# appended alphabetically, so dropping in a new file just works.
+PRIORITY = [
+    "priority.txt",     # portfolio + watchlist
+    "nzx.txt", "asx.txt",
+    "us_major.txt", "adr.txt",
+    "ftse.txt", "tsx.txt",
+    "hsci.txt", "sti.txt",
+    "dax.txt", "cac.txt",
+    "nikkei.txt", "nifty.txt",
+]
 
 
 def queue_files():
