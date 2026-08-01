@@ -70,7 +70,7 @@ def build_row(ticker):
     dcf = F.load_dcf(ticker)
     if dcf is None:
         return None
-    dcf_path = F.REPO / ticker / "Reports" / f"{ticker}_DCF.json"
+    dcf_path = F.REPO / "research" / ticker / "Reports" / f"{ticker}_DCF.json"
     return {
         "logged_at": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "ticker": ticker,
@@ -114,7 +114,7 @@ def append(tickers):
 def all_tickers():
     return sorted(
         p.parent.parent.name
-        for p in F.REPO.glob("*/Reports/*_DCF.json")
+        for p in F.REPO.glob("research/*/Reports/*_DCF.json")
         if p.stem == f"{p.parent.parent.name}_DCF"
     )
 

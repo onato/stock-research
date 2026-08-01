@@ -498,7 +498,7 @@ document.querySelector('#lb thead').addEventListener('click', (e) => {
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--root", default=".")
+    p.add_argument("--root", default="research")
     p.add_argument("--top", type=int, default=15)
     p.add_argument("--live", action="store_true", help="fetch live prices from Yahoo Finance")
     p.add_argument("--stale-days", type=int, default=45)

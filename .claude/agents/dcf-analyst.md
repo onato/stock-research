@@ -22,7 +22,7 @@ Use this value as `current_price` — do NOT rely on web search results for the 
 
 ### Read Historical Data
 
-Read from `./{ticker}/Reports/{TICKER}_Metrics.csv`:
+Read from `./research/{ticker}/Reports/{TICKER}_Metrics.csv`:
 - Revenue (5-10 years)
 - Free Cash Flow (as reported — you will adjust it in Step 1b)
 - Stock-Based Compensation (full history)
@@ -42,10 +42,10 @@ Most tickers parsed before 2026-07-29 have no `StockBasedComp` or `ShareRepurcha
 1. Read `StockBasedComp` / `ShareRepurchases` from the CSV. Accept the legacy aliases `SBC` and `ShareBasedComp` as equivalents.
 2. If absent, grep the filings yourself:
    ```bash
-   grep -i "stock-based compensation\|share-based payment" ./{ticker}/Extracted/*.txt
-   grep -i "repurchase of common stock\|treasury stock" ./{ticker}/Extracted/*.txt
-   grep -i "taxes paid related to net-share settlement\|taxes paid on equity" ./{ticker}/Extracted/*.txt
-   grep -i "interest income\|investment income" ./{ticker}/Extracted/*.txt
+   grep -i "stock-based compensation\|share-based payment" ./research/{ticker}/Extracted/*.txt
+   grep -i "repurchase of common stock\|treasury stock" ./research/{ticker}/Extracted/*.txt
+   grep -i "taxes paid related to net-share settlement\|taxes paid on equity" ./research/{ticker}/Extracted/*.txt
+   grep -i "interest income\|investment income" ./research/{ticker}/Extracted/*.txt
    ```
    The cash flow statement add-back is the figure you want; the equity-award footnote usually restates the same three-year total as a cross-check. **Backfill the values into the Metrics.csv** so later runs don't repeat the work.
 3. Only if SBC is genuinely undisclosed: set `sbc_source: "unavailable"`, proceed on unadjusted FCF, and emit a prominent warning in the DCF JSON plus a dashboard banner stating the valuation overstates intrinsic value by an unquantified amount.
@@ -126,7 +126,7 @@ A 5-year horizon remains fine for businesses already at steady-state margins. Th
 
 Anchor each component to the latest actuals and to management guidance where it exists; let margins improve only as fast as the business genuinely matures. Record the component assumptions in `assumptions[scenario]` so a reader can check each line independently rather than having to accept one blended margin number.
 
-Read from `./{ticker}/Reports/{TICKER}_Analysis.json`:
+Read from `./research/{ticker}/Reports/{TICKER}_Analysis.json`:
 - Business model summary
 - Growth drivers
 - Risk factors
@@ -209,7 +209,7 @@ Create matrix of prices across:
 
 ## Step 6: Output JSON
 
-Write to `./{ticker}/Reports/{TICKER}_DCF.json`:
+Write to `./research/{ticker}/Reports/{TICKER}_DCF.json`:
 
 ```json
 {
@@ -372,10 +372,10 @@ import xlsxwriter
 
 # Read the DCF JSON for initial values
 ticker = "{TICKER}"
-with open(f'./{ticker}/Reports/{ticker}_DCF.json', 'r') as f:
+with open(f'./research/{ticker}/Reports/{ticker}_DCF.json', 'r') as f:
     dcf = json.load(f)
 
-workbook = xlsxwriter.Workbook(f'./{ticker}/Reports/{ticker}_DCF_Model.xlsx')
+workbook = xlsxwriter.Workbook(f'./research/{ticker}/Reports/{ticker}_DCF_Model.xlsx')
 
 # Formats
 header_fmt = workbook.add_format({'bold': True, 'bg_color': '#2d3436', 'font_color': 'white', 'border': 1})
@@ -596,7 +596,7 @@ hist.write('A10', 'Source:')
 hist.write('B10', dcf['historical_growth']['growth_rate_source'])
 
 workbook.close()
-print(f"Excel file created: ./{ticker}/Reports/{ticker}_DCF_Model.xlsx")
+print(f"Excel file created: ./research/{ticker}/Reports/{ticker}_DCF_Model.xlsx")
 ```
 
 Run the script:

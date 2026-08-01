@@ -69,7 +69,7 @@ def exchange_of(ticker):
 
 def scan_ticker(ticker, sample=6):
     """Extraction stats for one ticker. Samples filings to stay fast."""
-    d = REPO / ticker / "Extracted"
+    d = REPO / "research" / ticker / "Extracted"
     files = sorted(d.glob("*.txt")) if d.is_dir() else []
     if not files:
         return None
@@ -119,7 +119,7 @@ def main():
     args = ap.parse_args()
 
     by_exch = collections.defaultdict(list)
-    for d in sorted(REPO.glob("*/Extracted")):
+    for d in sorted(REPO.glob("research/*/Extracted")):
         ticker = d.parent.name
         label, regime = exchange_of(ticker)
         if args.exchange and args.exchange.upper() not in (label.upper(),

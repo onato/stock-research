@@ -46,8 +46,8 @@ def main():
     ticker = sys.argv[1]
     force = "--force" in sys.argv
 
-    db = REPO / ticker / "Reports" / f"{ticker}.duckdb"
-    out = REPO / ticker / "Reports" / f"{ticker}_Metrics.csv"
+    db = REPO / "research" / ticker / "Reports" / f"{ticker}.duckdb"
+    out = REPO / "research" / ticker / "Reports" / f"{ticker}_Metrics.csv"
     if not db.exists():
         print(f"no database at {db}", file=sys.stderr)
         return 1

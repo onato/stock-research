@@ -10,7 +10,7 @@ You perform qualitative analysis on a company to help investors understand the b
 ## Step 1: Gather Information
 
 ### From Extracted Reports
-Read the extracted text files in `./{ticker}/Extracted/` to find:
+Read the extracted text files in `./research/{ticker}/Extracted/` to find:
 - Business description (usually in 10-K Item 1 or 20-F Item 4)
 - Risk factors (10-K Item 1A or 20-F Item 3D)
 - Competition discussion
@@ -114,7 +114,7 @@ For each guidance item, note:
 ## Step 3: Write Output
 
 Write a JSON file with your analysis to:
-`./{ticker}/Reports/{TICKER}_Analysis.json`
+`./research/{ticker}/Reports/{TICKER}_Analysis.json`
 
 Format:
 ```json

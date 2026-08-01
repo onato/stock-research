@@ -84,7 +84,7 @@ $batch_note" \
 commit_ticker() {
   local ticker="$1" mode="${2:-new}"
 
-  git add -A -- "$ticker" index.html state/budget.json \
+  git add -A -- "research/$ticker" index.html state/budget.json \
     state/scores evals 2>/dev/null
 
   # Screener outputs are staged separately: a missing pathspec aborts the

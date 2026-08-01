@@ -179,7 +179,7 @@ def main():
         return 2
     ticker = args[0]
 
-    extracted = REPO / ticker / "Extracted"
+    extracted = REPO / "research" / ticker / "Extracted"
     if not extracted.is_dir():
         print(f"no Extracted/ for {ticker} -- run pdftotext first", file=sys.stderr)
         return 1
@@ -190,7 +190,7 @@ def main():
         facts.extend(scan_file(f))
 
     import duckdb
-    db = REPO / ticker / "Reports" / f"{ticker}.duckdb"
+    db = REPO / "research" / ticker / "Reports" / f"{ticker}.duckdb"
     db.parent.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect(str(db))
     con.execute(schema.create_sql())

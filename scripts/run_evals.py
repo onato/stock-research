@@ -68,7 +68,7 @@ class Card:
 # ---------------------------------------------------------------------------
 
 def load_metrics(ticker):
-    path = F.REPO / ticker / "Reports" / f"{ticker}_Metrics.csv"
+    path = F.REPO / "research" / ticker / "Reports" / f"{ticker}_Metrics.csv"
     if not path.exists():
         return None, None
     with open(path, newline="") as fh:
@@ -304,7 +304,7 @@ def check_dcf(ticker, card):
 # ---------------------------------------------------------------------------
 
 def check_health(ticker, card):
-    reports = F.REPO / ticker / "Reports"
+    reports = F.REPO / "research" / ticker / "Reports"
 
     analysis = reports / f"{ticker}_Analysis.json"
     if not analysis.exists():
@@ -327,7 +327,7 @@ def check_health(ticker, card):
     else:
         card.add("dashboard_present", "pass")
 
-    extracted = F.REPO / ticker / "Extracted"
+    extracted = F.REPO / "research" / ticker / "Extracted"
     txts = sorted(extracted.glob("*.txt")) if extracted.is_dir() else []
     if not txts:
         card.add("extracted_nonempty", "skip", "no Extracted/*.txt")
@@ -355,7 +355,7 @@ def evaluate(ticker):
 
 
 def all_tickers():
-    return sorted(p.parent.name for p in F.REPO.glob("*/Reports")
+    return sorted(p.parent.name for p in F.REPO.glob("research/*/Reports")
                   if p.is_dir() and " " not in p.parent.name)
 
 

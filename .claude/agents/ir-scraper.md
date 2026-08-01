@@ -83,19 +83,19 @@ When downloading from SEC EDGAR:
 
 ## Download Command
 ```bash
-curl -L -o "./{ticker}/PDFs/{filename}" "{url}" \
+curl -L -o "./research/{ticker}/PDFs/{filename}" "{url}" \
   -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
   -H "Accept: application/pdf,*/*"
 ```
 
 For SEC EDGAR filings:
 ```bash
-curl -L -o "./{ticker}/PDFs/{filename}" "{url}" \
+curl -L -o "./research/{ticker}/PDFs/{filename}" "{url}" \
   -H "User-Agent: financial-research-tool admin@example.com"
 ```
 
 ## Output Structure
-Save files to: ./{ticker}/PDFs/
+Save files to: ./research/{ticker}/PDFs/
 Use descriptive filenames that can be renamed to standard format:
 - company_annual_report_2024.pdf → {TICKER}_Annual_FY2024.pdf
 - Q3_2024_earnings.pdf → {TICKER}_Quarterly_Q3-2024.pdf

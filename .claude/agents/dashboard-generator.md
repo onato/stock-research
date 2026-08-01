@@ -9,7 +9,7 @@ You create HTML dashboards tailored to each company's business model. Before gen
 
 ## Step 1: Analyze the Business Model
 
-Read the extracted text files in `./{ticker}/Extracted/` to understand:
+Read the extracted text files in `./research/{ticker}/Extracted/` to understand:
 
 1. **Revenue Model**: How does the company make money?
    - Subscriptions (SaaS, consumer apps)
@@ -58,8 +58,8 @@ Based on your analysis, select 6-8 KPI cards and 8-12 charts that best tell the 
 ## Step 3: Read the Data Files
 
 Read and embed both data files:
-1. **Metrics CSV**: `./{ticker}/Reports/{TICKER}_Metrics.csv` - quantitative financial data
-2. **Analysis JSON**: `./{ticker}/Reports/{TICKER}_Analysis.json` - qualitative analysis
+1. **Metrics CSV**: `./research/{ticker}/Reports/{TICKER}_Metrics.csv` - quantitative financial data
+2. **Analysis JSON**: `./research/{ticker}/Reports/{TICKER}_Analysis.json` - qualitative analysis
 
 Both files must be embedded directly in the HTML as JavaScript objects/strings.
 
@@ -860,13 +860,13 @@ const metricDescriptions = {
 ## Output
 
 Write the complete, self-contained HTML file to:
-`./{ticker}/Reports/{TICKER}_Dashboard.html`
+`./research/{ticker}/Reports/{TICKER}_Dashboard.html`
 
-**The CSV file is no longer needed after dashboard generation** since data is embedded in the HTML. However, keep the CSV at `./{ticker}/Reports/{TICKER}_Metrics.csv` as a data source for future updates.
+**The CSV file is no longer needed after dashboard generation** since data is embedded in the HTML. However, keep the CSV at `./research/{ticker}/Reports/{TICKER}_Metrics.csv` as a data source for future updates.
 
 ## Step 5: Add DCF Valuation Section
 
-If a DCF JSON file exists at `./{ticker}/Reports/{TICKER}_DCF.json`, add an interactive DCF Valuation section at the bottom of the dashboard.
+If a DCF JSON file exists at `./research/{ticker}/Reports/{TICKER}_DCF.json`, add an interactive DCF Valuation section at the bottom of the dashboard.
 
 ### DCF Section HTML Structure
 

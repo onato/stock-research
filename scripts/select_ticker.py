@@ -85,7 +85,7 @@ def has_reports(ticker):
     An empty Reports/ dir means a previous run died partway through, so it
     stays eligible rather than being skipped forever.
     """
-    reports = REPO_ROOT / ticker / "Reports"
+    reports = REPO_ROOT / "research" / ticker / "Reports"
     return reports.is_dir() and any(reports.iterdir())
 
 
@@ -111,7 +111,7 @@ def pick_stalest(exclude=()):
     """
     exclude = set(exclude)
     candidates = []
-    for dcf in REPO_ROOT.glob("*/Reports/*_DCF.json"):
+    for dcf in REPO_ROOT.glob("research/*/Reports/*_DCF.json"):
         ticker = dcf.parent.parent.name
         if ticker in exclude:
             continue

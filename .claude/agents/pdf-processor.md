@@ -31,21 +31,21 @@ You process financial PDFs by renaming them to a standard format and extracting 
 ## Text Extraction
 Use pdftotext with layout preservation:
 ```bash
-pdftotext -layout "./{ticker}/PDFs/{input}.pdf" "./{ticker}/Extracted/{output}.txt"
+pdftotext -layout "./research/{ticker}/PDFs/{input}.pdf" "./research/{ticker}/Extracted/{output}.txt"
 ```
 
 The `-layout` flag maintains the original document layout, which is important for tables.
 
 ## Workflow
-1. List all PDFs in ./{ticker}/PDFs/
+1. List all PDFs in ./research/{ticker}/PDFs/
 2. Determine appropriate standard name based on content/filename
 3. Rename files using `mv`
 4. Extract text using pdftotext
 5. Verify extraction by checking file size (empty = failed extraction)
 
 ## Output
-- Renamed PDFs in: ./{ticker}/PDFs/
-- Extracted text in: ./{ticker}/Extracted/
+- Renamed PDFs in: ./research/{ticker}/PDFs/
+- Extracted text in: ./research/{ticker}/Extracted/
 
 ## Troubleshooting
 - If pdftotext produces empty output, the PDF may be image-based (scanned)

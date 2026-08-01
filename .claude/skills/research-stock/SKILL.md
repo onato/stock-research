@@ -11,7 +11,7 @@ You are researching the stock: $ARGUMENTS
 
 Create the directory structure first:
 ```bash
-mkdir -p "./$ARGUMENTS/PDFs" "./$ARGUMENTS/Extracted" "./$ARGUMENTS/Reports"
+mkdir -p "./research/$ARGUMENTS/PDFs" "./research/$ARGUMENTS/Extracted" "./research/$ARGUMENTS/Reports"
 ```
 
 ## Step 0: Check for Existing Data
@@ -20,18 +20,18 @@ mkdir -p "./$ARGUMENTS/PDFs" "./$ARGUMENTS/Extracted" "./$ARGUMENTS/Reports"
 
 ```bash
 # List existing PDFs
-ls -la "./$ARGUMENTS/PDFs/" 2>/dev/null || echo "No PDFs folder yet"
+ls -la "./research/$ARGUMENTS/PDFs/" 2>/dev/null || echo "No PDFs folder yet"
 
 # List existing extracted text
-ls -la "./$ARGUMENTS/Extracted/" 2>/dev/null || echo "No Extracted folder yet"
+ls -la "./research/$ARGUMENTS/Extracted/" 2>/dev/null || echo "No Extracted folder yet"
 
 # List existing reports
-ls -la "./$ARGUMENTS/Reports/" 2>/dev/null || echo "No Reports folder yet"
+ls -la "./research/$ARGUMENTS/Reports/" 2>/dev/null || echo "No Reports folder yet"
 ```
 
 **Skip downloading if reports already exist:**
-- If `./$ARGUMENTS/PDFs/` contains PDF files, **DO NOT re-download** them
-- If `./$ARGUMENTS/Extracted/` contains .txt files, **DO NOT re-extract** them
+- If `./research/$ARGUMENTS/PDFs/` contains PDF files, **DO NOT re-download** them
+- If `./research/$ARGUMENTS/Extracted/` contains .txt files, **DO NOT re-extract** them
 - Only download reports that are missing (e.g., newer quarters/years)
 
 **When to re-download:**
@@ -41,7 +41,7 @@ ls -la "./$ARGUMENTS/Reports/" 2>/dev/null || echo "No Reports folder yet"
 
 ## Step 1: Find Investor Relations Website
 
-**Skip this step if PDFs already exist in `./$ARGUMENTS/PDFs/`**
+**Skip this step if PDFs already exist in `./research/$ARGUMENTS/PDFs/`**
 
 Search for "{ticker} investor relations" to find the company's IR page.
 Common patterns:
@@ -69,11 +69,11 @@ For US companies: Look for SEC filings (10-K, 10-Q)
 For international companies: Look for 20-F (annual) and 6-K (quarterly)
 For non-US listed: Look for Annual Reports and Interim/Half-Year Reports
 
-Save PDFs to: ./$ARGUMENTS/PDFs/
+Save PDFs to: ./research/$ARGUMENTS/PDFs/
 
 Download using curl:
 ```bash
-curl -L -o "./$ARGUMENTS/PDFs/{filename}" "{url}" \
+curl -L -o "./research/$ARGUMENTS/PDFs/{filename}" "{url}" \
   -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
 ```
 
@@ -93,16 +93,16 @@ Examples:
 
 ## Step 4: Extract Text
 
-**Skip if .txt files already exist in `./$ARGUMENTS/Extracted/` for each PDF**
+**Skip if .txt files already exist in `./research/$ARGUMENTS/Extracted/` for each PDF**
 
 Only extract text for PDFs that don't have a corresponding .txt file yet.
 
 Run pdftotext to extract readable text:
 ```bash
-pdftotext -layout "./$ARGUMENTS/PDFs/{input}.pdf" "./$ARGUMENTS/Extracted/{output}.txt"
+pdftotext -layout "./research/$ARGUMENTS/PDFs/{input}.pdf" "./research/$ARGUMENTS/Extracted/{output}.txt"
 ```
 
-Store extracted text in: ./$ARGUMENTS/Extracted/
+Store extracted text in: ./research/$ARGUMENTS/Extracted/
 
 ## Step 5: Parse Financial Metrics
 
@@ -125,7 +125,7 @@ This picks the extraction path for the ticker's exchange:
 It falls back from XBRL to text automatically when SEC has no coverage (ADRs,
 foreign private issuers), and logs a gap when neither path produces anything.
 
-Writes to `./$ARGUMENTS/Reports/$ARGUMENTS.duckdb`. Takes ~1 second.
+Writes to `./research/$ARGUMENTS/Reports/$ARGUMENTS.duckdb`. Takes ~1 second.
 
 **This must run before the financial-parser agent is spawned.** The agent
 queries the facts table instead of grepping the filings — that search
@@ -153,7 +153,7 @@ Standard metrics to look for:
 
 Also identify company-specific KPIs based on the business model (see Step 6).
 
-Write metrics to CSV: ./$ARGUMENTS/Reports/{TICKER}_Metrics.csv
+Write metrics to CSV: ./research/$ARGUMENTS/Reports/{TICKER}_Metrics.csv
 
 CSV Format (note: includes both quarterly AND annual data, sorted chronologically):
 ```csv
@@ -186,7 +186,7 @@ Use the qualitative-analyst agent instructions in `.claude/agents/qualitative-an
 - Recent developments (last 6-12 months)
 - Bull case and bear case
 
-Write the analysis to: ./$ARGUMENTS/Reports/{TICKER}_Analysis.json
+Write the analysis to: ./research/$ARGUMENTS/Reports/{TICKER}_Analysis.json
 
 This analysis will be embedded in the dashboard.
 
@@ -213,7 +213,7 @@ Dashboard must include:
 6. Help buttons (?) with company-specific metric explanations
 7. Derived metrics (growth rates, margins, ratios relevant to THIS company)
 
-Output: ./$ARGUMENTS/Reports/{TICKER}_Dashboard.html
+Output: ./research/$ARGUMENTS/Reports/{TICKER}_Dashboard.html
 
 ## Step 8: DCF Valuation
 
@@ -265,8 +265,8 @@ Use the dcf-analyst agent instructions in `.claude/agents/dcf-analyst.md` to:
    - Matrix of IV across WACC (+/-2%) and Terminal Growth (+/-1%)
 
 8. **Generate Outputs**
-   - `./$ARGUMENTS/Reports/{TICKER}_DCF.json` - Embedded in dashboard
-   - `./$ARGUMENTS/Reports/{TICKER}_DCF_Model.xlsx` - Downloadable Excel model
+   - `./research/$ARGUMENTS/Reports/{TICKER}_DCF.json` - Embedded in dashboard
+   - `./research/$ARGUMENTS/Reports/{TICKER}_DCF_Model.xlsx` - Downloadable Excel model
 
 The dashboard generator will embed the DCF JSON and add an interactive valuation section with:
 - Intrinsic Value and Entry Price cards
@@ -286,7 +286,7 @@ curl -s "https://query1.finance.yahoo.com/v8/finance/chart/$ARGUMENTS?range=1d&i
   -H "User-Agent: Mozilla/5.0" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['chart']['result'][0]['meta']['regularMarketPrice'])"
 ```
 
-2. Read `current_price` from `./$ARGUMENTS/Reports/{TICKER}_DCF.json`
+2. Read `current_price` from `./research/$ARGUMENTS/Reports/{TICKER}_DCF.json`
 
 3. If the prices differ by more than 5%, update the DCF JSON:
    - Set `current_price` to the Yahoo Finance price
@@ -296,7 +296,7 @@ curl -s "https://query1.finance.yahoo.com/v8/finance/chart/$ARGUMENTS?range=1d&i
 
 4. If the prices match within 5%, no changes needed — log that the price was verified.
 
-5. **If the DCF JSON was updated**, re-embed the updated DCF JSON into the dashboard HTML (`./$ARGUMENTS/Reports/{TICKER}_Dashboard.html`) by replacing the existing `const dcfData = {...};` block with the corrected data. This ensures the dashboard displays the verified price.
+5. **If the DCF JSON was updated**, re-embed the updated DCF JSON into the dashboard HTML (`./research/$ARGUMENTS/Reports/{TICKER}_Dashboard.html`) by replacing the existing `const dcfData = {...};` block with the corrected data. This ensures the dashboard displays the verified price.
 
 ## Step 8c: DCF Sanity Check (Implied Multiples vs History)
 
@@ -436,7 +436,7 @@ python3 .claude/skills/screen-investments/screen.py --html "$(pwd)/index.html"
 ## Final Checklist
 
 **Data Collection (cached - only download new reports):**
-- [ ] Check for existing PDFs in ./$ARGUMENTS/PDFs/
+- [ ] Check for existing PDFs in ./research/$ARGUMENTS/PDFs/
 - [ ] Download only NEW quarterly/annual reports not already present
 - [ ] Rename any new files to standard format
 - [ ] Extract text only for new PDFs (skip existing .txt files)
@@ -467,5 +467,5 @@ python3 .claude/skills/screen-investments/screen.py --html "$(pwd)/index.html"
 
 **Note:** To force re-download of ALL reports (not just new ones), delete the PDFs folder:
 ```bash
-rm -rf "./$ARGUMENTS/PDFs"
+rm -rf "./research/$ARGUMENTS/PDFs"
 ```

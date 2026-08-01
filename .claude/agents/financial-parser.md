@@ -67,7 +67,7 @@ Look for metrics specific to the company's business model:
 ## Parsing Strategy: query the facts table, don't grep
 
 `build_facts.py` has already scanned every extracted filing and written
-candidate values to `./{TICKER}/Reports/{TICKER}.duckdb`. **Query it. Do not
+candidate values to `./research/{TICKER}/Reports/{TICKER}.duckdb`. **Query it. Do not
 grep the .txt files to find numbers** — that search is already done, and
 repeating it is what made this step the most expensive part of the workflow
 (183 turns and 18.2M cache-read tokens on one ticker).
@@ -82,7 +82,7 @@ periods, resolved units, no competing candidates. In that case `core_metrics`
 is **already populated** and `facts` is empty.
 
 ```bash
-duckdb ./{TICKER}/Reports/{TICKER}.duckdb -c "
+duckdb ./research/{TICKER}/Reports/{TICKER}.duckdb -c "
   SELECT (SELECT count(*) FROM core_metrics) AS core,
          (SELECT count(*) FROM facts)        AS candidates"
 ```
@@ -98,7 +98,7 @@ duckdb ./{TICKER}/Reports/{TICKER}.duckdb -c "
 ### Step 1 — see what was found
 
 ```bash
-duckdb ./{TICKER}/Reports/{TICKER}.duckdb -c "
+duckdb ./research/{TICKER}/Reports/{TICKER}.duckdb -c "
   SELECT metric, count(*) n, count(DISTINCT period) periods
   FROM facts GROUP BY metric ORDER BY n DESC"
 ```
@@ -106,7 +106,7 @@ duckdb ./{TICKER}/Reports/{TICKER}.duckdb -c "
 ### Step 2 — pull one metric's candidates with context
 
 ```bash
-duckdb ./{TICKER}/Reports/{TICKER}.duckdb -c "
+duckdb ./research/{TICKER}/Reports/{TICKER}.duckdb -c "
   SELECT period, value_raw, source_file, line_no, confidence, context
   FROM facts
   WHERE metric = 'Revenue' AND confidence = 'statement_line'
@@ -182,8 +182,8 @@ the observation and move on — the log is reviewed separately.
 
 Write **both**, from the same resolved numbers:
 
-1. `./{TICKER}/Reports/{TICKER}.duckdb` → the `core_metrics` table
-2. `./{TICKER}/Reports/{TICKER}_Metrics.csv` → exported from it
+1. `./research/{TICKER}/Reports/{TICKER}.duckdb` → the `core_metrics` table
+2. `./research/{TICKER}/Reports/{TICKER}_Metrics.csv` → exported from it
 
 ### The database write comes first
 
@@ -204,7 +204,7 @@ Rules:
 - **Populate `units` and `currency` on every row** (see Step 4 above).
 
 ```bash
-duckdb ./{TICKER}/Reports/{TICKER}.duckdb -c "
+duckdb ./research/{TICKER}/Reports/{TICKER}.duckdb -c "
   INSERT INTO core_metrics (period, revenue, net_income, units, currency)
   VALUES ('FY2026', 161.285, -818.093, 'millions', 'NZD')"
 ```

@@ -215,7 +215,7 @@ def main():
         return 0
 
     import duckdb
-    db = REPO / ticker / "Reports" / f"{ticker}.duckdb"
+    db = REPO / "research" / ticker / "Reports" / f"{ticker}.duckdb"
     db.parent.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect(str(db))
     con.execute(schema.create_sql())

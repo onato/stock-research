@@ -74,7 +74,7 @@ def to_core(rows):
 
 def write_db(ticker, core, kpis):
     import duckdb
-    db = REPO / ticker / "Reports" / f"{ticker}.duckdb"
+    db = REPO / "research" / ticker / "Reports" / f"{ticker}.duckdb"
     db.parent.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect(str(db))
     con.execute(schema.create_sql())
@@ -100,13 +100,13 @@ def main():
     if args:
         paths = []
         for t in args:
-            p = REPO / t / "Reports" / f"{t}_Metrics.csv"
+            p = REPO / "research" / t / "Reports" / f"{t}_Metrics.csv"
             if p.exists():
                 paths.append(p)
             else:
                 print(f"  !! no metrics CSV for {t}", file=sys.stderr)
     else:
-        paths = sorted(REPO.glob("*/Reports/*_Metrics.csv"))
+        paths = sorted(REPO.glob("research/*/Reports/*_Metrics.csv"))
 
     unmapped_freq = collections.Counter()
     ok = failed = 0

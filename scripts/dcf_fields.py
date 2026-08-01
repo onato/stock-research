@@ -56,7 +56,7 @@ def currency_suffix(key):
 
 def load_dcf(ticker):
     """Parsed DCF.json for a ticker, or None."""
-    path = REPO / ticker / "Reports" / f"{ticker}_DCF.json"
+    path = REPO / "research" / ticker / "Reports" / f"{ticker}_DCF.json"
     if not path.exists():
         return None
     try:

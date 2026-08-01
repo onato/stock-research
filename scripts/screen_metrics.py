@@ -31,7 +31,7 @@ NUMERIC = ["revenue", "gross_profit", "operating_income", "ebitda",
 def load(tickers, period):
     import duckdb
     rows = []
-    for db in sorted(REPO.glob("*/Reports/*.duckdb")):
+    for db in sorted(REPO.glob("research/*/Reports/*.duckdb")):
         t = db.parent.parent.name
         if tickers and t not in tickers:
             continue

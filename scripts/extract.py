@@ -42,7 +42,7 @@ def run(script, *args):
 
 def facts_count(ticker):
     """Rows in whichever table the chosen path populated."""
-    db = REPO / ticker / "Reports" / f"{ticker}.duckdb"
+    db = REPO / "research" / ticker / "Reports" / f"{ticker}.duckdb"
     if not db.exists():
         return 0, 0
     try:

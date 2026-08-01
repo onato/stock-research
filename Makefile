@@ -67,7 +67,7 @@ screen: ## Rank every ticker by upside to weighted IV, at live prices
 
 status: ## What is researched, what is stale, what is queued
 	@python3 $(SCRIPTS)/select_ticker.py 2>&1 | grep -E '^(ticker|mode)=' | sed 's/^/  next  /'
-	@echo "  researched   $$(ls -d */Reports 2>/dev/null | wc -l | tr -d ' ') tickers"
+	@echo "  researched   $$(ls -d research/*/Reports 2>/dev/null | wc -l | tr -d ' ') tickers"
 	@echo "  scorecards   $$(ls $(STATE)/scores/*.json 2>/dev/null | wc -l | tr -d ' ')"
 	@echo "  ledger rows  $$(wc -l < evals/ledger.jsonl 2>/dev/null | tr -d ' ')"
 
