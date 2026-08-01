@@ -186,7 +186,8 @@ CREATE TABLE IF NOT EXISTS facts (
   source_file TEXT,
   line_no     INTEGER,
   context     TEXT,
-  confidence  TEXT
+  confidence  TEXT,
+  currency    TEXT
 );
 """
 

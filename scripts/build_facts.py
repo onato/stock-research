@@ -265,6 +265,9 @@ def main():
     db.parent.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect(str(db))
     con.execute(schema.create_sql())
+    # Migration shim: schema.py now declares currency in the facts DDL, but
+    # DBs created before that lack the column. Remove once every ticker DB
+    # has been rebuilt at least once.
     try:
         con.execute("ALTER TABLE facts ADD COLUMN currency TEXT")
     except Exception:
