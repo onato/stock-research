@@ -433,6 +433,34 @@ python3 .claude/skills/screen-investments/screen.py --html "$(pwd)/index.html"
 
 (Stored prices are fine here — the weekend screener refreshes live prices.)
 
+## Never end your turn with work still running
+
+**Every command must finish before you move on.** Do not background a slow
+step and end the turn expecting it to continue — the process is killed when
+the run ends, so the work is simply lost.
+
+These runs each exited cleanly, reported success, cost $3.50–$4.91, and
+produced no metrics at all:
+
+- *"The report scraper is still downloading the remaining filings in the
+  background. I'll continue the pipeline…"* — 28 PDFs, 0 extracted
+- *"The metrics extractor is still processing the ~16MB of filing text in
+  the background; I'll launch the financial parser as soon as it finishes."*
+- *"OCR is on the final file (FY2017, mid-write). Waiting for it to
+  complete before building the facts table."*
+
+If a step is genuinely slow, **wait for it** — run it in the foreground and
+let it take the time. If something cannot complete, say so plainly and stop;
+a truthful failure is recoverable, a false success is not.
+
+Before ending, confirm all three deliverables exist:
+
+```bash
+ls research/$ARGUMENTS/Reports/${ARGUMENTS}_Metrics.csv \
+   research/$ARGUMENTS/Reports/${ARGUMENTS}_DCF.json \
+   research/$ARGUMENTS/Reports/${ARGUMENTS}_Dashboard.html
+```
+
 ## Final Checklist
 
 **Data Collection (cached - only download new reports):**

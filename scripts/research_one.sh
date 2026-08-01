@@ -60,4 +60,24 @@ python3 "$REPO_ROOT/scripts/ledger.py" append "$TICKER" || true
 # still leaves useful extracted text and metrics on disk.
 with_git_lock "$TICKER" commit_ticker "$TICKER"
 
+# A run can exit 0 having produced nothing. The model sometimes backgrounds
+# a slow step ("the extractor is still processing", "OCR is on the final
+# file") and ends its turn expecting it to continue -- but the process dies
+# with the run. AIA.NZ, ANZ.NZ and ALF.NZ each cost $3.50-$4.91, reported
+# success, and left no metrics.
+#
+# The eval already detects this; the loop just wasn't looking. Report a
+# missing deliverable as a non-zero exit so parallel's joblog records the
+# failure and `make digest` surfaces it.
+missing=""
+for want in "_Metrics.csv" "_DCF.json" "_Dashboard.html"; do
+  [ -f "$REPO_ROOT/research/$TICKER/Reports/$TICKER$want" ] || missing="$missing $want"
+done
+if [ -n "$missing" ]; then
+  echo "[$TICKER] INCOMPLETE -- missing:$missing" >&2
+  echo "[$TICKER] a clean exit with no deliverable usually means a step was" >&2
+  echo "[$TICKER] left running in the background; re-run this ticker." >&2
+  [ "$rc" = "0" ] && rc=3
+fi
+
 exit "$rc"

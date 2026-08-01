@@ -383,7 +383,10 @@ def check_health(ticker, card):
     # so presence + non-trivial size is the deterministic check available.
     dash = reports / f"{ticker}_Dashboard.html"
     if not dash.exists():
-        card.add("dashboard_present", "warn", "Dashboard.html missing")
+        # fail, not warn: the dashboard is a deliverable, and AIR.NZ scored
+        # 1.0 while missing one. A warn here let an incomplete run look
+        # perfect.
+        card.add("dashboard_present", "fail", "Dashboard.html missing")
     elif dash.stat().st_size < 5000:
         card.add("dashboard_present", "warn",
                  f"suspiciously small ({dash.stat().st_size} bytes)")
