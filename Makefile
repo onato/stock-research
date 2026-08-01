@@ -20,7 +20,7 @@ LEADERBOARD ?= 15   # rows shown by `make screen`
 
 .DEFAULT_GOAL := help
 .PHONY: help run digest status screen research facts evals evals-all \
-        cost gaps ledger ledger-backfill queue-prune
+        cost gaps exchange-eval ledger ledger-backfill queue-prune
 
 help: ## Show this help
 	@echo "Usage: make <target> [TICKER=XYZ] [TICKERS=4] [PARALLEL=2]"
@@ -62,8 +62,8 @@ screen: ## Rank every ticker by upside to weighted IV, at live prices
 	@echo " SCREENER LEADERBOARD"
 	@echo "=================================================================="
 	@python3 $(SCREEN) --live --top $(LEADERBOARD) \
-	  --json $(STATE)/last_screen.json 2>/dev/null \
-	  || python3 $(SCREEN) --top $(LEADERBOARD)
+	  --json $(STATE)/last_screen.json --html leaderboard.html 2>/dev/null \
+	  || python3 $(SCREEN) --top $(LEADERBOARD) --html leaderboard.html
 
 status: ## What is researched, what is stale, what is queued
 	@python3 $(SCRIPTS)/select_ticker.py 2>&1 | grep -E '^(ticker|mode)=' | sed 's/^/  next  /'
@@ -92,6 +92,9 @@ evals-all: ## Tier-1 eval for every ticker; scorecards to state/scores/
 
 cost: ## Per-ticker cost report from run transcripts
 	python3 $(SCRIPTS)/cost_report.py
+
+exchange-eval: ## Extraction coverage per exchange (free, no model calls)
+	python3 $(SCRIPTS)/exchange_eval.py $(if $(EXCHANGE),--exchange $(EXCHANGE),) $(if $(VERBOSE),--verbose,)
 
 gaps: ## What the extractor could not parse (the improvement backlog)
 	python3 $(SCRIPTS)/log_gap.py --report
