@@ -129,8 +129,10 @@ class BaseParser:
 
     def currency(self, lines):
         """Currency hint from the file head, normalized to an ISO code."""
-        head = "\n".join(lines[:self.HEAD_LINES])
-        cm = self.CURRENCY_RE.search(head)
+        return self._search_currency("\n".join(lines[:self.HEAD_LINES]))
+
+    def _search_currency(self, text):
+        cm = self.CURRENCY_RE.search(text)
         if not cm:
             return None
         tok = cm.group(0)
@@ -149,7 +151,8 @@ class BaseParser:
         cells = common.CELL_SPLIT.split(line.strip())
         i = 0
         while i < len(cells):
-            if common.LABEL_RE.match(cells[i]):
+            label = self.clean_label(cells[i])
+            if label and common.LABEL_RE.match(label):
                 nums = []
                 j = i + 1
                 if j < len(cells) and self.is_note_cell(cells[j]) \
@@ -161,10 +164,18 @@ class BaseParser:
                     j += 1
                 nums = [n for n in nums if n is not None]
                 if nums:
-                    yield cells[i], nums
+                    yield label, nums
                     i = j
                     continue
             i += 1
+
+    def clean_label(self, cell):
+        """Normalize a candidate label cell before matching (identity here).
+
+        Extension point for exchanges whose labels carry non-label text —
+        HKEX bilingual filings append the Chinese rendering to every line.
+        """
+        return cell
 
     def is_note_cell(self, cell):
         return bool(self.NOTE_CELL.match(cell))
