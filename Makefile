@@ -20,7 +20,7 @@ LEADERBOARD ?= 15   # rows shown by `make screen`
 
 .DEFAULT_GOAL := help
 .PHONY: help run digest status screen research facts evals evals-all \
-        cost gaps exchange-eval ledger ledger-backfill queue-prune
+        cost gaps exchange-eval facts-xbrl ledger ledger-backfill queue-prune
 
 help: ## Show this help
 	@echo "Usage: make <target> [TICKER=XYZ] [TICKERS=4] [PARALLEL=2]"
@@ -82,6 +82,10 @@ research: ## Research one ticker with live progress (TICKER=AGL.NZ)
 facts: ## Rebuild the DuckDB facts table for one ticker (fast, no model)
 	@test -n "$(TICKER)" || { echo "usage: make facts TICKER=AGL.NZ" >&2; exit 2; }
 	python3 $(SCRIPTS)/build_facts.py $(TICKER) --show
+
+facts-xbrl: ## Structured extraction for a US filer via SEC XBRL (TICKER=PYPL)
+	@test -n "$(TICKER)" || { echo "usage: make facts-xbrl TICKER=PYPL" >&2; exit 2; }
+	python3 $(SCRIPTS)/build_facts_xbrl.py $(TICKER) --show
 
 evals: ## Tier-1 eval for one ticker (TICKER=AGL.NZ)
 	@test -n "$(TICKER)" || { echo "usage: make evals TICKER=AGL.NZ" >&2; exit 2; }
