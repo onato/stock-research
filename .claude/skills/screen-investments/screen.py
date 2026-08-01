@@ -197,6 +197,13 @@ def load_scores(root):
     return out
 
 
+def load_companies(root):
+    """{ticker: {name, sector}} from state/companies.json (maintained by the
+    research-stock skill). Missing file just means bare tickers on the page."""
+    data = load_dcf(os.path.join(root, "state", "companies.json"))
+    return data if isinstance(data, dict) else {}
+
+
 # Sentinel that sinks "—" cells to the bottom of any descending numeric sort.
 SORT_MISSING = "-1e18"
 
@@ -205,6 +212,7 @@ FLAG_MEANINGS = (
     ("PRICE_DRIFT", "live price far from the price the DCF was built on — stored upside unreliable"),
     ("NO_PRICE", "no usable price, live or stored"),
     ("NO_IV", "DCF has no probability-weighted intrinsic value"),
+    ("NO_DCF", "tracked company without a DCF model yet"),
     ("CCY", "DCF currency differs from the quote currency — upside mixes currencies"),
 )
 
@@ -225,7 +233,26 @@ def num_td(value, text, cls=""):
     return f'<td data-sort="{esc(sort)}"{cls_attr}>{text}</td>'
 
 
-def row_html(i, r, summary):
+def dashboard_href(t):
+    return f"{esc(t)}/Reports/{esc(t)}_Dashboard.html"
+
+
+def tr_open(t, co):
+    """Row opener carrying the click-through target and the search haystack."""
+    hay = " ".join(x for x in (t, co.get("name"), co.get("sector")) if x).lower()
+    return f'<tr data-href="{dashboard_href(t)}" data-search="{esc(hay)}">'
+
+
+def company_td(co):
+    name = co.get("name") or ""
+    sector = co.get("sector") or ""
+    inner = esc(name) or "—"
+    if sector:
+        inner += f'<br><span class="cur">{esc(sector)}</span>'
+    return f'<td class="co">{inner}</td>'
+
+
+def row_html(i, r, summary, co):
     t = r.get("ticker", "?")
     cur = r.get("currency")
     live_cur = r.get("live_currency")
@@ -261,9 +288,10 @@ def row_html(i, r, summary):
     else:
         score_cell = num_td(None, "—")
 
-    return "<tr>" + "".join((
+    return tr_open(t, co) + "".join((
         num_td(i, str(i)),
-        f'<td><a href="{esc(t)}/Reports/{esc(t)}_Dashboard.html">{esc(t)}</a></td>',
+        f'<td><a href="{dashboard_href(t)}">{esc(t)}</a></td>',
+        company_td(co),
         price_cell,
         num_td(iv, iv_txt),
         num_td(up, esc(up_txt), "pos" if (up or 0) >= 0 else "neg"),
@@ -273,13 +301,13 @@ def row_html(i, r, summary):
     )) + "</tr>"
 
 
-def write_html(ranked, unranked, meta, scores, path):
+def write_html(ranked, unranked, meta, scores, companies, path):
     head = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Screener Leaderboard</title>
+<title>Stock Research</title>
 <style>
 * {{ margin: 0; padding: 0; box-sizing: border-box; }}
 body {{
@@ -314,7 +342,18 @@ th {{
 th.asc::after {{ content: " \\25B2"; font-size: 0.8em; }}
 th.desc::after {{ content: " \\25BC"; font-size: 0.8em; }}
 td {{ padding: 7px 10px; border-bottom: 1px solid rgba(255,255,255,0.06); white-space: nowrap; }}
+tbody tr {{ cursor: pointer; }}
 tr:hover td {{ background: rgba(255,255,255,0.04); }}
+tr.hl td {{ background: rgba(0,212,170,0.10); }}
+td.co {{ white-space: normal; max-width: 280px; line-height: 1.3; }}
+.controls {{ display: flex; align-items: center; gap: 15px; margin-bottom: 20px; }}
+.search-box {{
+    flex: 1; padding: 12px 16px; font-size: 1em; color: #e0e0e0;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px; outline: none;
+}}
+.search-box:focus {{ border-color: #00d4aa; }}
+.count {{ color: #8b8ba0; white-space: nowrap; }}
 .pos {{ color: #00d4aa; }}
 .neg {{ color: #ff6b6b; }}
 .warn-text {{ color: #ffb400; }}
@@ -332,25 +371,32 @@ h2 {{ font-size: 1.1em; color: #00d4aa; margin: 5px 0 10px 5px; }}
 </head>
 <body>
 <div class="header">
-<h1>Screener Leaderboard</h1>
-<p class="meta"><a href="index.html">&larr; Portfolio</a> &nbsp;&middot;&nbsp;
+<h1>Stock Research</h1>
+<p class="meta">{len(companies) or len(ranked) + len(unranked)} companies tracked &nbsp;&middot;&nbsp;
 as of {esc(meta["generated_at"])} &nbsp;&middot;&nbsp;
 {"LIVE" if meta["live"] else "STORED"} prices &nbsp;&middot;&nbsp;
 {len(ranked)} ranked / {len(unranked)} unranked &nbsp;&middot;&nbsp;
 upside = weighted IV / price &minus; 1</p>
 </div>
+<div class="controls">
+<input type="text" class="search-box" id="search" autofocus
+ placeholder="Search by ticker, company, or sector&hellip; (Enter opens a single match)">
+<span class="count" id="count"></span>
+</div>
 """
     if ranked:
         body_rows = "\n".join(
-            row_html(i, r, scores.get(r.get("ticker")))
+            row_html(i, r, scores.get(r.get("ticker")),
+                     companies.get(r.get("ticker"), {}))
             for i, r in enumerate(ranked, 1))
     else:
-        body_rows = '<tr><td colspan="8">No ranked tickers — see unranked below.</td></tr>'
+        body_rows = '<tr><td colspan="9">No ranked tickers — see unranked below.</td></tr>'
 
     ranked_table = f"""<div class="card">
 <table id="lb">
 <thead><tr>
 <th data-type="num">#</th><th data-type="str">Ticker</th>
+<th data-type="str">Company</th>
 <th data-type="num">Price</th><th data-type="num">Weighted IV</th>
 <th data-type="num">Upside</th><th data-type="num">Age</th>
 <th data-type="str">Flags</th><th data-type="num">Eval</th>
@@ -364,18 +410,18 @@ upside = weighted IV / price &minus; 1</p>
     unranked_html = ""
     if unranked:
         u_rows = "\n".join(
-            "<tr>"
-            f'<td><a href="{esc(r.get("ticker", "?"))}/Reports/{esc(r.get("ticker", "?"))}_Dashboard.html">'
-            f'{esc(r.get("ticker", "?"))}</a></td>'
-            f"<td>{''.join(badge_html(f) for f in (r.get('flags') or [])) or '—'}</td>"
-            f"<td>{esc(fmt_price(r))}</td>"
-            f"<td>{esc(r.get('note', ''))}</td>"
-            "</tr>"
+            tr_open(r.get("ticker", "?"), companies.get(r.get("ticker"), {}))
+            + f'<td><a href="{dashboard_href(r.get("ticker", "?"))}">{esc(r.get("ticker", "?"))}</a></td>'
+            + company_td(companies.get(r.get("ticker"), {}))
+            + f"<td>{''.join(badge_html(f) for f in (r.get('flags') or [])) or '—'}</td>"
+            + f"<td>{esc(fmt_price(r))}</td>"
+            + f"<td>{esc(r.get('note', ''))}</td>"
+            + "</tr>"
             for r in unranked)
         unranked_html = f"""<h2>Not ranked</h2>
 <div class="card">
 <table>
-<thead><tr><th>Ticker</th><th>Flags</th><th>Price</th><th>Note</th></tr></thead>
+<thead><tr><th>Ticker</th><th>Company</th><th>Flags</th><th>Price</th><th>Note</th></tr></thead>
 <tbody>
 {u_rows}
 </tbody>
@@ -388,6 +434,39 @@ upside = weighted IV / price &minus; 1</p>
          "from state/scores/.</p>")
 
     sort_js = """<script>
+// Row click-through (anchors inside still work for open-in-new-tab).
+document.querySelectorAll('tbody tr[data-href]').forEach(tr => {
+    tr.addEventListener('click', (e) => {
+        if (e.target.closest('a')) return;
+        window.location = tr.dataset.href;
+    });
+});
+
+// Live search across both tables; Enter opens a lone match.
+const rows = Array.from(document.querySelectorAll('tbody tr[data-search]'));
+const count = document.getElementById('count');
+const search = document.getElementById('search');
+const applyFilter = () => {
+    const q = search.value.trim().toLowerCase();
+    const visible = [];
+    rows.forEach(tr => {
+        const show = !q || tr.dataset.search.includes(q);
+        tr.style.display = show ? '' : 'none';
+        tr.classList.remove('hl');
+        if (show) visible.push(tr);
+    });
+    count.textContent = q ? `${visible.length} / ${rows.length}` : `${rows.length} tracked`;
+    if (q && visible.length === 1) visible[0].classList.add('hl');
+    return visible;
+};
+search.addEventListener('input', applyFilter);
+search.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const visible = applyFilter();
+    if (visible.length === 1) window.location = visible[0].dataset.href;
+});
+applyFilter();
+
 document.querySelector('#lb thead').addEventListener('click', (e) => {
     const th = e.target.closest('th');
     if (!th) return;
@@ -414,7 +493,7 @@ document.querySelector('#lb thead').addEventListener('click', (e) => {
     doc = head + ranked_table + unranked_html + footnote + "\n" + sort_js + "</body>\n</html>\n"
     with open(path, "w") as f:
         f.write(doc)
-    print(f"Leaderboard written to {path}")
+    print(f"Index/leaderboard written to {path}")
 
 
 def main():
@@ -471,7 +550,15 @@ def main():
         print(f"\nFull results written to {args.json}")
 
     if args.html:
-        write_html(ranked, unranked, meta, load_scores(args.root), args.html)
+        companies = load_companies(args.root)
+        # Tracked companies with no DCF yet still belong on the index page.
+        covered = {r.get("ticker") for r in ranked + unranked}
+        extras = [{"ticker": t, "flags": ["NO_DCF"], "note": "no DCF model yet"}
+                  for t in sorted(companies)
+                  if t not in covered
+                  and os.path.isdir(os.path.join(args.root, t, "Reports"))]
+        write_html(ranked, unranked + extras, meta, load_scores(args.root),
+                   companies, args.html)
 
 
 if __name__ == "__main__":

@@ -89,7 +89,7 @@ commit_ticker() {
 
   # Screener outputs are staged separately: a missing pathspec aborts the
   # whole `git add`, and these only exist once `make screen` has run.
-  git add -A -- leaderboard.html state/last_screen.json 2>/dev/null || true
+  git add -A -- state/last_screen.json state/companies.json 2>/dev/null || true
 
   if git diff --cached --quiet; then
     echo "[$ticker] No output produced -- nothing to commit."
