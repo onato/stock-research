@@ -48,6 +48,24 @@ def close(a, b, tol=REL_TOL):
     return abs(a - b) <= tol * scale
 
 
+def margin_ok(m, part, whole):
+    """Margin column agrees with part/whole in percent (25) or fraction (0.25) form."""
+    if abs(whole) < 1e-9:
+        return True
+    ratio = part / whole
+    return abs(m - ratio * 100) <= 1.5 or abs(m - ratio) <= 0.015
+
+
+def eps_ok(ni, eps, sh):
+    """EPS vs share count agree up to the units convention (shares in
+    ones/thousands/millions); anything else is a units or split error."""
+    if abs(eps) < 1e-12 or abs(sh) < 1e-9:
+        return True
+    implied = ni / eps
+    return any(0.6 <= abs(implied / (sh * 1000 ** k)) <= 1.7
+               for k in (-3, -2, -1, 0, 1, 2, 3))
+
+
 class Card:
     def __init__(self):
         self.checks = []
@@ -126,12 +144,6 @@ def check_metrics(ticker, card):
              lambda ocf, cx, fcf: close(ocf - cx, fcf) or close(ocf + cx, fcf),
              note="(owner-FCF adjustments are a known cause)")
 
-    def margin_ok(m, part, whole):
-        if abs(whole) < 1e-9:
-            return True
-        ratio = part / whole
-        return abs(m - ratio * 100) <= 1.5 or abs(m - ratio) <= 0.015
-
     identity("identity_gross_margin",
              ("gross_margin", "gross_profit", "revenue"),
              lambda m, gp, rev: margin_ok(m, gp, rev))
@@ -141,15 +153,6 @@ def check_metrics(ticker, card):
     identity("identity_balance",
              ("total_assets", "total_liabilities", "shareholders_equity"),
              lambda a, l, e: close(a, l + e, 0.02))
-
-    # EPS vs share count should agree up to the units convention (shares in
-    # ones/thousands/millions); anything else is a units or split error
-    def eps_ok(ni, eps, sh):
-        if abs(eps) < 1e-12 or abs(sh) < 1e-9:
-            return True
-        implied = ni / eps
-        return any(0.6 <= abs(implied / (sh * 1000 ** k)) <= 1.7
-                   for k in (-3, -2, -1, 0, 1, 2, 3))
 
     identity("eps_share_scale", ("net_income", "eps", "shares_outstanding"),
              eps_ok, note="(units/split mismatch)")
