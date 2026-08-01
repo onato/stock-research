@@ -30,6 +30,53 @@ The `.duckdb` files are gitignored: they are local, rebuildable caches. The comm
 system of record is the CSV/JSON in `Reports/`. `scripts/load_existing.py` is the one
 reverse-direction script — it rebuilds a DB from a legacy CSV (pre-DB tickers).
 
+**Units convention:** the canonical cross-ticker scale is millions of the reporting
+currency, applied by the `metrics_normalized` view. Unknown or missing units resolve
+to NULL — never an assumed scale (SEK.NZ once read as NZ$411bn revenue from a
+defaulted thousands→millions guess; a missing row is obvious, a plausible wrong one
+is not).
+
+## Parser Architecture (open/closed)
+
+`scripts/build_facts.py` is only the CLI facade. Parsing lives in `scripts/parsers/`:
+`common.py` holds the exchange-independent metric vocabulary and number grammar;
+`base.py` holds the scan driver plus strategy hooks and is the generic fallback;
+one module per exchange (`nzx.py`, `hkex.py`, `lse.py`, `euronext.py`) registers
+itself by listing suffix. Parsers emit raw fact *candidates* with units/currency
+hints only — never scale units, never pick winners; adjudication into
+`core_metrics` belongs to the financial-parser agent (see the DELIBERATE
+NON-GOALS docstring in build_facts.py).
+
+**Adding an exchange = three new files, zero shared-code edits:**
+`tests/fixtures/extracted/{country}/` (trimmed real excerpts) +
+`tests/parsers/test_{country}.py` (written first, failing) +
+`scripts/parsers/{country}.py` (makes it green). Never bend `common.py`/`base.py`
+around one exchange's quirk.
+
+## Entry Points
+
+`make` is the interface — `run`, `research`, `facts`, `evals`, `screen`, `status`,
+`test`, `lint`. Don't invoke scripts ad hoc when a target exists.
+
+## Testing — strict TDD for deterministic code
+
+All code under `scripts/` is deterministic and test-covered (`tests/`, pytest via
+`pythonpath=["scripts"]`). Evals grade what the *agents* produce; unit tests guard
+the Python that does the extracting, grading and exporting. The rules:
+
+- **Red first.** Any change to `scripts/` starts with a failing test: write it, run
+  it, watch it fail, then make it pass. No production edit ships without a covering
+  test in the same commit.
+- **New exchange support starts from a failing fixture** (see Parser Architecture).
+- **`make test` must pass before any commit touching `scripts/`, `tests/`, or
+  `pyproject.toml`.** `make lint` is the style gate.
+- **Parser changes additionally require a corpus diff review:**
+  `python3 tests/tools/corpus_snapshot.py --out state/facts_before.jsonl` before,
+  again after, then diff. Refactors must diff empty; bug fixes must diff only in
+  the targeted exchange (`--suffix NZ`) and be reviewed line-by-line.
+- Test fixtures are committed trimmed excerpts under `tests/fixtures/` — tests must
+  never read live `research/` files (they are overwritten on every re-research).
+
 ## File Naming Convention
 {TICKER}_{REPORT_TYPE}_{PERIOD}.pdf
 
