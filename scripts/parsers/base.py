@@ -53,8 +53,15 @@ class BaseParser:
     # when the sentence form finds nothing in the head. None disables.
     UNITS_COL_RE = re.compile(r"(?:NZ|A|US)?\$\s?(M\b|'?000\b)")
 
+    # Symbols carry no word boundaries: "$" and "£" are non-word characters,
+    # so "NZ$ thousands" can never satisfy a trailing \b (the bug that left
+    # currency NULL for every non-US filing). ISO codes keep their \b.
     CURRENCY_RE = re.compile(
-        r"\b(NZ\$|AU\$|US\$|NZD|AUD|USD|GBP|EUR|HKD|SGD|CAD)\b")
+        r"(NZ\$|AU\$|US\$|HK\$|S\$|C\$|£|€)"
+        r"|\b(NZD|AUD|USD|GBP|EUR|HKD|SGD|CAD|RMB|CNY|JPY)\b")
+
+    SYMBOL_CCY = {"NZ$": "NZD", "AU$": "AUD", "US$": "USD", "HK$": "HKD",
+                  "S$": "SGD", "C$": "CAD", "£": "GBP", "€": "EUR"}
 
     # ------------------------------------------------------------------
     # The driver. Hermetic: text in, fact dicts out. No I/O.
@@ -121,13 +128,15 @@ class BaseParser:
         return default
 
     def currency(self, lines):
-        """Currency hint from the file head, normalized ('NZ$' -> 'NZD')."""
+        """Currency hint from the file head, normalized to an ISO code."""
         head = "\n".join(lines[:self.HEAD_LINES])
         cm = self.CURRENCY_RE.search(head)
         if not cm:
             return None
-        tok = cm.group(1)
-        return tok.replace("$", "D").upper() if "$" in tok else tok.upper()
+        tok = cm.group(0)
+        if tok in self.SYMBOL_CCY:
+            return self.SYMBOL_CCY[tok]
+        return "CNY" if tok.upper() == "RMB" else tok.upper()
 
     def segments(self, line):
         """Yield (label, numbers) pairs from one line.

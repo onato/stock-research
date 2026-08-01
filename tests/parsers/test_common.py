@@ -64,6 +64,38 @@ class TestSegments:
         assert list(bf.segments(line)) == [("Operating revenue", [6755.0, 6752.0])]
 
 
+class TestCurrencyDetection:
+    def currency_of(self, text):
+        from parsers.base import BaseParser
+        return BaseParser().currency(text.splitlines())
+
+    def test_nz_dollar_followed_by_space(self):
+        # The old regex put a \b after the $, which needs a following word
+        # character — so "NZ$ thousands" could never match and currency was
+        # None for every NZX filing.
+        assert self.currency_of("presented in NZ$ thousands") == "NZD"
+
+    def test_pound_and_euro_symbols(self):
+        assert self.currency_of("we saved our customers £1.5 billion") == "GBP"
+        assert self.currency_of("in thousands of € unless stated") == "EUR"
+
+    def test_rmb_maps_to_cny(self):
+        assert self.currency_of("RMB’000") == "CNY"
+        assert self.currency_of("amounts in CNY million") == "CNY"
+
+    def test_dollar_symbols_map_to_iso(self):
+        assert self.currency_of("HK$ 1,234") == "HKD"
+        assert self.currency_of("S$ 1,234") == "SGD"
+        assert self.currency_of("C$ 1,234") == "CAD"
+
+    def test_word_tokens_unchanged(self):
+        assert self.currency_of("expressed in NZD") == "NZD"
+        assert self.currency_of("amounts in USD millions") == "USD"
+
+    def test_no_currency(self):
+        assert self.currency_of("nothing monetary here") is None
+
+
 class TestPatternVocabulary:
     def find(self, label):
         return [m for m, pats in bf.COMPILED.items()
