@@ -144,6 +144,23 @@ Determine the scale yourself and record it explicitly:
   left NULL** — every one of the 67 historical CSVs omitted them, which makes
   cross-ticker screening unreliable. You are fixing that, not repeating it.
 
+**Determine `currency` from the filings, not from the listing.** A London
+listing does not guarantee GBP and an NZX listing does not guarantee NZD:
+
+- Look for an explicit statement — "presented in New Zealand dollars",
+  "reporting currency", "functional currency" — in the **most recent**
+  statutory filing. Companies change reporting currency: EBO.NZ reported in
+  NZD through FY2016 and in AUD by FY2025, so an old filing gives a
+  confidently wrong answer.
+- Otherwise count the currency symbols (`£`, `€`, `NZ$`, `A$`, `US$`) in the
+  newest annual report. Beware segment disclosures: a company can quote large
+  A$ figures for an Australian division while reporting in NZD.
+- WISE.L was recorded as USD when its filings carry 478 `£` markers against
+  1 `$`. That is a ~1.27× error on every figure, and it propagates into the
+  DCF, the dashboard and every cross-ticker comparison.
+
+`make check-currency` verifies this after a run.
+
 ### Period identification
 - Period comes from the filename (`{TICKER}_Annual_FY2024.txt` → `FY2024`), which
   the extractor has already applied to `statement_line` rows.

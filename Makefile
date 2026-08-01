@@ -20,7 +20,7 @@ LEADERBOARD ?= 15   # rows shown by `make screen`
 
 .DEFAULT_GOAL := help
 .PHONY: help run digest status screen research facts evals evals-all \
-        cost gaps exchange-eval facts-xbrl screen-metrics ledger ledger-backfill queue-prune
+        cost gaps exchange-eval facts-xbrl screen-metrics check-currency ledger ledger-backfill queue-prune
 
 help: ## Show this help
 	@echo "Usage: make <target> [TICKER=XYZ] [TICKERS=4] [PARALLEL=2]"
@@ -102,6 +102,9 @@ exchange-eval: ## Extraction coverage per exchange (free, no model calls)
 
 screen-metrics: ## Compare core metrics across tickers, normalized (PERIOD=FY2024)
 	python3 $(SCRIPTS)/screen_metrics.py --period $(or $(PERIOD),FY2024) $(if $(METRIC),--metric $(METRIC),)
+
+check-currency: ## Flag tickers whose recorded currency contradicts their filings
+	python3 $(SCRIPTS)/check_currency.py $(TICKER)
 
 gaps: ## What the extractor could not parse (the improvement backlog)
 	python3 $(SCRIPTS)/log_gap.py --report
