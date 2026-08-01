@@ -72,8 +72,8 @@ def main():
         el = int(time.time() - start)
         return f"[{el // 60:2d}:{el % 60:02d}]"
 
-    for line in sys.stdin:
-        line = line.strip()
+    for raw in sys.stdin:
+        line = raw.strip()
         if not line:
             continue
         try:

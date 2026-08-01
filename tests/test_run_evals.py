@@ -8,6 +8,7 @@ numeric helpers and the check flows over synthetic artifacts.
 import json
 import shutil
 from pathlib import Path
+from typing import ClassVar
 
 import run_evals as E
 
@@ -102,7 +103,7 @@ class TestEpsOk:
 
 
 class TestCheckMetrics:
-    HEADER = ["Period", "Revenue", "GrossProfit", "GrossMargin",
+    HEADER: ClassVar = ["Period", "Revenue", "GrossProfit", "GrossMargin",
               "NetIncome", "OperatingCashFlow", "CapEx", "FreeCashFlow"]
 
     def test_clean_csv_passes(self, make_ticker):

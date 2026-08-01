@@ -514,7 +514,7 @@ def main():
     p.add_argument("--json", default=None, help="write full results JSON to this path")
     p.add_argument("--html", default=None, help="write static leaderboard HTML to this path")
     args = p.parse_args()
-    global HREF_PREFIX
+    global HREF_PREFIX  # noqa: PLW0603 -- module-level link prefix, set once from --root
     _r = (args.root or ".").strip("/")
     HREF_PREFIX = "" if _r in ("", ".") else _r + "/"
 

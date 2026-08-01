@@ -17,6 +17,7 @@ directory + a test module. No shared-code edits.
 """
 
 import re
+from typing import ClassVar
 
 from . import common
 
@@ -60,8 +61,8 @@ class BaseParser:
         r"(NZ\$|AU\$|US\$|HK\$|S\$|C\$|£|€)"
         r"|\b(NZD|AUD|USD|GBP|EUR|HKD|SGD|CAD|RMB|CNY|JPY)\b")
 
-    SYMBOL_CCY = {"NZ$": "NZD", "AU$": "AUD", "US$": "USD", "HK$": "HKD",
-                  "S$": "SGD", "C$": "CAD", "£": "GBP", "€": "EUR"}
+    SYMBOL_CCY: ClassVar = {"NZ$": "NZD", "AU$": "AUD", "US$": "USD", "HK$": "HKD",
+                            "S$": "SGD", "C$": "CAD", "£": "GBP", "€": "EUR"}
 
     # ------------------------------------------------------------------
     # The driver. Hermetic: text in, fact dicts out. No I/O.
@@ -75,8 +76,8 @@ class BaseParser:
         currency = self.currency(lines)
 
         for i, line in enumerate(lines):
-            for label, nums in self.segments(line):
-                nums = self.strip_leading_note_ref(nums)
+            for label, raw_nums in self.segments(line):
+                nums = self.strip_leading_note_ref(raw_nums)
                 if not nums:
                     continue
 

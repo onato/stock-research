@@ -19,6 +19,7 @@ stray symbols in the head.
 """
 
 import re
+from typing import ClassVar
 
 from .base import BaseParser
 
@@ -39,7 +40,7 @@ class NZXParser(BaseParser):
     # Inline units cell between label and numbers.
     UNIT_CELL_RE = re.compile(r"^(?:NZ)?\$\s?(m|M|['’]?000)$")
 
-    STATED_CCY = [
+    STATED_CCY: ClassVar = [
         (re.compile(r"(?:presented|expressed)\W{0,20}in\s+"
                     r"(?:thousands of |millions of )?new zealand dollars?", re.I), "NZD"),
         (re.compile(r"(?:presented|expressed)\W{0,20}in\s+"

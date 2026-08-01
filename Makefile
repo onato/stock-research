@@ -21,7 +21,7 @@ LEADERBOARD ?= 15   # rows shown by `make screen`
 .DEFAULT_GOAL := help
 .PHONY: help run digest status screen research facts evals evals-all \
         cost gaps exchange-eval facts-xbrl screen-metrics check-currency ledger ledger-backfill queue-prune \
-        test test-country
+        test test-country lint
 
 help: ## Show this help
 	@echo "Usage: make <target> [TICKER=XYZ] [TICKERS=4] [PARALLEL=2]"
@@ -97,6 +97,12 @@ evals-all: ## Tier-1 eval for every ticker; scorecards to state/scores/
 
 test: ## Run the deterministic test suite (gates every commit touching scripts/)
 	python3 -m pytest
+
+# Ruff is version-pinned so local and CI agree; bumping it is a deliberate
+# commit (the rule set is pinned in pyproject.toml for the same reason).
+lint: ## Ruff + shellcheck; the technical-debt gate
+	uvx ruff@0.16.1 check .
+	shellcheck -S warning $(SCRIPTS)/*.sh
 
 test-country: ## One country's parser tests (COUNTRY=nzx)
 	@test -n "$(COUNTRY)" || { echo "usage: make test-country COUNTRY=nzx" >&2; exit 2; }

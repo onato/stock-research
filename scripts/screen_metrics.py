@@ -46,7 +46,7 @@ def load(tickers, period):
                 res = con.execute(q).fetchall()
             names = ["period", "currency", *NUMERIC]
             for r in res:
-                rows.append({"ticker": t, **dict(zip(names, r))})
+                rows.append({"ticker": t, **dict(zip(names, r, strict=True))})
             con.close()
         except Exception:
             # A DB without the view (never re-extracted) is skipped rather

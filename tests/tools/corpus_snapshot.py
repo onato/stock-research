@@ -51,7 +51,7 @@ def main():
             for fact in bf.scan_file(f):
                 rows.append((ticker, *[fact.get(k) for k in FIELDS]))
 
-    rows.sort(key=lambda r: json.dumps(r))
+    rows.sort(key=json.dumps)
     out = pathlib.Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w") as fh:

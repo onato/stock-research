@@ -64,11 +64,11 @@ def report(args):
         print("no gaps logged yet")
         return 0
     recs = []
-    for line in open(LOG, errors="replace"):
-        line = line.strip()
-        if line:
-            with contextlib.suppress(json.JSONDecodeError):
-                recs.append(json.loads(line))
+    with open(LOG, errors="replace") as fh:
+        for raw in fh:
+            if line := raw.strip():
+                with contextlib.suppress(json.JSONDecodeError):
+                    recs.append(json.loads(line))
     if args.metric:
         recs = [r for r in recs if r.get("metric") == args.metric]
     if args.ticker:

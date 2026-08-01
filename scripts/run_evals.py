@@ -27,6 +27,7 @@ Usage:
 
 import csv
 import datetime as dt
+import itertools
 import json
 import sys
 
@@ -145,20 +146,20 @@ def check_metrics(ticker, card):
 
     identity("identity_gross_margin",
              ("gross_margin", "gross_profit", "revenue"),
-             lambda m, gp, rev: margin_ok(m, gp, rev))
+             margin_ok)
     identity("identity_net_margin",
              ("net_margin", "net_income", "revenue"),
-             lambda m, ni, rev: margin_ok(m, ni, rev))
+             margin_ok)
     identity("identity_balance",
              ("total_assets", "total_liabilities", "shareholders_equity"),
-             lambda a, l, e: close(a, l + e, 0.02))
+             lambda a, liab, e: close(a, liab + e, 0.02))
 
     identity("eps_share_scale", ("net_income", "eps", "shares_outstanding"),
              eps_ok, note="(units/split mismatch)")
 
     def continuity(cid, field, limit):
         jumps, n = [], 0
-        for prev, cur in zip(rows, rows[1:]):
+        for prev, cur in itertools.pairwise(rows):
             a, b = prev.get(field), cur.get(field)
             if a is None or b is None or abs(a) < 1e-9 or (a < 0) != (b < 0):
                 continue
