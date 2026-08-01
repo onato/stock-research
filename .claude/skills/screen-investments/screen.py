@@ -233,8 +233,16 @@ def num_td(value, text, cls=""):
     return f'<td data-sort="{esc(sort)}"{cls_attr}>{text}</td>'
 
 
+# Where ticker directories live, relative to index.html. Set from --root so
+# regenerating the index cannot silently revert the links: a run that emitted
+# bare "{TICKER}/Reports/..." after the move to research/ broke all 136 of
+# them, and index.html is generated output, so the damage returns on every run
+# until the generator itself knows the layout.
+HREF_PREFIX = "research/"   # overridden from --root in main()
+
+
 def dashboard_href(t):
-    return f"{esc(t)}/Reports/{esc(t)}_Dashboard.html"
+    return f"{HREF_PREFIX}{esc(t)}/Reports/{esc(t)}_Dashboard.html"
 
 
 def tr_open(t, co):
@@ -507,6 +515,9 @@ def main():
     p.add_argument("--json", default=None, help="write full results JSON to this path")
     p.add_argument("--html", default=None, help="write static leaderboard HTML to this path")
     args = p.parse_args()
+    global HREF_PREFIX
+    _r = (args.root or ".").strip("/")
+    HREF_PREFIX = "" if _r in ("", ".") else _r + "/"
 
     ranked, unranked = screen(args)
     meta = {"generated_at": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),

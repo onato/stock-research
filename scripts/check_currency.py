@@ -51,18 +51,33 @@ SYMBOLS = [
 ]
 
 # An explicit statement of reporting currency outranks symbol counts.
-STATED = [
-    (r"presented in (?:thousands of |millions of )?new zealand dollars", "NZD"),
-    (r"presented in (?:thousands of |millions of )?australian dollars", "AUD"),
-    (r"presented in (?:thousands of |millions of )?(?:us|u\.s\.) dollars", "USD"),
-    (r"presented in (?:thousands of |millions of )?(?:pounds|sterling)", "GBP"),
-    (r"presented in (?:thousands of |millions of )?euros?", "EUR"),
-    (r"reporting currency[^.]{0,30}new zealand", "NZD"),
-    (r"reporting currency[^.]{0,30}australian", "AUD"),
-    (r"reporting currency[^.]{0,30}(?:pound|sterling)", "GBP"),
-    (r"functional currency[^.]{0,30}new zealand", "NZD"),
-    (r"functional currency[^.]{0,30}(?:pound|sterling)", "GBP"),
+#
+# Both orderings occur and both must match:
+#   "presented in New Zealand dollars"                     (currency last)
+#   "The reporting currency of the Group is the U.S. dollar" (currency last,
+#                                                             longer gap)
+# WISE.L's FY2026 20-F uses the second form with "U.S." punctuated, which an
+# earlier pattern set missed entirely -- so the checker fell back to counting
+# stray GBP symbols and confidently reported the wrong answer.
+_NAMES = [
+    (r"new zealand dollar", "NZD"),
+    (r"australian dollar", "AUD"),
+    (r"(?:u\.?s\.?|united states) dollar", "USD"),
+    (r"(?:pound[s]? sterling|pound[s]?(?! sterling)|sterling)", "GBP"),
+    (r"euro", "EUR"),
+    (r"hong kong dollar", "HKD"),
+    (r"singapore dollar", "SGD"),
+    (r"canadian dollar", "CAD"),
+    (r"japanese yen|yen", "JPY"),
+    (r"swiss franc", "CHF"),
 ]
+_LEADS = [
+    r"presented in (?:thousands of |millions of )?",
+    r"expressed in (?:thousands of |millions of )?",
+    r"(?:reporting|presentation|functional) currency[^.]{0,40}?is (?:the )?",
+    r"amounts are in ",
+]
+STATED = [(lead + name, ccy) for lead in _LEADS for name, ccy in _NAMES]
 
 
 def from_filings(ticker, sample=5):
@@ -75,22 +90,45 @@ def from_filings(ticker, sample=5):
     statutory = [f for f in files if any(
         k in f.name.lower() for k in
         ("annual", "halfyear", "half-year", "interim", "results", "10k", "20f"))]
-    picked = (statutory or files)[-sample:]
 
+    # Sort by the PERIOD in the filename, not the filename itself. Sorting
+    # alphabetically put WISE.L_Annual_FY2026 (the filing that announced the
+    # move to USD reporting) before HalfYear and Results, so the newest and
+    # most authoritative document fell outside the sample and the checker
+    # reported GBP with high confidence. "Newest" has to mean newest period.
+    def period_key(path):
+        m = re.search(r"(?:FY|H[12][-_]?|Q[1-4][-_]?)(\d{4})", path.name, re.I)
+        year = int(m.group(1)) if m else 0
+        # An annual report states the reporting currency; interims often
+        # only reference it, so prefer annuals within the same year.
+        rank = 2 if re.search(r"annual|10k|20f", path.name, re.I) else 1
+        return (year, rank, path.name)
+
+    picked = sorted(statutory or files, key=period_key)[-sample:]
+
+    # Read newest-first and stop at the first filing that states a currency.
+    # Pooling across years is wrong when a filer switches: WISE.L's older
+    # reports carry 500+ GBP symbols while the FY2026 20-F is USD, so any
+    # aggregate says GBP with false confidence. The most recent statutory
+    # filing is the authority; older ones describe a currency that no
+    # longer applies.
     counts = collections.Counter()
     stated = None
-    for f in picked:
+    for f in reversed(picked):
         text = f.read_text(errors="replace")
         low = text.lower()
-        if stated is None:
-            for pat, ccy in STATED:
-                if re.search(pat, low):
-                    stated = ccy
-                    break
+        for pat, ccy in STATED:
+            if re.search(pat, low):
+                stated = ccy
+                break
         for pat, ccy in SYMBOLS:
             n = len(re.findall(pat + r"\s?[\d,]", text))
             if n:
                 counts[ccy] += n
+        # One filing is enough once it names its currency, or once it has
+        # given us symbol evidence to judge by.
+        if stated or counts:
+            break
     return stated, dict(counts)
 
 
