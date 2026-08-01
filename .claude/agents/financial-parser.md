@@ -1,6 +1,6 @@
 ---
 name: financial-parser
-description: Parses extracted text to find key financial metrics and writes them to a CSV file
+description: Adjudicates extracted financial facts in the ticker DuckDB into core_metrics, then exports the Metrics CSV from it
 tools: Bash, Read, Grep, Write
 model: sonnet
 ---
