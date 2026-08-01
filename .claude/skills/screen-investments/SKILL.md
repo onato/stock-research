@@ -26,7 +26,8 @@ research root with live prices so the upside reflects current quotes:
 
 ```bash
 python3 .claude/skills/screen-investments/screen.py --live --top 15 \
-  --json "$(pwd)/.claude/skills/screen-investments/last_run.json"
+  --json "$(pwd)/.claude/skills/screen-investments/last_run.json" \
+  --html "$(pwd)/leaderboard.html"
 ```
 
 What it does, per ticker `{T}/Reports/{T}_DCF.json`:
@@ -41,7 +42,12 @@ What it does, per ticker `{T}/Reports/{T}_DCF.json`:
 If you have no network, drop `--live` to rank on stored prices (and say so in the
 output — stored prices may be months old).
 
-The full ranked list is written to `last_run.json` for the next steps.
+The full ranked list is written to `last_run.json` for the next steps, and a
+static leaderboard page to `leaderboard.html` at the repo root (next to
+`index.html`, which links to it). The page is generated deterministically by
+`screen.py` — never hand-edit it; re-running the screener refreshes it. When
+presenting results (Step 4), mention that the full sortable leaderboard is in
+`leaderboard.html`.
 
 ## Step 2: Read the leaders' qualitative data
 

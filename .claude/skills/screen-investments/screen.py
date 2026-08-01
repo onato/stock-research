@@ -25,6 +25,7 @@ With --live it fetches current prices for each ticker (slower, needs network).
 """
 import argparse
 import datetime as dt
+import html
 import json
 import os
 import sys
@@ -172,6 +173,250 @@ def fmt_price(r):
     return f"{r['price']:.2f}"
 
 
+# ---------------------------------------------------------------------------
+# Static leaderboard page
+# ---------------------------------------------------------------------------
+
+def load_scores(root):
+    """{ticker: eval summary} from the latest state/scores/{T}_{date}.json each.
+
+    Lexicographic order on the ISO-dated filenames means the last file per
+    ticker is the newest (same pattern as scripts/after_run.py). Missing dir
+    (fresh clone, or run from elsewhere) just means no quality column.
+    """
+    scores_dir = os.path.join(root, "state", "scores")
+    if not os.path.isdir(scores_dir):
+        return {}
+    out = {}
+    for name in sorted(os.listdir(scores_dir)):
+        if not name.endswith(".json"):
+            continue
+        card = load_dcf(os.path.join(scores_dir, name))
+        if card and isinstance(card.get("summary"), dict):
+            out[name.rsplit("_", 1)[0]] = card["summary"]
+    return out
+
+
+# Sentinel that sinks "—" cells to the bottom of any descending numeric sort.
+SORT_MISSING = "-1e18"
+
+FLAG_MEANINGS = (
+    ("STALE", "DCF or Analysis older than the staleness threshold"),
+    ("PRICE_DRIFT", "live price far from the price the DCF was built on — stored upside unreliable"),
+    ("NO_PRICE", "no usable price, live or stored"),
+    ("NO_IV", "DCF has no probability-weighted intrinsic value"),
+    ("CCY", "DCF currency differs from the quote currency — upside mixes currencies"),
+)
+
+
+def esc(x):
+    return html.escape(str(x))
+
+
+def badge_html(flag):
+    kind = flag.split("(")[0]
+    cls = "bad" if kind in ("NO_PRICE", "NO_IV") else "warn"
+    return f'<span class="badge {cls}">{esc(flag)}</span>'
+
+
+def num_td(value, text, cls=""):
+    sort = SORT_MISSING if value is None else f"{value}"
+    cls_attr = f' class="{cls}"' if cls else ""
+    return f'<td data-sort="{esc(sort)}"{cls_attr}>{text}</td>'
+
+
+def row_html(i, r, summary):
+    t = r.get("ticker", "?")
+    cur = r.get("currency")
+    live_cur = r.get("live_currency")
+    shown_cur = live_cur or cur or ""
+
+    flags = list(r.get("flags") or [])
+    if cur and live_cur and cur != live_cur:
+        flags.append(f"CCY({cur}→{live_cur})")
+
+    price_txt = esc(fmt_price(r))
+    if shown_cur:
+        price_txt += f' <span class="cur">{esc(shown_cur)}</span>'
+    price_cell = (f'<td data-sort="{esc(r["price"] if r.get("price") is not None else SORT_MISSING)}"'
+                  f' title="{esc(r.get("price_src", ""))} price">{price_txt}</td>')
+
+    iv = r.get("weighted_iv")
+    iv_txt = f"{iv:.2f}" if iv is not None else "—"
+    if iv is not None and cur:
+        iv_txt = f'{iv_txt} <span class="cur">{esc(cur)}</span>'
+
+    up = r.get("upside_pct")
+    up_txt = f"{up:+.1f}%" if up is not None else "—"
+
+    age = r.get("days_old")
+
+    if summary:
+        s_txt = f"{summary.get('score')}" if summary.get("score") is not None else "—"
+        nf, nw = summary.get("fail", 0), summary.get("warn", 0)
+        if nf or nw:
+            s_txt += f' <span class="cur">({nf}F/{nw}W)</span>'
+        s_cls = "neg" if nf else ("warn-text" if nw else "pos")
+        score_cell = num_td(summary.get("score"), s_txt, s_cls)
+    else:
+        score_cell = num_td(None, "—")
+
+    return "<tr>" + "".join((
+        num_td(i, str(i)),
+        f'<td><a href="{esc(t)}/Reports/{esc(t)}_Dashboard.html">{esc(t)}</a></td>',
+        price_cell,
+        num_td(iv, iv_txt),
+        num_td(up, esc(up_txt), "pos" if (up or 0) >= 0 else "neg"),
+        num_td(age, f"{age}d" if age is not None else "—"),
+        "<td>" + ("".join(badge_html(f) for f in flags) or '<span class="ok">ok</span>') + "</td>",
+        score_cell,
+    )) + "</tr>"
+
+
+def write_html(ranked, unranked, meta, scores, path):
+    head = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Screener Leaderboard</title>
+<style>
+* {{ margin: 0; padding: 0; box-sizing: border-box; }}
+body {{
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e0e0; min-height: 100vh; max-width: 1100px;
+    margin: 0 auto; padding: 20px;
+}}
+.header {{
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px; padding: 20px 25px; margin-bottom: 20px;
+}}
+h1 {{
+    font-size: 1.6em;
+    background: linear-gradient(90deg, #00d4aa, #00b894);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+}}
+.meta {{ color: #8b8ba0; margin-top: 6px; font-size: 0.9em; }}
+a {{ color: #00d4aa; text-decoration: none; }}
+a:hover {{ color: #00b894; }}
+.card {{
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px; padding: 10px; margin-bottom: 20px; overflow-x: auto;
+}}
+table {{ border-collapse: collapse; width: 100%; font-size: 0.92em; }}
+th {{
+    color: #00d4aa; text-align: left; cursor: pointer; user-select: none;
+    padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.15);
+    white-space: nowrap;
+}}
+th.asc::after {{ content: " \\25B2"; font-size: 0.8em; }}
+th.desc::after {{ content: " \\25BC"; font-size: 0.8em; }}
+td {{ padding: 7px 10px; border-bottom: 1px solid rgba(255,255,255,0.06); white-space: nowrap; }}
+tr:hover td {{ background: rgba(255,255,255,0.04); }}
+.pos {{ color: #00d4aa; }}
+.neg {{ color: #ff6b6b; }}
+.warn-text {{ color: #ffb400; }}
+.ok {{ color: #8b8ba0; font-size: 0.85em; }}
+.cur {{ color: #8b8ba0; font-size: 0.82em; }}
+.badge {{
+    display: inline-block; font-size: 0.72em; padding: 2px 6px;
+    border-radius: 8px; margin-right: 4px;
+}}
+.badge.warn {{ background: rgba(255,180,0,0.15); color: #ffb400; }}
+.badge.bad  {{ background: rgba(255,107,107,0.15); color: #ff6b6b; }}
+h2 {{ font-size: 1.1em; color: #00d4aa; margin: 5px 0 10px 5px; }}
+.footnote {{ color: #8b8ba0; font-size: 0.82em; line-height: 1.6; padding: 0 5px; }}
+</style>
+</head>
+<body>
+<div class="header">
+<h1>Screener Leaderboard</h1>
+<p class="meta"><a href="index.html">&larr; Portfolio</a> &nbsp;&middot;&nbsp;
+as of {esc(meta["generated_at"])} &nbsp;&middot;&nbsp;
+{"LIVE" if meta["live"] else "STORED"} prices &nbsp;&middot;&nbsp;
+{len(ranked)} ranked / {len(unranked)} unranked &nbsp;&middot;&nbsp;
+upside = weighted IV / price &minus; 1</p>
+</div>
+"""
+    if ranked:
+        body_rows = "\n".join(
+            row_html(i, r, scores.get(r.get("ticker")))
+            for i, r in enumerate(ranked, 1))
+    else:
+        body_rows = '<tr><td colspan="8">No ranked tickers — see unranked below.</td></tr>'
+
+    ranked_table = f"""<div class="card">
+<table id="lb">
+<thead><tr>
+<th data-type="num">#</th><th data-type="str">Ticker</th>
+<th data-type="num">Price</th><th data-type="num">Weighted IV</th>
+<th data-type="num">Upside</th><th data-type="num">Age</th>
+<th data-type="str">Flags</th><th data-type="num">Eval</th>
+</tr></thead>
+<tbody>
+{body_rows}
+</tbody>
+</table>
+</div>
+"""
+    unranked_html = ""
+    if unranked:
+        u_rows = "\n".join(
+            "<tr>"
+            f'<td><a href="{esc(r.get("ticker", "?"))}/Reports/{esc(r.get("ticker", "?"))}_Dashboard.html">'
+            f'{esc(r.get("ticker", "?"))}</a></td>'
+            f"<td>{''.join(badge_html(f) for f in (r.get('flags') or [])) or '—'}</td>"
+            f"<td>{esc(fmt_price(r))}</td>"
+            f"<td>{esc(r.get('note', ''))}</td>"
+            "</tr>"
+            for r in unranked)
+        unranked_html = f"""<h2>Not ranked</h2>
+<div class="card">
+<table>
+<thead><tr><th>Ticker</th><th>Flags</th><th>Price</th><th>Note</th></tr></thead>
+<tbody>
+{u_rows}
+</tbody>
+</table>
+</div>
+"""
+    footnote = "<p class=\"footnote\">" + " &middot; ".join(
+        f"<b>{esc(k)}</b>: {esc(v)}" for k, v in FLAG_MEANINGS
+    ) + (" &middot; <b>Eval</b>: tier-1 scorecard pass rate (F fails / W warns), "
+         "from state/scores/.</p>")
+
+    sort_js = """<script>
+document.querySelector('#lb thead').addEventListener('click', (e) => {
+    const th = e.target.closest('th');
+    if (!th) return;
+    const idx = th.cellIndex, numeric = th.dataset.type === 'num';
+    const dir = th.classList.contains(numeric ? 'desc' : 'asc')
+        ? (numeric ? 'asc' : 'desc') : (numeric ? 'desc' : 'asc');
+    th.parentNode.querySelectorAll('th').forEach(h => h.classList.remove('asc', 'desc'));
+    th.classList.add(dir);
+    const tbody = document.querySelector('#lb tbody');
+    const key = row => {
+        const td = row.cells[idx];
+        return numeric ? parseFloat(td.dataset.sort ?? td.textContent) : td.textContent.trim();
+    };
+    Array.from(tbody.rows)
+        .sort((a, b) => {
+            const x = key(a), y = key(b);
+            const c = numeric ? x - y : String(x).localeCompare(String(y));
+            return dir === 'asc' ? c : -c;
+        })
+        .forEach(r => tbody.appendChild(r));
+});
+</script>
+"""
+    doc = head + ranked_table + unranked_html + footnote + "\n" + sort_js + "</body>\n</html>\n"
+    with open(path, "w") as f:
+        f.write(doc)
+    print(f"Leaderboard written to {path}")
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--root", default=".")
@@ -181,9 +426,12 @@ def main():
     p.add_argument("--drift-pct", type=float, default=15.0)
     p.add_argument("--only", default=None, help="comma-separated tickers to restrict to")
     p.add_argument("--json", default=None, help="write full results JSON to this path")
+    p.add_argument("--html", default=None, help="write static leaderboard HTML to this path")
     args = p.parse_args()
 
     ranked, unranked = screen(args)
+    meta = {"generated_at": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "live": args.live}
 
     print(f"\nInvestment screen — {today()}  ({'LIVE prices' if args.live else 'STORED prices'})")
     print("Upside = probability-weighted intrinsic value / price - 1\n")
@@ -217,8 +465,13 @@ def main():
     if args.json:
         with open(args.json, "w") as f:
             json.dump({"ranked": ranked, "unranked": unranked,
-                       "generated": str(today()), "live": args.live}, f, indent=2)
+                       "generated": str(today()),
+                       "generated_at": meta["generated_at"],
+                       "live": args.live}, f, indent=2)
         print(f"\nFull results written to {args.json}")
+
+    if args.html:
+        write_html(ranked, unranked, meta, load_scores(args.root), args.html)
 
 
 if __name__ == "__main__":
