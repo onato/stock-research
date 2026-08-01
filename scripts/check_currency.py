@@ -26,10 +26,10 @@ Usage:
   check_currency.py WISE.L     # one
 """
 
+import collections
 import pathlib
 import re
 import sys
-import collections
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 

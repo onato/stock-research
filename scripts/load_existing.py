@@ -12,13 +12,13 @@ Usage:
   load_existing.py --report       # show alias coverage, write nothing
 """
 
-import csv
-import sys
-import pathlib
 import collections
+import csv
+import pathlib
+import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-import schema  # noqa: E402
+import schema
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
@@ -52,7 +52,7 @@ def to_core(rows):
     """Map CSV rows onto core columns; everything else becomes a KPI row."""
     core, kpis = [], []
     for row in rows:
-        rec = {c: None for c in schema.CORE_NAMES}
+        rec = dict.fromkeys(schema.CORE_NAMES)
         for header, raw in row.items():
             if not header:
                 continue
@@ -141,7 +141,7 @@ def main():
     print("-" * 74)
     print(f"  {ok} ticker(s) loaded, {failed} failed")
     if unmapped_freq:
-        print(f"\n  most common unmapped headers (these become KPI rows):")
+        print("\n  most common unmapped headers (these become KPI rows):")
         for h, c in unmapped_freq.most_common(15):
             print(f"    {c:3d}x  {h}")
     if report_only:

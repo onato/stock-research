@@ -17,10 +17,10 @@ Usage:
   cost_report.py --compare out.json  # diff against a saved baseline
 """
 
-import json
-import sys
-import pathlib
 import collections
+import json
+import pathlib
+import sys
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 LOGS = REPO / "state" / "logs"
@@ -54,10 +54,9 @@ def analyse(path):
     reported = None
     turns = 0
 
-    for line in open(path, errors="replace"):
-        line = line.strip()
-        if not line.startswith("{"):
-            continue
+    with open(path, errors="replace") as fh:
+        events = [line for raw in fh if (line := raw.strip()).startswith("{")]
+    for line in events:
         try:
             ev = json.loads(line)
         except json.JSONDecodeError:

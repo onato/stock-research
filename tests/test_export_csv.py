@@ -4,7 +4,6 @@ import csv
 import sys
 
 import duckdb
-
 import export_csv
 import schema
 

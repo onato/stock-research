@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import build_facts as bf
-from parsers import get_parser, BaseParser
+from parsers import BaseParser, get_parser
 
 
 class TestRouting:

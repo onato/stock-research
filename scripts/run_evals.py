@@ -29,7 +29,6 @@ import csv
 import datetime as dt
 import json
 import sys
-from pathlib import Path
 
 import dcf_fields as F
 from schema import normalize
@@ -416,7 +415,7 @@ def evaluate(ticker):
     check_health(ticker, card)
     return {
         "ticker": ticker,
-        "run_at": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "run_at": dt.datetime.now(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "agents_sha": F.agents_sha(),
         "git_head": F.git_head(),
         "checks": card.checks,

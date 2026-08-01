@@ -117,7 +117,7 @@ def main():
     if args.today:
         today = dt.datetime.strptime(args.today, "%Y-%m-%d").date()
     else:
-        today = dt.datetime.now(dt.timezone.utc).date()
+        today = dt.datetime.now(dt.UTC).date()
 
     key = weekend_key(today)
 

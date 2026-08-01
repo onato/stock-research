@@ -36,7 +36,7 @@ def is_us_symbol(ticker):
 
 def run(script, *args):
     r = subprocess.run([sys.executable, str(SCRIPTS / script), *args],
-                       capture_output=True, text=True, cwd=REPO)
+                       capture_output=True, text=True, cwd=REPO, check=False)
     return r.returncode, (r.stdout or "") + (r.stderr or "")
 
 
@@ -62,7 +62,7 @@ def facts_count(ticker):
 def log_gap(ticker, kind, detail):
     subprocess.run([sys.executable, str(SCRIPTS / "log_gap.py"),
                     "--ticker", ticker, "--kind", kind, "--detail", detail],
-                   capture_output=True, cwd=REPO)
+                   capture_output=True, cwd=REPO, check=False)
 
 
 def main():

@@ -27,7 +27,7 @@ import sys
 import urllib.request
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-import schema  # noqa: E402
+import schema
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 CACHE = REPO / "state" / "xbrl_cache"
@@ -195,7 +195,7 @@ def main():
 
     rows, kpis, missing, used = {}, [], [], {}
     for col, concepts in CONCEPTS.items():
-        concept, values, unit = collect(facts, concepts)
+        concept, values, _unit = collect(facts, concepts)
         if not values:
             missing.append(col)
             continue
@@ -236,7 +236,7 @@ def main():
     SCALE_FREE = {"period", "units", "currency", "eps", "dividend_per_share",
                   "gross_margin", "operating_margin", "net_margin"}
     for period, vals in sorted(rows.items()):
-        rec = {c: None for c in cols}
+        rec = dict.fromkeys(cols)
         rec["period"] = period
         rec["units"] = "millions"
         rec["currency"] = "USD"

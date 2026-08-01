@@ -29,8 +29,7 @@ import pathlib
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-import build_facts as bf  # noqa: E402
-import schema  # noqa: E402
+import build_facts as bf
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
@@ -135,7 +134,7 @@ def main():
         return 1
 
     # The set of metrics the schema actually wants populated.
-    core = {m for m in bf.PATTERNS}
+    core = set(bf.PATTERNS)
 
     print(f"  {'exchange':14s} {'tickers':>7s} {'zero':>5s} {'ixbrl':>6s} "
           f"{'metrics':>8s}  regime")

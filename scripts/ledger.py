@@ -26,7 +26,6 @@ import datetime as dt
 import fcntl
 import json
 import sys
-from pathlib import Path
 
 import dcf_fields as F
 
@@ -72,7 +71,7 @@ def build_row(ticker):
         return None
     dcf_path = F.REPO / "research" / ticker / "Reports" / f"{ticker}_DCF.json"
     return {
-        "logged_at": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "logged_at": dt.datetime.now(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "ticker": ticker,
         "valuation_date": dcf.get("valuation_date"),
         "valuation_model": dcf.get("valuation_model"),
@@ -84,7 +83,7 @@ def build_row(ticker):
         "entry_price": F.entry_prices(dcf),
         "hurdle_rate": F.hurdle_rate(dcf),
         "dcf_mtime": dt.datetime.fromtimestamp(
-            dcf_path.stat().st_mtime, dt.timezone.utc
+            dcf_path.stat().st_mtime, dt.UTC
         ).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "agents_sha": F.agents_sha(),
         "git_head": F.git_head(),

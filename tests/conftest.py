@@ -85,7 +85,6 @@ def pinned_identity(monkeypatch):
 def mem_db():
     """In-memory DuckDB with the canonical schema applied."""
     import duckdb
-
     import schema
 
     con = duckdb.connect(":memory:")

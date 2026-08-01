@@ -11,11 +11,11 @@ Usage: export_csv.py TICKER
 """
 
 import csv
-import sys
 import pathlib
+import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-import schema  # noqa: E402
+import schema
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
@@ -79,10 +79,10 @@ def main():
         if existing > len(rows):
             print(f"REFUSING to overwrite {out.name}: it has {existing} periods "
                   f"but core_metrics has only {len(rows)}.", file=sys.stderr)
-            print(f"  The table is missing periods the CSV already covers "
-                  f"(often H1/Q rows).", file=sys.stderr)
-            print(f"  Populate core_metrics fully, or re-run with --force to "
-                  f"discard them.", file=sys.stderr)
+            print("  The table is missing periods the CSV already covers "
+                  "(often H1/Q rows).", file=sys.stderr)
+            print("  Populate core_metrics fully, or re-run with --force to "
+                  "discard them.", file=sys.stderr)
             return 1
 
     with open(out, "w", newline="") as fh:

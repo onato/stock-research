@@ -44,7 +44,7 @@ def load(tickers, period):
                 res = con.execute(q, [period]).fetchall()
             else:
                 res = con.execute(q).fetchall()
-            names = ["period", "currency"] + NUMERIC
+            names = ["period", "currency", *NUMERIC]
             for r in res:
                 rows.append({"ticker": t, **dict(zip(names, r))})
             con.close()
@@ -80,7 +80,7 @@ def main():
     for r in rows[:args.top]:
         ni = r.get("net_income")
         eps = r.get("eps")
-        print(f"  {r['ticker']:10s} {r[key]:18,.1f} {str(r['currency'] or '?'):>5s} "
+        print(f"  {r['ticker']:10s} {r[key]:18,.1f} {r['currency'] or '?'!s:>5s} "
               f"{(f'{ni:,.1f}' if ni is not None else '-'):>14s} "
               f"{(f'{eps:.2f}' if eps is not None else '-'):>8s}")
     print(f"\n  {len(rows)} ticker(s) with data for {args.period}")

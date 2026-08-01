@@ -48,13 +48,13 @@ class TestToCore:
         assert kpis == [("FY2024", "ARR", 250.0, None)]
 
     def test_unmapped_text_headers_dropped(self):
-        core, kpis = L.to_core([
+        _core, kpis = L.to_core([
             {"Period": "FY2024", "Revenue": "100", "Notes": "restated"},
         ])
         assert kpis == []
 
     def test_rows_without_period_dropped(self):
-        core, kpis = L.to_core([
+        core, _kpis = L.to_core([
             {"Period": "", "Revenue": "100"},
             {"Period": "FY2024", "Revenue": "200"},
         ])

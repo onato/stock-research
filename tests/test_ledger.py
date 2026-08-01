@@ -72,7 +72,7 @@ class TestAppend:
         # in-memory key set is updated as rows are written, not just seeded
         # from the file.
         install_dcf(make_ticker, "FRFHF")
-        added, skipped, missing = ledger.append(["FRFHF", "FRFHF"])
+        added, skipped, _missing = ledger.append(["FRFHF", "FRFHF"])
         assert added == ["FRFHF"]
         assert skipped == ["FRFHF"]
         assert len(ledger.LEDGER.read_text().splitlines()) == 1

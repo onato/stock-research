@@ -23,11 +23,12 @@ Usage (from an agent):
 """
 
 import argparse
+import collections
+import contextlib
 import datetime as dt
 import json
 import pathlib
 import sys
-import collections
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 LOG = REPO / "state" / "improvements.jsonl"
@@ -66,10 +67,8 @@ def report(args):
     for line in open(LOG, errors="replace"):
         line = line.strip()
         if line:
-            try:
+            with contextlib.suppress(json.JSONDecodeError):
                 recs.append(json.loads(line))
-            except json.JSONDecodeError:
-                pass
     if args.metric:
         recs = [r for r in recs if r.get("metric") == args.metric]
     if args.ticker:

@@ -28,7 +28,6 @@ import datetime as dt
 import html
 import json
 import os
-import sys
 import urllib.request
 
 YF_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{t}?range=1d&interval=1d"
@@ -92,7 +91,7 @@ def discover(root):
 
 def screen(args):
     rows = []
-    only = set(t.strip() for t in args.only.split(",")) if args.only else None
+    only = {t.strip() for t in args.only.split(",")} if args.only else None
 
     for ticker, dcf_path, ana_path in discover(args.root):
         if only and ticker not in only:

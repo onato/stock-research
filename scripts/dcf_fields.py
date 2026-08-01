@@ -113,7 +113,7 @@ def weighted_ivs(dcf):
     out = {}
     for k, v in pw.items():
         kl = k.lower()
-        if kl.startswith("weighted_iv") or kl.startswith("weighted_intrinsic"):
+        if kl.startswith(("weighted_iv", "weighted_intrinsic")):
             n = num(v)
             if n is not None:
                 out[k] = n
@@ -184,7 +184,7 @@ def git_head():
     try:
         return subprocess.run(
             ["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True, text=True, timeout=10, check=False,
         ).stdout.strip() or None
     except OSError:
         return None

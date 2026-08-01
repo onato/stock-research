@@ -5,9 +5,8 @@ in the repo: canonical scale is millions of reporting currency, and unknown
 units yield NULL — never an assumed scale (the SEK.NZ 1000x incident).
 """
 
-from pytest import approx
-
 import schema
+from pytest import approx
 
 
 class TestNormalize:

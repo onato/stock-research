@@ -26,15 +26,20 @@ This file is the CLI and the stable import surface (scan_file, PATTERNS).
 Usage: build_facts.py TICKER [--show]
 """
 
-import sys
 import pathlib
+import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-import schema  # noqa: E402
-from parsers import get_parser  # noqa: E402
-from parsers.base import BaseParser  # noqa: E402
-from parsers.common import (  # noqa: E402,F401  (re-exported API)
-    PATTERNS, COMPILED, parse_num, period_from_filename,
+import contextlib
+
+import schema
+from parsers import get_parser
+from parsers.base import BaseParser
+from parsers.common import (  # noqa: F401  (re-exported API)
+    COMPILED,
+    PATTERNS,
+    parse_num,
+    period_from_filename,
 )
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
@@ -88,10 +93,8 @@ def main():
     # Migration shim: schema.py now declares currency in the facts DDL, but
     # DBs created before that lack the column. Remove once every ticker DB
     # has been rebuilt at least once.
-    try:
+    with contextlib.suppress(Exception):
         con.execute("ALTER TABLE facts ADD COLUMN currency TEXT")
-    except Exception:
-        pass
     con.execute("DELETE FROM facts")
     if facts:
         con.executemany(

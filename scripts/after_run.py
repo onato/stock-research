@@ -67,7 +67,7 @@ def latest_scorecard(ticker):
 def run(cmd):
     try:
         return subprocess.run(cmd, capture_output=True, text=True,
-                              cwd=REPO, timeout=120).stdout
+                              cwd=REPO, timeout=120, check=False).stdout
     except Exception as e:
         return f"(failed: {e})"
 
@@ -124,8 +124,8 @@ def main():
     # A check warning on several tickers at once is systemic, not a quirk.
     for cid, n in problems.most_common():
         if n >= max(2, len(tickers) // 2):
-            actions.append((1, f"{cid} warns on {n}/{len(tickers)} tickers "
-                               f"— likely systemic, not per-ticker"))
+            actions.append((1, (f"{cid} warns on {n}/{len(tickers)} tickers "
+                                "— likely systemic, not per-ticker")))
 
     # Extractor gaps: the improvements log is the backlog of missing patterns.
     gaps = run(["python3", str(SCRIPTS / "log_gap.py"), "--report"])
@@ -140,8 +140,8 @@ def main():
                 break
             metric_lines.append(line.strip())
     if metric_lines:
-        actions.append((2, f"build_facts.py is missing {len(metric_lines)} "
-                           f"pattern(s) — see `make gaps`"))
+        actions.append((2, (f"build_facts.py is missing {len(metric_lines)} "
+                            "pattern(s) — see `make gaps`")))
 
     if not actions:
         print("  Nothing flagged. Clean batch.")
