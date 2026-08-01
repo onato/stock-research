@@ -77,7 +77,9 @@ COMPILED = {m: [re.compile(p, re.I) for p in pats] for m, pats in PATTERNS.items
 NUM = r"\(?-?[\d,]+\.?\d*\)?|—|–|-"
 LINE_RE = re.compile(
     r"^(?P<label>[A-Za-z][A-Za-z0-9 ,.&/()'\-]{2,60}?)\s{2,}"
-    r"(?P<rest>(?:\s*(?:" + NUM + r"))+)\s*$"
+    # Tokens must be whitespace-separated: (?:\s*NUM)+ lets the regex
+    # engine re-partition long digit runs exponentially on failing lines.
+    r"(?P<rest>(?:" + NUM + r")(?:\s+(?:" + NUM + r"))*)\s*$"
 )
 UNITS_RE = re.compile(
     r"\b(?:in|expressed in|amounts in)?\s*"
