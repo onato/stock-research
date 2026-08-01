@@ -150,6 +150,15 @@ def collect(facts, concepts):
                 # Prefer an annual statement over a 10-Q restatement, a
                 # later filing over an earlier one, and an earlier-listed
                 # concept over a later one.
+                #
+                # "Later filing wins" is what makes per-share history
+                # survive splits. Netflix's 10-for-1 means FY2024 EPS is
+                # tagged 19.83 in the 2024 10-K and 1.98 in the 2025 one;
+                # taking the newer value keeps the whole EPS series on
+                # today's share basis, so it stays comparable year to year
+                # and divides into the current quoted price. A figure that
+                # disagrees with contemporaneous headlines is expected
+                # here, not a bug.
                 rank = (f.get("form") == "10-K", f.get("filed", ""), -pref)
                 if p not in out or rank > out[p][1]:
                     out[p] = (f["val"], rank)

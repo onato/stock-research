@@ -110,6 +110,64 @@ CREATE TABLE IF NOT EXISTS core_metrics (
   PRIMARY KEY (period)
 );
 
+-- Cross-ticker comparison needs one scale. Tickers arrive with several:
+-- SEC XBRL gives absolute dollars, NZX filings are usually thousands, and
+-- some existing CSVs are already in millions. Recording `units` is not
+-- enough on its own -- something has to normalise, or a query ranking by
+-- revenue compares 22 against 45,183,036,000.
+--
+-- This view is the comparable surface. Query it, not core_metrics, when
+-- ranking across tickers. Per-share figures (eps, dividend_per_share) and
+-- percentages are never scaled.
+--
+-- NOTE: the view references core_metrics unqualified, so ATTACHing several
+-- ticker DBs at once makes it ambiguous and DuckDB resolves it against the
+-- wrong catalog. For cross-ticker work, open each DB separately and union
+-- the results client-side (see scripts/screen_metrics.py) rather than
+-- ATTACHing them together.
+CREATE OR REPLACE VIEW metrics_normalized AS
+WITH scaled AS (
+  SELECT *,
+    CASE lower(units)
+      WHEN 'absolute'         THEN 1e-6
+      WHEN 'absolute dollars' THEN 1e-6
+      WHEN 'units'            THEN 1e-6
+      WHEN 'thousands'        THEN 1e-3
+      WHEN 'millions'         THEN 1.0
+      WHEN 'billions'         THEN 1e3
+      -- Unrecorded units are NULL, not assumed. Defaulting to millions
+      -- silently produced 1000x errors: SEK.NZ files in thousands and
+      -- read as NZ$411bn of revenue for a company that makes ~NZ$400m.
+      -- A missing row is obvious; a plausible wrong one is not.
+      ELSE NULL
+    END AS k
+  FROM core_metrics
+)
+SELECT
+  period, currency, units AS units_raw,
+  -- money columns, all in millions of the reporting currency
+  revenue * k              AS revenue,
+  cost_of_revenue * k      AS cost_of_revenue,
+  gross_profit * k         AS gross_profit,
+  operating_income * k     AS operating_income,
+  ebitda * k               AS ebitda,
+  net_income * k           AS net_income,
+  operating_cash_flow * k  AS operating_cash_flow,
+  capex * k                AS capex,
+  free_cash_flow * k       AS free_cash_flow,
+  shareholders_equity * k  AS shareholders_equity,
+  total_assets * k         AS total_assets,
+  total_liabilities * k    AS total_liabilities,
+  total_debt * k           AS total_debt,
+  cash_and_equivalents * k AS cash_and_equivalents,
+  stock_based_comp * k     AS stock_based_comp,
+  -- share counts scale with the same factor
+  shares_outstanding * k   AS shares_outstanding,
+  -- per-share and percentage figures are scale-free
+  eps, dividend_per_share,
+  gross_margin, operating_margin, net_margin
+FROM scaled;
+
 -- Company-specific metrics that cannot be a fixed column set.
 CREATE TABLE IF NOT EXISTS kpis (
   period TEXT,

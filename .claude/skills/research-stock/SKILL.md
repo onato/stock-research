@@ -111,11 +111,21 @@ Store extracted text in: ./$ARGUMENTS/Extracted/
 ### Step 5a: Build the facts table first (fast, no model)
 
 ```bash
-python3 scripts/build_facts.py "$ARGUMENTS"
+python3 scripts/extract.py "$ARGUMENTS"
 ```
 
-One linear pass over `Extracted/*.txt`, writing candidate values to
-`./$ARGUMENTS/Reports/$ARGUMENTS.duckdb`. Takes ~1 second for 18 filings.
+This picks the extraction path for the ticker's exchange:
+
+- **US filers** (bare symbol, no suffix) → SEC XBRL `companyfacts`. Returns
+  typed facts with exact periods and units, written straight to
+  `core_metrics`. No adjudication needed — the data is already resolved.
+- **Everything else** (`.NZ`, `.AX`, `.HK`, `.L`, …) → text extraction from
+  `Extracted/*.txt` into the `facts` table, for the agent to adjudicate.
+
+It falls back from XBRL to text automatically when SEC has no coverage (ADRs,
+foreign private issuers), and logs a gap when neither path produces anything.
+
+Writes to `./$ARGUMENTS/Reports/$ARGUMENTS.duckdb`. Takes ~1 second.
 
 **This must run before the financial-parser agent is spawned.** The agent
 queries the facts table instead of grepping the filings — that search
@@ -400,25 +410,28 @@ Add a `sanity_check` block to the DCF JSON regardless of pass/fail:
 
 This makes the fix auditable and surfaces in future runs whether assumptions have drifted back into unrealistic territory.
 
-## Step 9: Update Index Page
+## Step 9: Update Company Registry + Index Page
 
 **Always run after dashboard generation.**
 
-Update the stock index at `./index.html` to include this ticker. The index contains a JavaScript `stocks` array with entries like:
+`./index.html` is GENERATED output (the searchable screener leaderboard,
+written by `.claude/skills/screen-investments/screen.py --html`) — never edit
+it directly. Company names and sectors live in `./state/companies.json`:
 
-```js
-{ ticker: "AAPL", name: "Apple Inc.", sector: "Technology", dashboard: true, metrics: true, analysis: true, dcf: true }
+```json
+{ "AAPL": { "name": "Apple Inc.", "sector": "Consumer Electronics / Services" } }
 ```
 
-1. Read `./index.html` and check if `$ARGUMENTS` already exists in the `stocks` array
-2. If not present, add a new entry with:
-   - `ticker`: `$ARGUMENTS`
-   - `name`: Company name from the Analysis JSON
-   - `sector`: Short sector label from the Analysis JSON
-   - `dashboard`, `metrics`, `analysis`, `dcf`: `true`/`false` based on which report files exist
-3. Insert the entry in **alphabetical order by ticker** (numbers before letters, e.g. "0285.HK" before "ASML")
-4. Update the subtitle count: find `${stocks.length} companies tracked` - the template literal auto-updates, so no change needed
-5. If already present, update the `name` and `sector` fields in case they changed
+1. Read `./state/companies.json` and check if `$ARGUMENTS` has an entry
+2. Add or update it: `name` = company name from the Analysis JSON, `sector` =
+   short sector label from the Analysis JSON (keys stay alphabetically sorted)
+3. Regenerate the index without hitting the network:
+
+```bash
+python3 .claude/skills/screen-investments/screen.py --html "$(pwd)/index.html"
+```
+
+(Stored prices are fine here — the weekend screener refreshes live prices.)
 
 ## Final Checklist
 

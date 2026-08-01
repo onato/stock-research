@@ -75,6 +75,26 @@ repeating it is what made this step the most expensive part of the workflow
 Your job is **adjudication, not search**: the extractor deliberately emits
 every candidate and never decides between them.
 
+### Step 0 — check whether the work is already done
+
+US filers are extracted from SEC XBRL, which arrives already typed: exact
+periods, resolved units, no competing candidates. In that case `core_metrics`
+is **already populated** and `facts` is empty.
+
+```bash
+duckdb ./{TICKER}/Reports/{TICKER}.duckdb -c "
+  SELECT (SELECT count(*) FROM core_metrics) AS core,
+         (SELECT count(*) FROM facts)        AS candidates"
+```
+
+- **`core` > 0, `candidates` = 0** — XBRL path. Do **not** re-derive these
+  numbers from the filings; they are the filer's own tagged values. Your job
+  is only to add company-specific KPIs to the `kpis` table (Step 6's business
+  metrics) and export the CSV. Skip to the Output section.
+- **`candidates` > 0** — text path. Adjudicate, as below.
+- **both 0** — neither path worked; read the filings directly and log a gap
+  (see Fallback).
+
 ### Step 1 — see what was found
 
 ```bash
