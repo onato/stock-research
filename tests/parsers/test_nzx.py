@@ -84,6 +84,23 @@ class TestStatedCurrency:
         assert {f["currency"] for f in facts} == {"AUD"}
 
 
+class TestProseFigureBacklog:
+    import pytest
+
+    @pytest.mark.xfail(
+        strict=False,
+        reason="Known gap (state/improvements.jsonl): SUM.NZ interims state "
+               "headline figures only in prose; the cell-segmentation model "
+               "has no prose extraction. Backlog, not a regression.")
+    def test_prose_stated_profit(self):
+        text = ("We are pleased to have recorded a\n"
+                "$127.2 million IFRS net profit after\n"
+                "tax for the first half of 2025\n")
+        facts = list(parser().scan(text, "SUM.NZ_HalfYear_H1-2025.txt"))
+        assert any(f["metric"] == "NetIncome" and f["value_raw"] == 127.2
+                   for f in facts)
+
+
 class TestNoteColumnStillWorks:
     def test_note_refs_skipped(self, fixture_text):
         facts = scan(fixture_text, "AGL_note_column.txt")

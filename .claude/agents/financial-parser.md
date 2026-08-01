@@ -188,12 +188,15 @@ python3 scripts/log_gap.py --ticker {TICKER} \
 
 Log one entry per distinct gap — not one per file, and not one per period. The
 useful signal is *"this metric's wording isn't matched"*, which a human then
-turns into a regex in `build_facts.py`.
+turns into a regex in `scripts/parsers/common.py` (metric vocabulary, shared by
+all exchanges) or a fix in `scripts/parsers/{exchange}.py` (one exchange's
+layout/units quirk).
 
-**Do not edit `build_facts.py`, this file, or the skill yourself.** They are
-shared across concurrent runs and encode corrections learned from past
-mistakes; a subagent rewriting them mid-run risks silently losing that. Record
-the observation and move on — the log is reviewed separately.
+**Do not edit `build_facts.py`, anything under `scripts/parsers/`, this file,
+or the skill yourself.** They are shared across concurrent runs and encode
+corrections learned from past mistakes (each guarded by tests in
+`tests/parsers/`); a subagent rewriting them mid-run risks silently losing
+that. Record the observation and move on — the log is reviewed separately.
 
 ## Output Format
 
