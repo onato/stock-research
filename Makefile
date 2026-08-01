@@ -20,7 +20,8 @@ LEADERBOARD ?= 15   # rows shown by `make screen`
 
 .DEFAULT_GOAL := help
 .PHONY: help run digest status screen research facts evals evals-all \
-        cost gaps exchange-eval facts-xbrl screen-metrics check-currency ledger ledger-backfill queue-prune
+        cost gaps exchange-eval facts-xbrl screen-metrics check-currency ledger ledger-backfill queue-prune \
+        test test-country
 
 help: ## Show this help
 	@echo "Usage: make <target> [TICKER=XYZ] [TICKERS=4] [PARALLEL=2]"
@@ -93,6 +94,13 @@ evals: ## Tier-1 eval for one ticker (TICKER=AGL.NZ)
 
 evals-all: ## Tier-1 eval for every ticker; scorecards to state/scores/
 	python3 $(SCRIPTS)/run_evals.py --all
+
+test: ## Run the deterministic test suite (gates every commit touching scripts/)
+	python3 -m pytest
+
+test-country: ## One country's parser tests (COUNTRY=nzx)
+	@test -n "$(COUNTRY)" || { echo "usage: make test-country COUNTRY=nzx" >&2; exit 2; }
+	python3 -m pytest tests/parsers/test_$(COUNTRY).py -v
 
 cost: ## Per-ticker cost report from run transcripts
 	python3 $(SCRIPTS)/cost_report.py
