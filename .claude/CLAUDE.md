@@ -58,6 +58,12 @@ around one exchange's quirk.
 `make` is the interface — `run`, `research`, `facts`, `evals`, `screen`, `status`,
 `test`, `lint`. Don't invoke scripts ad hoc when a target exists.
 
+## Commits
+
+Follow [Conventional Commits](https://www.conventionalcommits.org): `type: description`
+(`feat:`, `fix:`, `test:`, `refactor:`, `docs:`, `chore:`, `style:`). Do **not** use the
+optional parenthesized scope — `fix: currency detection`, never `fix(parsers): ...`.
+
 ## Testing — strict TDD for deterministic code
 
 All code under `scripts/` is deterministic and test-covered (`tests/`, pytest via
