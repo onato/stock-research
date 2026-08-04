@@ -15,6 +15,8 @@ for d in "$REPO"/research/*/; do
   fi
 done
 
-echo "=== nightly fetch $(date '+%F %T') — ${#TICKERS[@]} tickers ==="
-"$HERE/run.sh" "${TICKERS[@]}"
+SEEDS=($(python3 "$HERE/next_new.py" 3))
+
+echo "=== nightly fetch $(date '+%F %T') — ${#TICKERS[@]} updates + ${#SEEDS[@]} seeds (${SEEDS[*]:-none}) ==="
+"$HERE/run.sh" "${TICKERS[@]}" "${SEEDS[@]}"
 echo "=== done $(date '+%F %T') ==="
