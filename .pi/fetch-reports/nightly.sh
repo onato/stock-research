@@ -7,6 +7,13 @@ export PATH="$HOME/.local/share/mise/shims:$HOME/.local/share/mise/installs/node
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 
+LOCK="$HERE/.nightly.lock"
+if ! mkdir "$LOCK" 2>/dev/null; then
+  echo "another nightly run is active ($LOCK exists) — exiting"
+  exit 0
+fi
+trap 'rmdir "$LOCK"' EXIT
+
 TICKERS=()
 for d in "$REPO"/research/*/; do
   t="$(basename "$d")"
