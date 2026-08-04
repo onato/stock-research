@@ -1,7 +1,12 @@
 #!/bin/bash
 # Nightly gated report fetch over the international tickers (US bare symbols are
 # excluded — EDGAR is handled deterministically by the main pipeline).
-# Run by launchd: ~/Library/LaunchAgents/com.swilliams.fetch-reports.plist
+# Run by launchd at 02:00: ~/Library/LaunchAgents/com.swilliams.fetch-reports.plist
+#
+# Modes:
+#   nightly.sh      update pass for all researched tickers, then seed the queue
+#                   in batches of 3 until 05:45 (at least one batch regardless)
+#   nightly.sh N    continuous: seed batches of N until stopped or queue dry
 set -u
 export PATH="$HOME/.local/share/mise/shims:$HOME/.local/share/mise/installs/node/23.0.0/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -23,25 +28,31 @@ for d in "$REPO"/research/*/; do
 done
 
 BATCH="${1:-}"
+ATTEMPTED=""
+
+seed_batch() {  # $1 = batch size; returns 1 when the queue is exhausted
+  local seeds=($(python3 "$HERE/next_new.py" "$1" --exclude "${ATTEMPTED#,}"))
+  [ ${#seeds[@]} -eq 0 ] && return 1
+  echo "=== seeding $(date '+%F %T') — ${seeds[*]} ==="
+  /usr/bin/caffeinate -s "$HERE/run.sh" "${seeds[@]}"
+  local t; for t in "${seeds[@]}"; do ATTEMPTED="$ATTEMPTED,$t"; done
+  return 0
+}
 
 if [ -z "$BATCH" ]; then
-  # Default: one nightly pass — updates for all researched tickers + 3 seeds.
-  SEEDS=($(python3 "$HERE/next_new.py" 3))
-  echo "=== nightly fetch $(date '+%F %T') — ${#TICKERS[@]} updates + ${#SEEDS[@]} seeds (${SEEDS[*]:-none}) ==="
-  "$HERE/run.sh" "${TICKERS[@]}" "${SEEDS[@]}"
+  # Default nightly pass: updates first, then seed until 05:45 local time
+  # (started at 02:00 that means roughly four hours of work, ending near 06:00).
+  echo "=== nightly fetch $(date '+%F %T') — ${#TICKERS[@]} updates ==="
+  /usr/bin/caffeinate -s "$HERE/run.sh" "${TICKERS[@]}"
+  seed_batch 3 || echo "queue exhausted"
+  while [ "$(date '+%H%M')" -lt 0545 ]; do
+    seed_batch 3 || { echo "queue exhausted"; break; }
+  done
   echo "=== done $(date '+%F %T') ==="
 else
-  # Continuous mode: `nightly.sh N` seeds the queue in batches of N until the
-  # queue runs dry or the process is stopped (Ctrl-C, or: pkill -f nightly.sh).
-  # caffeinate -s keeps the Mac awake (AC power) for as long as this runs.
-  ATTEMPTED=""
-  batch_no=0
-  while :; do
-    SEEDS=($(python3 "$HERE/next_new.py" "$BATCH" --exclude "${ATTEMPTED#,}"))
-    [ ${#SEEDS[@]} -eq 0 ] && { echo "=== queue exhausted after $batch_no batches $(date '+%F %T') ==="; break; }
-    batch_no=$((batch_no + 1))
-    echo "=== batch $batch_no $(date '+%F %T') — seeding: ${SEEDS[*]} ==="
-    /usr/bin/caffeinate -s "$HERE/run.sh" "${SEEDS[@]}"
-    for t in "${SEEDS[@]}"; do ATTEMPTED="$ATTEMPTED,$t"; done
-  done
+  # Continuous mode: batches of N until stopped (Ctrl-C / pkill -f nightly.sh)
+  # or the queue runs dry.
+  n=0
+  while seed_batch "$BATCH"; do n=$((n + 1)); done
+  echo "=== queue exhausted after $n batches $(date '+%F %T') ==="
 fi
