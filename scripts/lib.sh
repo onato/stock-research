@@ -96,7 +96,7 @@ commit_ticker() {
     return 0
   fi
 
-  git commit -q -m "feat(screener): $mode research for $ticker
+  git commit -q -m "feat: $mode research for $ticker
 
 Automated local run via scripts/"
   echo "[$ticker] Committed."
