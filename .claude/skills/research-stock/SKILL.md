@@ -2,7 +2,7 @@
 name: research-stock
 description: Downloads financial reports from company IR website, extracts data, and creates a CSV-backed HTML dashboard for stock research
 allowed-tools: Bash, Read, Write, Edit, WebFetch, WebSearch, Glob, Grep, Task
-argument-hint: [TICKER]
+argument-hint: "[TICKER]"
 ---
 
 # Stock Research Workflow

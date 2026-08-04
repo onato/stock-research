@@ -2,7 +2,7 @@
 name: screen-investments
 description: Ranks every ticker in the research folder by DCF upside (intrinsic value vs current price), refreshes prices live, flags stale/drifted data, and recommends the top N best risk-adjusted investments. Use when asked to compare the whole portfolio, find the most promising/undervalued names, or pick the top picks given current prices.
 allowed-tools: Bash, Read, Glob, Agent
-argument-hint: [N picks, default 3] [--max-upside | --quality]
+argument-hint: "[N picks, default 3] [--max-upside | --quality]"
 ---
 
 # Investment Screen — Top Picks Across the Research Folder
