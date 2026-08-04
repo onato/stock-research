@@ -448,6 +448,16 @@ produced no metrics at all:
   the background; I'll launch the financial parser as soon as it finishes."*
 - *"OCR is on the final file (FY2017, mid-write). Waiting for it to
   complete before building the facts table."*
+- *"The financial-parser and qualitative-analyst agents are still running
+  in the background — I'll continue the pipeline as soon as their results
+  arrive."* — APL.NZ: the harness terminated them at its 600s background
+  ceiling; no core_metrics, no CSV, no DCF, no dashboard.
+
+**This applies to subagents too.** Spawn financial-parser and
+qualitative-analyst with `run_in_background: false` — issuing both Agent
+calls in ONE message still runs them concurrently, so nothing is lost by
+waiting. Never end a turn while a subagent is pending: in a headless batch
+there is no later turn for its results to arrive in.
 
 If a step is genuinely slow, **wait for it** — run it in the foreground and
 let it take the time. If something cannot complete, say so plainly and stop;

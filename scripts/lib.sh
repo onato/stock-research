@@ -39,6 +39,13 @@ When finished, reply with at most two sentences stating the ticker and \
 the files written -- the dashboard and reports are the deliverable, so \
 do not summarize their contents."
 
+  # Backstop for the skill's "never end your turn with work still running"
+  # rule: if the model backgrounds a subagent anyway, wait for it instead of
+  # letting the harness terminate it at the default 600s ceiling — that
+  # killed APL.NZ's financial-parser mid-adjudication (2026-08-04). The
+  # run's own wall-clock timeout still bounds the wait.
+  export CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0
+
   # stream-json emits one event per line as work proceeds, so a ~40min run
   # is observable instead of silent. Without it, plain -p buffers everything
   # until completion, which is indistinguishable from a hang.
@@ -96,10 +103,26 @@ commit_ticker() {
     return 0
   fi
 
-  git commit -q -m "feat: $mode research for $ticker
+  # Partial output is still worth committing (extracted text is the durable
+  # copy; PDFs are gitignored) but must not masquerade as finished research:
+  # APL.NZ/AOF.NZ landed as "feat: new research" with no DCF or dashboard.
+  # research_one.sh separately fails the run so the joblog records it.
+  local missing=""
+  for want in Metrics.csv DCF.json Dashboard.html; do
+    [ -s "research/$ticker/Reports/${ticker}_$want" ] || missing="$missing $want"
+  done
+
+  if [ -n "$missing" ]; then
+    git commit -q -m "wip: partial research for $ticker -- missing$missing
+
+Automated local run via scripts/; incomplete, needs a re-run."
+    echo "[$ticker] Committed PARTIAL output (missing$missing)."
+  else
+    git commit -q -m "feat: $mode research for $ticker
 
 Automated local run via scripts/"
-  echo "[$ticker] Committed."
+    echo "[$ticker] Committed."
+  fi
 
   if [ "$PUSH" = "1" ]; then
     git pull -q --rebase --autostash && git push -q && echo "[$ticker] Pushed."
