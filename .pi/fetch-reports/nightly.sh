@@ -22,8 +22,26 @@ for d in "$REPO"/research/*/; do
   fi
 done
 
-SEEDS=($(python3 "$HERE/next_new.py" 3))
+BATCH="${1:-}"
 
-echo "=== nightly fetch $(date '+%F %T') — ${#TICKERS[@]} updates + ${#SEEDS[@]} seeds (${SEEDS[*]:-none}) ==="
-"$HERE/run.sh" "${TICKERS[@]}" "${SEEDS[@]}"
-echo "=== done $(date '+%F %T') ==="
+if [ -z "$BATCH" ]; then
+  # Default: one nightly pass — updates for all researched tickers + 3 seeds.
+  SEEDS=($(python3 "$HERE/next_new.py" 3))
+  echo "=== nightly fetch $(date '+%F %T') — ${#TICKERS[@]} updates + ${#SEEDS[@]} seeds (${SEEDS[*]:-none}) ==="
+  "$HERE/run.sh" "${TICKERS[@]}" "${SEEDS[@]}"
+  echo "=== done $(date '+%F %T') ==="
+else
+  # Continuous mode: `nightly.sh N` seeds the queue in batches of N until the
+  # queue runs dry or the process is stopped (Ctrl-C, or: pkill -f nightly.sh).
+  # caffeinate -s keeps the Mac awake (AC power) for as long as this runs.
+  ATTEMPTED=""
+  batch_no=0
+  while :; do
+    SEEDS=($(python3 "$HERE/next_new.py" "$BATCH" --exclude "${ATTEMPTED#,}"))
+    [ ${#SEEDS[@]} -eq 0 ] && { echo "=== queue exhausted after $batch_no batches $(date '+%F %T') ==="; break; }
+    batch_no=$((batch_no + 1))
+    echo "=== batch $batch_no $(date '+%F %T') — seeding: ${SEEDS[*]} ==="
+    /usr/bin/caffeinate -s "$HERE/run.sh" "${SEEDS[@]}"
+    for t in "${SEEDS[@]}"; do ATTEMPTED="$ATTEMPTED,$t"; done
+  done
+fi
