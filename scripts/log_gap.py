@@ -18,8 +18,16 @@ Usage (from an agent):
              --detail "filing says 'Net cash inflow from operating activities'" \
              --example "AFC.NZ_Annual_FY2026.txt:1042"
 
-  log_gap.py --report            # grouped summary, most common first
+  log_gap.py --report            # grouped summary of OPEN entries
   log_gap.py --report --metric EBITDA
+  log_gap.py --list              # open entries, numbered by file line
+  log_gap.py --list --all        # include resolved ones
+
+Closure (for the human review loop) keeps the file append-only: resolving
+appends a {"resolves": <line>, "note": ...} record instead of editing the
+entry, so history survives while reports show only the open backlog:
+
+  log_gap.py --resolve 12 --note "handled by parsers/lse.py units fix"
 """
 
 import argparse
@@ -59,30 +67,91 @@ def add(args):
     return 0
 
 
-def report(args):
-    if not LOG.exists():
-        print("no gaps logged yet")
-        return 0
-    recs = []
-    with open(LOG, errors="replace") as fh:
-        for raw in fh:
-            if line := raw.strip():
+def load():
+    """(open_entries, resolutions) with file line numbers attached.
+
+    An entry is open unless a later {"resolves": <line>} record names its
+    line. Resolutions are appended, never edited in place — the log stays
+    append-only for agents and history survives closure.
+    """
+    entries, resolutions = [], {}
+    if LOG.exists():
+        with open(LOG, errors="replace") as fh:
+            for lineno, raw in enumerate(fh, 1):
+                if not raw.strip():
+                    continue
                 with contextlib.suppress(json.JSONDecodeError):
-                    recs.append(json.loads(line))
+                    rec = json.loads(raw)
+                    if "resolves" in rec:
+                        resolutions[int(rec["resolves"])] = rec
+                    else:
+                        rec["_line"] = lineno
+                        entries.append(rec)
+    open_ = [r for r in entries if r["_line"] not in resolutions]
+    return entries, open_, resolutions
+
+
+def resolve(args):
+    entries, _open, resolutions = load()
+    target = int(args.resolve)
+    if target in resolutions:
+        print(f"entry #{target} is already resolved "
+              f"({resolutions[target].get('note', '')})", file=sys.stderr)
+        return 1
+    if not any(r["_line"] == target for r in entries):
+        print(f"no gap entry at line {target} (see --list)", file=sys.stderr)
+        return 1
+    rec = {
+        "ts": dt.datetime.now().isoformat(timespec="seconds"),
+        "resolves": target,
+        "note": args.note,
+    }
+    with open(LOG, "a") as fh:
+        fh.write(json.dumps(rec) + "\n")
+    print(f"resolved #{target}: {args.note}")
+    return 0
+
+
+def list_entries(args):
+    entries, open_, resolutions = load()
+    show = entries if args.all else open_
+    if args.ticker:
+        show = [r for r in show if r.get("ticker") == args.ticker]
+    if not show:
+        print("no open entries" if not args.all else "no entries")
+        return 0
+    for r in show:
+        res = resolutions.get(r["_line"])
+        mark = f"  [resolved: {res.get('note', '')}]" if res else ""
+        print(f"#{r['_line']:<4d} {r.get('ts', '')[:16]}  {r.get('ticker', ''):9s} "
+              f"{r.get('kind', '?'):16s} {r.get('metric') or '-'}{mark}")
+        if r.get("detail"):
+            print(f"      {r['detail'][:100]}")
+        if r.get("example"):
+            print(f"      e.g. {r['example'][:80]}")
+    return 0
+
+
+def report(args):
+    _, recs, resolutions = load()
     if args.metric:
         recs = [r for r in recs if r.get("metric") == args.metric]
     if args.ticker:
         recs = [r for r in recs if r.get("ticker") == args.ticker]
 
     if not recs:
-        print("no matching entries")
+        print("no open entries"
+              + (f" ({len(resolutions)} resolved; --list --all shows them)"
+                 if resolutions else ""))
         return 0
 
     by_kind = collections.Counter(r.get("kind") for r in recs)
     by_metric = collections.Counter(r.get("metric") for r in recs if r.get("metric"))
     tickers = collections.Counter(r.get("ticker") for r in recs)
 
-    print(f"{len(recs)} observation(s) across {len(tickers)} ticker(s)\n")
+    resolved_note = f", {len(resolutions)} resolved" if resolutions else ""
+    print(f"{len(recs)} open observation(s) across {len(tickers)} ticker(s)"
+          f"{resolved_note}\n")
     print("  by kind:")
     for k, n in by_kind.most_common():
         print(f"    {n:4d}  {k}")
@@ -113,8 +182,19 @@ def main():
     p.add_argument("--detail", default="")
     p.add_argument("--example", default="", help="file:line showing the case")
     p.add_argument("--report", action="store_true")
+    p.add_argument("--list", action="store_true", dest="list_",
+                   help="numbered open entries (IDs for --resolve)")
+    p.add_argument("--all", action="store_true",
+                   help="with --list: include resolved entries")
+    p.add_argument("--resolve", default="", metavar="N",
+                   help="close entry #N (appends a resolution record)")
+    p.add_argument("--note", default="", help="with --resolve: what fixed it")
     args = p.parse_args()
 
+    if args.resolve:
+        return resolve(args)
+    if args.list_:
+        return list_entries(args)
     if args.report:
         return report(args)
     if not args.ticker:
