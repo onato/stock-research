@@ -13,13 +13,20 @@ STAGING="$HERE/staging/$TICKER"
 mkdir -p "$STAGING"
 rm -f "$STAGING"/*.pdf 2>/dev/null
 
+# Resolve the company name deterministically (Yahoo) and persist it — LSE codes
+# like BNZL are not guessable from the ticker, and this also arms gate.py's
+# company-name check for this run.
+COMPANY=$(python3 "$HERE/resolve_name.py" "$TICKER")
+echo "company: $COMPANY"
+
 INVENTORY=$(python3 "$HERE/missing.py" "$TICKER")
 QUIRK=$(python3 -c "
-import json,sys
+import json
 q=json.load(open('$HERE/quirks.json'))
 t='$TICKER'
 notes=[q[t]] if t in q else []
 if t.endswith('.NZ'): notes.append(q['_default_nz'].replace('{CODE}', t.split('.')[0]))
+if t.endswith('.L'): notes.append(q['_default_l'])
 print(' '.join(notes))")
 
 cd "$STAGING"   # bare-filename downloads land in staging by construction
@@ -28,7 +35,7 @@ cd "$STAGING"   # bare-filename downloads land in staging by construction
 /usr/bin/perl -e 'alarm shift; exec @ARGV' 900 \
 pi -p --no-session --provider ollama --model "gpt-oss-20b-64k:latest" \
   --tools read,bash,write,ls,find,grep,web_search,fetch_content \
-  "Find and download newer financial reports for $TICKER.
+  "Find and download newer financial reports for $COMPANY (ticker $TICKER). Search by the company name, not the ticker symbol.
 
 What we already hold (do NOT re-download these or anything older):
 $INVENTORY
@@ -37,18 +44,18 @@ Source notes: ${QUIRK:-none}
 
 $(if echo "$INVENTORY" | grep -q "no filings"; then cat <<SEED
 Task (initial seeding — we hold nothing for this company):
-1. Use web_search to find the company's investor-relations / results page.
+1. Use web_search to find the investor-relations / results page of $COMPANY.
 2. Download the annual report PDF for each of the last 8 fiscal years (or as many as are published), plus the most recent half-year or quarterly report, with bash + curl (browser User-Agent, follow redirects) into this exact directory: $STAGING
 3. Name each file exactly: ${TICKER}_{Type}_{Period}.pdf where Type is Annual, HalfYear, Quarterly, or Presentation and Period is like FY2024 or H1-2026 (fiscal year labels, four-digit years).
 SEED
 else cat <<UPDATE
 Task:
-1. Use web_search to find the company's investor-relations / results page and check whether any annual or half-year/quarterly report NEWER than the newest period listed above has been published.
+1. Use web_search to find the investor-relations / results page of $COMPANY and check whether any annual or half-year/quarterly report NEWER than the newest period listed above has been published.
 2. If yes, download each new report PDF with bash + curl (browser User-Agent, follow redirects) into this exact directory: $STAGING
 3. Name each file exactly: ${TICKER}_{Type}_{Period}.pdf where Type is Annual, HalfYear, Quarterly, or Presentation, and Period follows the same style as the periods listed above (e.g. FY2026, H1-2026).
 UPDATE
 fi)
-4. Verify each download is a real PDF with the file command; delete anything that is not.
+4. Verify each download is a real PDF with the file command; delete anything that is not. Also verify it is a report OF $COMPANY — if the PDF is about a different company, delete it.
 5. If nothing suitable is published, download nothing — that is a fine outcome. Say NOTHING-NEW.
 Rules: write only inside $STAGING. Never run make, git, claude, or a nested pi. Finish by listing the files you downloaded (or NOTHING-NEW)." \
   2>&1 | tail -20
