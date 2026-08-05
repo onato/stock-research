@@ -73,6 +73,21 @@ def check(path: Path, ticker: str, company: str, dest: Path) -> str | None:
     return None
 
 
+def extract(pdf: Path, ticker: str) -> None:
+    """Deterministic pipeline step 4: promoted PDFs get extracted immediately,
+    so seeded tickers arrive Claude-ready. No model involved."""
+    out_dir = REPO / "research" / ticker / "Extracted"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / (pdf.stem + ".txt")
+    if out.exists():
+        return
+    try:
+        subprocess.run(["pdftotext", "-layout", str(pdf), str(out)],
+                       capture_output=True, timeout=300, check=True)
+    except Exception as e:
+        print(f"  extract-failed {pdf.name}: {e}")
+
+
 def main(ticker: str) -> int:
     staging = HERE / "staging" / ticker
     quarantine = HERE / "quarantine" / ticker
@@ -92,6 +107,7 @@ def main(ticker: str) -> int:
         reason = check(f, ticker, company, dest)
         if reason is None:
             shutil.move(str(f), dest / f.name)
+            extract(dest / f.name, ticker)
             results.append({"file": f.name, "verdict": "promoted"})
         else:
             shutil.move(str(f), quarantine / f.name)
