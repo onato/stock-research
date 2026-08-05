@@ -22,6 +22,9 @@ if t.endswith('.NZ'): notes.append(q['_default_nz'].replace('{CODE}', t.split('.
 print(' '.join(notes))")
 
 cd "$STAGING"   # bare-filename downloads land in staging by construction
+# perl alarm = per-ticker watchdog: a hung tool call (e.g. a filesystem-wide
+# find) kills this ticker after 15 min instead of wedging the whole loop.
+/usr/bin/perl -e 'alarm shift; exec @ARGV' 900 \
 pi -p --no-session --provider ollama --model "gpt-oss-20b-64k:latest" \
   --tools read,bash,write,ls,find,grep,web_search,fetch_content \
   "Find and download newer financial reports for $TICKER.
