@@ -29,6 +29,7 @@ done
 
 BATCH="${1:-}"
 ATTEMPTED=""
+START_TS="$(date +%FT%T)"
 
 seed_batch() {  # $1 = batch size; returns 1 when the queue is exhausted
   local seeds=($(python3 "$HERE/next_new.py" "$1" --exclude "${ATTEMPTED#,}"))
@@ -55,4 +56,18 @@ else
   n=0
   while seed_batch "$BATCH"; do n=$((n + 1)); done
   echo "=== queue exhausted after $n batches $(date '+%F %T') ==="
+fi
+
+# Send a Telegram summary if credentials are configured (telegram.env is
+# gitignored; create it with TELEGRAM_BOT_TOKEN=... and TELEGRAM_CHAT_ID=...).
+if [ -f "$HERE/telegram.env" ]; then
+  . "$HERE/telegram.env"
+  SUMMARY="$(python3 "$HERE/summarize.py" --since "$START_TS")"
+  MODE_LINE="nightly pass"; [ -n "$BATCH" ] && MODE_LINE="continuous run (batch $BATCH)"
+  curl -sf --max-time 30 "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+    --data-urlencode chat_id="${TELEGRAM_CHAT_ID}" \
+    --data-urlencode text="🌙 Report fetch — $MODE_LINE
+$START_TS → $(date +%T)
+
+$SUMMARY" > /dev/null && echo "telegram summary sent" || echo "telegram send FAILED"
 fi
