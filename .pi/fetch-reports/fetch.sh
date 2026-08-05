@@ -32,6 +32,7 @@ print(' '.join(notes))")
 cd "$STAGING"   # bare-filename downloads land in staging by construction
 # perl alarm = per-ticker watchdog: a hung tool call (e.g. a filesystem-wide
 # find) kills this ticker after 15 min instead of wedging the whole loop.
+{
 /usr/bin/perl -e 'alarm shift; exec @ARGV' 900 \
 pi -p --no-session --provider ollama --model "gpt-oss-20b-64k:latest" \
   --tools read,bash,write,ls,find,grep,web_search,fetch_content \
@@ -58,7 +59,11 @@ fi)
 4. Verify each download is a real PDF with the file command; delete anything that is not. Also verify it is a report OF $COMPANY — if the PDF is about a different company, delete it.
 5. If nothing suitable is published, download nothing — that is a fine outcome. Say NOTHING-NEW.
 Rules: write only inside $STAGING. Never run make, git, claude, or a nested pi. Finish by listing the files you downloaded (or NOTHING-NEW)." \
-  2>&1 | tail -20
+  2>&1
+} 2>/dev/null | tail -20
+if [ "${PIPESTATUS[0]}" -eq 142 ]; then
+  echo "watchdog: pi killed after 15 min on $TICKER — will be retried on a later pass"
+fi
 
 for stray in "$REPO/$TICKER"_*.pdf; do   # rescue anything written outside staging
   [ -f "$stray" ] && mv "$stray" "$STAGING/"
