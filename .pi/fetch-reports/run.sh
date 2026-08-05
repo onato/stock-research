@@ -3,6 +3,7 @@
 # Every line is timestamped so a stalled ticker is visible at a glance.
 # Usage: run.sh TICKER [TICKER...]
 set -u
+trap 'echo "interrupted — stopping"; exit 130' INT TERM
 HERE="$(cd "$(dirname "$0")" && pwd)"
 for t in "$@"; do
   start=$(date +%s)

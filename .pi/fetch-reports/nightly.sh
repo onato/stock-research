@@ -8,6 +8,7 @@
 #                   in batches of 3 until 05:45 (at least one batch regardless)
 #   nightly.sh N    continuous: seed batches of N until stopped or queue dry
 set -u
+trap 'echo "interrupted — stopping"; exit 130' INT TERM
 export PATH="$HOME/.local/share/mise/shims:$HOME/.local/share/mise/installs/node/23.0.0/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
