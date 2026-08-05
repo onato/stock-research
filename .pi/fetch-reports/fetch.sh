@@ -5,6 +5,7 @@
 #
 # Usage: fetch.sh TICKER
 set -uo pipefail
+export NODE_OPTIONS="--disable-warning=ExperimentalWarning"   # silence pi's node noise in logs
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 TICKER="$1"

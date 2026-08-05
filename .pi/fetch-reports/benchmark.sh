@@ -5,6 +5,7 @@
 #
 # Usage: benchmark.sh TICKER CUTOFF_YEAR
 set -uo pipefail
+export NODE_OPTIONS="--disable-warning=ExperimentalWarning"   # silence pi's node noise in logs
 HERE="$(cd "$(dirname "$0")" && pwd)"
 TICKER="$1"; CUTOFF="$2"
 STAGING="$HERE/staging/bench-$TICKER"
