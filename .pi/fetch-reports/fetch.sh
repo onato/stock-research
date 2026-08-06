@@ -18,7 +18,9 @@ rm -f "$STAGING"/*.pdf 2>/dev/null
 # company-name check for this run.
 
 finish() {
-  finish
+  printf '%s\t%s\n' "$TICKER" "$(date +%FT%T)" >> "$HERE/logs/attempts.tsv"
+  echo "--- gate ---"
+  python3 "$HERE/gate.py" "$TICKER"
   # Commit this ticker's extracted text + name registry. Uses the repo's mkdir
   # spinlock convention (scripts/lib.sh) so concurrent research runs are safe.
   local lockdir="$REPO/state/git.lock.d" waited=0
@@ -118,7 +120,4 @@ for stray in "$REPO/$TICKER"_*.pdf; do   # rescue anything written outside stagi
   [ -f "$stray" ] && mv "$stray" "$STAGING/"
 done
 
-printf '%s\t%s\n' "$TICKER" "$(date +%FT%T)" >> "$HERE/logs/attempts.tsv"
-
-echo "--- gate ---"
-python3 "$HERE/gate.py" "$TICKER"
+finish
