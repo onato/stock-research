@@ -107,20 +107,20 @@ Source notes: ${QUIRK:-none}
 $(if echo "$INVENTORY" | grep -q "no filings"; then cat <<SEED
 Task (initial seeding — we hold nothing for this company):
 1. Use web_search to find the investor-relations / results page of $COMPANY.
-2. Download the annual report PDF for each of the last 8 fiscal years (or as many as are published), plus the most recent half-year or quarterly report, with bash + curl (browser User-Agent, follow redirects, ALWAYS pass --max-time 120 so a hanging server cannot stall you) into this exact directory: $STAGING
+2. Download the annual report PDF for each of the last 8 fiscal years (or as many as are published), plus the most recent half-year or quarterly report, with bash + curl (browser User-Agent, follow redirects, ALWAYS pass --max-time 120 so a hanging server cannot stall you) into the CURRENT working directory (you are already in the correct staging directory — use './filename.pdf')
 3. Name each file exactly: ${TICKER}_{Type}_{Period}.pdf where Type is Annual, HalfYear, Quarterly, or Presentation and Period is like FY2024 or H1-2026 (fiscal year labels, four-digit years).
 SEED
 else cat <<UPDATE
 Task:
 1. Use web_search to find the investor-relations / results page of $COMPANY and check whether any annual or half-year/quarterly report NEWER than the newest period listed above has been published.
-2. If yes, download each new report PDF with bash + curl (browser User-Agent, follow redirects, ALWAYS pass --max-time 120 so a hanging server cannot stall you) into this exact directory: $STAGING
+2. If yes, download each new report PDF with bash + curl (browser User-Agent, follow redirects, ALWAYS pass --max-time 120 so a hanging server cannot stall you) into the CURRENT working directory (you are already in the correct staging directory — use './filename.pdf')
 3. Name each file exactly: ${TICKER}_{Type}_{Period}.pdf where Type is Annual, HalfYear, Quarterly, or Presentation, and Period follows the same style as the periods listed above (e.g. FY2026, H1-2026).
 UPDATE
 fi)
 4. Verify each download is a real PDF with the file command; delete anything that is not. Also verify it is a report OF $COMPANY — if the PDF is about a different company, delete it.
 5. If nothing suitable is published, download nothing — that is a fine outcome. Say NOTHING-NEW.
-6. Write the URL of the investor-relations / reports page you actually used into a plain-text file named ir_url.txt in the same directory as the PDFs (one line, the URL only).
-Rules: write only inside $STAGING. Never run make, git, claude, or a nested pi. Finish by listing the files you downloaded (or NOTHING-NEW)." \
+6. Write the URL of the investor-relations / reports page you actually used into a plain-text file named ir_url.txt in the current directory (one line, the URL only).
+Rules: you are already in the correct working directory — use RELATIVE paths only ('.', './file.pdf') for every file operation; never use absolute paths and never list or search any directory outside the current one. Never run make, git, claude, or a nested pi. Finish by listing the files you downloaded (or NOTHING-NEW)." \
   2>&1
 } 2>/dev/null | python3 "$HERE/pi_progress.py"
 if [ "${PIPESTATUS[0]}" -eq 142 ]; then
