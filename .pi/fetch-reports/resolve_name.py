@@ -72,7 +72,7 @@ if not name:
     if not name:
         # unresolvable: flag for strong-model curation, keep the old contract
         write(ticker, {"name": "", "needs_review": True,
-                       "needs_review_reason": "yahoo-resolution-failed",
+                       "needs_review_reason": "auto-resolution-failed (yahoo chart+search, openfigi)",
                        "updated_by": "resolve_name.py"})
 
 if name and entry.get("name") != name:
