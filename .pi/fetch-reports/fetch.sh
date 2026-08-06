@@ -16,6 +16,28 @@ rm -f "$STAGING"/*.pdf 2>/dev/null
 # Resolve the company name deterministically (Yahoo) and persist it — LSE codes
 # like BNZL are not guessable from the ticker, and this also arms gate.py's
 # company-name check for this run.
+
+finish() {
+  finish
+  # Commit this ticker's extracted text + name registry. Uses the repo's mkdir
+  # spinlock convention (scripts/lib.sh) so concurrent research runs are safe.
+  local lockdir="$REPO/state/git.lock.d" waited=0
+  while ! mkdir "$lockdir" 2>/dev/null; do
+    sleep 2; waited=$((waited + 2))
+    [ "$waited" -gt 120 ] && { echo "git lock busy — skipping commit for $TICKER"; return 0; }
+  done
+  ( cd "$REPO" &&
+    { git add -A -- "research/$TICKER/Extracted" 2>/dev/null || true; } &&
+    { git add -- state/companies.json 2>/dev/null || true; } &&
+    if ! git diff --cached --quiet; then
+      git commit --quiet -m "chore: fetch filings for $TICKER
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
+      echo "committed: fetch filings for $TICKER"
+    fi )
+  rmdir "$lockdir" 2>/dev/null
+}
+
 COMPANY=$(python3 "$HERE/resolve_name.py" "$TICKER")
 echo "company: $COMPANY"
 
@@ -32,9 +54,7 @@ case "$TICKER" in
       python3 "$HERE/adapters/annualreports.py" "$TICKER" --dest "$STAGING" || true
       STAGED=$(ls "$STAGING"/*.pdf 2>/dev/null | wc -l | tr -d " ")
       if [ "$STAGED" -ge 3 ]; then
-        printf '%s\t%s\n' "$TICKER" "$(date +%FT%T)" >> "$HERE/logs/attempts.tsv"
-        echo "--- gate ---"
-        python3 "$HERE/gate.py" "$TICKER"
+        finish
         exit 0
       fi
       echo "annualreports-adapter: only $STAGED files — falling back to the model (staged files kept)"
@@ -43,9 +63,7 @@ case "$TICKER" in
   *.HK)
     AFTER_YEAR=$(python3 -c "import sys; sys.path.insert(0,'$HERE'); from missing import scan; print(scan('$TICKER')['newest_year'])")
     if python3 "$HERE/adapters/hkex.py" "$TICKER" --dest "$STAGING" --after-year "$AFTER_YEAR"; then
-      printf '%s\t%s\n' "$TICKER" "$(date +%FT%T)" >> "$HERE/logs/attempts.tsv"
-      echo "--- gate ---"
-      python3 "$HERE/gate.py" "$TICKER"
+      finish
       exit 0
     fi
     echo "hkex-adapter failed — falling back to the model"
