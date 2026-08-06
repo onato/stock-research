@@ -49,7 +49,7 @@ def check(path: Path, ticker: str, company: str, dest: Path) -> str | None:
         return f"too-small ({path.stat().st_size} bytes)"
     try:
         text = subprocess.run(
-            ["pdftotext", "-l", "5", str(path), "-"],
+            ["pdftotext", "-l", "10", str(path), "-"],
             capture_output=True, text=True, timeout=120, check=True,
         ).stdout
     except Exception as e:
@@ -57,17 +57,24 @@ def check(path: Path, ticker: str, company: str, dest: Path) -> str | None:
     if len(text.strip()) < 200:
         return "no-extractable-text"
     if company != ticker:  # unknown-name tickers skip this check rather than fail everything
-        name_token = " ".join(company.lower().split()[:2])
-        if name_token not in text.lower():
-            return f"company-name-missing ({name_token!r} not in first 5 pages)"
+        # Calibrated on the 2026-08-05 audit: demand any distinctive name word
+        # (or the ticker base) — covers say "Skellerup", not "Skellerup Holdings".
+        stop = {"the", "plc", "limited", "ltd", "group", "holdings", "company", "corporation"}
+        words = [w.strip("&.,").lower() for w in company.split()]
+        words = [w for w in words if w not in stop and len(w) > 2]
+        base = ticker.split(".")[0].lower()
+        tl = text.lower()
+        if words and not any(w in tl for w in words) and base not in tl:
+            return f"company-name-missing (none of {words[:3]} nor {base!r} in first 10 pages)"
     # Period consistency: a report labeled FY2022/H1-2023 must not be *about* a
     # later period. "…ended 31 December 2023" in an H1-2023 file means mislabeled.
     label_year = max((int(y) for y in re.findall(r"(\d{4})", path.name)), default=0)
     ended = re.findall(r"(?:year|period)\s+end(?:ed|ing)\s+\d{1,2}\s+\w+\s+(\d{4})", text, re.I)
     if ended and max(int(y) for y in ended) > label_year:
         return f"period-mismatch (labeled {label_year}, text reports period ended {max(ended)})"
-    if not ended and str(label_year) not in text:
-        return f"period-unverifiable (no 'ended <date>' phrase and {label_year} absent from first pages)"
+    short = f"fy{label_year % 100}"  # covers say "FY25" as often as "2025"
+    if not ended and str(label_year) not in text and short not in text.lower():
+        return f"period-unverifiable (no 'ended <date>' phrase; neither {label_year} nor {short.upper()} in first pages)"
     if (dest / path.name).exists():
         return "already-exists"
     return None
