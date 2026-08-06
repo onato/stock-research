@@ -42,9 +42,25 @@ seed_batch() {  # $1 = batch size; returns 1 when the queue is exhausted
 }
 
 if [ -z "$BATCH" ]; then
-  # Default nightly pass: updates first, then seed until 05:45 local time
-  # (started at 02:00 that means roughly four hours of work, ending near 06:00).
-  echo "=== nightly fetch $(date '+%F %T') — ${#TICKERS[@]} updates ==="
+  # Default nightly pass: updates first, then seed until 05:45 local time.
+  # The deadline applies to the WHOLE night (run.sh checks it between tickers),
+  # and tickers attempted in the last 3 days are skipped — a corpus this size
+  # only changes twice a year per company, so nightly full sweeps are waste.
+  if [ "$(date '+%H%M')" -lt 0545 ]; then export FETCH_DEADLINE=0545; fi
+  TICKERS=($(printf '%s\n' "${TICKERS[@]}" | python3 -c "
+import sys, datetime
+from pathlib import Path
+cutoff = (datetime.datetime.now() - datetime.timedelta(days=3)).isoformat()
+last = {}
+tsv = Path('$HERE/logs/attempts.tsv')
+if tsv.exists():
+    for line in tsv.read_text().splitlines():
+        t, _, ts = line.partition('\t')
+        if ts > last.get(t, ''): last[t] = ts
+for t in sys.stdin.read().split():
+    if last.get(t, '') < cutoff: print(t)
+"))
+  echo "=== nightly fetch $(date '+%F %T') — ${#TICKERS[@]} due updates (deadline ${FETCH_DEADLINE:-none}) ==="
   /usr/bin/caffeinate -s "$HERE/run.sh" "${TICKERS[@]}"
   seed_batch 3 || echo "queue exhausted"
   while [ "$(date '+%H%M')" -lt 0545 ]; do

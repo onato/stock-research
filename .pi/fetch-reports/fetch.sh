@@ -34,7 +34,7 @@ cd "$STAGING"   # bare-filename downloads land in staging by construction
 # find) kills this ticker after 15 min instead of wedging the whole loop.
 {
 /usr/bin/perl -e 'alarm shift; exec @ARGV' 900 \
-pi -p --no-session --provider ollama --model "gpt-oss-20b-64k:latest" \
+pi --mode json -p --no-session --provider ollama --model "gpt-oss-20b-64k:latest" \
   --tools read,bash,write,ls,find,grep,web_search,fetch_content \
   "Find and download newer financial reports for $COMPANY (ticker $TICKER). Search by the company name, not the ticker symbol.
 
@@ -46,13 +46,13 @@ Source notes: ${QUIRK:-none}
 $(if echo "$INVENTORY" | grep -q "no filings"; then cat <<SEED
 Task (initial seeding — we hold nothing for this company):
 1. Use web_search to find the investor-relations / results page of $COMPANY.
-2. Download the annual report PDF for each of the last 8 fiscal years (or as many as are published), plus the most recent half-year or quarterly report, with bash + curl (browser User-Agent, follow redirects) into this exact directory: $STAGING
+2. Download the annual report PDF for each of the last 8 fiscal years (or as many as are published), plus the most recent half-year or quarterly report, with bash + curl (browser User-Agent, follow redirects, ALWAYS pass --max-time 120 so a hanging server cannot stall you) into this exact directory: $STAGING
 3. Name each file exactly: ${TICKER}_{Type}_{Period}.pdf where Type is Annual, HalfYear, Quarterly, or Presentation and Period is like FY2024 or H1-2026 (fiscal year labels, four-digit years).
 SEED
 else cat <<UPDATE
 Task:
 1. Use web_search to find the investor-relations / results page of $COMPANY and check whether any annual or half-year/quarterly report NEWER than the newest period listed above has been published.
-2. If yes, download each new report PDF with bash + curl (browser User-Agent, follow redirects) into this exact directory: $STAGING
+2. If yes, download each new report PDF with bash + curl (browser User-Agent, follow redirects, ALWAYS pass --max-time 120 so a hanging server cannot stall you) into this exact directory: $STAGING
 3. Name each file exactly: ${TICKER}_{Type}_{Period}.pdf where Type is Annual, HalfYear, Quarterly, or Presentation, and Period follows the same style as the periods listed above (e.g. FY2026, H1-2026).
 UPDATE
 fi)
@@ -60,7 +60,7 @@ fi)
 5. If nothing suitable is published, download nothing — that is a fine outcome. Say NOTHING-NEW.
 Rules: write only inside $STAGING. Never run make, git, claude, or a nested pi. Finish by listing the files you downloaded (or NOTHING-NEW)." \
   2>&1
-} 2>/dev/null | tail -20
+} 2>/dev/null | python3 "$HERE/pi_progress.py"
 if [ "${PIPESTATUS[0]}" -eq 142 ]; then
   echo "watchdog: pi killed after 15 min on $TICKER — will be retried on a later pass"
 fi
@@ -68,6 +68,8 @@ fi
 for stray in "$REPO/$TICKER"_*.pdf; do   # rescue anything written outside staging
   [ -f "$stray" ] && mv "$stray" "$STAGING/"
 done
+
+printf '%s\t%s\n' "$TICKER" "$(date +%FT%T)" >> "$HERE/logs/attempts.tsv"
 
 echo "--- gate ---"
 python3 "$HERE/gate.py" "$TICKER"

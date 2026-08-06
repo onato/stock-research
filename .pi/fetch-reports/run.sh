@@ -6,6 +6,10 @@ set -u
 trap 'echo "interrupted — stopping"; exit 130' INT TERM
 HERE="$(cd "$(dirname "$0")" && pwd)"
 for t in "$@"; do
+  if [ -n "${FETCH_DEADLINE:-}" ] && [ "$(date +%H%M)" -ge "$FETCH_DEADLINE" ]; then
+    echo "=== deadline $FETCH_DEADLINE reached — stopping pass ($t onward deferred) ==="
+    break
+  fi
   start=$(date +%s)
   echo "=============== $t — started $(date '+%T') ==============="
   "$HERE/fetch.sh" "$t" 2>&1 | perl -pe 'BEGIN { $| = 1 } my @t = localtime; $_ = sprintf("[%02d:%02d:%02d] ", $t[2], $t[1], $t[0]) . $_'
