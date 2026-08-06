@@ -24,6 +24,22 @@ INVENTORY=$(python3 "$HERE/missing.py" "$TICKER")
 # Deterministic exchange adapters get first crack; the model is only the
 # fallback for exchanges without one.
 case "$TICKER" in
+  *.L|*.AX|*.NZ)
+    # Seeds get the deterministic annuals backbone from AnnualReports.com when
+    # possible (zero wrong-company risk); the model still handles updates and
+    # interims. Fall through to the model when the archive has little.
+    if echo "$INVENTORY" | grep -q "no filings"; then
+      python3 "$HERE/adapters/annualreports.py" "$TICKER" --dest "$STAGING" || true
+      STAGED=$(ls "$STAGING"/*.pdf 2>/dev/null | wc -l | tr -d " ")
+      if [ "$STAGED" -ge 3 ]; then
+        printf '%s\t%s\n' "$TICKER" "$(date +%FT%T)" >> "$HERE/logs/attempts.tsv"
+        echo "--- gate ---"
+        python3 "$HERE/gate.py" "$TICKER"
+        exit 0
+      fi
+      echo "annualreports-adapter: only $STAGED files — falling back to the model (staged files kept)"
+    fi
+    ;;
   *.HK)
     AFTER_YEAR=$(python3 -c "import sys; sys.path.insert(0,'$HERE'); from missing import scan; print(scan('$TICKER')['newest_year'])")
     if python3 "$HERE/adapters/hkex.py" "$TICKER" --dest "$STAGING" --after-year "$AFTER_YEAR"; then
