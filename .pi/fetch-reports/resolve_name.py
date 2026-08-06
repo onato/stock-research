@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
-"""Ensure state/companies.json knows this ticker's company name.
+"""Resolve a ticker's company name. Prints exactly one line: the name, or the
+ticker itself when unresolvable (callers rely on this contract — the value
+feeds the fetch prompt and gate.py's skip logic).
 
-Resolves via Yahoo's chart API when missing and persists the result, so the
-fetch prompt can name the actual company (LSE codes like BNZL are not
-guessable) and gate.py's company-name check is armed for the same run.
-
-Usage: resolve_name.py TICKER   -> prints the name (or the ticker if unknown)
+Precedence: research/{T}/info.json  >  state/companies.json  >  Yahoo  >  stub.
+The winning name is synced into companies.json non-destructively (name key
+updated in place; other fields untouched) so every companies.json reader sees
+curated names without changes. On total failure a needs_review stub info.json
+is written for the curation queue (see needs_review.py).
 """
 import json
 import subprocess
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from company_info import load, write  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
 COMPANIES = REPO / "state" / "companies.json"
@@ -18,9 +23,13 @@ COMPANIES = REPO / "state" / "companies.json"
 ticker = sys.argv[1]
 companies = json.loads(COMPANIES.read_text())
 entry = companies.get(ticker, {})
-name = entry.get("name", "")
 
-if not name or name == ticker:
+info_name = load(ticker).get("name", "")
+name = info_name or entry.get("name", "")
+if name == ticker:
+    name = ""
+
+if not name:
     try:
         out = subprocess.run(
             ["curl", "-s", "--max-time", "10",
@@ -31,8 +40,16 @@ if not name or name == ticker:
         name = meta.get("longName") or meta.get("shortName") or ""
     except Exception:
         name = ""
-    if name:
-        companies[ticker] = {"name": name, "sector": entry.get("sector", "Unknown")}
-        COMPANIES.write_text(json.dumps(companies, indent=2, sort_keys=True) + "\n")
+    if not name:
+        # unresolvable: flag for strong-model curation, keep the old contract
+        write(ticker, {"name": "", "needs_review": True,
+                       "needs_review_reason": "yahoo-resolution-failed",
+                       "updated_by": "resolve_name.py"})
+
+if name and entry.get("name") != name:
+    entry = companies.setdefault(ticker, {})
+    entry["name"] = name
+    entry.setdefault("sector", "Unknown")
+    COMPANIES.write_text(json.dumps(companies, indent=2, sort_keys=True) + "\n")
 
 print(name or ticker)

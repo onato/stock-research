@@ -61,7 +61,9 @@ for t in sys.stdin.read().split():
     if last.get(t, '') < cutoff: print(t)
 "))
   echo "=== nightly fetch $(date '+%F %T') — ${#TICKERS[@]} due updates (deadline ${FETCH_DEADLINE:-none}) ==="
-  /usr/bin/caffeinate -s "$HERE/run.sh" "${TICKERS[@]}"
+  if [ ${#TICKERS[@]} -gt 0 ]; then
+    /usr/bin/caffeinate -s "$HERE/run.sh" ${TICKERS[@]+"${TICKERS[@]}"}
+  fi
   seed_batch 3 || echo "queue exhausted"
   while [ "$(date '+%H%M')" -lt 0545 ]; do
     seed_batch 3 || { echo "queue exhausted"; break; }

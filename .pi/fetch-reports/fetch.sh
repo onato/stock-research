@@ -19,8 +19,24 @@ rm -f "$STAGING"/*.pdf 2>/dev/null
 
 finish() {
   printf '%s\t%s\n' "$TICKER" "$(date +%FT%T)" >> "$HERE/logs/attempts.tsv"
+  local learned_url=""
+  [ -f "$STAGING/ir_url.txt" ] && learned_url=$(head -1 "$STAGING/ir_url.txt")
   echo "--- gate ---"
-  python3 "$HERE/gate.py" "$TICKER"
+  local gate_out
+  gate_out=$(python3 "$HERE/gate.py" "$TICKER")
+  echo "$gate_out"
+  # Trust-gated source learning: remember the IR page only when this run's
+  # downloads actually passed the gate.
+  if echo "$gate_out" | grep -q "\[promoted\]" && [ -n "$learned_url" ]; then
+    LEARNED_URL="$learned_url" python3 -c "
+import os, sys; sys.path.insert(0, '$HERE')
+from company_info import write
+url = os.environ['LEARNED_URL'].strip()
+if url.startswith('http') and len(url) < 500:
+    write('$TICKER', {'ir_url': url, 'updated_by': 'fetcher-learned'})
+    print(f'learned ir_url: {url}')"
+  fi
+  rm -f "$STAGING/ir_url.txt"
   # Commit this ticker's extracted text + name registry. Uses the repo's mkdir
   # spinlock convention (scripts/lib.sh) so concurrent research runs are safe.
   local lockdir="$REPO/state/git.lock.d" waited=0
@@ -31,6 +47,7 @@ finish() {
   ( cd "$REPO" &&
     { git add -A -- "research/$TICKER/Extracted" 2>/dev/null || true; } &&
     { git add -- state/companies.json 2>/dev/null || true; } &&
+    { git add -- "research/$TICKER/info.json" 2>/dev/null || true; } &&
     if ! git diff --cached --quiet; then
       git commit --quiet -m "chore: fetch filings for $TICKER
 
@@ -71,14 +88,7 @@ case "$TICKER" in
     echo "hkex-adapter failed — falling back to the model"
     ;;
 esac
-QUIRK=$(python3 -c "
-import json
-q=json.load(open('$HERE/quirks.json'))
-t='$TICKER'
-notes=[q[t]] if t in q else []
-if t.endswith('.NZ'): notes.append(q['_default_nz'].replace('{CODE}', t.split('.')[0]))
-if t.endswith('.L'): notes.append(q['_default_l'])
-print(' '.join(notes))")
+QUIRK=$(python3 "$HERE/company_info.py" quirks "$TICKER")
 
 cd "$STAGING"   # bare-filename downloads land in staging by construction
 # perl alarm = per-ticker watchdog: a hung tool call (e.g. a filesystem-wide
@@ -109,6 +119,7 @@ UPDATE
 fi)
 4. Verify each download is a real PDF with the file command; delete anything that is not. Also verify it is a report OF $COMPANY — if the PDF is about a different company, delete it.
 5. If nothing suitable is published, download nothing — that is a fine outcome. Say NOTHING-NEW.
+6. Write the URL of the investor-relations / reports page you actually used into a plain-text file named ir_url.txt in the same directory as the PDFs (one line, the URL only).
 Rules: write only inside $STAGING. Never run make, git, claude, or a nested pi. Finish by listing the files you downloaded (or NOTHING-NEW)." \
   2>&1
 } 2>/dev/null | python3 "$HERE/pi_progress.py"

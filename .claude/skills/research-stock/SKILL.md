@@ -425,7 +425,11 @@ it directly. Company names and sectors live in `./state/companies.json`:
 1. Read `./state/companies.json` and check if `$ARGUMENTS` has an entry
 2. Add or update it: `name` = company name from the Analysis JSON, `sector` =
    short sector label from the Analysis JSON (keys stay alphabetically sorted)
-3. Regenerate the index without hitting the network:
+3. Also write/refresh `./research/$ARGUMENTS/info.json` (the fetcher's curated
+   metadata): set `name`, `sector`, `fiscal_year_end` ("MM-DD", from the
+   filings), `updated_by: "claude"`, `needs_review: false` — and PRESERVE any
+   existing fields (`quirks`, `ir_url`, `aliases`). Merge, never overwrite.
+4. Regenerate the index without hitting the network:
 
 ```bash
 python3 .claude/skills/screen-investments/screen.py --html "$(pwd)/index.html"

@@ -20,13 +20,7 @@ for t, ps in sorted(r['filings'].items()):
     old = [p for p in ps if period_year(p) <= $CUTOFF]
     if old: print(f'  newest {t}: {max(old, key=period_year)}  ({len(old)} on file)')")
 
-QUIRK=$(python3 -c "
-import json
-q=json.load(open('$HERE/quirks.json'))
-t='$TICKER'
-notes=[q[t]] if t in q else []
-if t.endswith('.NZ'): notes.append(q['_default_nz'].replace('{CODE}', t.split('.')[0]))
-print(' '.join(notes))")
+QUIRK=$(python3 "$HERE/company_info.py" quirks "$TICKER")
 
 pi -p --no-session --provider ollama --model "gpt-oss-20b-64k:latest" \
   --tools read,bash,write,ls,find,grep,web_search,fetch_content \

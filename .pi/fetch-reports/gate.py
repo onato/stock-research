@@ -108,8 +108,8 @@ def main(ticker: str) -> int:
 
     results = []
     for f in sorted(staging.glob("*")) if staging.is_dir() else []:
-        if f.name.startswith("."):
-            continue
+        if f.name.startswith(".") or not f.name.lower().endswith(".pdf"):
+            continue  # sidecars like ir_url.txt are protocol files, not downloads
         f = normalize(f)
         reason = check(f, ticker, company, dest)
         if reason is None:
