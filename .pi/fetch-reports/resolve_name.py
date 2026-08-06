@@ -29,17 +29,46 @@ name = info_name or entry.get("name", "")
 if name == ticker:
     name = ""
 
+def _curl(url, extra=None):
+    cmd = ["curl", "-s", "--max-time", "10", url, "-H", "User-Agent: Mozilla/5.0"]
+    if extra:
+        cmd += extra
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=15).stdout
+
+
+def yahoo_chart(t):
+    meta = json.loads(_curl(f"https://query1.finance.yahoo.com/v8/finance/chart/{t}"))["chart"]["result"][0]["meta"]
+    return meta.get("longName") or meta.get("shortName") or ""
+
+
+def yahoo_search(t):
+    d = json.loads(_curl(f"https://query1.finance.yahoo.com/v1/finance/search?q={t}&quotesCount=3"))
+    qs = [q for q in d.get("quotes", []) if q.get("symbol", "").upper() == t.upper()]
+    return (qs[0].get("longname") or qs[0].get("shortname") or "") if qs else ""
+
+
+def openfigi(t):
+    # Bloomberg's free symbology API; names come back ALL-CAPS but the gate
+    # matches case-insensitively. Keyless tier is rate-limited — last resort.
+    exch = {"HK": "HK", "AX": "AU", "L": "LN", "NZ": "NZ"}.get(t.rsplit(".", 1)[-1])
+    if not exch or "." not in t:
+        return ""
+    code = t.split(".")[0].lstrip("0") or t.split(".")[0]
+    body = json.dumps([{"idType": "TICKER", "idValue": code, "exchCode": exch}])
+    d = json.loads(_curl("https://api.openfigi.com/v3/mapping",
+                         ["-H", "Content-Type: application/json", "-d", body]))
+    data = (d[0] or {}).get("data") if isinstance(d, list) and d else None
+    return data[0].get("name", "").title() if data else ""
+
+
 if not name:
-    try:
-        out = subprocess.run(
-            ["curl", "-s", "--max-time", "10",
-             f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}",
-             "-H", "User-Agent: Mozilla/5.0"],
-            capture_output=True, text=True, timeout=15).stdout
-        meta = json.loads(out)["chart"]["result"][0]["meta"]
-        name = meta.get("longName") or meta.get("shortName") or ""
-    except Exception:
-        name = ""
+    for source in (yahoo_chart, yahoo_search, openfigi):
+        try:
+            name = source(ticker)
+        except Exception:
+            name = ""
+        if name:
+            break
     if not name:
         # unresolvable: flag for strong-model curation, keep the old contract
         write(ticker, {"name": "", "needs_review": True,
