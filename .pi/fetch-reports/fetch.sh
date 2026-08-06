@@ -20,6 +20,21 @@ COMPANY=$(python3 "$HERE/resolve_name.py" "$TICKER")
 echo "company: $COMPANY"
 
 INVENTORY=$(python3 "$HERE/missing.py" "$TICKER")
+
+# Deterministic exchange adapters get first crack; the model is only the
+# fallback for exchanges without one.
+case "$TICKER" in
+  *.HK)
+    AFTER_YEAR=$(python3 -c "import sys; sys.path.insert(0,'$HERE'); from missing import scan; print(scan('$TICKER')['newest_year'])")
+    if python3 "$HERE/adapters/hkex.py" "$TICKER" --dest "$STAGING" --after-year "$AFTER_YEAR"; then
+      printf '%s\t%s\n' "$TICKER" "$(date +%FT%T)" >> "$HERE/logs/attempts.tsv"
+      echo "--- gate ---"
+      python3 "$HERE/gate.py" "$TICKER"
+      exit 0
+    fi
+    echo "hkex-adapter failed — falling back to the model"
+    ;;
+esac
 QUIRK=$(python3 -c "
 import json
 q=json.load(open('$HERE/quirks.json'))
