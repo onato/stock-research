@@ -62,10 +62,42 @@ for f in sorted((HERE / "logs").glob("*.jsonl")):
         if info.get("updated_by") not in ("claude", "human", "manual"):
             name_missing.append((ticker, f"{len(bad)} name-missing quarantine(s)"))
 
-if not flagged and not name_missing:
+# Repeat-empty tickers: attempted 2+ times, never promoted a single file, and
+# not yet human/claude-curated — prime candidates for ir_url + quirks curation
+# (the CEN.NZ pattern: JS-rendered reports pages invisible to curl).
+from collections import Counter
+attempts = Counter()
+tsv = HERE / "logs" / "attempts.tsv"
+if tsv.exists():
+    for line in tsv.read_text().splitlines():
+        t = line.split("\t")[0]
+        if TICKER_RE.match(t):
+            attempts[t] += 1
+promoted_ever = set()
+for f in (HERE / "logs").glob("*.jsonl"):
+    for line in f.read_text().splitlines():
+        try:
+            r = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if r.get("verdict") == "promoted":
+            promoted_ever.add(f.stem)
+repeat_empty = []
+for t, n in sorted(attempts.items(), key=lambda kv: -kv[1]):
+    if n < 2 or t in promoted_ever:
+        continue
+    info = json.loads((REPO / "research" / t / "info.json").read_text()) if (REPO / "research" / t / "info.json").exists() else {}
+    if info.get("updated_by") in ("claude", "human", "manual") or info.get("ir_url"):
+        continue
+    if not (REPO / "research" / t / "PDFs").is_dir() or not any((REPO / "research" / t / "PDFs").iterdir()):
+        repeat_empty.append((t, n))
+
+if not flagged and not name_missing and not repeat_empty:
     print("curation queue empty")
 else:
     for t, why in flagged:
         print(f"REVIEW  {t}: {why}")
     for t, why in name_missing:
         print(f"CHECK   {t}: {why}")
+    for t, n in repeat_empty[:15]:
+        print(f"EMPTY   {t}: {n} attempts, 0 promotions ever — curate ir_url/quirks")
