@@ -41,6 +41,7 @@ def write(ticker: str, updates: dict) -> dict:
     path = info_path(ticker)
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".info-", suffix=".json")
+    os.fchmod(fd, 0o644)
     with os.fdopen(fd, "w") as fh:
         fh.write(json.dumps(data, indent=2, sort_keys=True) + "\n")
     os.replace(tmp, path)
