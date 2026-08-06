@@ -61,6 +61,7 @@ def openfigi(t):
     return data[0].get("name", "").title() if data else ""
 
 
+resolved_by = "info.json" if info_name else ("companies.json" if name else "")
 if not name:
     for source in (yahoo_chart, yahoo_search, openfigi):
         try:
@@ -68,12 +69,17 @@ if not name:
         except Exception:
             name = ""
         if name:
+            resolved_by = source.__name__
             break
     if not name:
         # unresolvable: flag for strong-model curation, keep the old contract
         write(ticker, {"name": "", "needs_review": True,
                        "needs_review_reason": "auto-resolution-failed (yahoo chart+search, openfigi)",
                        "updated_by": "resolve_name.py"})
+
+# persist into the ticker's own info.json so the folder is self-describing
+if name and load(ticker).get("name") != name:
+    write(ticker, {"name": name, "updated_by": resolved_by})
 
 if name and entry.get("name") != name:
     entry = companies.setdefault(ticker, {})
