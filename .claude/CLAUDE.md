@@ -56,7 +56,8 @@ around one exchange's quirk.
 ## Entry Points
 
 `make` is the interface — `run`, `research`, `facts`, `evals`, `screen`, `status`,
-`test`, `lint`. Don't invoke scripts ad hoc when a target exists.
+`test`, `lint`, `typecheck`, `coverage`. Don't invoke scripts ad hoc when a target
+exists.
 
 ## Commits
 
@@ -75,7 +76,8 @@ the Python that does the extracting, grading and exporting. The rules:
   test in the same commit.
 - **New exchange support starts from a failing fixture** (see Parser Architecture).
 - **`make test` must pass before any commit touching `scripts/`, `tests/`, or
-  `pyproject.toml`.** `make lint` is the style gate.
+  `pyproject.toml`.** `make lint` is the style gate; `make typecheck` (mypy,
+  every def in `scripts/` annotated) must also pass for those commits.
 - **Parser changes additionally require a corpus diff review:**
   `python3 tests/tools/corpus_snapshot.py --out state/facts_before.jsonl` before,
   again after, then diff. Refactors must diff empty; bug fixes must diff only in
