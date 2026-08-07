@@ -113,6 +113,11 @@ def main() -> int:
             url = pdf_url(ids)
             subprocess.run(["curl", "-sfL", "--max-time", "300", url, "-A", UA,
                             "-o", str(out)], timeout=320, check=True)
+            with open(out, "rb") as fh:  # MAGIC-CHECKED: manifests/HTML are not reports
+                if fh.read(5) != b"%PDF-":
+                    out.unlink(missing_ok=True)
+                    print(f"skipped non-PDF payload for {out.name}")
+                    continue
             print(f"asx-adapter: downloaded {name}")
             ok += 1
         except Exception as e:
