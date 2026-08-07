@@ -33,6 +33,8 @@ def normalize(path: Path) -> Path:
     """Fix mechanical label malformations before validation (FY26 -> FY2026)."""
     fixed = re.sub(r"_FY(\d{2})\.pdf$", r"_FY20\1.pdf", path.name)
     fixed = re.sub(r"_(H[12]|Q[1-4])-FY?(\d{2})\.pdf$", r"_\1-20\2.pdf", fixed)
+    fixed = re.sub(r"_([12])H(\d{2})\.pdf$", r"_H\1-20\2.pdf", fixed)   # 1H26 -> H1-2026
+    fixed = re.sub(r"_HY(\d{2})\.pdf$", r"_H1-20\1.pdf", fixed)          # HY26 -> H1-2026
     if fixed != path.name:
         path = path.rename(path.with_name(fixed))
     return path
