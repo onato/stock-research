@@ -125,7 +125,7 @@ def screen(args):
         if args.live:
             live_price, live_ccy = fetch_live_price(ticker)
 
-        price = live_price if live_price else stored_price
+        price = live_price or stored_price
         price_src = "live" if live_price else "stored"
         if price is None:
             flags.append("NO_PRICE")
