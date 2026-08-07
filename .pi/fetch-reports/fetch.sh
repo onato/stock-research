@@ -62,6 +62,20 @@ echo "company: $COMPANY"
 
 INVENTORY=$(python3 "$HERE/missing.py" "$TICKER")
 
+# ASX registry adapter: authoritative for updates; on an empty seed result we
+# fall through to the AnnualReports/model path below.
+if [[ "$TICKER" == *.AX ]]; then
+  AFTER_YEAR=$(python3 -c "import sys; sys.path.insert(0,'$HERE'); from missing import scan; print(scan('$TICKER')['newest_year'])")
+  if python3 "$HERE/adapters/asx.py" "$TICKER" --dest "$STAGING" --after-year "$AFTER_YEAR"; then
+    STAGED=$(ls "$STAGING"/*.pdf 2>/dev/null | wc -l | tr -d " ")
+    if [ "$STAGED" -ge 1 ] || [ "$AFTER_YEAR" -gt 0 ]; then
+      finish
+      exit 0
+    fi
+    echo "asx-adapter: empty seed — falling back to archive/model"
+  fi
+fi
+
 # Deterministic exchange adapters get first crack; the model is only the
 # fallback for exchanges without one.
 case "$TICKER" in
