@@ -110,8 +110,10 @@ lint: ## Ruff + shellcheck; the technical-debt gate
 typecheck: ## Mypy over scripts/; part of the technical-debt gate
 	uvx mypy@1.19.0 --python-executable "$$(command -v python3)" scripts
 
-coverage: ## Test suite with line coverage over scripts/
-	python3 -m pytest --cov=$(SCRIPTS) --cov-report=term-missing:skip-covered
+# The floor only ratchets up: raise it when coverage rises, never lower it.
+coverage: ## Test suite with line coverage over scripts/; fails under the floor
+	python3 -m pytest --cov=$(SCRIPTS) --cov-report=term-missing:skip-covered \
+	  --cov-fail-under=56
 
 test-country: ## One country's parser tests (COUNTRY=nzx)
 	@test -n "$(COUNTRY)" || { echo "usage: make test-country COUNTRY=nzx" >&2; exit 2; }
