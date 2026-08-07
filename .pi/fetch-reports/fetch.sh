@@ -120,6 +120,7 @@ fi)
 4. Verify each download is a real PDF with the file command; delete anything that is not. Also verify it is a report OF $COMPANY — if the PDF is about a different company, delete it.
 5. If nothing suitable is published, download nothing — that is a fine outcome. Say NOTHING-NEW.
 6. Write the URL of the investor-relations / reports page you actually used into a plain-text file named ir_url.txt in the current directory (one line, the URL only).
+Strategy (do it the cheap way): use AT MOST 1-2 web searches — just enough to find the company's investor/reports page — then use fetch_content on that page to enumerate ALL report links in one pass. NEVER run one search per year. If report URLs follow an obvious pattern (e.g. .../Annual-Report-2024.pdf), derive the other years from the pattern and check each with curl -I instead of searching. Download files one at a time with individual curl commands — no multi-URL bash scripts with set -e (one bad URL kills the whole batch).
 Rules: you are already in the correct working directory — use RELATIVE paths only ('.', './file.pdf') for every file operation; never use absolute paths and never list or search any directory outside the current one. Never run make, git, claude, or a nested pi. Finish by listing the files you downloaded (or NOTHING-NEW)." \
   2>&1
 } 2>/dev/null | python3 "$HERE/pi_progress.py"
