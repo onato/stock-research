@@ -193,6 +193,17 @@ class TestMain:
         assert run_main(monkeypatch, "--baseline", str(fp)) == 0
         assert json.loads(fp.read_text()) == {"AAA.NZ": 2.46}
 
+    def test_baseline_keeps_reported_zero_cost(self, logs, monkeypatch,
+                                               tmp_path, capsys):
+        """A legitimately reported $0.00 run must snapshot as 0.0 -- the
+        summary table already selects on `is not None`, and the snapshot
+        must agree rather than fall back to the modelled estimate."""
+        write_log(logs / "AAA.NZ.log",
+                  [assistant(usage=USAGE), result(cost=0.0)])
+        fp = tmp_path / "base.json"
+        assert run_main(monkeypatch, "--baseline", str(fp)) == 0
+        assert json.loads(fp.read_text()) == {"AAA.NZ": 0.0}
+
     def test_baseline_without_filename_returns_2(self, logs, monkeypatch, capsys):
         write_log(logs / "AAA.NZ.log", [assistant(usage=USAGE), result()])
         assert run_main(monkeypatch, "--baseline") == 2
@@ -216,3 +227,11 @@ class TestMain:
         out = capsys.readouterr().out
         assert "-50.0%" in out          # 2.46 -> 1.23
         assert "(new)" in out           # BBB.NZ absent from the baseline
+        # The (new) row pads the change column to the full layout so the
+        # diff table stays aligned. Inspect the compare block only -- the
+        # summary table above it also mentions both tickers.
+        block = out.split("before")[1].splitlines()
+        aaa = next(line for line in block if "AAA.NZ" in line)
+        bbb = next(line for line in block if "BBB.NZ" in line)
+        assert "(new)" in bbb
+        assert len(bbb) == len(aaa)

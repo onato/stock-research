@@ -127,6 +127,16 @@ class TestMain:
         out = capsys.readouterr().out
         assert out.index("TINY") < out.index("BIGCO")
 
+    def test_order_typo_is_rejected_by_argparse(self, repo, monkeypatch, capsys):
+        # --order takes the same keys as --metric, so a typo must die at the
+        # parser with the legal choices listed -- not silently filter every
+        # row and report a misleading "no data for period" error.
+        make_db(repo, "BIGCO", [("FY2024", 500.0, 50.0, 1.0, "millions", "USD")])
+        with pytest.raises(SystemExit) as exc:
+            run(monkeypatch, "--period", "FY2024", "--order", "revnue")
+        assert exc.value.code == 2  # argparse usage error
+        assert "invalid choice" in capsys.readouterr().err
+
     def test_no_data_exits_one_with_hint(self, repo, monkeypatch, capsys):
         make_db(repo, "BIGCO", [("FY2024", 500.0, 50.0, 1.0, "millions", "USD")])
         assert run(monkeypatch, "--period", "FY1999") == 1

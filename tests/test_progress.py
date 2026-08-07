@@ -129,6 +129,15 @@ class TestMain:
         assert render(monkeypatch, capsys,
                       [assistant({"type": "text", "text": "ok."})]) == ""
 
+    def test_plain_string_content_is_a_single_text_block(
+            self, monkeypatch, capsys):
+        # Real stream-json emits plain-string content for simple messages;
+        # it must render as one prose line, not iterate char-by-char.
+        out = render(monkeypatch, capsys, [
+            {"type": "assistant", "message": {"content": "Simple reply text"}}])
+        assert "Simple reply text" in out
+        assert out.count("\n") == 1
+
     def test_tools_only_flag_drops_prose_keeps_tools(self, monkeypatch, capsys):
         out = render(monkeypatch, capsys, [
             assistant({"type": "text", "text": "Narration to hide"},
@@ -164,6 +173,12 @@ class TestMain:
         assert out.count("RATE LIMIT") == 1
         assert "RATE LIMIT: rejected (output_tokens)" in out
 
+    def test_rate_limit_without_info_prints_no_nones(self, monkeypatch, capsys):
+        # An event with no rate_limit_info payload carries nothing worth
+        # printing; "RATE LIMIT: None (None)" is noise, not signal.
+        out = render(monkeypatch, capsys, [{"type": "rate_limit_event"}])
+        assert "None" not in out
+
     def test_result_summarizes_tool_count_turns_and_cost(
             self, monkeypatch, capsys):
         out = render(monkeypatch, capsys, [
@@ -186,11 +201,10 @@ class TestMain:
         assert "ERROR -- 0 tool calls" in out
         assert "budget exceeded second line" in out
 
-    def test_zero_cost_still_prints_but_zero_turns_dropped(
-            self, monkeypatch, capsys):
-        # Documents the asymmetry: cost uses `is not None`, turns uses
-        # truthiness, so a 0-turn result silently drops the turn count.
+    def test_zero_cost_and_zero_turns_both_print(self, monkeypatch, capsys):
+        # 0 is a real value for both fields: cost and turns each use
+        # `is not None`, so a 0-turn result must not drop the turn count.
         out = render(monkeypatch, capsys, [
             {"type": "result", "num_turns": 0, "total_cost_usd": 0.0}])
         assert "$0.00" in out
-        assert "turns" not in out
+        assert "0 turns" in out

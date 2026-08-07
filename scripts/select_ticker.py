@@ -92,12 +92,10 @@ def has_reports(ticker: str) -> bool:
 
 def pick_new(exclude: Iterable[str] = ()) -> str | None:
     exclude = set(exclude)
-    seen = set()
     for qf in queue_files():
         for ticker in read_tickers(qf):
-            if ticker in seen or ticker in exclude:
+            if ticker in exclude:
                 continue
-            seen.add(ticker)
             if not has_reports(ticker):
                 return ticker
     return None

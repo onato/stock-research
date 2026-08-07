@@ -136,6 +136,7 @@ def main() -> int:
     import duckdb
     only = set(sys.argv[1:])
     problems: list[tuple[str, str, str]] = []
+    ambiguous: list[tuple[str, list[str]]] = []
 
     print(f"  {'ticker':10s} {'recorded':>8s} {'suffix':>7s} {'stated':>7s}  filing symbols")
     print("  " + "-" * 68)
@@ -154,7 +155,16 @@ def main() -> int:
             continue
         if not rows:
             continue
-        recorded = rows[0][0]
+        currencies = sorted(r[0] for r in rows)
+        # More than one distinct currency means adjudication conflated
+        # periods reported in different currencies. Reporting whichever
+        # row came first would let that pass as agreement, so flag it.
+        if len(currencies) > 1:
+            ambiguous.append((ticker, currencies))
+            print(f"  {ticker:10s} ambiguous: multiple currencies recorded "
+                  f"({', '.join(currencies)})")
+            continue
+        recorded = currencies[0]
 
         suffix = ticker.rsplit(".", 1)[1].upper() if "." in ticker else ""
         expect = BY_SUFFIX.get(suffix, "?")
@@ -177,9 +187,14 @@ def main() -> int:
         print(f"\n  {len(problems)} ticker(s) need a re-run to correct currency:")
         for t, got, want in problems:
             print(f"    make run TICKER={t}      # recorded {got}, should be {want}")
-    else:
+    if ambiguous:
+        print(f"\n  {len(ambiguous)} ticker(s) record multiple currencies "
+              "(re-run to re-adjudicate):")
+        for t, ccys in ambiguous:
+            print(f"    make run TICKER={t}      # recorded {', '.join(ccys)}")
+    if not problems and not ambiguous:
         print("\n  no currency mismatches")
-    return 1 if problems else 0
+    return 1 if problems or ambiguous else 0
 
 
 if __name__ == "__main__":

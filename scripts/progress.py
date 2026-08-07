@@ -60,6 +60,18 @@ def shorten_url(u: str) -> str:
     return u if len(u) <= 60 else u[:57] + "..."
 
 
+def content_blocks(ev: dict[str, Any]) -> list[dict[str, Any]]:
+    """A message's content as a list of block dicts.
+
+    stream-json emits plain-string content for simple messages; wrap it
+    as a single text block rather than iterating it character-by-character.
+    """
+    content = ev.get("message", {}).get("content") or []
+    if isinstance(content, str):
+        return [{"type": "text", "text": content}]
+    return [b for b in content if isinstance(b, dict)]
+
+
 def main() -> int:
     # --tools-only drops the model's prose entirely, leaving just the tool
     # trace. Useful once you trust the run and only want to see movement.
@@ -92,7 +104,7 @@ def main() -> int:
             print(f"{stamp()} session started on {model}", flush=True)
 
         elif kind == "assistant":
-            for block in ev.get("message", {}).get("content", []) or []:
+            for block in content_blocks(ev):
                 btype = block.get("type")
                 if btype == "text":
                     text = (block.get("text") or "").strip()
@@ -113,7 +125,7 @@ def main() -> int:
         elif kind == "user":
             # Tool results come back as user-role messages. Surface only
             # errors -- successful results are far too voluminous to print.
-            for block in ev.get("message", {}).get("content", []) or []:
+            for block in content_blocks(ev):
                 if block.get("type") == "tool_result" and block.get("is_error"):
                     content = block.get("content")
                     if isinstance(content, list):
@@ -124,8 +136,10 @@ def main() -> int:
                     print(f"{stamp()}   !! {msg[:110]}", flush=True)
 
         elif kind == "rate_limit_event":
+            # No payload means nothing worth reporting -- skip rather than
+            # printing a "RATE LIMIT: None (None)" line.
             info = ev.get("rate_limit_info") or {}
-            if info.get("status") != "allowed":
+            if info and info.get("status") != "allowed":
                 print(
                     f"{stamp()} RATE LIMIT: {info.get('status')} "
                     f"({info.get('rateLimitType')})",
@@ -136,7 +150,9 @@ def main() -> int:
             cost = ev.get("total_cost_usd")
             turns = ev.get("num_turns")
             bits = [f"{tools} tool calls"]
-            if turns:
+            # 0 turns is a real value, not an absence -- match cost's
+            # `is not None` rather than truthiness.
+            if turns is not None:
                 bits.append(f"{turns} turns")
             if cost is not None:
                 bits.append(f"${cost:.2f}")

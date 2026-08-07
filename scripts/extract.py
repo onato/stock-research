@@ -48,15 +48,20 @@ def facts_count(ticker: str) -> tuple[int, int]:
     try:
         import duckdb
         con = duckdb.connect(str(db), read_only=True)
-        f = con.execute("SELECT count(*) FROM facts").fetchone()[0]  # type: ignore[index]
-        try:
-            c = con.execute("SELECT count(*) FROM core_metrics").fetchone()[0]  # type: ignore[index]
-        except Exception:
-            c = 0
-        con.close()
-        return f, c
     except Exception:
         return 0, 0
+    # Count each table independently: the XBRL path writes only core_metrics,
+    # so a missing facts table must not hide the core rows (or vice versa).
+    try:
+        f = con.execute("SELECT count(*) FROM facts").fetchone()[0]  # type: ignore[index]
+    except Exception:
+        f = 0
+    try:
+        c = con.execute("SELECT count(*) FROM core_metrics").fetchone()[0]  # type: ignore[index]
+    except Exception:
+        c = 0
+    con.close()
+    return f, c
 
 
 def log_gap(ticker: str, kind: str, detail: str) -> None:
@@ -81,7 +86,13 @@ def main() -> int:
         rc, out = run("build_facts_xbrl.py", t, *(["--show"] if args.show else []))
         print(out.rstrip())
         _, core = facts_count(t)
-        if rc == 0 and core:
+        if core:
+            # Populated core_metrics is the success signal; a nonzero exit
+            # (say, one bad period) is worth surfacing but not a reason to
+            # fall back over rows that already exist.
+            if rc != 0:
+                print(f"  WARNING: build_facts_xbrl.py exited {rc} "
+                      "but core_metrics is populated; keeping XBRL result")
             print(f"  path: SEC XBRL  ({core} periods in core_metrics)")
             return 0
         # A US symbol SEC does not cover (foreign private issuer, recent

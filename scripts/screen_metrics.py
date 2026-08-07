@@ -60,7 +60,9 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--period", default="FY2024")
     ap.add_argument("--metric", default="revenue", choices=NUMERIC)
-    ap.add_argument("--order", default="")
+    # Same legal keys as --metric: an unvalidated typo would filter every
+    # row and masquerade as "no data for period".
+    ap.add_argument("--order", default=None, choices=NUMERIC)
     ap.add_argument("--top", type=int, default=25)
     ap.add_argument("--ticker", nargs="*", default=[])
     args = ap.parse_args()

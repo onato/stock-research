@@ -350,6 +350,7 @@ def check_units_consistent(ticker: str, card: Card) -> None:
         card.add("units_consistent", "skip", f"csv unreadable: {str(e)[:40]}")
         return
 
+    disagreement: str | None = None
     for period, dbv in db_rev.items():
         raw = csv_rev.get(period)
         if raw in (None, ""):
@@ -371,7 +372,14 @@ def check_units_consistent(ticker: str, card: Card) -> None:
                      f"{period}: db={dbv:,.1f} vs csv={cv:,.1f} "
                      f"({ratio:,.0f}x) -- units mismatch")
             return
-    card.add("units_consistent", "warn", "no comparable FY period")
+        # A moderate gap (e.g. 2x) is a data disagreement rather than a
+        # units error; remember the first one so it is reported as what it
+        # is, not buried under "no comparable FY period".
+        if disagreement is None:
+            disagreement = (f"{period}: db={dbv:,.1f} vs csv={cv:,.1f} "
+                            f"({ratio:.1f}x) -- revenue disagrees")
+    card.add("units_consistent", "warn",
+             disagreement or "no comparable FY period")
 
 
 def check_health(ticker: str, card: Card) -> None:

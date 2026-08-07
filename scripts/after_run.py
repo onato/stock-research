@@ -16,6 +16,7 @@ Usage:
 import collections
 import json
 import pathlib
+import re
 import subprocess
 import sys
 from typing import Any
@@ -24,6 +25,11 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 SCRIPTS = REPO / "scripts"
 SCORES = REPO / "state" / "scores"
 JOBLOG = REPO / "state" / "joblog.tsv"
+
+# What a ticker looks like: uppercase alphanumerics with an optional
+# exchange suffix ("DUOL", "WISE.L", "1211.HK"). Anything else in the
+# command's final position -- a path, a flag like "--fast" -- is not one.
+TICKER_RE = re.compile(r"[A-Z0-9]+(?:\.[A-Z0-9]+)?")
 
 
 def last_batch() -> list[str]:
@@ -42,7 +48,7 @@ def last_batch() -> list[str]:
             # The joblog's last column is the whole command
             # ("/path/to/research_one.sh WISE.L"), not just the ticker.
             token = parts[-1].strip().split()[-1]
-            if token and "/" not in token:
+            if TICKER_RE.fullmatch(token):
                 out.append(token)
     if out:
         return out
@@ -56,7 +62,10 @@ def last_batch() -> list[str]:
 
 
 def latest_scorecard(ticker: str) -> dict[str, Any] | None:
-    cards = sorted(SCORES.glob(f"{ticker}_*.json"))
+    # Newest by mtime, not by name: a re-run rewrites whichever file it
+    # rewrites, and the freshest write is the card that reflects it.
+    cards = sorted(SCORES.glob(f"{ticker}_*.json"),
+                   key=lambda p: p.stat().st_mtime)
     if not cards:
         return None
     try:
@@ -101,7 +110,14 @@ def main() -> int:
         if not card:
             print(f"  {t:10s} no scorecard")
             continue
-        bad = [c for c in card.get("checks", []) if c["status"] in ("warn", "fail")]
+        # Scorecards are agent-written JSON: a check missing status/id/
+        # detail degrades to an unknown-status warn with placeholders,
+        # the same way malformed JSON degrades to "no scorecard".
+        checks = [{"status": c.get("status", "warn"),
+                   "id": c.get("id", "?"),
+                   "detail": c.get("detail", "")}
+                  for c in card.get("checks", [])]
+        bad = [c for c in checks if c["status"] in ("warn", "fail")]
         per_ticker[t] = bad
         for c in bad:
             problems[c["id"]] += 1

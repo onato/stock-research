@@ -85,6 +85,18 @@ class TestLastBatch:
         ])
         assert after_run.last_batch() == ["DUOL"]
 
+    def test_trailing_flags_are_not_tickers(self, digest_repo):
+        # A flag after the ticker ("research_one.sh DUOL --fast") is the
+        # final token but not a ticker; only uppercase alnum tokens with
+        # an optional .SUFFIX qualify.
+        write_joblog(digest_repo, [
+            "/repo/scripts/research_one.sh DUOL --fast",
+            "/repo/scripts/research_one.sh 1211.HK",
+        ])
+        batch = after_run.last_batch()
+        assert "--fast" not in batch
+        assert "1211.HK" in batch
+
     def test_short_or_blank_rows_are_skipped(self, digest_repo):
         (digest_repo / "state" / "joblog.tsv").write_text(
             "Seq\tCommand\n"
@@ -120,10 +132,15 @@ class TestLatestScorecard:
     def test_missing_scorecard_is_none(self, digest_repo):
         assert after_run.latest_scorecard("WISE.L") is None
 
-    def test_picks_lexically_last_card(self, digest_repo):
-        write_scorecard(digest_repo, "DUOL", [], name="20260101")
+    def test_picks_newest_card_by_mtime(self, digest_repo):
+        # Newest by mtime wins, not lexicographic filename order: a re-run
+        # written to a lexically-earlier name must still be the one read.
         write_scorecard(digest_repo, "DUOL", [{"id": "newer", "status": "ok",
-                                               "detail": ""}], name="20260615")
+                                               "detail": ""}], name="20260101")
+        write_scorecard(digest_repo, "DUOL", [], name="20260615")
+        scores = digest_repo / "state" / "scores"
+        os.utime(scores / "DUOL_20260615.json", (1_700_000_000, 1_700_000_000))
+        os.utime(scores / "DUOL_20260101.json", (1_700_000_100, 1_700_000_100))
         card = after_run.latest_scorecard("DUOL")
         assert card["checks"][0]["id"] == "newer"
 
@@ -182,6 +199,18 @@ class TestMain:
         assert "FAIL" in out
         assert "no scorecard" in out
         assert "FIX DUOL: dcf_entry_price" in out
+
+    def test_check_dicts_missing_keys_do_not_crash(
+            self, digest_repo, canned_run, monkeypatch, capsys):
+        # Malformed JSON already degrades to "no scorecard"; a well-formed
+        # card whose check dicts lack status/id/detail must degrade too
+        # (missing status reads as warn, missing id/detail as placeholders),
+        # never KeyError the whole digest.
+        write_scorecard(digest_repo, "A1", [{}, {"status": "fail"}])
+        monkeypatch.setattr("sys.argv", ["after_run.py", "A1"])
+        assert after_run.main() == 0
+        out = capsys.readouterr().out
+        assert "FAIL" in out
 
     def test_warn_on_one_of_two_tickers_is_not_systemic(
             self, digest_repo, canned_run, monkeypatch, capsys):

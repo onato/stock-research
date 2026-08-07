@@ -187,6 +187,23 @@ class TestMain:
         assert "AAA.NZ" in out
         assert "BBB.NZ" not in out
 
+    def test_multiple_recorded_currencies_flagged_ambiguous(
+            self, make_ticker, monkeypatch, capsys):
+        # A DB carrying two distinct currencies means adjudication went
+        # wrong somewhere; silently reporting whichever row came first
+        # would let the ambiguity pass as agreement.
+        import duckdb
+        d = install_db(make_ticker, "AMB.NZ", "NZD")
+        con = duckdb.connect(str(d / "Reports" / "AMB.NZ.duckdb"))
+        con.execute(
+            "INSERT INTO core_metrics (period, currency) VALUES ('FY2025', 'AUD')")
+        con.close()
+        code, out = run_main(monkeypatch, capsys)
+        assert code == 1
+        assert "ambiguous" in out
+        assert "AUD" in out
+        assert "NZD" in out
+
     def test_db_without_currency_rows_is_skipped(
             self, make_ticker, monkeypatch, capsys):
         install_db(make_ticker, "EMPTY.NZ", None)

@@ -174,7 +174,10 @@ def main() -> int:
                 print(f"  {flag} needs a filename", file=sys.stderr)
                 return 2
             fp = pathlib.Path(sys.argv[i + 1])
-            snap = {s["ticker"]: (s["reported"] or s["estimated"]) for s in results}
+            # Same selection as the summary table: a reported $0.00 is a
+            # real number, not a cue to fall back to the estimate.
+            snap = {s["ticker"]: (s["reported"] if s["reported"] is not None
+                                  else s["estimated"]) for s in results}
             if flag == "--baseline":
                 fp.write_text(json.dumps(snap, indent=2))
                 print(f"\n  baseline saved to {fp}")
@@ -187,7 +190,8 @@ def main() -> int:
                 for t, after in snap.items():
                     before = base.get(t)
                     if before is None:
-                        print(f"  {t:11s} {'(new)':>8s} ${after:7.2f}")
+                        # Pad the change column so the table stays aligned.
+                        print(f"  {t:11s} {'(new)':>8s} ${after:7.2f} {'--':>10s}")
                         continue
                     pct = (after - before) / before * 100 if before else 0
                     print(f"  {t:11s} ${before:7.2f} ${after:7.2f} {pct:+9.1f}%")

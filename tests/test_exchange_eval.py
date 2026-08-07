@@ -14,8 +14,9 @@ import exchange_eval
 import pytest
 
 PROSE = "Revenue for the year was $400.0 million.\n" * 5
-# 4 markers in the head trips the >3 threshold.
-IXBRL = "http://fasb.org/us-gaap/2024 xbrl ifrs-full\n" + "prose line\n" * 20
+# 4 distinctive taxonomy markers in the head trips the >3 threshold.
+IXBRL = ("http://fasb.org/us-gaap/2024 xbrl.org ifrs-full\n"
+         + "prose line\n" * 20)
 
 
 @pytest.fixture
@@ -57,13 +58,29 @@ class TestIsIxbrl:
         assert exchange_eval.is_ixbrl(IXBRL) is True
 
     def test_threshold_is_strictly_more_than_three(self):
-        assert exchange_eval.is_ixbrl("fasb.org us-gaap xbrl") is False
+        assert exchange_eval.is_ixbrl("fasb.org us-gaap xbrl.org") is False
 
     def test_prose_is_not_ixbrl(self):
         assert exchange_eval.is_ixbrl(PROSE) is False
 
-    def test_only_the_first_5000_chars_are_inspected(self):
-        assert exchange_eval.is_ixbrl("x" * 5000 + IXBRL * 5) is False
+    def test_marker_matching_is_case_insensitive(self):
+        """Extracts of uppercased taxonomy junk are still machine markup."""
+        assert exchange_eval.is_ixbrl(IXBRL.upper()) is True
+
+    def test_prose_mentions_of_xbrl_are_not_markup(self):
+        """A filing that *discusses* XBRL is prose, not taxonomy junk --
+        the bare word must not count as a marker."""
+        prose = ("The company files its accounts in XBRL format. "
+                 "XBRL adoption is mandatory. xbrl xbrl xbrl xbrl")
+        assert exchange_eval.is_ixbrl(prose) is False
+
+    def test_markers_past_a_prose_preamble_are_still_seen(self):
+        """Real iXBRL extracts open with a prose cover page; markers a few
+        thousand chars in must still be inside the scan window."""
+        assert exchange_eval.is_ixbrl("prose " * 1500 + IXBRL) is True
+
+    def test_scan_window_is_bounded_at_20000_chars(self):
+        assert exchange_eval.is_ixbrl("x" * 20000 + IXBRL * 5) is False
 
 
 class TestExchangeOf:
@@ -181,6 +198,25 @@ class TestMain:
         # The label works too, case-insensitively.
         assert run_main(monkeypatch, "--exchange", "nzx") == 0
         assert "NZX" in capsys.readouterr().out
+
+    def test_unit_group_selectable_by_label_or_suffix_key(self, fake_repo,
+                                                          stub_scan,
+                                                          monkeypatch, capsys):
+        """The .U group answers to its exact display label and its suffix
+        key -- and the suffix branch matches the group's suffix key, never
+        the raw ticker tail (a suffixless ticker's tail is its whole name,
+        which is not an exchange)."""
+        extract(fake_repo, "FIH.U", "FIH.U_Annual_FY2024.txt")
+        extract(fake_repo, "DUOL", "DUOL_10K_FY2024.txt")
+        assert run_main(monkeypatch, "--exchange", "US (unit)") == 0
+        out = capsys.readouterr().out
+        assert "US (unit)" in out
+        assert "companyfacts" not in out    # plain-US group excluded
+        assert run_main(monkeypatch, "--exchange", "U") == 0
+        assert "US (unit)" in capsys.readouterr().out
+        # A bare ticker name selects nothing.
+        assert run_main(monkeypatch, "--exchange", "DUOL") == 1
+        assert "no extracted filings" in capsys.readouterr().err
 
     def test_json_snapshot(self, fake_repo, stub_scan, monkeypatch, tmp_path,
                            capsys):

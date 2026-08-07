@@ -105,10 +105,10 @@ class TestFactsCount:
         con.close()
         assert extract.facts_count("AGL.NZ") == (1, 0)
 
-    def test_missing_facts_table_hides_core_rows(self, monkeypatch, tmp_path):
-        """CURRENT behavior: the facts count is queried first and its failure
-        aborts the whole function, so a DB holding only core_metrics reads as
-        (0, 0) — core rows are invisible, and main() would fall back."""
+    def test_missing_facts_table_still_counts_core_rows(self, monkeypatch, tmp_path):
+        # Each table is counted independently: the XBRL path never writes a
+        # facts table, so a DB holding only core_metrics must not read as
+        # (0, 0) — that would hide the core rows and make main() fall back.
         monkeypatch.setattr(extract, "REPO", tmp_path)
         d = tmp_path / "research" / "NFLX" / "Reports"
         d.mkdir(parents=True)
@@ -116,7 +116,7 @@ class TestFactsCount:
         con.execute("CREATE TABLE core_metrics (period TEXT)")
         con.execute("INSERT INTO core_metrics VALUES ('FY2024')")
         con.close()
-        assert extract.facts_count("NFLX") == (0, 0)
+        assert extract.facts_count("NFLX") == (0, 1)
 
     def test_unreadable_file_counts_zero(self, monkeypatch, tmp_path):
         monkeypatch.setattr(extract, "REPO", tmp_path)
@@ -179,17 +179,22 @@ class TestMainRouting:
         assert [g[1] for g in gaps] == ["other"]
         assert "falling back to text" in capsys.readouterr().out
 
-    def test_xbrl_nonzero_rc_falls_back_even_with_core_rows(self, monkeypatch, capsys):
-        """CURRENT behavior: success requires rc == 0 AND core rows, so a
-        script that populated core_metrics but exited nonzero still triggers
-        the text fallback and a gap entry."""
+    def test_xbrl_nonzero_rc_with_core_rows_is_success(self, monkeypatch, capsys):
+        # Populated core_metrics is the success signal, not the exit code: a
+        # script that wrote rows but exited nonzero (say, one bad period) did
+        # its job. Falling back to text would only bury the good rows, so
+        # warn about the exit code and stop -- no fallback, no gap entry.
         rc, calls, gaps = drive(
             monkeypatch, ["NFLX"],
-            {"build_facts_xbrl.py": (1, "boom"), "build_facts.py": (0, "ok")},
-            [(0, 5), (3, 0)])
+            {"build_facts_xbrl.py": (1, "boom")},
+            [(0, 5)])
         assert rc == 0
-        assert [c[0] for c in calls] == ["build_facts_xbrl.py", "build_facts.py"]
-        assert [g[1] for g in gaps] == ["other"]
+        assert [c[0] for c in calls] == ["build_facts_xbrl.py"]
+        assert gaps == []
+        out = capsys.readouterr().out
+        assert "SEC XBRL" in out
+        assert "5 periods" in out
+        assert "exited 1" in out  # the nonzero rc is surfaced, not swallowed
 
     def test_neither_path_logs_layout_unparsed_but_exits_zero(self, monkeypatch, capsys):
         rc, _calls, gaps = drive(

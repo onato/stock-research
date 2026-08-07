@@ -56,10 +56,19 @@ EXCHANGES = {
 
 # A filing whose text is mostly XBRL taxonomy URLs rather than prose --
 # pdftotext ran on an iXBRL document and produced machine markup.
+# Markers are distinctive taxonomy artefacts (namespace hosts and inline-tag
+# prefixes), matched case-insensitively. The bare word "xbrl" is NOT a
+# marker: filings legitimately *discuss* XBRL in prose. The scan window is
+# 20,000 chars -- real iXBRL extracts open with a prose cover page (title,
+# contents, auditor boilerplate) that can run well past 5,000 chars before
+# the markup starts, while staying bounded keeps multi-MB files cheap.
+IXBRL_MARKERS = ("fasb.org", "us-gaap", "ifrs-full", "xbrl.org",
+                 "ix:nonfraction", "xbrli:")
+
+
 def is_ixbrl(text: str) -> bool:
-    head = text[:5000]
-    return (head.count("fasb.org") + head.count("us-gaap")
-            + head.count("xbrl") + head.count("ifrs-full")) > 3
+    head = text[:20000].lower()
+    return sum(head.count(m) for m in IXBRL_MARKERS) > 3
 
 
 def exchange_of(ticker: str) -> tuple[str, str]:
@@ -122,8 +131,13 @@ def main() -> int:
     for d in sorted(REPO.glob("research/*/Extracted")):
         ticker = d.parent.name
         label, regime = exchange_of(ticker)
+        # Accept the suffix key ("U") or the exact display label
+        # ("US (unit)"), case-insensitively. The key is derived as in
+        # exchange_of -- empty for suffixless tickers, so a bare ticker
+        # name never masquerades as an exchange.
+        suffix = ticker.rsplit(".", 1)[1].upper() if "." in ticker else ""
         if args.exchange and args.exchange.upper() not in (label.upper(),
-                                                           ticker.rsplit(".", 1)[-1].upper()):
+                                                           suffix):
             continue
         st = scan_ticker(ticker)
         if st:

@@ -344,14 +344,18 @@ class TestUnitsConsistent:
         assert check["status"] == "fail"
         assert "units mismatch" in check["detail"]
 
-    def test_moderate_disagreement_falls_through_to_warn(self, make_ticker):
-        # A 2x gap is a data difference, not a units error: current behavior
-        # is the (misleadingly worded) "no comparable FY period" warn.
+    def test_moderate_disagreement_warns_with_ratio_and_period(self, make_ticker):
+        # A 2x gap is a data disagreement, not a units error -- but it is a
+        # disagreement, and must be reported as one (period + ratio), never
+        # hidden behind the generic "no comparable FY period" detail.
         d = make_ticker("TWOX")
         make_db(d, "TWOX", [("FY2024", 220.0)])
         write_csv(d, "TWOX", GOOD_HEADER, GOOD_ROWS)
         check = units_checks(make_ticker, "TWOX")
-        assert (check["status"], check["detail"]) == ("warn", "no comparable FY period")
+        assert check["status"] == "warn"
+        assert "FY2024" in check["detail"]
+        assert "2.0x" in check["detail"]
+        assert "no comparable FY period" not in check["detail"]
 
     def test_zero_and_absent_periods_skipped_until_a_match(self, make_ticker):
         # FY2022 absent from the CSV and FY2023 zero are both skipped; the
@@ -365,11 +369,12 @@ class TestUnitsConsistent:
         assert check["status"] == "pass"
 
     def test_non_numeric_csv_revenue_warns(self, make_ticker):
+        # No pair was ever comparable here, so the generic detail is right.
         d = make_ticker("NAN")
         make_db(d, "NAN", [("FY2024", 110.0)])
         write_csv(d, "NAN", ["Period", "Revenue"], [["FY2024", "n/a"]])
         check = units_checks(make_ticker, "NAN")
-        assert check["status"] == "warn"
+        assert (check["status"], check["detail"]) == ("warn", "no comparable FY period")
 
     def test_unreadable_csv_skips(self, make_ticker):
         d = make_ticker("DIRCSV")
