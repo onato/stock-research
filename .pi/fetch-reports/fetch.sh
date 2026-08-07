@@ -62,6 +62,17 @@ echo "company: $COMPANY"
 
 INVENTORY=$(python3 "$HERE/missing.py" "$TICKER")
 
+# NZX adapter: update-mode only (current-year announcements are hydrated in
+# the page; back-years are not reachable deterministically). Authoritative
+# for updates; seeds fall through to archive/model.
+if [[ "$TICKER" == *.NZ ]]; then
+  AFTER_YEAR=$(python3 -c "import sys; sys.path.insert(0,'$HERE'); from missing import scan; print(scan('$TICKER')['newest_year'])")
+  if [ "$AFTER_YEAR" -gt 0 ] && python3 "$HERE/adapters/nzx.py" "$TICKER" --dest "$STAGING" --after-year "$AFTER_YEAR"; then
+    finish
+    exit 0
+  fi
+fi
+
 # ASX registry adapter: authoritative for updates; on an empty seed result we
 # fall through to the AnnualReports/model path below.
 if [[ "$TICKER" == *.AX ]]; then
