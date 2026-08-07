@@ -1,4 +1,5 @@
-"""Tests for check_currency.py's filing-evidence sampling (from_filings).
+"""Tests for check_currency.py's filing-evidence sampling (from_filings)
+and the reporting path (main).
 
 The hard-won rules pinned here both come from WISE.L: sort by the PERIOD in
 the filename (alphabetical sorting pushed the FY2026 20-F that announced the
@@ -7,6 +8,8 @@ filing with evidence (pooling across years lets 500+ stale GBP symbols
 outvote the current USD reality).
 """
 
+import sys
+
 import check_currency as C
 
 
@@ -14,6 +17,22 @@ def install(make_ticker, ticker, files):
     d = make_ticker(ticker)
     for name, text in files.items():
         (d / "Extracted" / name).write_text(text)
+    return d
+
+
+def install_db(make_ticker, ticker, currency):
+    """A real DuckDB under Reports/ with one core_metrics row."""
+    import duckdb
+    import schema
+
+    d = make_ticker(ticker)
+    con = duckdb.connect(str(d / "Reports" / f"{ticker}.duckdb"))
+    con.execute(schema.create_sql())
+    if currency is not None:
+        con.execute(
+            "INSERT INTO core_metrics (period, currency) VALUES ('FY2024', ?)",
+            [currency])
+    con.close()
     return d
 
 
@@ -97,3 +116,87 @@ class TestSampling:
         })
         stated, _ = C.from_filings("T", sample=1)
         assert stated == "NZD"
+
+
+def run_main(monkeypatch, capsys, *argv):
+    monkeypatch.setattr(sys, "argv", ["check_currency.py", *argv])
+    code = C.main()
+    return code, capsys.readouterr().out
+
+
+class TestMain:
+    def test_agreement_exits_zero(self, make_ticker, monkeypatch, capsys):
+        d = install_db(make_ticker, "OK.NZ", "NZD")
+        (d / "Extracted" / "OK.NZ_Annual_FY2025.txt").write_text(
+            "presented in New Zealand dollars. Revenue NZ$ 1,234.")
+        code, out = run_main(monkeypatch, capsys)
+        assert code == 0
+        assert "no currency mismatches" in out
+        assert "NZDx1" in out  # symbol counts shown in the table
+
+    def test_mismatch_flags_and_exits_one(self, make_ticker, monkeypatch, capsys):
+        # Recorded USD but the newest filing states NZD: flag with a
+        # ready-to-paste re-run command.
+        d = install_db(make_ticker, "BAD.NZ", "USD")
+        (d / "Extracted" / "BAD.NZ_Annual_FY2025.txt").write_text(
+            "presented in New Zealand dollars")
+        code, out = run_main(monkeypatch, capsys)
+        assert code == 1
+        assert "<-- expected NZD" in out
+        assert "make run TICKER=BAD.NZ" in out
+        assert "recorded USD, should be NZD" in out
+
+    def test_stated_currency_outranks_suffix_prior(
+            self, make_ticker, monkeypatch, capsys):
+        # WISE.L-shaped: .L suffix says GBP, but the filing states USD and
+        # the record agrees — an explicit statement must beat the prior.
+        d = install_db(make_ticker, "X.L", "USD")
+        (d / "Extracted" / "X.L_Annual_FY2026.txt").write_text(
+            "The reporting currency of the Group is the U.S. dollar.")
+        code, out = run_main(monkeypatch, capsys)
+        assert code == 0
+        assert "GBP" in out  # suffix expectation still displayed
+        assert "no currency mismatches" in out
+
+    def test_suffix_prior_used_when_nothing_stated(
+            self, make_ticker, monkeypatch, capsys):
+        install_db(make_ticker, "Y.NZ", "USD")  # no Extracted files at all
+        code, out = run_main(monkeypatch, capsys)
+        assert code == 1
+        assert "recorded USD, should be NZD" in out
+
+    def test_unknown_suffix_never_flagged(self, make_ticker, monkeypatch, capsys):
+        # No stated currency and no suffix mapping -> truth is "?" and the
+        # ticker cannot be flagged, whatever was recorded.
+        install_db(make_ticker, "Z.XX", "EUR")
+        code, out = run_main(monkeypatch, capsys)
+        assert code == 0
+        assert "?" in out
+
+    def test_bare_ticker_defaults_to_usd(self, make_ticker, monkeypatch, capsys):
+        install_db(make_ticker, "ACME", "USD")
+        code, out = run_main(monkeypatch, capsys)
+        assert code == 0
+        assert "no currency mismatches" in out
+
+    def test_argv_filters_to_named_tickers(self, make_ticker, monkeypatch, capsys):
+        install_db(make_ticker, "AAA.NZ", "NZD")
+        install_db(make_ticker, "BBB.NZ", "USD")  # would be flagged if scanned
+        code, out = run_main(monkeypatch, capsys, "AAA.NZ")
+        assert code == 0
+        assert "AAA.NZ" in out
+        assert "BBB.NZ" not in out
+
+    def test_db_without_currency_rows_is_skipped(
+            self, make_ticker, monkeypatch, capsys):
+        install_db(make_ticker, "EMPTY.NZ", None)
+        code, out = run_main(monkeypatch, capsys)
+        assert code == 0
+        assert "EMPTY.NZ" not in out
+
+    def test_unreadable_db_is_skipped(self, make_ticker, monkeypatch, capsys):
+        d = make_ticker("CORRUPT.NZ")
+        (d / "Reports" / "CORRUPT.NZ.duckdb").write_text("not a database")
+        code, out = run_main(monkeypatch, capsys)
+        assert code == 0
+        assert "CORRUPT.NZ" not in out
