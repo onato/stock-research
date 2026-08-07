@@ -61,8 +61,18 @@ def check(path: Path, ticker: str, company: str, dest: Path) -> str | None:
     if company != ticker:  # unknown-name tickers skip this check rather than fail everything
         # Calibrated on the 2026-08-05 audit: demand any distinctive name word
         # (or the ticker base) — covers say "Skellerup", not "Skellerup Holdings".
+        # info.json aliases join the accepted vocabulary (renames: EVT Limited
+        # was "Event Hospitality & Entertainment" — old annuals never say EVT).
         stop = {"the", "plc", "limited", "ltd", "group", "holdings", "company", "corporation"}
-        words = [w.strip("&.,").lower() for w in company.split()]
+        alias_words = []
+        info_file = REPO / "research" / ticker / "info.json"
+        if info_file.exists():
+            try:
+                for alias in json.loads(info_file.read_text()).get("aliases", []):
+                    alias_words += str(alias).split()
+            except json.JSONDecodeError:
+                pass
+        words = [w.strip("&.,").lower() for w in company.split() + alias_words]
         words = [w for w in words if w not in stop and len(w) > 2]
         base = ticker.split(".")[0].lower()
         tl = text.lower()
