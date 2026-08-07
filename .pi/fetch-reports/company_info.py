@@ -54,7 +54,11 @@ def quirks(ticker: str) -> str:
     notes = []
     info = load(ticker)
     if info.get("ir_url"):
-        notes.append(f"Known investor-relations page (verified previously): {info['ir_url']}")
+        if info.get("ir_url_source") == "observed":
+            notes.append("Investor-relations page used on a previous pass "
+                         f"(unverified): {info['ir_url']}")
+        else:
+            notes.append(f"Known investor-relations page (verified previously): {info['ir_url']}")
     if info.get("quirks"):
         notes.append(str(info["quirks"]))
     try:

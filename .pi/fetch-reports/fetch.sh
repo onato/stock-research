@@ -25,16 +25,28 @@ finish() {
   local gate_out
   gate_out=$(python3 "$HERE/gate.py" "$TICKER")
   echo "$gate_out"
-  # Trust-gated source learning: remember the IR page only when this run's
-  # downloads actually passed the gate.
-  if echo "$gate_out" | grep -q "\[promoted\]" && [ -n "$learned_url" ]; then
-    LEARNED_URL="$learned_url" python3 -c "
+  # Trust-gated source learning: a gate-promoted run is the strong signal and
+  # may overwrite. A NOTHING-NEW run still located the IR page; keep that as
+  # an unverified hint, but never let it replace a gate-promoted URL.
+  if [ -n "$learned_url" ]; then
+    local promoted=0
+    echo "$gate_out" | grep -q "\[promoted\]" && promoted=1
+    LEARNED_URL="$learned_url" PROMOTED="$promoted" python3 -c "
 import os, sys; sys.path.insert(0, '$HERE')
-from company_info import write
+from company_info import load, write
 url = os.environ['LEARNED_URL'].strip()
 if url.startswith('http') and len(url) < 500:
-    write('$TICKER', {'ir_url': url, 'updated_by': 'fetcher-learned'})
-    print(f'learned ir_url: {url}')"
+    if os.environ['PROMOTED'] == '1':
+        write('$TICKER', {'ir_url': url, 'ir_url_source': 'gate-promoted',
+                          'updated_by': 'fetcher-learned'})
+        print(f'learned ir_url: {url}')
+    else:
+        have = load('$TICKER')
+        # Legacy entries predate ir_url_source but were all gate-promoted.
+        if not have.get('ir_url') or have.get('ir_url_source') == 'observed':
+            write('$TICKER', {'ir_url': url, 'ir_url_source': 'observed',
+                              'updated_by': 'fetcher-observed'})
+            print(f'observed ir_url (unverified): {url}')"
   fi
   rm -f "$STAGING/ir_url.txt"
   # Commit this ticker's extracted text + name registry. Uses the repo's mkdir
