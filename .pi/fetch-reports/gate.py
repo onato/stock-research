@@ -81,8 +81,12 @@ def check(path: Path, ticker: str, company: str, dest: Path) -> str | None:
     # Period consistency: a report labeled FY2022/H1-2023 must not be *about* a
     # later period. "…ended 31 December 2023" in an H1-2023 file means mislabeled.
     label_year = max((int(y) for y in re.findall(r"(\d{4})", path.name)), default=0)
-    ended = re.findall(r"(?:year|period)\s+end(?:ed|ing)\s+\d{1,2}\s+\w+\s+(\d{4})", text, re.I)
-    if ended and max(int(y) for y in ended) > label_year:
+    ended = [int(y) for y in re.findall(
+        r"(?:year|period)\s+end(?:ed|ing)\s+\d{1,2}\s+\w+\s+(\d{4})", text, re.I)]
+    # The label year appearing among 'ended' mentions means the real statement
+    # matches; timeline pages citing later-period events must not outvote it
+    # (30 genuine HK annuals were false-flagged by a max-year rule).
+    if ended and label_year not in ended and max(ended) > label_year:
         return f"period-mismatch (labeled {label_year}, text reports period ended {max(ended)})"
     short = f"fy{label_year % 100}"  # covers say "FY25" as often as "2025"
     if not ended and str(label_year) not in text and short not in text.lower():
