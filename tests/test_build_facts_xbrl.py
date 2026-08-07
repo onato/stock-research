@@ -109,12 +109,15 @@ class TestPeriodLabel:
         assert bfx.period_label(
             {"start": "2024-02-01", "end": "2024-04-30"}) == "Q2 2024"
 
-    def test_nine_month_ytd_collapses_into_a_half(self):
-        # CURRENT BEHAVIOR: a 273-day 10-Q YTD period (150 < days <= 300)
-        # falls into the half-year branch and comes out as H2, where it can
-        # collide with a genuine second half. Documented, not endorsed.
+    def test_nine_month_ytd_has_no_canonical_period(self):
+        # A 273-day 10-Q YTD span is neither a half nor a quarter; labeling
+        # it H2 let it collide with -- and, filed later, overwrite -- a
+        # genuine second half. It must be dropped, not shoehorned.
         assert bfx.period_label(
-            {"start": "2024-01-01", "end": "2024-09-30"}) == "H2-2024"
+            {"start": "2024-01-01", "end": "2024-09-30"}) is None
+        # A real second half (~184 days) still labels as H2.
+        assert bfx.period_label(
+            {"start": "2024-07-01", "end": "2024-12-31"}) == "H2-2024"
 
     def test_missing_end_is_none(self):
         assert bfx.period_label({}) is None

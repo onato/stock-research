@@ -113,6 +113,10 @@ def period_label(fact: dict[str, Any]) -> str | None:
     days = (_d(end) - _d(start)).days
     if days > 300:
         return f"FY{year}"
+    if days > 200:
+        # 9-month 10-Q YTD: no canonical period. Labeling it H2 collided
+        # with the genuine second half, which it overwrote when filed later.
+        return None
     if days > 150:
         half = "H1" if int(end[5:7]) <= 8 else "H2"
         return f"{half}-{year}"
