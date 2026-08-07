@@ -80,7 +80,10 @@ def check(path: Path, ticker: str, company: str, dest: Path) -> str | None:
             return f"company-name-missing (none of {words[:3]} nor {base!r} in first 20 pages)"
     # Period consistency: a report labeled FY2022/H1-2023 must not be *about* a
     # later period. "…ended 31 December 2023" in an H1-2023 file means mislabeled.
-    label_year = max((int(y) for y in re.findall(r"(\d{4})", path.name)), default=0)
+    # Parse the year from the PERIOD token only — high-numbered .HK codes
+    # (2689.HK, 9988.HK) otherwise masquerade as years via max-of-filename.
+    m_label = re.search(r"(?:FY|H[12]-|Q[1-4]-)(20\d\d)", path.name)
+    label_year = int(m_label[1]) if m_label else 0
     ended = [int(y) for y in re.findall(
         r"(?:year|period)\s+end(?:ed|ing)\s+\d{1,2}\s+\w+\s+(\d{4})", text, re.I)]
     # The label year appearing among 'ended' mentions means the real statement
