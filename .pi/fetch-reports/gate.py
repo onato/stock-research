@@ -51,7 +51,7 @@ def check(path: Path, ticker: str, company: str, dest: Path) -> str | None:
         return f"too-small ({path.stat().st_size} bytes)"
     try:
         text = subprocess.run(
-            ["pdftotext", "-l", "10", str(path), "-"],
+            ["pdftotext", "-l", "20", str(path), "-"],
             capture_output=True, text=True, timeout=120, check=True,
         ).stdout
     except Exception as e:
@@ -77,7 +77,7 @@ def check(path: Path, ticker: str, company: str, dest: Path) -> str | None:
         base = ticker.split(".")[0].lower()
         tl = text.lower()
         if words and not any(w in tl for w in words) and base not in tl:
-            return f"company-name-missing (none of {words[:3]} nor {base!r} in first 10 pages)"
+            return f"company-name-missing (none of {words[:3]} nor {base!r} in first 20 pages)"
     # Period consistency: a report labeled FY2022/H1-2023 must not be *about* a
     # later period. "…ended 31 December 2023" in an H1-2023 file means mislabeled.
     label_year = max((int(y) for y in re.findall(r"(\d{4})", path.name)), default=0)
