@@ -60,7 +60,7 @@ def quarterly_filings(sid: int) -> list[dict]:
 def title_year(title: str) -> int:
     years = [int(y) for y in re.findall(r"(20\d\d)", title)]
     # "2024/25 annual report" style: second part is 2-digit
-    frac = re.search(r"20(\d\d)\s*/\s*(\d\d)", title)
+    frac = re.search(r"20(\d\d)\s*[/\-\u2013\u2014]\s*(\d\d)", title)
     if frac:
         years.append(2000 + int(frac[2]))
     return max(years, default=0)
