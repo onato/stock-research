@@ -28,7 +28,9 @@ import fcntl
 import json
 import os
 import sys
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 STATE_FILE = REPO_ROOT / "state" / "budget.json"
@@ -36,7 +38,7 @@ STATE_FILE = REPO_ROOT / "state" / "budget.json"
 SATURDAY, SUNDAY = 5, 6
 
 
-def weekend_key(d):
+def weekend_key(d: dt.date) -> str:
     """ISO year+week, e.g. '2026-W31'.
 
     Saturday and Sunday share an ISO week number, so both days of one
@@ -46,20 +48,20 @@ def weekend_key(d):
     return f"{iso[0]}-W{iso[1]:02d}"
 
 
-def load_state():
+def load_state() -> dict[str, Any]:
     try:
         return json.loads(STATE_FILE.read_text())
     except (OSError, json.JSONDecodeError):
         return {}
 
 
-def save_state(state):
+def save_state(state: dict[str, Any]) -> None:
     STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
     STATE_FILE.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n")
 
 
 @contextlib.contextmanager
-def state_lock():
+def state_lock() -> Iterator[None]:
     """Serialize the budget read-modify-write across concurrent runners.
 
     Parallel local runs would otherwise each read the same count and write
@@ -80,7 +82,7 @@ def state_lock():
             fcntl.flock(fh, fcntl.LOCK_UN)
 
 
-def emit(proceed, reason, runs_used, max_runs):
+def emit(proceed: bool, reason: str, runs_used: int, max_runs: int) -> None:
     out = os.environ.get("GITHUB_OUTPUT")
     payload = (
         f"proceed={'true' if proceed else 'false'}\n"
@@ -94,7 +96,7 @@ def emit(proceed, reason, runs_used, max_runs):
     print(reason, file=sys.stderr)
 
 
-def main():
+def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--max-runs", type=int, default=8, help="Runs allowed per weekend")
     ap.add_argument(

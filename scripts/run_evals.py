@@ -30,6 +30,8 @@ import datetime as dt
 import itertools
 import json
 import sys
+from collections.abc import Callable
+from typing import Any
 
 import dcf_fields as F
 from schema import normalize
@@ -43,12 +45,12 @@ SHARES_RATIO = 3        # shares should be split-adjusted, so tighter
 MIN_EXTRACT_BYTES = 200
 
 
-def close(a, b, tol=REL_TOL):
+def close(a: float, b: float, tol: float = REL_TOL) -> bool:
     scale = max(abs(a), abs(b), 1e-9)
     return abs(a - b) <= tol * scale
 
 
-def margin_ok(m, part, whole):
+def margin_ok(m: float, part: float, whole: float) -> bool:
     """Margin column agrees with part/whole in percent (25) or fraction (0.25) form."""
     if abs(whole) < 1e-9:
         return True
@@ -56,7 +58,7 @@ def margin_ok(m, part, whole):
     return abs(m - ratio * 100) <= 1.5 or abs(m - ratio) <= 0.015
 
 
-def eps_ok(ni, eps, sh):
+def eps_ok(ni: float, eps: float, sh: float) -> bool:
     """EPS vs share count agree up to the units convention (shares in
     ones/thousands/millions); anything else is a units or split error."""
     if abs(eps) < 1e-12 or abs(sh) < 1e-9:
@@ -67,15 +69,15 @@ def eps_ok(ni, eps, sh):
 
 
 class Card:
-    def __init__(self):
-        self.checks = []
+    def __init__(self) -> None:
+        self.checks: list[dict[str, str]] = []
 
-    def add(self, cid, status, detail=""):
+    def add(self, cid: str, status: str, detail: str = "") -> None:
         self.checks.append({"id": cid, "status": status, "detail": detail})
 
-    def summary(self):
-        counts = {s: sum(1 for c in self.checks if c["status"] == s)
-                  for s in ("pass", "warn", "fail", "skip")}
+    def summary(self) -> dict[str, Any]:
+        counts: dict[str, Any] = {s: sum(1 for c in self.checks if c["status"] == s)
+                                  for s in ("pass", "warn", "fail", "skip")}
         graded = counts["pass"] + counts["fail"]
         counts["score"] = round(counts["pass"] / graded, 3) if graded else None
         return counts
@@ -85,7 +87,7 @@ class Card:
 # Metrics.csv checks
 # ---------------------------------------------------------------------------
 
-def load_metrics(ticker):
+def load_metrics(ticker: str) -> tuple[list[dict[str, Any]] | None, Any]:
     path = F.REPO / "research" / ticker / "Reports" / f"{ticker}_Metrics.csv"
     if not path.exists():
         return None, None
@@ -96,9 +98,9 @@ def load_metrics(ticker):
         return [], []
     header = rows[0]
     cols = [normalize(h) for h in header]
-    out = []
+    out: list[dict[str, Any]] = []
     for raw in rows[1:]:
-        rec = {}
+        rec: dict[str, Any] = {}
         for i, cell in enumerate(raw[: len(cols)]):
             key = cols[i] or f"kpi:{header[i]}"
             rec[key] = cell.strip() if key == "period" else F.num(cell)
@@ -106,7 +108,7 @@ def load_metrics(ticker):
     return out, header
 
 
-def check_metrics(ticker, card):
+def check_metrics(ticker: str, card: Card) -> None:
     rows, header = load_metrics(ticker)
     if rows is None:
         card.add("csv_parse", "fail", "Metrics.csv missing")
@@ -121,7 +123,9 @@ def check_metrics(ticker, card):
     card.add("periods_unique", "fail" if dupes else "pass",
              f"duplicate periods: {dupes}" if dupes else "")
 
-    def identity(cid, fields, test, note=""):
+    def identity(cid: str, fields: tuple[str, ...],
+                 test: Callable[..., bool], note: str = "") -> None:
+        bad: list[Any]
         bad, n = [], 0
         for r in rows:
             vals = [r.get(f) for f in fields]
@@ -157,7 +161,8 @@ def check_metrics(ticker, card):
     identity("eps_share_scale", ("net_income", "eps", "shares_outstanding"),
              eps_ok, note="(units/split mismatch)")
 
-    def continuity(cid, field, limit):
+    def continuity(cid: str, field: str, limit: float) -> None:
+        jumps: list[str]
         jumps, n = [], 0
         for prev, cur in itertools.pairwise(rows):
             a, b = prev.get(field), cur.get(field)
@@ -191,7 +196,7 @@ def check_metrics(ticker, card):
 # DCF.json checks
 # ---------------------------------------------------------------------------
 
-def check_dcf(ticker, card):
+def check_dcf(ticker: str, card: Card) -> None:
     dcf = F.load_dcf(ticker)
     if dcf is None:
         card.add("dcf_parse", "fail", "DCF.json missing or unparseable")
@@ -228,7 +233,7 @@ def check_dcf(ticker, card):
     # scenarios (files carry parallel series: per-share vs whole-equity,
     # USD vs CAD) and match against every weighted_iv* the file declares.
     wivs = F.weighted_ivs(dcf)
-    expected = {}
+    expected: dict[str, Any] = {}
     if len(w) == 3:
         names = set.intersection(*(set(ivs[s]) for s in F.SCENARIOS)) \
             if all(s in ivs for s in F.SCENARIOS) else set()
@@ -237,7 +242,7 @@ def check_dcf(ticker, card):
         card.add("dcf_weighted_iv", "skip", "not recomputable "
                  f"(candidates={list(wivs)}, groups={list(expected)})")
     else:
-        def pool(k):
+        def pool(k: str) -> list[Any]:
             same = [e for n, e in expected.items()
                     if F.currency_suffix(n) == F.currency_suffix(k)]
             return same or list(expected.values())
@@ -279,7 +284,7 @@ def check_dcf(ticker, card):
         else:
             card.add("dcf_sanity_check", "warn", f"no pass/fail verdict: {list(sc)[:5]}")
 
-    high = []
+    high: list[str] = []
     for s, sc_ in F.scenario_block(dcf).items():
         if s in F.SCENARIOS and isinstance(sc_, dict):
             t = F.num(sc_.get("terminal_pct_of_value"))
@@ -306,7 +311,7 @@ def check_dcf(ticker, card):
 # Pipeline health
 # ---------------------------------------------------------------------------
 
-def check_units_consistent(ticker, card):
+def check_units_consistent(ticker: str, card: Card) -> None:
     """core_metrics and the exported CSV must use the same scale.
 
     XBRL originally wrote absolute dollars while the text path and every
@@ -369,7 +374,7 @@ def check_units_consistent(ticker, card):
     card.add("units_consistent", "warn", "no comparable FY period")
 
 
-def check_health(ticker, card):
+def check_health(ticker: str, card: Card) -> None:
     reports = F.REPO / "research" / ticker / "Reports"
 
     analysis = reports / f"{ticker}_Analysis.json"
@@ -408,7 +413,7 @@ def check_health(ticker, card):
 
 # ---------------------------------------------------------------------------
 
-def evaluate(ticker):
+def evaluate(ticker: str) -> dict[str, Any]:
     card = Card()
     check_metrics(ticker, card)
     check_dcf(ticker, card)
@@ -424,12 +429,12 @@ def evaluate(ticker):
     }
 
 
-def all_tickers():
+def all_tickers() -> list[str]:
     return sorted(p.parent.name for p in F.REPO.glob("research/*/Reports")
                   if p.is_dir() and " " not in p.parent.name)
 
 
-def main():
+def main() -> int:
     argv = sys.argv[1:]
     strict = "--strict" in argv
     argv = [a for a in argv if a != "--strict"]

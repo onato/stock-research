@@ -26,6 +26,8 @@ import datetime as dt
 import fcntl
 import json
 import sys
+from collections.abc import Iterator
+from typing import Any
 
 import dcf_fields as F
 
@@ -34,7 +36,7 @@ LOCK = F.REPO / "state" / "ledger.lock"
 
 
 @contextlib.contextmanager
-def ledger_lock():
+def ledger_lock() -> Iterator[None]:
     """Serialize appends across parallel research_one.sh runners."""
     LOCK.parent.mkdir(parents=True, exist_ok=True)
     with open(LOCK, "w") as fh:
@@ -45,7 +47,7 @@ def ledger_lock():
             fcntl.flock(fh, fcntl.LOCK_UN)
 
 
-def row_key(row):
+def row_key(row: dict[str, Any]) -> tuple[Any, ...]:
     """Identity of a prediction: same ticker+date+numbers == same forecast."""
     return (
         row.get("ticker"),
@@ -55,7 +57,7 @@ def row_key(row):
     )
 
 
-def existing_keys():
+def existing_keys() -> set[tuple[Any, ...]]:
     keys = set()
     if LEDGER.exists():
         for line in LEDGER.read_text().splitlines():
@@ -65,7 +67,7 @@ def existing_keys():
     return keys
 
 
-def build_row(ticker):
+def build_row(ticker: str) -> dict[str, Any] | None:
     dcf = F.load_dcf(ticker)
     if dcf is None:
         return None
@@ -90,7 +92,7 @@ def build_row(ticker):
     }
 
 
-def append(tickers):
+def append(tickers: list[str]) -> tuple[list[str], list[str], list[str]]:
     added, skipped, missing = [], [], []
     with ledger_lock():
         keys = existing_keys()
@@ -110,7 +112,7 @@ def append(tickers):
     return added, skipped, missing
 
 
-def all_tickers():
+def all_tickers() -> list[str]:
     return sorted(
         p.parent.parent.name
         for p in F.REPO.glob("research/*/Reports/*_DCF.json")
@@ -118,7 +120,7 @@ def all_tickers():
     )
 
 
-def main():
+def main() -> int:
     if len(sys.argv) < 2 or sys.argv[1] not in ("append", "backfill"):
         print(__doc__.strip(), file=sys.stderr)
         return 2

@@ -44,10 +44,10 @@ class HKEXParser(BaseParser):
         r"\(\s*(?:RMB\s*,?\s*|All amounts\s+)?in (thousands|millions|billions)",
         re.I)
 
-    def clean_label(self, cell):
+    def clean_label(self, cell: str) -> str:
         return self.CJK_RE.sub("", cell).strip()
 
-    def units_hint(self, lines):
+    def units_hint(self, lines: list[str]) -> str | None:
         for line in lines:
             m = self.PAREN_DECL_RE.search(line) or self.UNITS_TOKEN_RE.search(line)
             if m:
@@ -57,5 +57,5 @@ class HKEXParser(BaseParser):
                         else "billions")
         return super().units_hint(lines)
 
-    def currency(self, lines):
+    def currency(self, lines: list[str]) -> str | None:
         return self._search_currency("\n".join(lines))

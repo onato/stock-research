@@ -18,7 +18,7 @@ ticker is exactly the drift this replaces.
 # Core columns, in the order they appear in the exported CSV.
 # (column_name, sql_type, csv_header) -- csv_header preserves the existing
 # CamelCase the dashboards already read.
-CORE_COLUMNS = [
+CORE_COLUMNS: list[tuple[str, str, str]] = [
     ("period",               "TEXT",   "Period"),
     ("revenue",              "DOUBLE", "Revenue"),
     ("cost_of_revenue",      "DOUBLE", "CostOfRevenue"),
@@ -45,13 +45,13 @@ CORE_COLUMNS = [
     ("currency",             "TEXT",   "Currency"),
 ]
 
-CORE_NAMES = [c[0] for c in CORE_COLUMNS]
-CSV_HEADERS = [c[2] for c in CORE_COLUMNS]
+CORE_NAMES: list[str] = [c[0] for c in CORE_COLUMNS]
+CSV_HEADERS: list[str] = [c[2] for c in CORE_COLUMNS]
 
 # Existing CSV headers -> core column. Drawn from the aliases actually
 # observed across the 67 committed CSVs, plus the legacy names called out
 # in financial-parser.md (SBC / StockBasedComp / ShareBasedComp).
-ALIASES = {
+ALIASES: dict[str, str] = {
     "period": "period",
     "revenue": "revenue", "netsales": "revenue", "totalrevenue": "revenue",
     "operatingrevenue": "revenue", "sales": "revenue",
@@ -91,7 +91,7 @@ ALIASES = {
 }
 
 
-def normalize(header):
+def normalize(header: object) -> str | None:
     """Map a CSV header to its core column, or None if it is a KPI.
 
     Case- and punctuation-insensitive: `Gross Margin`, `gross_margin` and
@@ -101,7 +101,7 @@ def normalize(header):
     return ALIASES.get(key)
 
 
-def create_sql():
+def create_sql() -> str:
     """DDL for a ticker DB. Identical for every ticker -- that is the point."""
     cols = ",\n  ".join(f"{n} {t}" for n, t, _ in CORE_COLUMNS)
     return f"""

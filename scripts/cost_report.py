@@ -21,6 +21,7 @@ import collections
 import json
 import pathlib
 import sys
+from typing import Any
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 LOGS = REPO / "state" / "logs"
@@ -34,21 +35,21 @@ RATES = {
 }
 
 
-def rate(model):
+def rate(model: str | None) -> tuple[float, float]:
     for k, v in RATES.items():
         if model and model.startswith(k[:18]):
             return v
     return (3.0e-6, 15.0e-6)
 
 
-def cost_of(model, fresh, write, read, out):
+def cost_of(model: str | None, fresh: int, write: int, read: int, out: int) -> float:
     rin, rout = rate(model)
     return fresh * rin + write * rin * 2.0 + read * rin * 0.1 + out * rout
 
 
-def analyse(path):
+def analyse(path: pathlib.Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Return (summary, per-subagent rows) for one transcript."""
-    agents = collections.defaultdict(
+    agents: collections.defaultdict[str, dict[str, Any]] = collections.defaultdict(
         lambda: {"msgs": 0, "fresh": 0, "write": 0, "read": 0, "out": 0,
                  "model": None, "tools": collections.Counter(), "label": ""})
     reported = None
@@ -105,7 +106,7 @@ def analyse(path):
     }, rows
 
 
-def show_detail(summary, rows):
+def show_detail(summary: dict[str, Any], rows: list[dict[str, Any]]) -> None:
     print(f"\n=== {summary['ticker']} ===")
     rep = summary["reported"]
     print(f"  reported ${rep:.2f}" if rep is not None else "  (incomplete run)", end="")
@@ -121,7 +122,7 @@ def show_detail(summary, rows):
         print(f"          {who}")
 
 
-def main():
+def main() -> int:
     # Drop the value that follows --baseline/--compare so it is not
     # mistaken for a ticker name.
     argv, skip = [], False

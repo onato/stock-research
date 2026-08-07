@@ -19,6 +19,7 @@ Usage:
 import argparse
 import pathlib
 import sys
+from typing import Any
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
@@ -28,7 +29,7 @@ NUMERIC = ["revenue", "gross_profit", "operating_income", "ebitda",
            "cash_and_equivalents", "stock_based_comp", "eps"]
 
 
-def load(tickers, period):
+def load(tickers: set[str], period: str) -> list[dict[str, Any]]:
     import duckdb
     rows = []
     for db in sorted(REPO.glob("research/*/Reports/*.duckdb")):
@@ -55,7 +56,7 @@ def load(tickers, period):
     return rows
 
 
-def main():
+def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--period", default="FY2024")
     ap.add_argument("--metric", default="revenue", choices=NUMERIC)

@@ -18,6 +18,7 @@ import json
 import pathlib
 import subprocess
 import sys
+from typing import Any
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 SCRIPTS = REPO / "scripts"
@@ -25,7 +26,7 @@ SCORES = REPO / "state" / "scores"
 JOBLOG = REPO / "state" / "joblog.tsv"
 
 
-def last_batch():
+def last_batch() -> list[str]:
     """Tickers from the most recent run_loop joblog.
 
     Falls back to the most recently written transcripts, so the digest is
@@ -54,7 +55,7 @@ def last_batch():
     return out
 
 
-def latest_scorecard(ticker):
+def latest_scorecard(ticker: str) -> dict[str, Any] | None:
     cards = sorted(SCORES.glob(f"{ticker}_*.json"))
     if not cards:
         return None
@@ -64,7 +65,7 @@ def latest_scorecard(ticker):
         return None
 
 
-def run(cmd):
+def run(cmd: list[str]) -> str:
     try:
         return subprocess.run(cmd, capture_output=True, text=True,
                               cwd=REPO, timeout=120, check=False).stdout
@@ -72,7 +73,7 @@ def run(cmd):
         return f"(failed: {e})"
 
 
-def main():
+def main() -> int:
     tickers = sys.argv[1:] or last_batch()
     if not tickers:
         print("no tickers -- pass them explicitly or run the pipeline first")
@@ -93,8 +94,8 @@ def main():
 
     # ---- quality ---------------------------------------------------------
     print("\n## Quality (tier-1 evals)\n")
-    problems = collections.Counter()
-    per_ticker = {}
+    problems: collections.Counter[str] = collections.Counter()
+    per_ticker: dict[str, list[dict[str, Any]]] = {}
     for t in tickers:
         card = latest_scorecard(t)
         if not card:

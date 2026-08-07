@@ -19,7 +19,8 @@ stray symbols in the head.
 """
 
 import re
-from typing import ClassVar
+from collections.abc import Iterator
+from typing import Any, ClassVar
 
 from .base import BaseParser
 
@@ -40,7 +41,7 @@ class NZXParser(BaseParser):
     # Inline units cell between label and numbers.
     UNIT_CELL_RE = re.compile(r"^(?:NZ)?\$\s?(m|M|['’]?000)$")
 
-    STATED_CCY: ClassVar = [
+    STATED_CCY: ClassVar[list[tuple["re.Pattern[str]", str]]] = [
         (re.compile(r"(?:presented|expressed)\W{0,20}in\s+"
                     r"(?:thousands of |millions of )?new zealand dollars?", re.I), "NZD"),
         (re.compile(r"(?:presented|expressed)\W{0,20}in\s+"
@@ -50,11 +51,11 @@ class NZXParser(BaseParser):
                     re.I), "USD"),
     ]
 
-    def scan(self, text, filename):
-        self._lines = text.splitlines()
+    def scan(self, text: str, filename: str) -> Iterator[dict[str, Any]]:
+        self._lines: list[str] = text.splitlines()
         yield from super().scan(text, filename)
 
-    def units_hint(self, lines):
+    def units_hint(self, lines: list[str]) -> str | None:
         m = self.DECL_RE.search("\n".join(lines))
         if m:
             u = m.group(1).lower()
@@ -62,7 +63,7 @@ class NZXParser(BaseParser):
                     else "millions" if u.startswith("million") else "billions")
         return super().units_hint(lines)
 
-    def units_for_line(self, i, default):
+    def units_for_line(self, i: int, default: str | None) -> str | None:
         m = self.UNIT_CELL_RE.search(self._lines[i].strip())
         if m is None:
             for cell in re.split(r"\s{2,}", self._lines[i].strip()):
@@ -73,14 +74,14 @@ class NZXParser(BaseParser):
             return "millions" if m.group(1).lower() == "m" else "thousands"
         return default
 
-    def currency(self, lines):
+    def currency(self, lines: list[str]) -> str | None:
         text = "\n".join(lines)
         for rx, ccy in self.STATED_CCY:
             if rx.search(text):
                 return ccy
         return super().currency(lines)
 
-    def is_note_cell(self, cell):
+    def is_note_cell(self, cell: str) -> bool:
         # A units cell sits where a note reference would; consume it the
         # same way so the numbers after it are captured.
         return bool(self.UNIT_CELL_RE.match(cell)) or super().is_note_cell(cell)

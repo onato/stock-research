@@ -16,11 +16,12 @@ this only summarizes.
 import json
 import sys
 import time
+from typing import Any
 
 
 # Tool-name -> how to describe the call. Each entry pulls the most
 # informative field out of that tool's input dict.
-def describe(tool, inp):
+def describe(tool: str, inp: Any) -> str:
     if not isinstance(inp, dict):
         return tool
 
@@ -45,7 +46,7 @@ def describe(tool, inp):
     return tool
 
 
-def shorten_path(p):
+def shorten_path(p: str) -> str:
     """Trim absolute repo paths down to something readable."""
     if not p:
         return ""
@@ -55,11 +56,11 @@ def shorten_path(p):
     return p if len(p) <= 60 else "..." + p[-57:]
 
 
-def shorten_url(u):
+def shorten_url(u: str) -> str:
     return u if len(u) <= 60 else u[:57] + "..."
 
 
-def main():
+def main() -> int:
     # --tools-only drops the model's prose entirely, leaving just the tool
     # trace. Useful once you trust the run and only want to see movement.
     quiet_prose = "--tools-only" in sys.argv
@@ -68,7 +69,7 @@ def main():
     tools = 0
     model = None
 
-    def stamp():
+    def stamp() -> str:
         el = int(time.time() - start)
         return f"[{el // 60:2d}:{el % 60:02d}]"
 

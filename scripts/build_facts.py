@@ -28,6 +28,8 @@ Usage: build_facts.py TICKER [--show]
 
 import pathlib
 import sys
+from collections.abc import Iterator
+from typing import Any
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import contextlib
@@ -45,12 +47,12 @@ from parsers.common import (  # noqa: F401  (re-exported API)
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
 
-def segments(line):
+def segments(line: str) -> Iterator[tuple[str, list[float]]]:
     """Generic line segmentation (compat re-export; see BaseParser.segments)."""
     return BaseParser().segments(line)
 
 
-def ticker_for(path):
+def ticker_for(path: pathlib.Path) -> str:
     """The ticker a filing belongs to, for parser routing.
 
     research/{TICKER}/Extracted/x.txt names the ticker in the directory;
@@ -62,13 +64,13 @@ def ticker_for(path):
     return path.name.split("_", 1)[0]
 
 
-def scan_file(path):
+def scan_file(path: pathlib.Path) -> Iterator[dict[str, Any]]:
     """Yield candidate facts from one extracted filing."""
     parser = get_parser(ticker_for(path))
     yield from parser.scan(path.read_text(errors="replace"), path.name)
 
 
-def main():
+def main() -> int:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     if not args:
         print("usage: build_facts.py TICKER [--show]", file=sys.stderr)
@@ -81,7 +83,7 @@ def main():
         return 1
 
     files = sorted(extracted.glob("*.txt"))
-    facts = []
+    facts: list[dict[str, Any]] = []
     for f in files:
         facts.extend(scan_file(f))
 

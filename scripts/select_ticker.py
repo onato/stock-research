@@ -17,6 +17,7 @@ import argparse
 import json
 import os
 import sys
+from collections.abc import Iterable
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -30,7 +31,7 @@ try:
 except ImportError:  # pragma: no cover - keeps the selector usable standalone
     import datetime as _dt
 
-    def parse_date(s):
+    def parse_date(s: str | None) -> "_dt.date | None":
         if not s:
             return None
         for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y-%m"):
@@ -60,7 +61,7 @@ PRIORITY = [
 ]
 
 
-def queue_files():
+def queue_files() -> list[Path]:
     if not QUEUE_DIR.is_dir():
         return []
     present = {p.name: p for p in QUEUE_DIR.glob("*.txt")}
@@ -69,7 +70,7 @@ def queue_files():
     return ordered
 
 
-def read_tickers(path):
+def read_tickers(path: Path) -> list[str]:
     """One ticker per line. Blank lines and `#` comments are ignored."""
     out = []
     for raw in path.read_text().splitlines():
@@ -79,7 +80,7 @@ def read_tickers(path):
     return out
 
 
-def has_reports(ticker):
+def has_reports(ticker: str) -> bool:
     """A ticker counts as researched once its Reports/ dir has content.
 
     An empty Reports/ dir means a previous run died partway through, so it
@@ -89,7 +90,7 @@ def has_reports(ticker):
     return reports.is_dir() and any(reports.iterdir())
 
 
-def pick_new(exclude=()):
+def pick_new(exclude: Iterable[str] = ()) -> str | None:
     exclude = set(exclude)
     seen = set()
     for qf in queue_files():
@@ -102,7 +103,7 @@ def pick_new(exclude=()):
     return None
 
 
-def pick_stalest(exclude=()):
+def pick_stalest(exclude: Iterable[str] = ()) -> str | None:
     """Oldest DCF by its internal `valuation_date`.
 
     Deliberately not file mtime: actions/checkout stamps every file with the
@@ -131,7 +132,7 @@ def pick_stalest(exclude=()):
     return candidates[0][2]
 
 
-def emit(ticker, mode):
+def emit(ticker: str | None, mode: str) -> None:
     out = os.environ.get("GITHUB_OUTPUT")
     payload = f"ticker={ticker or ''}\nmode={mode}\n"
     if out:
@@ -140,7 +141,7 @@ def emit(ticker, mode):
     print(payload, end="")
 
 
-def main():
+def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--override", default="", help="Force this ticker (manual dispatch)")
     ap.add_argument(

@@ -20,7 +20,7 @@ import schema
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
 
-def sort_key(period):
+def sort_key(period: str | None) -> tuple[int, int, str]:
     """Chronological, with half/quarter periods following their year.
 
     Dashboards plot in row order, so 'oldest first' matters.
@@ -39,7 +39,7 @@ def sort_key(period):
     return (year, sub, p)
 
 
-def main():
+def main() -> int:
     if len(sys.argv) < 2:
         print("usage: export_csv.py TICKER [--force]", file=sys.stderr)
         return 2

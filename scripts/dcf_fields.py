@@ -17,6 +17,7 @@ import hashlib
 import json
 import pathlib
 import subprocess
+from typing import Any
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
@@ -30,7 +31,7 @@ CURRENCIES = (
 )
 
 
-def num(v):
+def num(v: Any) -> float | None:
     """Coerce to float, else None. Accepts '1,234' and '25%' strings."""
     if isinstance(v, bool):
         return None
@@ -45,7 +46,7 @@ def num(v):
     return None
 
 
-def currency_suffix(key):
+def currency_suffix(key: str) -> str:
     """'intrinsic_value_per_share_hkd' -> 'hkd'; 'intrinsic_value' -> ''."""
     k = key.lower()
     for cur in CURRENCIES:
@@ -54,7 +55,7 @@ def currency_suffix(key):
     return ""
 
 
-def load_dcf(ticker):
+def load_dcf(ticker: str) -> dict[str, Any] | None:
     """Parsed DCF.json for a ticker, or None."""
     path = REPO / "research" / ticker / "Reports" / f"{ticker}_DCF.json"
     if not path.exists():
@@ -65,7 +66,7 @@ def load_dcf(ticker):
         return None
 
 
-def scenario_block(dcf):
+def scenario_block(dcf: dict[str, Any]) -> dict[str, Any]:
     """The base/bear/bull dict: `valuation` in most files, `scenarios` in a few."""
     for key in ("valuation", "scenarios"):
         block = dcf.get(key)
@@ -74,13 +75,13 @@ def scenario_block(dcf):
     return {}
 
 
-def scenario_ivs(dcf):
+def scenario_ivs(dcf: dict[str, Any]) -> dict[str, dict[str, float]]:
     """{scenario: {key: value}} for every intrinsic-value-ish numeric key."""
-    out = {}
+    out: dict[str, dict[str, float]] = {}
     for s, sc in scenario_block(dcf).items():
         if s not in SCENARIOS or not isinstance(sc, dict):
             continue
-        ivs = {}
+        ivs: dict[str, float] = {}
         for k, v in sc.items():
             if "intrinsic" not in k.lower():
                 continue
@@ -92,25 +93,25 @@ def scenario_ivs(dcf):
     return out
 
 
-def weights(dcf):
+def weights(dcf: dict[str, Any]) -> dict[str, float]:
     """{scenario: weight} normalized to sum to ~1, or {}."""
     pw = dcf.get("probability_weighted")
     w = pw.get("weights") if isinstance(pw, dict) else None
     if not isinstance(w, dict):
         return {}
-    out = {s: num(v) for s, v in w.items() if s in SCENARIOS and num(v) is not None}
+    out: dict[str, Any] = {s: num(v) for s, v in w.items() if s in SCENARIOS and num(v) is not None}
     total = sum(out.values())
     if 99 <= total <= 101:  # stored as percentages
         out = {s: v / 100 for s, v in out.items()}
     return out
 
 
-def weighted_ivs(dcf):
+def weighted_ivs(dcf: dict[str, Any]) -> dict[str, float]:
     """{key: value} for every weighted-IV numeric key in probability_weighted."""
     pw = dcf.get("probability_weighted")
     if not isinstance(pw, dict):
         return {}
-    out = {}
+    out: dict[str, float] = {}
     for k, v in pw.items():
         kl = k.lower()
         if kl.startswith(("weighted_iv", "weighted_intrinsic")):
@@ -120,12 +121,12 @@ def weighted_ivs(dcf):
     return out
 
 
-def weighted_upsides(dcf):
+def weighted_upsides(dcf: dict[str, Any]) -> dict[str, float]:
     """{key: value} for weighted/aggregate upside keys in probability_weighted."""
     pw = dcf.get("probability_weighted")
     if not isinstance(pw, dict):
         return {}
-    out = {}
+    out: dict[str, float] = {}
     for k, v in pw.items():
         if "upside" in k.lower():
             n = num(v)
@@ -134,7 +135,7 @@ def weighted_upsides(dcf):
     return out
 
 
-def entry_prices(dcf):
+def entry_prices(dcf: dict[str, Any]) -> dict[str, dict[str, float]]:
     """{scenario_or_key: {key: value}} of numeric entry-price fields.
 
     Handles both shapes: `entry_price.base` as a dict of fields, as a bare
@@ -143,7 +144,7 @@ def entry_prices(dcf):
     ep = dcf.get("entry_price")
     if not isinstance(ep, dict):
         return {}
-    out = {}
+    out: dict[str, dict[str, Any]] = {}
     for k, v in ep.items():
         if isinstance(v, dict):
             fields = {fk: num(fv) for fk, fv in v.items()
@@ -157,7 +158,7 @@ def entry_prices(dcf):
     return out
 
 
-def hurdle_rate(dcf):
+def hurdle_rate(dcf: dict[str, Any]) -> float | None:
     ep = dcf.get("entry_price")
     if isinstance(ep, dict):
         for k in ("hurdle_rate", "target_return", "target_cagr", "target_irr"):
@@ -167,7 +168,7 @@ def hurdle_rate(dcf):
     return None
 
 
-def agents_sha():
+def agents_sha() -> str:
     """Content hash of the agent prompts that produced this run.
 
     Hashes the working-tree files rather than a git object so uncommitted
@@ -180,7 +181,7 @@ def agents_sha():
     return h.hexdigest()[:12]
 
 
-def git_head():
+def git_head() -> str | None:
     try:
         return subprocess.run(
             ["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"],

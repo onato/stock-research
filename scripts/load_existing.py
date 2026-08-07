@@ -16,6 +16,8 @@ import collections
 import csv
 import pathlib
 import sys
+from collections.abc import Sequence
+from typing import Any
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import schema
@@ -23,7 +25,7 @@ import schema
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
 
-def parse_number(raw):
+def parse_number(raw: Any) -> float | None:
     """CSV values carry commas, currency marks, percent signs and blanks."""
     if raw is None:
         return None
@@ -38,7 +40,7 @@ def parse_number(raw):
         return None
 
 
-def read_csv(path):
+def read_csv(path: pathlib.Path) -> tuple[list[dict[str, Any]], Sequence[str], list[str]]:
     """Return (rows, headers, unmapped_headers)."""
     with open(path, newline="", errors="replace") as fh:
         rdr = csv.DictReader(fh)
@@ -48,11 +50,11 @@ def read_csv(path):
     return rows, headers, unmapped
 
 
-def to_core(rows):
+def to_core(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[tuple[str, str, float, None]]]:
     """Map CSV rows onto core columns; everything else becomes a KPI row."""
     core, kpis = [], []
     for row in rows:
-        rec = dict.fromkeys(schema.CORE_NAMES)
+        rec: dict[str, Any] = dict.fromkeys(schema.CORE_NAMES)
         for header, raw in row.items():
             if not header:
                 continue
@@ -72,7 +74,7 @@ def to_core(rows):
     return core, kpis
 
 
-def write_db(ticker, core, kpis):
+def write_db(ticker: str, core: list[dict[str, Any]], kpis: list[tuple[str, str, float, None]]) -> pathlib.Path:
     import duckdb
     db = REPO / "research" / ticker / "Reports" / f"{ticker}.duckdb"
     db.parent.mkdir(parents=True, exist_ok=True)
@@ -93,7 +95,7 @@ def write_db(ticker, core, kpis):
     return db
 
 
-def main():
+def main() -> int:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     report_only = "--report" in sys.argv
 
@@ -108,9 +110,9 @@ def main():
     else:
         paths = sorted(REPO.glob("research/*/Reports/*_Metrics.csv"))
 
-    unmapped_freq = collections.Counter()
+    unmapped_freq: collections.Counter[str] = collections.Counter()
     ok = failed = 0
-    coverage = []
+    coverage: list[tuple[str, int, int, int, list[str]]] = []
 
     for p in paths:
         ticker = p.parent.parent.name

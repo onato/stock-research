@@ -17,7 +17,7 @@ class LSEParser(BaseParser):
 
     POUND_COL_RE = re.compile(r"£\s?(m|M|['’]?000)\b")
 
-    def units_hint(self, lines):
+    def units_hint(self, lines: list[str]) -> str | None:
         for line in lines:
             m = self.POUND_COL_RE.search(line)
             if m:

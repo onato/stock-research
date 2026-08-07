@@ -21,10 +21,12 @@ Usage:
 """
 
 import argparse
+import datetime
 import json
 import pathlib
 import sys
 import urllib.request
+from typing import Any
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import schema
@@ -70,7 +72,7 @@ CONCEPTS = {
 }
 
 
-def fetch(url, dest=None):
+def fetch(url: str, dest: pathlib.Path | None = None) -> Any:
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     with urllib.request.urlopen(req, timeout=60) as r:
         data = r.read()
@@ -80,7 +82,7 @@ def fetch(url, dest=None):
     return json.loads(data)
 
 
-def cik_for(ticker):
+def cik_for(ticker: str) -> int | None:
     """Resolve ticker -> CIK. Only bare US symbols exist in SEC's map."""
     if "." in ticker:
         return None
@@ -95,7 +97,7 @@ def cik_for(ticker):
     return None
 
 
-def period_label(fact):
+def period_label(fact: dict[str, Any]) -> str | None:
     """Derive the period from the fact's own dates, not its `fy`.
 
     A 10-K restates prior years, so `fy` is the filing's year rather than
@@ -118,12 +120,13 @@ def period_label(fact):
     return f"Q{q} {year}"
 
 
-def _d(s):
+def _d(s: str) -> datetime.date:
     import datetime as dt
     return dt.date(int(s[:4]), int(s[5:7]), int(s[8:10]))
 
 
-def collect(facts, concepts):
+def collect(facts: dict[str, Any],
+            concepts: list[str]) -> tuple[str | None, dict[str, Any], str]:
     """Best value per period, merged across every listed concept.
 
     Filers switch tags over time -- PayPal reports Revenues for 2018-2025
@@ -133,9 +136,9 @@ def collect(facts, concepts):
     period.
     """
     gaap = facts.get("facts", {}).get("us-gaap", {})
-    out = {}
-    used = []
-    unit_seen = None
+    out: dict[str, tuple[Any, Any]] = {}
+    used: list[str] = []
+    unit_seen: str | None = None
     for pref, concept in enumerate(concepts):
         entry = gaap.get(concept)
         if not entry:
@@ -170,7 +173,7 @@ def collect(facts, concepts):
             unit_seen or "USD")
 
 
-def main():
+def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("ticker")
     ap.add_argument("--show", action="store_true")
@@ -193,6 +196,10 @@ def main():
         print(f"{ticker}: SEC fetch failed: {e}", file=sys.stderr)
         return 1
 
+    rows: dict[str, dict[str, Any]]
+    kpis: list[tuple[str, str, float, str]]
+    missing: list[str]
+    used: dict[str, str | None]
     rows, kpis, missing, used = {}, [], [], {}
     for col, concepts in CONCEPTS.items():
         concept, values, _unit = collect(facts, concepts)
@@ -225,7 +232,7 @@ def main():
     con.execute("DELETE FROM kpis")
 
     cols = schema.CORE_NAMES
-    payload = []
+    payload: list[list[Any]] = []
     # XBRL reports absolute dollars; the text path and every existing CSV
     # use millions. Scale here so core_metrics has ONE convention -- the
     # alternative left export_csv.py writing 45183036000 into a CSV whose
@@ -236,7 +243,7 @@ def main():
     SCALE_FREE = {"period", "units", "currency", "eps", "dividend_per_share",
                   "gross_margin", "operating_margin", "net_margin"}
     for period, vals in sorted(rows.items()):
-        rec = dict.fromkeys(cols)
+        rec: dict[str, Any] = dict.fromkeys(cols)
         rec["period"] = period
         rec["units"] = "millions"
         rec["currency"] = "USD"

@@ -10,7 +10,7 @@ import re
 
 # Metric -> regexes matched against the line label. Sourced from the search
 # strings already documented in .claude/agents/financial-parser.md.
-PATTERNS = {
+PATTERNS: dict[str, list[str]] = {
     # "(?!\s*tax)" because HLG.NZ's "Total income tax expense" line was
     # tagged as Revenue, poisoning the whole candidate set for the agent.
     "Revenue": [r"^(total |operating |net )?revenue", r"^net sales",
@@ -70,7 +70,8 @@ PATTERNS = {
     "CashTaxesPaid": [r"^(net |corporate |corporation )?(income )?tax(es|ation)? paid",
                       r"^tax(es)? (paid|refunded)"],
 }
-COMPILED = {m: [re.compile(p, re.I) for p in pats] for m, pats in PATTERNS.items()}
+COMPILED: dict[str, list[re.Pattern[str]]] = {
+    m: [re.compile(p, re.I) for p in pats] for m, pats in PATTERNS.items()}
 
 # Statement lines are matched by splitting on runs of 2+ spaces and
 # looking for a label cell followed by numeric cells. The old approach --
@@ -92,7 +93,7 @@ NUM_CELL = re.compile(r"^(?:" + NUM + r")(?:\s+(?:" + NUM + r"))*$")
 LABEL_RE = re.compile(r"^[A-Za-z][A-Za-z0-9 ,.&/()'’\-]{2,80}$")
 
 
-def parse_num(tok):
+def parse_num(tok: str) -> float | None:
     tok = tok.strip()
     if tok in ("-", "—", "–", ""):
         return 0.0
@@ -105,7 +106,7 @@ def parse_num(tok):
     return -v if neg else v
 
 
-def period_from_filename(name):
+def period_from_filename(name: str) -> str | None:
     """Filenames follow {TICKER}_{type}_{period}.txt (see CLAUDE.md)."""
     m = re.search(r"_(FY\d{4})", name, re.I)
     if m:

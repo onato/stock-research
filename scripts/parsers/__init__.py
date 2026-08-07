@@ -16,10 +16,10 @@ import pkgutil
 
 from .base import BaseParser
 
-_REGISTRY = {}
+_REGISTRY: dict[str, type[BaseParser]] = {}
 
 
-def _discover():
+def _discover() -> None:
     for m in pkgutil.iter_modules(__path__):
         mod = importlib.import_module(f"{__name__}.{m.name}")
         for obj in vars(mod).values():
@@ -32,7 +32,7 @@ def _discover():
 _discover()
 
 
-def get_parser(ticker):
+def get_parser(ticker: str) -> BaseParser:
     """Parser instance for a ticker's listing suffix ('AGL.NZ' -> NZX)."""
     suffix = ticker.rsplit(".", 1)[1].upper() if "." in ticker else ""
     return _REGISTRY.get(suffix, BaseParser)()

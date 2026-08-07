@@ -32,7 +32,7 @@ UA = "Mozilla/5.0 (stock-research)"
 URL = "https://query1.finance.yahoo.com/v8/finance/chart/{t}?range=5d&interval=1d"
 
 
-def quote(ticker):
+def quote(ticker: str) -> tuple[float | None, str]:
     """Return (price, currency) or (None, reason)."""
     try:
         req = urllib.request.Request(URL.format(t=ticker), headers={"User-Agent": UA})
@@ -63,7 +63,7 @@ def quote(ticker):
     return px, meta.get("currency", "?")
 
 
-def main():
+def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--file", default="")

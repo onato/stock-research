@@ -27,6 +27,7 @@ import collections
 import json
 import pathlib
 import sys
+from typing import Any
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import build_facts as bf
@@ -55,18 +56,18 @@ EXCHANGES = {
 
 # A filing whose text is mostly XBRL taxonomy URLs rather than prose --
 # pdftotext ran on an iXBRL document and produced machine markup.
-def is_ixbrl(text):
+def is_ixbrl(text: str) -> bool:
     head = text[:5000]
     return (head.count("fasb.org") + head.count("us-gaap")
             + head.count("xbrl") + head.count("ifrs-full")) > 3
 
 
-def exchange_of(ticker):
+def exchange_of(ticker: str) -> tuple[str, str]:
     suffix = ticker.rsplit(".", 1)[1].upper() if "." in ticker else ""
     return EXCHANGES.get(suffix, (suffix or "US", "unknown"))
 
 
-def scan_ticker(ticker, sample=6):
+def scan_ticker(ticker: str, sample: int = 6) -> dict[str, Any] | None:
     """Extraction stats for one ticker. Samples filings to stay fast."""
     d = REPO / "research" / ticker / "Extracted"
     files = sorted(d.glob("*.txt")) if d.is_dir() else []
@@ -89,7 +90,7 @@ def scan_ticker(ticker, sample=6):
     picked = pool[:sample // 2] + pool[-(sample - sample // 2):]
     picked = list(dict.fromkeys(picked))
 
-    facts = []
+    facts: list[dict[str, Any]] = []
     ixbrl = 0
     for f in picked:
         text = f.read_text(errors="replace")
@@ -110,7 +111,7 @@ def scan_ticker(ticker, sample=6):
     }
 
 
-def main():
+def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--exchange", default="", help="restrict to one, e.g. NZ")
     ap.add_argument("--json", default="")

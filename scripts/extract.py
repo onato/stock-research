@@ -25,7 +25,7 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 SCRIPTS = REPO / "scripts"
 
 
-def is_us_symbol(ticker):
+def is_us_symbol(ticker: str) -> bool:
     """SEC covers US filers only, and those carry no exchange suffix.
 
     A suffixed ticker (AGL.NZ, WISE.L, 0285.HK) is never in SEC's map, so
@@ -34,13 +34,13 @@ def is_us_symbol(ticker):
     return "." not in ticker
 
 
-def run(script, *args):
+def run(script: str, *args: str) -> tuple[int, str]:
     r = subprocess.run([sys.executable, str(SCRIPTS / script), *args],
                        capture_output=True, text=True, cwd=REPO, check=False)
     return r.returncode, (r.stdout or "") + (r.stderr or "")
 
 
-def facts_count(ticker):
+def facts_count(ticker: str) -> tuple[int, int]:
     """Rows in whichever table the chosen path populated."""
     db = REPO / "research" / ticker / "Reports" / f"{ticker}.duckdb"
     if not db.exists():
@@ -48,9 +48,9 @@ def facts_count(ticker):
     try:
         import duckdb
         con = duckdb.connect(str(db), read_only=True)
-        f = con.execute("SELECT count(*) FROM facts").fetchone()[0]
+        f = con.execute("SELECT count(*) FROM facts").fetchone()[0]  # type: ignore[index]
         try:
-            c = con.execute("SELECT count(*) FROM core_metrics").fetchone()[0]
+            c = con.execute("SELECT count(*) FROM core_metrics").fetchone()[0]  # type: ignore[index]
         except Exception:
             c = 0
         con.close()
@@ -59,13 +59,13 @@ def facts_count(ticker):
         return 0, 0
 
 
-def log_gap(ticker, kind, detail):
+def log_gap(ticker: str, kind: str, detail: str) -> None:
     subprocess.run([sys.executable, str(SCRIPTS / "log_gap.py"),
                     "--ticker", ticker, "--kind", kind, "--detail", detail],
                    capture_output=True, cwd=REPO, check=False)
 
 
-def main():
+def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("ticker")
     ap.add_argument("--show", action="store_true")

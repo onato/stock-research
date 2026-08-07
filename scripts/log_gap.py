@@ -37,6 +37,7 @@ import datetime as dt
 import json
 import pathlib
 import sys
+from typing import Any
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 LOG = REPO / "state" / "improvements.jsonl"
@@ -51,7 +52,7 @@ KINDS = (
 )
 
 
-def add(args):
+def add(args: argparse.Namespace) -> int:
     LOG.parent.mkdir(parents=True, exist_ok=True)
     rec = {
         "ts": dt.datetime.now().isoformat(timespec="seconds"),
@@ -67,13 +68,16 @@ def add(args):
     return 0
 
 
-def load():
+def load() -> tuple[list[dict[str, Any]], list[dict[str, Any]],
+                    dict[int, dict[str, Any]]]:
     """(open_entries, resolutions) with file line numbers attached.
 
     An entry is open unless a later {"resolves": <line>} record names its
     line. Resolutions are appended, never edited in place — the log stays
     append-only for agents and history survives closure.
     """
+    entries: list[dict[str, Any]]
+    resolutions: dict[int, dict[str, Any]]
     entries, resolutions = [], {}
     if LOG.exists():
         with open(LOG, errors="replace") as fh:
@@ -91,7 +95,7 @@ def load():
     return entries, open_, resolutions
 
 
-def resolve(args):
+def resolve(args: argparse.Namespace) -> int:
     entries, _open, resolutions = load()
     target = int(args.resolve)
     if target in resolutions:
@@ -112,7 +116,7 @@ def resolve(args):
     return 0
 
 
-def list_entries(args):
+def list_entries(args: argparse.Namespace) -> int:
     entries, open_, resolutions = load()
     show = entries if args.all else open_
     if args.ticker:
@@ -132,7 +136,7 @@ def list_entries(args):
     return 0
 
 
-def report(args):
+def report(args: argparse.Namespace) -> int:
     _, recs, resolutions = load()
     if args.metric:
         recs = [r for r in recs if r.get("metric") == args.metric]
@@ -173,7 +177,7 @@ def report(args):
     return 0
 
 
-def main():
+def main() -> int:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--ticker", default="")

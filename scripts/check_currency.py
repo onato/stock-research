@@ -80,7 +80,7 @@ _LEADS = [
 STATED = [(lead + name, ccy) for lead in _LEADS for name, ccy in _NAMES]
 
 
-def from_filings(ticker, sample=5):
+def from_filings(ticker: str, sample: int = 5) -> tuple[str | None, dict[str, int]]:
     """(stated_currency, symbol_counts) from the extracted text."""
     d = REPO / "research" / ticker / "Extracted"
     files = sorted(d.glob("*.txt")) if d.is_dir() else []
@@ -96,7 +96,7 @@ def from_filings(ticker, sample=5):
     # move to USD reporting) before HalfYear and Results, so the newest and
     # most authoritative document fell outside the sample and the checker
     # reported GBP with high confidence. "Newest" has to mean newest period.
-    def period_key(path):
+    def period_key(path: pathlib.Path) -> tuple[int, int, str]:
         m = re.search(r"(?:FY|H[12][-_]?|Q[1-4][-_]?)(\d{4})", path.name, re.I)
         year = int(m.group(1)) if m else 0
         # An annual report states the reporting currency; interims often
@@ -112,8 +112,8 @@ def from_filings(ticker, sample=5):
     # aggregate says GBP with false confidence. The most recent statutory
     # filing is the authority; older ones describe a currency that no
     # longer applies.
-    counts = collections.Counter()
-    stated = None
+    counts: collections.Counter[str] = collections.Counter()
+    stated: str | None = None
     for f in reversed(picked):
         text = f.read_text(errors="replace")
         low = text.lower()
@@ -132,10 +132,10 @@ def from_filings(ticker, sample=5):
     return stated, dict(counts)
 
 
-def main():
+def main() -> int:
     import duckdb
     only = set(sys.argv[1:])
-    problems = []
+    problems: list[tuple[str, str, str]] = []
 
     print(f"  {'ticker':10s} {'recorded':>8s} {'suffix':>7s} {'stated':>7s}  filing symbols")
     print("  " + "-" * 68)
