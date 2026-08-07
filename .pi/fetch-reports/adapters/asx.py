@@ -67,7 +67,7 @@ def main() -> int:
     this_year = datetime.date.today().year
     floor = after if after else this_year - SEED_ANNUALS
     plan = []  # (filename, idsId, year)
-    seen = set()
+    seen = {}
     for year in range(this_year, floor, -1):
         for ids, text in rows(code, year) or []:
             if EXCLUDE_RE.search(text):
@@ -82,12 +82,20 @@ def main() -> int:
             label_year = int(m[1]) if m else year
             if after and label_year <= after:
                 continue
+            pm = re.search(r"(\d+) pages?", text)
+            pages = int(pm[1]) if pm else 0
+            if pages and pages < (10 if typ == "Annual" else 4):
+                continue  # lodgement/correction cover letters, not the report
             period = f"FY{label_year}" if typ == "Annual" else f"H1-{label_year}"
-            if (typ, period) in seen:
+            key = (typ, period)
+            # keep the fattest candidate per period: the real report beats the
+            # same-day cover letter (WOR FY2025: 1-page correction vs 152 pages)
+            if key in seen and seen[key][1] >= pages:
                 continue
-            seen.add((typ, period))
-            plan.append((f"{ticker}_{typ}_{period}.pdf", ids, label_year))
+            seen[key] = (ids, pages, label_year)
 
+    plan = [(f"{ticker}_{typ}_{period}.pdf", ids, y)
+            for (typ, period), (ids, _pages, y) in seen.items()]
     if not after:
         annuals = [p for p in plan if "_Annual_" in p[0]][:SEED_ANNUALS]
         halves = [p for p in plan if "_HalfYear_" in p[0]][:SEED_HALVES]
