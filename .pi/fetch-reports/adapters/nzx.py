@@ -22,8 +22,10 @@ import sys
 from pathlib import Path
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
-TYPES = {"ANNREP": "Annual", "HALFYR": "HalfYear"}
-ALSO_IF_REPORT = {"FLLYR": "Annual", "INTERIM": "HalfYear"}
+# Small NZX companies often never lodge a glossy ANNREP — the FLLYR results
+# announcement (with financial statements attached) IS the annual filing.
+TYPES = {"ANNREP": "Annual", "HALFYR": "HalfYear", "FLLYR": "Annual", "INTERIM": "HalfYear"}
+ALSO_IF_REPORT = {}
 
 
 def get(url: str) -> str:
@@ -49,9 +51,9 @@ def main() -> int:
     args = sys.argv[2:]
     dest = Path(args[args.index("--dest") + 1])
     after = int(args[args.index("--after-year") + 1]) if "--after-year" in args else 0
-    if not after:
-        print("nzx-adapter: update-mode only (needs --after-year > 0)")
-        return 1
+    # after=0 (seed): bootstrap from whatever current-year announcements are
+    # hydrated in the page — usually the latest annual/half-year, enough to
+    # give a placeholder ticker its first real filings and enable updates.
     code = ticker.split(".")[0]
 
     d = next_data(f"https://www.nzx.com/companies/{code}/announcements")
@@ -76,7 +78,7 @@ def main() -> int:
         if year is None:
             import datetime
             year = datetime.datetime.fromtimestamp(a.get("releaseDate", 0)).year
-        if year <= after:
+        if after and year <= after:
             continue
         period = f"FY{year}" if typ == "Annual" else f"H1-{year}"
         plan.setdefault((typ, period), a["id"])
