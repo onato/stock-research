@@ -6,10 +6,14 @@ with agents_sha/git_head frozen for determinism.
 """
 
 import json
+import runpy
 import shutil
+import sys
+import warnings
 from pathlib import Path
 
 import ledger
+import pytest
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -108,3 +112,65 @@ class TestAppend:
         added, _, _ = ledger.append(["FRFHF"])
         assert added == ["FRFHF"]
         assert len(ledger.LEDGER.read_text().splitlines()) == 2
+
+
+class TestAllTickers:
+    def test_sorted_and_stem_must_match_ticker_dir(self, make_ticker, patch_repo):
+        """backfill only picks up {TICKER}_DCF.json whose stem matches its
+        own ticker directory — a stray foreign DCF file must not seed a row
+        under the wrong name."""
+        install_dcf(make_ticker, "FRFHF")
+        install_dcf(make_ticker, "0285.HK")
+        stray = make_ticker("STRAY")
+        (stray / "Reports" / "OTHER_DCF.json").write_text("{}")
+        assert ledger.all_tickers() == ["0285.HK", "FRFHF"]
+
+    def test_empty_repo(self, patch_repo):
+        assert ledger.all_tickers() == []
+
+
+class TestMain:
+    def run(self, monkeypatch, *argv):
+        monkeypatch.setattr(sys, "argv", ["ledger.py", *argv])
+        return ledger.main()
+
+    def test_no_subcommand_prints_usage(self, monkeypatch, capsys):
+        assert self.run(monkeypatch) == 2
+        assert "Usage:" in capsys.readouterr().err
+
+    def test_unknown_subcommand_rejected(self, monkeypatch, capsys):
+        assert self.run(monkeypatch, "frobnicate") == 2
+        assert "Usage:" in capsys.readouterr().err
+
+    def test_append_requires_a_ticker(self, monkeypatch, capsys):
+        assert self.run(monkeypatch, "append") == 2
+        assert "at least one TICKER" in capsys.readouterr().err
+
+    def test_append_reports_added_and_missing(self, make_ticker,
+                                              pinned_identity, monkeypatch,
+                                              capsys):
+        install_dcf(make_ticker, "FRFHF")
+        make_ticker("GHOST")
+        assert self.run(monkeypatch, "append", "FRFHF", "GHOST") == 0
+        out = capsys.readouterr().out
+        assert "1 added, 0 already logged, 1 without DCF.json" in out
+        assert "added: FRFHF" in out
+        assert "no DCF: GHOST" in out
+
+    def test_backfill_seeds_every_existing_dcf(self, make_ticker,
+                                               pinned_identity, monkeypatch,
+                                               capsys):
+        install_dcf(make_ticker, "FRFHF")
+        install_dcf(make_ticker, "0285.HK")
+        assert self.run(monkeypatch, "backfill") == 0
+        assert "2 added" in capsys.readouterr().out
+        assert len(ledger.LEDGER.read_text().splitlines()) == 2
+
+    def test_entrypoint_exits_with_main_status(self, monkeypatch, capsys):
+        # No args -> usage -> sys.exit(2), before any file path is touched.
+        monkeypatch.setattr(sys, "argv", ["ledger.py"])
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            with pytest.raises(SystemExit) as ei:
+                runpy.run_module("ledger", run_name="__main__")
+        assert ei.value.code == 2
