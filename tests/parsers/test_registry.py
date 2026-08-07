@@ -19,14 +19,16 @@ class TestRouting:
         # grows one module at a time (open/closed), so no fixed list here.
         from parsers import _REGISTRY
         for cls in _REGISTRY.values():
-            assert issubclass(cls, BaseParser) and cls is not BaseParser
+            assert issubclass(cls, BaseParser)
+            assert cls is not BaseParser
             assert cls.SUFFIXES
 
 
 class TestFacadeApi:
     def test_scan_file_and_patterns_survive(self, tmp_path):
         # exchange_eval.py imports build_facts and uses exactly these two.
-        assert isinstance(bf.PATTERNS, dict) and "Revenue" in bf.PATTERNS
+        assert isinstance(bf.PATTERNS, dict)
+        assert "Revenue" in bf.PATTERNS
         f = tmp_path / "X_Annual_FY2024.txt"
         f.write_text("Revenue      263,527      267,805\n")
         facts = list(bf.scan_file(f))

@@ -48,15 +48,14 @@ def main():
         if args.suffix and suffix != args.suffix:
             continue
         for f in sorted(extracted.glob("*.txt")):
-            for fact in bf.scan_file(f):
-                rows.append((ticker, *[fact.get(k) for k in FIELDS]))
+            rows.extend((ticker, *[fact.get(k) for k in FIELDS])
+                        for fact in bf.scan_file(f))
 
     rows.sort(key=json.dumps)
     out = pathlib.Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w") as fh:
-        for r in rows:
-            fh.write(json.dumps(r) + "\n")
+        fh.writelines(json.dumps(r) + "\n" for r in rows)
     print(f"{len(rows)} facts -> {out}")
     return 0
 

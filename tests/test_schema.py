@@ -5,8 +5,8 @@ in the repo: canonical scale is millions of reporting currency, and unknown
 units yield NULL — never an assumed scale (the SEK.NZ 1000x incident).
 """
 
+import pytest
 import schema
-from pytest import approx
 
 
 class TestNormalize:
@@ -44,7 +44,7 @@ class TestMetricsNormalizedView:
         assert revenue_for(mem_db, "thousands")[0] == 0.4
         assert revenue_for(mem_db, "millions")[0] == 400.0
         assert revenue_for(mem_db, "billions")[0] == 400_000.0
-        assert revenue_for(mem_db, "absolute")[0] == approx(0.0004)
+        assert revenue_for(mem_db, "absolute")[0] == pytest.approx(0.0004)
 
     def test_units_matching_is_case_insensitive(self, mem_db):
         assert revenue_for(mem_db, "THOUSANDS")[0] == 0.4

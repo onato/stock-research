@@ -31,7 +31,7 @@ NUMERIC = ["revenue", "gross_profit", "operating_income", "ebitda",
 
 def load(tickers: set[str], period: str) -> list[dict[str, Any]]:
     import duckdb
-    rows = []
+    rows: list[dict[str, Any]] = []
     for db in sorted(REPO.glob("research/*/Reports/*.duckdb")):
         t = db.parent.parent.name
         if tickers and t not in tickers:
@@ -46,8 +46,8 @@ def load(tickers: set[str], period: str) -> list[dict[str, Any]]:
             else:
                 res = con.execute(q).fetchall()
             names = ["period", "currency", *NUMERIC]
-            for r in res:
-                rows.append({"ticker": t, **dict(zip(names, r, strict=True))})
+            rows.extend(
+                {"ticker": t, **dict(zip(names, r, strict=True))} for r in res)
             con.close()
         except Exception:
             # A DB without the view (never re-extracted) is skipped rather

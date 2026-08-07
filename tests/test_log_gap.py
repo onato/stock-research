@@ -77,7 +77,8 @@ class TestList:
         capsys.readouterr()
         run(monkeypatch, "--list")
         out = capsys.readouterr().out
-        assert "#2" in out and "CapEx" in out
+        assert "#2" in out
+        assert "CapEx" in out
         assert "EBITDA" not in out
 
     def test_list_all_includes_resolved(self, gap_log, monkeypatch, capsys):

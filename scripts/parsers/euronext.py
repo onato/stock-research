@@ -18,7 +18,7 @@ from .base import BaseParser
 class EuronextParser(BaseParser):
     SUFFIXES = ("AS",)
 
-    DECL_RE = re.compile(r"in (thousands|millions|billions) of euros?\b", re.I)
+    DECL_RE = re.compile(r"in (thousands|millions|billions) of euros?\b", re.IGNORECASE)
 
     def scan(self, text: str, filename: str) -> Iterator[dict[str, Any]]:
         lines = text.splitlines()

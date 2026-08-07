@@ -97,11 +97,11 @@ def from_filings(ticker: str, sample: int = 5) -> tuple[str | None, dict[str, in
     # most authoritative document fell outside the sample and the checker
     # reported GBP with high confidence. "Newest" has to mean newest period.
     def period_key(path: pathlib.Path) -> tuple[int, int, str]:
-        m = re.search(r"(?:FY|H[12][-_]?|Q[1-4][-_]?)(\d{4})", path.name, re.I)
+        m = re.search(r"(?:FY|H[12][-_]?|Q[1-4][-_]?)(\d{4})", path.name, re.IGNORECASE)
         year = int(m.group(1)) if m else 0
         # An annual report states the reporting currency; interims often
         # only reference it, so prefer annuals within the same year.
-        rank = 2 if re.search(r"annual|10k|20f", path.name, re.I) else 1
+        rank = 2 if re.search(r"annual|10k|20f", path.name, re.IGNORECASE) else 1
         return (year, rank, path.name)
 
     picked = sorted(statutory or files, key=period_key)[-sample:]

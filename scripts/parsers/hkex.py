@@ -34,7 +34,7 @@ class HKEXParser(BaseParser):
     CJK_RE = re.compile(r"[一-鿿　-〿＀-￯].*$")
 
     UNITS_TOKEN_RE = re.compile(
-        r"(?:RMB|HK\$|US\$)\s?(?:['’]\s?)?(000\b|million|billion)", re.I)
+        r"(?:RMB|HK\$|US\$)\s?(?:['’]\s?)?(000\b|million|billion)", re.IGNORECASE)
 
     # Table-header declarations: "(in thousands)", "(RMB, in thousands)",
     # "(All amounts in thousands, ...)", "(in millions)" — how the US-style
@@ -42,7 +42,7 @@ class HKEXParser(BaseParser):
     # units, always at the statement, far below the head window.
     PAREN_DECL_RE = re.compile(
         r"\(\s*(?:RMB\s*,?\s*|All amounts\s+)?in (thousands|millions|billions)",
-        re.I)
+        re.IGNORECASE)
 
     def clean_label(self, cell: str) -> str:
         return self.CJK_RE.sub("", cell).strip()

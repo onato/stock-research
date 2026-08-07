@@ -33,7 +33,7 @@ class NZXParser(BaseParser):
     # mid-sentence.
     DECL_RE = re.compile(
         r"(?:rounded to(?:\s+the nearest)?|amounts?\s+(?:are\s+)?in|expressed in)"
-        r"\s+(thousands?|millions?|billions?)", re.I)
+        r"\s+(thousands?|millions?|billions?)", re.IGNORECASE)
 
     # Column-header form, curly apostrophe included.
     UNITS_COL_RE = re.compile(r"(?:NZ|A|US)?\$\s?(M\b|['’]?000\b)")
@@ -43,12 +43,12 @@ class NZXParser(BaseParser):
 
     STATED_CCY: ClassVar[list[tuple["re.Pattern[str]", str]]] = [
         (re.compile(r"(?:presented|expressed)\W{0,20}in\s+"
-                    r"(?:thousands of |millions of )?new zealand dollars?", re.I), "NZD"),
+                    r"(?:thousands of |millions of )?new zealand dollars?", re.IGNORECASE), "NZD"),
         (re.compile(r"(?:presented|expressed)\W{0,20}in\s+"
-                    r"(?:thousands of |millions of )?australian dollars?", re.I), "AUD"),
+                    r"(?:thousands of |millions of )?australian dollars?", re.IGNORECASE), "AUD"),
         (re.compile(r"(?:presented|expressed)\W{0,20}in\s+"
                     r"(?:thousands of |millions of )?(?:u\.?s\.?|united states) dollars?",
-                    re.I), "USD"),
+                    re.IGNORECASE), "USD"),
     ]
 
     def scan(self, text: str, filename: str) -> Iterator[dict[str, Any]]:

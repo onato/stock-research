@@ -240,7 +240,7 @@ def main() -> int:
     #
     # Per-share and percentage columns are scale-free and must not be
     # touched: EPS of 1.98 is 1.98 whatever the revenue units are.
-    SCALE_FREE = {"period", "units", "currency", "eps", "dividend_per_share",
+    scale_free = {"period", "units", "currency", "eps", "dividend_per_share",
                   "gross_margin", "operating_margin", "net_margin"}
     for period, vals in sorted(rows.items()):
         rec: dict[str, Any] = dict.fromkeys(cols)
@@ -250,7 +250,7 @@ def main() -> int:
         for k, v in vals.items():
             if k not in rec:
                 continue
-            rec[k] = v / 1e6 if (k not in SCALE_FREE and v is not None) else v
+            rec[k] = v / 1e6 if (k not in scale_free and v is not None) else v
         payload.append([rec[c] for c in cols])
     if payload:
         con.executemany(

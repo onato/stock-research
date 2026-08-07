@@ -44,12 +44,12 @@ class BaseParser:
                            r"|^[A-Za-z]{1,3}\d{1,2}$"
                            r"|^Notes?\s+\d{1,2}$"
                            r"|^\d{1,2}\s?\([a-z]\)$"
-                           r"|^[ivx]{1,4}$", re.I)
+                           r"|^[ivx]{1,4}$", re.IGNORECASE)
 
     # Sentence-form units declaration ("amounts in thousands", "$000").
     UNITS_RE = re.compile(
         r"\b(?:in|expressed in|amounts in)?\s*"
-        r"(thousands?|millions?|billions?|000s?|\$000|NZ\$000)\b", re.I)
+        r"(thousands?|millions?|billions?|000s?|\$000|NZ\$000)\b", re.IGNORECASE)
 
     # Column-header units form ("$M", "$'000"); scanned over the whole file
     # when the sentence form finds nothing in the head. None disables.

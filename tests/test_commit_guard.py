@@ -66,7 +66,8 @@ class TestCommitTicker:
         rc, subject, out = run_commit_ticker(tmp_path, ("Metrics.csv",))
         assert rc == "rc=0", out.stderr
         assert subject.startswith("wip: partial research for T"), subject
-        assert "DCF.json" in subject and "Dashboard.html" in subject
+        assert "DCF.json" in subject
+        assert "Dashboard.html" in subject
 
     def test_extraction_only_run_is_wip_not_feat(self, tmp_path):
         # The APL.NZ case: extraction succeeded, everything downstream died.

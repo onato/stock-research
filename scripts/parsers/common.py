@@ -71,7 +71,7 @@ PATTERNS: dict[str, list[str]] = {
                       r"^tax(es)? (paid|refunded)"],
 }
 COMPILED: dict[str, list[re.Pattern[str]]] = {
-    m: [re.compile(p, re.I) for p in pats] for m, pats in PATTERNS.items()}
+    m: [re.compile(p, re.IGNORECASE) for p in pats] for m, pats in PATTERNS.items()}
 
 # Statement lines are matched by splitting on runs of 2+ spaces and
 # looking for a label cell followed by numeric cells. The old approach --
@@ -108,13 +108,13 @@ def parse_num(tok: str) -> float | None:
 
 def period_from_filename(name: str) -> str | None:
     """Filenames follow {TICKER}_{type}_{period}.txt (see CLAUDE.md)."""
-    m = re.search(r"_(FY\d{4})", name, re.I)
+    m = re.search(r"_(FY\d{4})", name, re.IGNORECASE)
     if m:
         return m.group(1).upper()
-    m = re.search(r"_(H[12])[-_ ]?(\d{4})", name, re.I)
+    m = re.search(r"_(H[12])[-_ ]?(\d{4})", name, re.IGNORECASE)
     if m:
         return f"{m.group(1).upper()}-{m.group(2)}"
-    m = re.search(r"_(Q[1-4])[-_ ]?(\d{4})", name, re.I)
+    m = re.search(r"_(Q[1-4])[-_ ]?(\d{4})", name, re.IGNORECASE)
     if m:
         return f"{m.group(1).upper()} {m.group(2)}"
     return None
