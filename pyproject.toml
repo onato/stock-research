@@ -8,6 +8,27 @@ testpaths = ["tests"]
 addopts = "-q"
 markers = ["slow: touches the live research/ corpus"]
 
+[tool.mypy]
+# scripts/ is a flat directory of sibling-importing modules (see the pytest
+# pythonpath note above); explicit_package_bases + mypy_path reproduce that
+# import layout for the type checker.
+mypy_path = "scripts"
+explicit_package_bases = true
+python_version = "3.12"
+# Every def in scripts/ is annotated; keep it that way.
+disallow_untyped_defs = true
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+# bs4/requests: scraping deps without type stubs. screen: the
+# screen-investments skill module that select_ticker.py imports via a
+# sys.path hack — it lives outside scripts/ and is linted separately.
+module = ["bs4.*", "requests.*", "screen"]
+ignore_missing_imports = true
+
 [tool.ruff]
 target-version = "py312"
 # Lint the code, not the research corpus.
@@ -29,9 +50,21 @@ select = [
     "PLW",             # pylint warnings (incl. subprocess-run-without-check)
     "RUF",             # ruff-native (unused-noqa, mutable class defaults, ...)
     "EXE",             # shebang/executable-bit mismatches
+    "ANN",             # type annotations (scripts/ only; see per-file-ignores)
+    "W",               # pycodestyle warnings (trailing whitespace etc.)
+    "A",               # builtin shadowing
+    "RET",             # return-statement hygiene
 ]
 # The parsers match curly quotes and en-dashes exactly as pdftotext emits
 # them from real filings; "fixing" those to ASCII would break matching.
-ignore = ["RUF001", "RUF002", "RUF003"]
+# ANN401: explicit Any is the policy for JSON/duckdb-row payloads.
+ignore = ["RUF001", "RUF002", "RUF003", "ANN401"]
 # Not selected on purpose: BLE (broad excepts are policy in the scraping
 # pipeline) and DTZ (naive datetimes are fine in a single-timezone tool).
+
+[tool.ruff.lint.per-file-ignores]
+# The annotation gate covers the production pipeline; annotating test
+# functions and eval/skill glue adds noise, not safety.
+"tests/**" = ["ANN"]
+"evals/**" = ["ANN"]
+".claude/skills/**" = ["ANN"]

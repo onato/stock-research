@@ -21,7 +21,7 @@ LEADERBOARD ?= 15   # rows shown by `make screen`
 .DEFAULT_GOAL := help
 .PHONY: help run digest status screen research facts evals evals-all \
         cost gaps exchange-eval facts-xbrl screen-metrics check-currency ledger ledger-backfill queue-prune \
-        test test-country lint
+        test test-country lint coverage typecheck
 
 help: ## Show this help
 	@echo "Usage: make <target> [TICKER=XYZ] [TICKERS=4] [PARALLEL=2]"
@@ -103,6 +103,15 @@ test: ## Run the deterministic test suite (gates every commit touching scripts/)
 lint: ## Ruff + shellcheck; the technical-debt gate
 	uvx ruff@0.16.1 check .
 	shellcheck -S warning $(SCRIPTS)/*.sh
+
+# Mypy is pinned for the same reason as ruff; the config lives in pyproject.toml.
+# --python-executable lets the isolated uvx mypy resolve the interpreter's real
+# site-packages (duckdb etc.) instead of demanding stubs it can't see.
+typecheck: ## Mypy over scripts/; part of the technical-debt gate
+	uvx mypy@1.19.0 --python-executable "$$(command -v python3)" scripts
+
+coverage: ## Test suite with line coverage over scripts/
+	python3 -m pytest --cov=$(SCRIPTS) --cov-report=term-missing:skip-covered
 
 test-country: ## One country's parser tests (COUNTRY=nzx)
 	@test -n "$(COUNTRY)" || { echo "usage: make test-country COUNTRY=nzx" >&2; exit 2; }
