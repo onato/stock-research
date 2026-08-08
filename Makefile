@@ -20,7 +20,7 @@ PARALLEL ?= 2
 LEADERBOARD ?= 15   # rows shown by `make screen`
 
 .DEFAULT_GOAL := help
-.PHONY: help run digest status screen research facts evals evals-all \
+.PHONY: help run digest status screen integrity research facts evals evals-all \
         cost gaps exchange-eval facts-xbrl screen-metrics check-currency ledger ledger-backfill queue-prune \
         test test-country lint coverage typecheck
 
@@ -66,6 +66,12 @@ screen: ## Rank every ticker by upside to weighted IV, at live prices
 	@$(PY) $(SCREEN) --live --top $(LEADERBOARD) \
 	  --json $(STATE)/last_screen.json --html index.html 2>/dev/null \
 	  || $(PY) $(SCREEN) --top $(LEADERBOARD) --html index.html
+
+# Named "integrity", not "coverage": `make coverage` already means test line
+# coverage, and the two would be read as the same thing.
+integrity: ## Data integrity: how much financial history we have, and the holes
+	@$(PY) $(SCRIPTS)/integrity_report.py \
+	  --json $(STATE)/integrity.json --html integrity.html
 
 status: ## What is researched, what is stale, what is queued
 	@$(PY) $(SCRIPTS)/select_ticker.py 2>&1 | grep -E '^(ticker|mode)=' | sed 's/^/  next  /'
