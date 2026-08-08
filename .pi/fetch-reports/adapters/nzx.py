@@ -128,7 +128,11 @@ def main() -> int:
     dest.mkdir(parents=True, exist_ok=True)
     ok = 0
     for (typ, period), ann_id in plan.items():
-        detail = next_data(f"https://www.nzx.com/announcements/{ann_id}")
+        try:
+            detail = next_data(f"https://www.nzx.com/announcements/{ann_id}")
+        except subprocess.CalledProcessError as e:
+            print(f"nzx-adapter: announcement {ann_id} unreachable ({e}); skipping")
+            continue
         pdfs = sorted(set(re.findall(
             r"https?://api\.nzx\.com/public/announcement/[^\"\\s]+?\.pdf",
             json.dumps(detail))))
