@@ -20,7 +20,7 @@ PARALLEL ?= 2
 LEADERBOARD ?= 15   # rows shown by `make screen`
 
 .DEFAULT_GOAL := help
-.PHONY: help run digest status screen integrity research facts evals evals-all \
+.PHONY: help run digest status screen integrity missing research facts evals evals-all \
         cost gaps exchange-eval facts-xbrl screen-metrics check-currency ledger ledger-backfill queue-prune \
         test test-country lint coverage typecheck
 
@@ -72,6 +72,14 @@ screen: ## Rank every ticker by upside to weighted IV, at live prices
 integrity: ## Data integrity: how much financial history we have, and the holes
 	@$(PY) $(SCRIPTS)/integrity_report.py \
 	  --json $(STATE)/integrity.json --html integrity.html
+
+# integrity reports the percentages; this names the actual cells, so a fix
+# run can be driven off the output instead of opening CSVs by hand.
+missing: ## Which fields are missing on which tickers (JSONL; SCOPE=all, FORMAT=csv)
+	@$(PY) $(SCRIPTS)/missing_fields.py \
+	  --scope $(or $(SCOPE),core8) --format $(or $(FORMAT),jsonl) \
+	  $(if $(TICKER),--ticker $(TICKER),) $(if $(FIELD),--field $(FIELD),) \
+	  $(if $(OUT),--out $(OUT),)
 
 status: ## What is researched, what is stale, what is queued
 	@$(PY) $(SCRIPTS)/select_ticker.py 2>&1 | grep -E '^(ticker|mode)=' | sed 's/^/  next  /'
