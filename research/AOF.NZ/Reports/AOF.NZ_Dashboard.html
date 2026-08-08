@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AoFrio Limited (AOF.NZ) Financial Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 20px;
+}
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+}
+.header h1 {
+    font-size: 2.5rem;
+    background: linear-gradient(90deg, #00d4aa, #00b894);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+}
+.header p { color: #888; font-size: 1.1rem; }
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.kpi-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.kpi-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 212, 170, 0.2);
+}
+.kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+.kpi-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.kpi-change { font-size: 0.9rem; margin-top: 5px; }
+.kpi-change.positive { color: #00d4aa; }
+.kpi-change.negative { color: #ff6b6b; }
+.guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+.guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 8px; }
+.guidance-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.guidance-header h3::before {
+    content: ''; display: inline-block; width: 4px; height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px;
+}
+.guidance-meta { font-size: 0.85rem; color: #888; }
+.guidance-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px; margin-bottom: 20px;
+}
+.guidance-card {
+    background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.1); transition: transform 0.2s ease;
+}
+.guidance-card:hover { transform: translateY(-2px); }
+.guidance-metric { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.guidance-target { font-size: 1.15rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; line-height: 1.4; }
+.guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
+.guidance-vs-prior { display: inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+.guidance-vs-prior.raised { background: rgba(0, 212, 170, 0.15); color: #00d4aa; }
+.guidance-vs-prior.lowered { background: rgba(255, 107, 107, 0.15); color: #ff6b6b; }
+.guidance-vs-prior.maintained { background: rgba(255, 255, 255, 0.1); color: #888; }
+.guidance-vs-prior.new { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
+.guidance-vs-prior.shortfall,
+.guidance-vs-prior.on { background: rgba(253, 203, 110, 0.15); color: #fdcb6e; }
+.guidance-notes { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
+.guidance-commentary {
+    background: rgba(255, 255, 255, 0.03); border-radius: 10px; padding: 16px 20px;
+    border-left: 3px solid #00d4aa; font-style: italic; color: #b0b0b0; line-height: 1.6;
+}
+.guidance-commentary::before { content: '"'; font-size: 1.5rem; color: #00d4aa; margin-right: 4px; }
+.section-title {
+    font-size: 1.5rem; color: #fff; margin: 40px auto 20px; padding-bottom: 10px;
+    border-bottom: 2px solid rgba(0, 212, 170, 0.3); max-width: 1400px;
+}
+.charts-container {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 25px; max-width: 1400px; margin: 0 auto;
+}
+.chart-card {
+    background: rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.chart-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.chart-header h3::before {
+    content: ''; display: inline-block; width: 4px; height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px;
+}
+.help-btn {
+    width: 24px; height: 24px; border-radius: 50%; background: rgba(0, 212, 170, 0.2);
+    border: 1px solid #00d4aa; color: #00d4aa; font-size: 14px; font-weight: bold;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s ease;
+}
+.help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.chart-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.log-toggle {
+    padding: 3px 10px; border-radius: 12px; background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2); color: #888; font-size: 11px;
+    font-weight: 600; cursor: pointer; transition: all 0.2s ease;
+}
+.log-toggle:hover { border-color: #00d4aa; color: #00d4aa; }
+.log-toggle.active { background: rgba(0, 212, 170, 0.2); border-color: #00d4aa; color: #00d4aa; }
+.chart-wrapper { position: relative; height: 300px; }
+.modal-overlay {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.7); z-index: 1000; justify-content: center;
+    align-items: center; padding: 20px;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+    background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%); border-radius: 16px;
+    max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto;
+    border: 1px solid rgba(0, 212, 170, 0.3); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.modal-header {
+    padding: 20px 25px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.modal-header h3 { color: #00d4aa; font-size: 1.4rem; margin: 0; }
+.modal-close {
+    width: 32px; height: 32px; border-radius: 50%; background: rgba(255, 107, 107, 0.2);
+    border: 1px solid #ff6b6b; color: #ff6b6b; font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+.modal-close:hover { background: #ff6b6b; color: #fff; }
+.modal-body { padding: 25px; line-height: 1.7; }
+.modal-body p { margin-bottom: 15px; }
+.modal-body strong { color: #00d4aa; }
+.modal-body ul { margin: 15px 0; padding-left: 20px; }
+.modal-body li { margin-bottom: 8px; }
+.metric-highlight {
+    background: rgba(0, 212, 170, 0.1); border-left: 3px solid #00d4aa;
+    padding: 12px 15px; margin: 15px 0; border-radius: 0 8px 8px 0;
+}
+.overview-section { max-width: 1400px; margin: 0 auto 30px; }
+.overview-toggle {
+    width: 100%; background: rgba(0, 212, 170, 0.1); border: 1px solid rgba(0, 212, 170, 0.3);
+    border-radius: 12px; padding: 16px 24px; color: #00d4aa; font-size: 1.1rem;
+    font-weight: 600; cursor: pointer; display: flex; justify-content: space-between;
+    align-items: center; transition: all 0.2s ease;
+}
+.overview-toggle:hover { background: rgba(0, 212, 170, 0.2); }
+.overview-toggle .arrow { transition: transform 0.3s ease; }
+.overview-toggle.active .arrow { transform: rotate(180deg); }
+.overview-content {
+    display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: none; border-radius: 0 0 12px 12px; padding: 30px; margin-top: -12px;
+}
+.overview-content.active { display: block; }
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+.overview-card {
+    background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.overview-card h3 {
+    color: #00d4aa; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.overview-card p { margin-bottom: 12px; line-height: 1.6; }
+.overview-card ul { list-style: none; padding: 0; margin: 0; }
+.overview-card li { padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); line-height: 1.5; }
+.overview-card li:last-child { border-bottom: none; }
+.overview-card.bull h3 { color: #00d4aa; }
+.overview-card.bear h3 { color: #ff6b6b; }
+.overview-card.risks h3 { color: #fdcb6e; }
+.risk-high { color: #ff6b6b; }
+.risk-moderate { color: #fdcb6e; }
+.risk-low, .risk-low-moderate { color: #00d4aa; }
+.revenue-stream { display: flex; justify-content: space-between; align-items: center; }
+.revenue-stream .percent { color: #00d4aa; font-weight: 600; }
+.trend-growing { color: #00d4aa; }
+.trend-stable { color: #888; }
+.trend-declining { color: #ff6b6b; }
+/* DCF */
+.dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+.dcf-model-warning {
+    background: rgba(253, 203, 110, 0.12); border: 1px solid rgba(253, 203, 110, 0.4);
+    border-radius: 10px; padding: 18px 22px; margin-bottom: 25px; color: #fdcb6e;
+    line-height: 1.6; display: flex; gap: 14px; align-items: flex-start;
+}
+.dcf-model-warning .warning-icon { font-size: 1.4rem; flex-shrink: 0; }
+.dcf-model-warning strong { color: #fff; }
+.dcf-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+.dcf-card {
+    background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 24px; text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1); transition: transform 0.3s ease;
+}
+.dcf-card:hover { transform: translateY(-3px); }
+.dcf-card.highlight { background: rgba(0, 212, 170, 0.1); border-color: rgba(0, 212, 170, 0.3); }
+.dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.dcf-value { font-size: 2.2rem; font-weight: bold; color: #00d4aa; }
+.dcf-card:not(.highlight) .dcf-value { color: #fff; }
+.dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+.dcf-change.positive { color: #00d4aa; }
+.dcf-change.negative { color: #ff6b6b; }
+.dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
+.dcf-warning {
+    background: rgba(253, 203, 110, 0.15); border: 1px solid rgba(253, 203, 110, 0.4); border-radius: 8px;
+    padding: 12px 16px; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; color: #fdcb6e;
+}
+.warning-icon { font-size: 1.2rem; }
+.dcf-inputs {
+    background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; margin-bottom: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+.dcf-inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.dcf-input-card {
+    background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 12px; text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #00d4aa; }
+.dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
+.fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
+.fcf-projection-table {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px;
+    background: rgba(0, 0, 0, 0.2); border-radius: 8px; padding: 12px; overflow-x: auto;
+}
+.fcf-projection-item { text-align: center; }
+.fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
+.fcf-projection-item .year { font-size: 0.75rem; color: #888; margin-bottom: 2px; }
+.fcf-projection-item .fcf-value { font-size: 1rem; color: #e0e0e0; font-weight: 500; }
+.fcf-projection-item .growth-rate { font-size: 0.75rem; color: #00d4aa; margin-top: 2px; }
+.dcf-controls {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; margin-bottom: 30px;
+    padding: 25px; background: rgba(255, 255, 255, 0.03); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.slider-group { display: flex; flex-direction: column; gap: 10px; }
+.slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+.slider-group label span { color: #00d4aa; font-weight: 600; }
+.slider-group input[type="range"] {
+    -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); outline: none;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #00d4aa;
+    cursor: pointer; transition: transform 0.2s;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.slider-hint { font-size: 0.8rem; color: #666; }
+.scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+.scenario-tab {
+    padding: 10px 24px; border: 1px solid rgba(255, 255, 255, 0.2); background: transparent;
+    color: #888; border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s;
+}
+.scenario-tab:hover { border-color: rgba(0, 212, 170, 0.5); color: #e0e0e0; }
+.scenario-tab.active { background: rgba(0, 212, 170, 0.15); border-color: #00d4aa; color: #00d4aa; }
+.scenario-details {
+    background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; margin-bottom: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.scenario-details h4 { color: #00d4aa; margin-bottom: 10px; }
+.scenario-narrative { color: #b0b0b0; font-size: 0.9rem; line-height: 1.6; margin-bottom: 18px; font-style: italic; }
+.assumption-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+.assumption-item { text-align: center; }
+.assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+.assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
+.sensitivity-section { margin-bottom: 30px; }
+.sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; }
+.sensitivity-note { font-size: 0.8rem; color: #666; margin-bottom: 12px; line-height: 1.5; }
+.sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255, 255, 255, 0.03); border-radius: 8px; overflow: hidden; }
+.sensitivity-table th, .sensitivity-table td { padding: 12px 16px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); }
+.sensitivity-table th { background: rgba(0, 212, 170, 0.1); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td { color: #e0e0e0; }
+.sensitivity-table td.highlight { background: rgba(0, 212, 170, 0.15); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td.below-current { color: #ff6b6b; }
+.sensitivity-table td.above-current { color: #00d4aa; }
+.historical-growth { margin-bottom: 30px; }
+.historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
+.growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
+.growth-item {
+    background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 15px; text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.growth-item .metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
+.growth-item .rate { font-size: 1.2rem; font-weight: 600; }
+.growth-item .rate.positive { color: #00d4aa; }
+.growth-item .rate.negative { color: #ff6b6b; }
+.growth-item .rate.na { color: #666; }
+.growth-item.selected { border-color: #00d4aa; background: rgba(0, 212, 170, 0.1); }
+.dcf-download { text-align: center; margin-top: 30px; }
+.download-btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; background: rgba(0, 212, 170, 0.15);
+    border: 1px solid #00d4aa; border-radius: 8px; color: #00d4aa; text-decoration: none; font-weight: 600; transition: all 0.2s;
+}
+.download-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.download-icon { font-size: 1.2rem; }
+@media (max-width: 768px) {
+    .charts-container { grid-template-columns: 1fr; }
+    .overview-grid { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.8rem; }
+    .fcf-projection-table { grid-template-columns: repeat(3, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>AoFrio Limited (AOF.NZ)</h1>
+    <p>Commercial Refrigeration IoT / SaaS &amp; EC Motors &mdash; FY ends 31 December &mdash; Reported in NZD (millions)</p>
+</div>
+
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid" id="overviewGrid"></div>
+    </div>
+</div>
+
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf"></span> | <span id="guidanceFY"></span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<h2 class="section-title">Revenue &amp; Segment Mix</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Annual Revenue</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('revenueChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('revenue')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="revenueChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>H1 vs Full-Year Revenue</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('h1fy')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="h1fyChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Gross Margin Trend (Motors&rarr;IoT Mix Shift)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('grossMargin')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="grossMarginChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Gross Profit vs Cost of Revenue</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('grossProfitChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('grossProfit')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="grossProfitChart"></canvas></div>
+    </div>
+</div>
+
+<h2 class="section-title">Profitability</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>EBITDA vs Net Income</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('ebitdaNi')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="ebitdaNiChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Operating &amp; Net Margin (%)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('margins')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="marginsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>EPS (Loss per Share)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('eps')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="epsChart"></canvas></div>
+    </div>
+</div>
+
+<h2 class="section-title">Cash Flow &amp; Capital Intensity</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Operating Cash Flow, CapEx &amp; Free Cash Flow</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('fcf')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="fcfChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>CapEx Intensity (% of Revenue)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('capexIntensity')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="capexIntensityChart"></canvas></div>
+    </div>
+</div>
+
+<h2 class="section-title">Balance Sheet &amp; Dilution</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shares Outstanding (Dilution History)</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('sharesChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('shares')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="sharesChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shareholders' Equity</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('equityChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('equity')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="equityChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Cash vs Total Debt</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('cashDebt')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="cashDebtChart"></canvas></div>
+    </div>
+</div>
+
+<h2 class="section-title">DCF Valuation</h2>
+<div class="dcf-section">
+    <div class="dcf-model-warning">
+        <span class="warning-icon">&#9888;</span>
+        <div>
+            <strong>Model approach:</strong> AoFrio's Base and Bear DCF scenarios imply <strong>negative</strong> raw equity value once
+            net debt ($8.2m) is subtracted from projected owner FCF, and are floored at $0.00/share (limited liability).
+            The probability-weighted intrinsic value of roughly <strong>$0.009</strong> sits far below the current market price
+            of <strong>$0.065</strong>. Net debt alone exceeds the Base case's entire computed enterprise value ($1.1m) by more than 7x.
+            This divergence is not a modeling error &mdash; a cash-flow DCF discounting realized financials at a risk-appropriate WACC
+            cannot capture the option value the market may be pricing into AoFrio's 3.2m-device connected installed base, the newly
+            launched SCS 800 / AoFrio iQ SaaS platform (33 active trials, first purchase orders expected 2H26), and takeout optionality
+            on a sub-$50m market cap. Treat these outputs as a fundamentals-only downside/floor check, not a precise fair-value estimate.
+        </div>
+    </div>
+
+    <div class="dcf-summary">
+        <div class="dcf-card highlight">
+            <div class="dcf-label">Intrinsic Value (Base)</div>
+            <div class="dcf-value" id="dcfIV">$0.00</div>
+            <div class="dcf-change negative" id="dcfUpside">-100% downside</div>
+            <div class="dcf-sublabel">Owner FCF &mdash; floored at $0.00 (raw: -$0.01)</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Entry Price (15% Hurdle)</div>
+            <div class="dcf-value" id="dcfEntry">$0.00</div>
+            <div class="dcf-sublabel">Buy below for a 15% annual return (incl. interim FCF)</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Current Price</div>
+            <div class="dcf-value" id="dcfCurrent">$0.065</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Prob-Weighted IV</div>
+            <div class="dcf-value" id="dcfWeighted">$0.009</div>
+            <div class="dcf-change negative" id="dcfWeightedUpside"></div>
+            <div class="dcf-sublabel">20% Bull / 50% Base / 30% Bear &mdash; all on owner FCF</div>
+        </div>
+    </div>
+
+    <div class="dcf-warning" id="growthWarning" style="display:flex;">
+        <span class="warning-icon">&#9888;</span>
+        <span id="warningText">Historical CAGRs are not usable growth anchors for AoFrio &mdash; EPS is near-zero/negative in 6 of 8 years, FCF was negative in 6 of 8 years, and equity CAGR is negative (-12.6% over 3yr) from accumulated losses. This DCF builds revenue bottom-up from the realized 1H2026 Motors/IoT split and management's FY2026 guidance walk-back.</span>
+    </div>
+
+    <div class="dcf-inputs">
+        <h4>DCF Model Inputs</h4>
+        <div class="dcf-inputs-grid">
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Base FCF (Owner, FY2025)</div>
+                <div class="dcf-input-value" id="baseFCF">-$5.26M</div>
+                <div class="dcf-input-note" id="sbcBreakdown">Starting point for projections</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Shares Outstanding</div>
+                <div class="dcf-input-value" id="sharesOut">561.4M</div>
+                <div class="dcf-input-note" id="dilutionNote"></div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Net Debt</div>
+                <div class="dcf-input-value" id="netDebt">$8.21M</div>
+                <div class="dcf-input-note">Positive = net debt (no net cash cushion)</div>
+            </div>
+        </div>
+        <div class="fcf-projections">
+            <h5>Projected Owner FCF (First 5 of 10 Years)</h5>
+            <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+        </div>
+    </div>
+
+    <div class="dcf-controls">
+        <div class="slider-group">
+            <label>Year-1 Revenue Growth: <span id="growthValue">8%</span></label>
+            <input type="range" id="growthSlider" min="-5" max="20" value="8" step="1" oninput="updateDCFDisplay()">
+            <div class="slider-hint" id="growthHint">Bottom-up revenue build (Motors/IoT segment split), not a historical CAGR</div>
+        </div>
+        <div class="slider-group">
+            <label>WACC: <span id="waccValue">20%</span></label>
+            <input type="range" id="waccSlider" min="14" max="26" value="20" step="0.5" oninput="updateDCFDisplay()">
+        </div>
+        <div class="slider-group">
+            <label>Terminal Growth: <span id="terminalValue">3%</span></label>
+            <input type="range" id="terminalSlider" min="0" max="5" value="3" step="0.5" oninput="updateDCFDisplay()">
+        </div>
+    </div>
+
+    <div class="scenario-tabs">
+        <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+        <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+        <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+    </div>
+
+    <div class="scenario-details" id="scenarioDetails">
+        <h4>Assumptions &amp; Narrative</h4>
+        <div class="scenario-narrative" id="scenarioNarrative"></div>
+        <div class="assumption-grid" id="assumptionGrid"></div>
+    </div>
+
+    <div class="sensitivity-section">
+        <h4>Sensitivity Analysis: Base-Case Intrinsic Value by WACC &amp; Terminal Growth</h4>
+        <div class="sensitivity-note">Raw (unfloored) values shown so the full range is visible &mdash; even the most favorable corner (WACC 16%, terminal growth 5%) remains negative at roughly -$0.0006/share. Red = below current price / negative; green = above current price.</div>
+        <table class="sensitivity-table" id="sensitivityMatrix"></table>
+    </div>
+
+    <div class="historical-growth">
+        <h4>Historical Growth Rates (CAGR) &mdash; Context Only, Not Used as DCF Anchor</h4>
+        <div class="growth-grid" id="growthGrid"></div>
+    </div>
+
+    <div class="dcf-download">
+        <a href="AOF.NZ_DCF_Model.xlsx" class="download-btn" download>
+            <span class="download-icon">&#8681;</span> Download Excel Model
+        </a>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ============ EMBEDDED DATA ============
+const csvData = `Period,Revenue,CostOfRevenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,EBITDA,NetIncome,NetMargin,EPS,OperatingCashFlow,CapEx,FreeCashFlow,ShareholdersEquity,TotalAssets,TotalLiabilities,TotalDebt,CashAndEquivalents,SharesOutstanding,StockBasedComp,DividendPerShare,Units,Currency
+FY2010,28.015,-27.091,0.924,3.3,-14.923,-53.3,-13.18,-14.847,-53.0,-0.025,-17.406,-1.378,-18.784,18.268,31.513,13.245,0.716,2.9,673.663985,0.162,0.0,millions,NZD
+H1-2011,18.087,-17.565,0.522,2.9,-7.018,-38.8,-6.037,-6.986,-38.6,-0.1145,-5.198,-0.773,-5.971,18.885,30.473,11.588,,5.123,,0.108,0.0,millions,NZD
+FY2011,34.985,-33.266,1.719,4.9,-14.46,-41.3,-12.912,-14.472,-41.4,-0.2168,-6.518,-1.452,-7.97,12.48,26.529,14.049,1.266,3.628,67.36645,0.187,0.0,millions,NZD
+H1-2012,22.276,-19.532,2.744,12.3,-3.271,-14.7,-1.894,-3.292,-14.8,-0.0489,-1.484,-0.294,-1.778,8.828,22.353,13.525,,2.438,,0.076,0.0,millions,NZD
+FY2012,35.562,-30.59,4.972,14.0,-6.28,-17.7,-5.355,-6.333,-17.8,-0.0897,-3.453,-0.512,-3.965,7.486,16.687,9.201,1.237,1.869,80.76645,0.118,0.0,millions,NZD
+H1-2013,16.363,-13.585,2.778,17.0,-1.739,-10.6,-1.471,-1.756,-10.7,-0.0187,0.523,-0.236,0.287,10.73,20.375,9.645,0.002,5.367,115.458703,0.064,0.0,millions,NZD
+FY2013,27.437,-22.306,5.131,18.7,-3.748,-13.7,-3.23,-3.768,-13.7,-0.0349,-2.436,-1.096,-3.532,9.36,16.873,7.513,0.0,2.984,126.058703,0.115,0.0,millions,NZD
+H1-2014,10.57,-8.615,1.955,18.5,-2.161,-20.4,-1.955,-1.992,-18.8,-0.0158,-1.818,-1.017,-2.835,6.863,18.675,11.812,,4.853,126.373117,0.02,0.0,millions,NZD
+FY2014,17.805,-14.609,3.196,18.0,-4.509,-25.3,-4.062,-4.474,-25.1,-0.0318,-4.426,-2.282,-6.708,4.978,15.091,10.113,4.507,1.196,126.373117,0.049,0.0,millions,NZD
+H1-2015,13.537,-10.736,2.801,20.7,-0.211,-1.6,0.012,-0.671,-5.0,-0.0038,0.512,-1.063,-0.551,7.854,22.164,14.31,4.832,3.379,231.684047,0.042,0.0,millions,NZD
+FY2015,24.572,-19.311,5.261,21.4,-1.802,-7.3,-1.403,-2.78,-11.3,-0.0129,0.834,-2.206,-1.372,5.598,18.831,13.233,5.188,2.88,231.684047,0.077,0.0,millions,NZD
+H1-2016,18.665,-14.486,4.179,22.4,-0.703,-3.8,0.045,-1.243,-6.7,-0.0048,0.607,-1.112,-0.505,4.148,20.733,16.585,5.635,2.518,231.684047,0.038,0.0,millions,NZD
+FY2016,35.274,-26.821,8.453,24.0,-1.304,-3.7,0.204,-2.478,-7.0,-0.0096,-0.048,-2.217,-2.265,2.749,21.488,18.739,7.533,2.099,231.684047,0.127,0.0,millions,NZD
+H1-2017,23.775,-17.865,5.91,24.9,0.181,0.8,1.001,-0.522,-2.2,-0.002,0.311,-1.242,-0.931,8.515,23.792,15.277,1.547,1.157,257.097352,0.047,0.0,millions,NZD
+FY2017,43.308,-32.967,10.341,23.9,-1.008,-2.3,0.538,-1.98,-4.6,-0.0077,1.257,-2.618,-1.361,7.135,24.163,17.028,2.598,1.563,257.097352,0.127,0.0,millions,NZD
+H1-2018,28.042,-21.127,6.915,24.7,0.269,1.0,1.095,-0.181,-0.6,-0.0007,1.794,-1.099,0.695,7.187,32.637,25.45,3.157,2.589,257.097352,0.008,0.0,millions,NZD
+FY2018,58.761,-44.505,14.256,24.3,0.453,0.8,2.464,-0.713,-1.2,-0.0028,1.849,-2.526,-0.677,6.374,35.625,29.251,5.642,0.933,257.436,0.056,0.0,millions,NZD
+H1-2019,33.314,-24.731,8.583,25.8,1.268,3.8,2.447,0.722,2.2,0.0028,1.108,-1.589,-0.481,7.468,40.045,32.577,6.592,1.835,261.72601,0.004,0.0,millions,NZD
+FY2019,61.719,-45.085,16.634,27.0,1.511,2.4,4.219,0.448,0.7,0.0017,2.987,-3.758,-0.771,13.107,37.908,24.801,3.061,3.459,322.707005,0.012,0.0,millions,NZD
+H1-2020,20.484,-14.27,6.214,30.3,-0.549,-2.7,1.136,-0.787,-3.8,-0.0024,0.722,-1.77,-1.048,12.253,33.232,20.979,3.562,3.062,323.936592,0.0,0.0,millions,NZD
+FY2020,36.88,-26.332,10.548,28.6,-1.593,-4.3,1.19,-2.154,-5.8,-0.005,0.34,-3.363,-3.023,14.715,31.131,16.416,2.033,4.61,431.91462,0.006,0.0,millions,NZD
+H1-2021,30.561,-21.707,8.854,29.0,0.705,2.3,1.83,0.611,2.0,0.0014,3.122,-2.223,0.899,15.656,40.686,25.03,2.114,6.146,431.91462,0.0,0.0,millions,NZD
+FY2021,64.218,-46.345,17.873,27.8,-0.36,-0.6,2.626,5.425,8.4,0.0126,3.947,-2.223,1.724,20.288,48.794,28.506,1.997,5.953,431.91462,0.031,0.0,millions,NZD
+H1-2022,31.892,-23.397,8.495,26.6,-1.77,-5.5,-0.579,-1.867,-5.9,-0.0043,-0.55,-0.846,-1.396,19.605,48.436,28.831,2.187,4.839,433.488816,0.047,0.0,millions,NZD
+FY2022,74.324,-53.734,20.59,27.7,-0.833,-1.1,1.613,3.26,4.4,0.0075,-4.364,-1.846,-6.21,23.781,63.133,39.352,3.918,2.839,431.853006,0.095,0.0,millions,NZD
+H1-2023,30.108,-20.974,9.134,30.3,-2.129,-7.1,-0.707,-2.674,-8.9,-0.0062,-2.823,-1.92,-4.743,20.834,62.608,41.774,8.803,2.515,431.853006,0.033,0.0,millions,NZD
+FY2023,66.552,-46.564,19.988,30.0,-2.048,-3.1,1.006,-3.534,-5.3,-0.0082,3.948,-4.379,-0.431,19.543,58.6,39.057,4.985,3.295,431.853006,0.077,0.0,millions,NZD
+H1-2024,38.362,-26.844,11.518,30.0,-0.279,-0.7,1.104,-1.043,-2.7,-0.0024,2.271,-2.897,-0.626,18.318,65.638,47.32,4.459,1.951,431.853006,0.043,0.0,millions,NZD
+FY2024,79.69,-56.468,23.222,29.1,-0.26,-0.3,2.514,-1.88,-2.4,-0.0044,5.762,-5.902,-0.14,17.311,67.175,49.864,4.578,2.093,431.853006,0.071,0.0,millions,NZD
+H1-2025,43.044,-30.315,12.729,29.6,-0.953,-2.2,0.748,-1.77,-4.1,-0.0041,-0.923,-4.009,-4.932,15.684,70.284,54.6,9.231,1.971,434.232042,0.011,0.0,millions,NZD
+FY2025,83.186,-56.782,26.404,31.7,-0.118,-0.1,3.503,-2.086,-2.5,-0.0048,3.819,-9.078,-5.259,15.874,70.765,54.891,9.553,1.342,434.232042,0.016,0.0,millions,NZD`;
+
+const analysis = {"ticker":"AOF.NZ","company_name":"AoFrio Limited","sector":"Industrial IoT / Commercial Refrigeration Hardware & SaaS","analysis_date":"2026-08-08","overview":"AoFrio Limited (formerly Wellington Drive Technologies, renamed September 2022) is a New Zealand-headquartered, NZX-listed hardware-enabled SaaS company that designs and manufactures energy-efficient electronically commutated (EC) motors and fans, and IoT-enabled smart controllers/cloud connectivity (SCS Connect, SCS 800, AoFrio iQ) for commercial refrigeration in the food and beverage industry, principally bottle coolers used by Coca-Cola system bottlers, Heineken, Nestle, PepsiCo and other global beverage brands. The company reports two segments, Motors and IoT, sells globally with heavy revenue concentration in the Americas (LATAM plus USA), and is pursuing diversification into Food Retail and Chilled/Frozen Food adjacent markets while transitioning from a hardware-led business toward a hardware-enabled, AI-powered SaaS model.","business_model":{"summary":"Revenue splits between hardware sales of EC motors/fans (commoditized, lower margin, largely transactional) and IoT hardware plus recurring multi-year cloud data/software connection fees (higher margin, increasingly recurring). FY25 (year ended 31-Dec-2025) revenue was NZ$83.2m (+4.4% YoY): IoT NZ$47.1m (+8.9%, 42.5% gross margin) and Motors NZ$36.1m (flat, 17.7% gross margin). However, 1H26 (six months to 30-Jun-2026) revenue fell sharply to $33.8m (down 21.5% YoY) as Motors revenue collapsed to $10.6m (down 50.5%, -$10.8m) following the loss of AoFrio's largest US motor customer to tariff-driven onshoring; IoT revenue held up, growing 6.8% to $23.2m and now represents the clear majority of group revenue. Gross margin improved to 34.9% in 1H26 (from 29.6% in 1H25) purely on mix-shift toward higher-margin IoT, even as absolute revenue and EBITDA quality (aided by a one-off $1.2m RDTI tax credit in the $0.9m 1H26 EBITDA) softened. Recurring SaaS/data revenue was only 3.8% of FY25 revenue recognized ($3.2m) against a long-term target of 50%, with $17.8m of contract liability (deferred revenue) on the balance sheet to be recognized over 1-10 year contracts as the installed base of connected devices (3.2m at FY25 year-end, +22% YoY) converts to recognized revenue.","revenue_streams":[{"name":"IoT (hardware + connectivity/SaaS)","percent":69,"trend":"growing (share rising as Motors collapses)"},{"name":"Motors and Fans","percent":31,"trend":"declining sharply (1H26 -50.5% YoY on lost US customer)"},{"name":"Recurring cloud/SaaS revenue (subset of IoT, recognized)","percent":4,"trend":"growing off a small base"}],"customer_type":"B2B - enterprise, historically concentrated among global beverage bottlers/brands (Coca-Cola system bottlers, Heineken, Nestle, PepsiCo), OEMs, and USA appliance/water-heater manufacturers; FY25 saw four customers each individually >=10% of revenue together account for 49% of Group revenue ($40.5m of $83.2m), all within the Americas segment (up from two customers/27% in FY24); the single largest USA motor customer has now been lost in 2026 (onshoring supply to avoid tariffs), crystallizing the concentration risk flagged in FY25","geographic_mix":"Americas ~85% (LATAM plus USA) in FY25, APAC 8.3%, EMEA 7.0%; North America previously a growth driver via ECR2 motors into water heaters/supermarket display units and early SCS IoT launch, now the source of the 2026 Motors downturn; South America (core CDE/LATAM base) revenue declined 12.5% YoY in FY25 on reduced demand"},"competitive_position":{"main_competitors":["Embraco (Nidec)","Danfoss","ebm-papst","Generic/local EC motor and fan manufacturers (especially in EMEA on price)","In-house/legacy telemetry and asset-tracking vendors for cooler fleets","Traditional AC-motor incumbents being displaced by EC technology"],"market_position":"Long-established, high-share incumbent supplier of EC motors/fans and connected controllers to the global cold drink equipment (CDE)/bottle cooler market, particularly strong in LATAM; a much smaller, earlier-stage challenger in IoT-enabled fleet SaaS platforms versus larger industrial IoT and cold-chain software players","moat_factors":[{"factor":"Embedded hardware installed base","strength":"moderate","description":"SCS/Monitor/Click devices installed on coolers create a base of ~3.2m connected devices and long-dated (1-10 year) data contracts, generating switching costs once fleets are connected and integrated into customer operations"},{"factor":"OEM/bottler relationships and trust","strength":"moderate","description":"Decades-long relationships with global beverage brands and bottlers (Coca-Cola system, Heineken, Nestle, PepsiCo) and high customer NPS (+62, up 9pts in FY25) support renewal and cross-sell, though this coexists with severe customer concentration risk that has now materialized (loss of largest US motor customer in 2026)"},{"factor":"Energy-efficiency engineering / regulatory tailwind","strength":"moderate","description":"ECR2 motor technology delivers validated energy savings (up to 68% in bundled configurations) that align with customer ESG targets and evolving efficiency regulations (e.g., US DOE water heater standards), supporting product pull-through"},{"factor":"Data network effects","strength":"weak-to-moderate","description":"Growing connected fleet (3.2m devices, app utilisation up 31% in FY25) improves AoFrio iQ's fleet insights and product value, but the platform only reached commercial launch in mid-2026 (33 global trials underway, first purchase orders anticipated 2H26) and remains unproven at scale"},{"factor":"Brand/scale","strength":"weak","description":"Micro-cap scale (market cap roughly NZ$25-45m depending on share price) limits R&D budget, negotiating leverage and resilience versus larger diversified industrial competitors; balance sheet fragility constrains ability to fund the more ambitious growth path without dilutive equity raises"}],"weaknesses":["Motors segment is a commoditized, price-competitive, low-margin (17.7% FY25) business exposed to aggressive competitor pricing (notably in EMEA) and tariff-driven customer reshoring; this materialized in 1H26 with a 50.5% Motors revenue collapse","Customer concentration risk crystallized: the single largest USA motor customer sourced elsewhere in 2026 due to tariffs, directly causing the group revenue decline; four customers = 49% of FY25 revenue, all in the Americas","Recurring/SaaS revenue still tiny (3.8% of FY25 revenue) relative to the 50% long-term target; AoFrio iQ and SCS 800 only reached commercial launch in mid-2026 and are still ramping (purchase orders not yet flowing at scale)","Fragile balance sheet: net debt rose to $8.2m (from $2.5m) and cash fell to $1.3m at FY25 year-end (then $1.4m at 1Q26), funded partly via extended supplier payment terms and an enlarged trade finance facility; the 2026 capital raise (placement + rights issue) has so far only delivered $8.9m of the $15m targeted for the accelerated growth path"]},"growth_drivers":["Commercial launch of SCS 800 cellular-connected controller and AoFrio iQ SaaS platform both completed in mid-2026, with 33 global customer trials underway and first purchase orders anticipated in 2H26, targeting a combined ~700,000-unit/year US/Europe/Canada cellular controller TAM","Food Retail vertical achieved commercial go-live in 2026 with a first order secured from a Latin American supermarket chain following a successful trial, building on the FY25 NZ convenience-store (115 sites) and Chilled/Frozen Food (pet food, ~3,500 freezers) wins","New fan pack sizes (7\", 8\", 9\", 10\") and new motor applications (e.g., ECR2 into beverage-dispenser agitators) intended to protect/expand Motors margin and unit volumes even as the largest US customer is lost","Two-path FY26-FY30 growth strategy presented at December 2025 Investor Day: self-funded path targeting ~10% revenue CAGR to ~$140m/EBITDA $14m by FY30, versus an externally-capitalized 'aspirational' path targeting >3x revenue to $300m and EBITDA of $50m by FY30; the Board's preferred (aspirational) path is now partly funded via the May-June 2026 placement/rights issue ($8.9m raised of $15m target), with capital deployment beginning 2H26","Secular tailwind from cold-chain energy efficiency, refrigerant/ESG regulation, and increasing enterprise appetite for connected/AI-driven asset management across cooler fleets","Management (Chair John Scott) has publicly framed the 2026 Motors downturn as a one-off 'blip' with 2Q26 revenue expected broadly in line with 2Q25 and recovery expected in subsequent quarters, implying management still sees the underlying IoT/CDE growth trajectory intact"],"risks":{"business":[{"risk":"Customer concentration crystallizing into realized losses","severity":"high","description":"AoFrio's single largest USA motor customer has now been lost (onshoring supply to avoid tariffs), directly driving the 50.5% Motors revenue decline and 21.5% total revenue decline in 1H26; FY25 saw four customers at 49% of revenue, up from two customers/27% in FY24, underscoring a worsening concentration trend that has now materially hit results"},{"risk":"Motors commoditization / margin pressure","severity":"high","description":"Motors and Fans is a lower-margin (17.7% FY25), price-competitive category facing aggressive competitor pricing (EMEA revenue fell 8.8% YoY in FY25) and is now also structurally shrinking in the Americas post the largest customer's exit"},{"risk":"Execution risk on new product/SaaS launches","severity":"moderate","description":"Growth thesis depends heavily on SCS 800 and AoFrio iQ converting from commercial launch (mid-2026) and 33 active trials into meaningful purchase orders; management itself flagged in the 1H26 result that 'the improvement in full-year revenue now appears unlikely' for FY26"},{"risk":"Product obsolescence / long sales and qualification cycles","severity":"moderate","description":"OEM/bottler capital purchase cycles are multi-year; new hardware must pass customer qualification programmes, slowing revenue realization from new launches"}],"financial":[{"risk":"Rising net debt and thin liquidity","severity":"high","description":"Net debt increased from $2.5m to $8.2m and cash fell to $1.3m at 31-Dec-2025 (further to $1.4m by 1Q26); working capital pressure from longer customer payment terms, higher inventory and increased reliance on extended supplier payment terms (contract manufacturer East West) and an enlarged trade finance facility"},{"risk":"Recurring losses / going concern language","severity":"moderate","description":"Company has posted statutory net losses in recent years (FY25 loss $2.1m, FY24 loss $1.9m); annual and interim reports include going-concern assessments dependent on Board-approved budget assumptions and continued bank trade facility support; the FY26 revenue shortfall increases pressure on these assumptions"},{"risk":"Shareholder dilution, partially executed but incomplete","severity":"high","description":"May 2026 placement (65.1m shares at NZ$0.07 to Wairahi Investments, $4.6m) plus a 1-for-7 renounceable rights issue at the same $0.07 price raised $8.9m combined against a $15m target for the accelerated growth path; the shortfall implies either scaled-back growth ambitions or a further dilutive raise; share count has grown materially from ~431.9m (FY24) toward 500m+ post-raise"},{"risk":"Currency exposure","severity":"moderate","description":"Functional currency is USD but presentation currency is NZD; FY26 guidance assumptions were based on a 0.606 NZD/USD rate and management has flagged NZD strengthening as an adverse headwind to reported revenue and profit"}],"regulatory":[{"risk":"US tariff policy","severity":"high","description":"April 2025 US reciprocal tariffs have now materially cost AoFrio its largest USA motor customer (previously ~US$5.6m FY25 revenue), driving the 50.5% 1H26 Motors revenue decline; this is the single biggest realized risk event in the company's recent history and there is no indication of resolution or replacement business as of mid-2026"},{"risk":"Trade/manufacturing jurisdiction concentration","severity":"moderate","description":"Reliance on a Vietnam-based contract manufacturer (East West) for motor production creates ongoing exposure to further shifts in US trade policy toward Vietnam-origin goods"},{"risk":"Energy efficiency / appliance standards","severity":"low-moderate","description":"Changing regulatory standards (e.g., US DOE water heater efficiency standards) can be a tailwind (driving ECR2 motor adoption) but also a compliance cost and uncertainty factor"}],"macro":[{"risk":"Global trade/tariff uncertainty","severity":"high","description":"Broader macroeconomic headwinds from US tariff policy caused subdued customer capital spending through H1-2025 and has now directly cost the company its largest customer in 2026, with management declining to provide confident full-year guidance"},{"risk":"Capex cyclicality of customer base","severity":"moderate","description":"Bottler/OEM capital purchase cycles are discretionary and can be deferred in a weaker macro environment, directly affecting AoFrio's hardware sell-through"},{"risk":"Interest rate / funding cost sensitivity","severity":"moderate","description":"Rising bank borrowings and trade finance usage make the company sensitive to interest rate levels; finance costs increased $0.3m in FY25 due to increased borrowings and extended payment terms"}]},"macro_factors":{"industry_outlook":"Commercial refrigeration / cold drink equipment is a mature, essential replacement-and-growth market with a structural shift toward energy-efficient EC motor technology and IoT-enabled fleet management, reinforced by ESG/carbon-reduction targets among major beverage brands (refrigeration is ~35% of a cold drink's carbon footprint per company disclosure) and rising enterprise demand for connected asset management and AI-driven insights; however, the Motors sub-segment is now visibly exposed to US trade policy shocks that can remove large customers abruptly","cyclicality":"Moderate-to-high - revenue tied to customer capital expenditure cycles (bottler/OEM cooler fleet renewal and expansion) which can be deferred in weaker macro conditions or amid trade-policy uncertainty, as evidenced by the 1H26 downturn triggered by tariff-driven customer reshoring","interest_rate_sensitivity":"Moderate - increasing use of bank trade finance and borrowings to fund working capital and growth investment means finance costs rise with base rates and facility utilization","key_input_costs":["Electronic components and motor/fan raw materials (contract-manufactured in Vietnam)","Ocean freight/shipping (longer shipping times cited as a working capital driver)","Cloud/software engineering and R&D talent costs"]},"recent_developments":[{"date":"2026-02","event":"FY2025 annual results released: record revenue of NZ$83.2m (+4.4%), EBITDA $3.5m (+$1.0m), gross margin 31.7% (+2.6pp), but revenue came in below the September 2025 updated guidance of ~$86m due to Q4-25 US tariff-driven motor demand weakness"},{"date":"2025-12","event":"Investor Day: management presented two FY26-FY30 growth paths - self-funded (~10% revenue CAGR to ~$140m/EBITDA $14m by FY30) versus an externally capitalized 'aspirational' path (>3x revenue to $300m, EBITDA $50m by FY30); several shareholders indicated support for the higher-growth path"},{"date":"2026-05","event":"Placement of 65,134,806 shares to Wairahi Investments Limited at NZ$0.07/share raising NZ$4.559m, the first stage of securing growth capital for the accelerated ('aspirational') strategy"},{"date":"2026-05/06","event":"Announced and executed a 1-for-7 pro-rata renounceable rights issue at NZ$0.07/share (opened 5 June, closed 18 June 2026); combined placement plus rights issue raised $8.9m against a $15m target for the accelerated growth path"},{"date":"2026-Q1","event":"1Q26 trading update: revenue $17.2m, down 28.1% YoY, as Motor revenue fell 52.9% to $5.7m following the loss of the largest US motor customer to tariff-driven onshoring; EBITDA -$0.4m (vs +$1.5m 1Q25); cash $1.4m; Chair John Scott described it as the company's first quarterly 'blip' after a run of predictable results, expecting recovery in subsequent quarters"},{"date":"2026-Q2/mid-year","event":"Commercial launch of SCS 800 cellular controller and AoFrio iQ SaaS platform completed; 33 global customer trials underway with first purchase orders anticipated in 2H26; Food Retail vertical achieved commercial go-live with a first order from a Latin American supermarket chain"},{"date":"2026-08 (interim result for 6 months to 30-Jun-2026)","event":"1H26 revenue $33.8m, down 21.5% YoY, entirely attributable to the 50.5% (-$10.8m) Motors revenue decline; IoT revenue grew 6.8% to $23.2m and is now the majority of group revenue; gross margin improved to 34.9% (from 29.6%) on mix shift; EBITDA $0.9m (aided by a $1.2m one-off 2025 RDTI tax credit); management stated 'the improvement in full-year revenue now appears unlikely' for FY26, with EBITDA expected 'broadly consistent with 2025' and IoT revenue expected above 2025 levels"}],"guidance":{"as_of":"1H2026 Interim Results (August 2026)","fiscal_year":"FY2026","items":[{"metric":"Revenue","target":"Full-year revenue improvement over FY25 ($83.2m) now considered unlikely","period":"FY2026","vs_prior":"lowered","notes":"At FY25 results (Feb-2026) management expected FY26 revenue to exceed FY25 across all segments; by the 1H26 interim result (Aug-2026) this was walked back given the Motors collapse from the lost largest US customer and uncertain trading environment"},{"metric":"EBITDA","target":"Broadly consistent with FY2025 ($3.5m)","period":"FY2026","vs_prior":"lowered from 'expected improvement' to 'broadly consistent'","notes":"IoT revenue specifically still expected to be above FY2025 levels, i.e. the shortfall is concentrated in Motors"},{"metric":"2Q26 revenue","target":"Broadly in line with 2Q25","period":"Q2 2026","vs_prior":"new","notes":"Guided at the 1Q26 trading update following the Q1 'blip'; actual 1H26 result implies 2Q26 performance roughly matched this expectation given 1H26 total of $33.8m"},{"metric":"Capital raise / growth funding","target":"$15m target for the accelerated ('aspirational') growth path; $8.9m raised to date via placement + rights issue","period":"2026","vs_prior":"shortfall","notes":"Company stated it will adjust its plan to align with the capital actually raised and will commence deploying the $8.9m in 2H26 to accelerate CDE growth; implies either a scaled-down version of the aspirational path or a further capital raise to close the gap to $15m"},{"metric":"Long-term revenue growth target","target":"20% per annum revenue growth with 50% of revenue recurring (longer-term strategic goal) — refined at Dec-2025 Investor Day into two explicit paths: ~10% CAGR self-funded to $140m FY30 revenue/$14m EBITDA, or an externally funded 'aspirational' path targeting $300m FY30 revenue/$50m EBITDA","period":"FY26-FY30","vs_prior":"maintained","notes":"The FY26 Motors shortfall and partial capital raise both create execution risk against these FY30 targets"},{"metric":"SCS 800 / AoFrio iQ commercialization","target":"Commercial launch completed mid-2026; 33 global trials underway; first purchase orders anticipated 2H26","period":"2H2026","vs_prior":"maintained","notes":"This is now the key swing factor for whether IoT growth can offset the structural Motors decline"}],"management_commentary":"Chair John Scott described 1Q26 as the company's first quarterly 'blip' after a run of predictable, reliable results, attributing it to the anticipated but still material loss of the largest US motor customer to tariffs, and expressed confidence in recovery in subsequent quarters. By the 1H26 interim result, management tempered this to say full-year revenue improvement over FY25 'now appears unlikely,' while reiterating EBITDA should be broadly consistent with FY25 and that IoT revenue specifically is expected to exceed FY25 levels — i.e., management is framing the shortfall as isolated to the lower-margin, structurally challenged Motors segment rather than a failure of the core IoT/SaaS growth strategy. Management also confirmed the $8.9m capital raised (against a $15m target) will begin to be deployed in 2H26 to accelerate CDE growth."},"bull_case":["IoT segment continues to grow through the downturn (+6.8% in 1H26 to $23.2m, +8.9% in FY25) and now represents the clear majority of revenue at improving gross margins (34.9% blended 1H26, 42.5% IoT-specific in FY25), validating the hardware-to-SaaS transition even as Motors struggles","SCS 800 cellular controller and AoFrio iQ SaaS platform both reached commercial launch in mid-2026 with 33 active global trials and first purchase orders expected 2H26, opening a combined ~700,000-unit US/Europe TAM and a path toward the long-stated 50% recurring-revenue target (still only 3.8% today, so a small starting base with a long theoretical runway)","Diversification into Food Retail (commercial go-live and first Latin American supermarket order in 2026) and Chilled/Frozen Food verticals reduces long-term dependence on the volatile CDE/bottle cooler and Motors business","Deep, multi-decade OEM/bottler relationships and high customer satisfaction (NPS +62 in FY25) plus proven energy-efficiency technology (up to 68% validated energy savings) support a durable secular tailwind independent of the near-term Motors setback","Management has begun deploying freshly raised growth capital ($8.9m) in 2H26 specifically to accelerate CDE/IoT growth, and has publicly framed the FY26 shortfall as an isolated, anticipated Motors 'blip' rather than a broader strategic failure"],"bear_case":["The single largest customer-concentration risk flagged in FY25 has now fully crystallized: loss of the largest US motor customer drove a 50.5% Motors revenue collapse and a 21.5% total revenue decline in 1H26, with management now admitting full-year revenue improvement over FY25 'now appears unlikely' — guidance has been walked back within a single half-year","Balance sheet remains fragile: net debt roughly tripled to $8.2m and cash fell to $1.3m-$1.4m through FY25 and into 2026, funded via extended supplier terms and trade finance; the 2026 capital raise fell well short of its $15m target (only $8.9m raised), suggesting further dilution may be needed to fund the 'aspirational' growth path","Meaningful shareholder dilution already executed (May-June 2026 placement plus 1-for-7 rights issue at NZ$0.07/share, both below prior trading levels), with the funding shortfall implying more dilution risk ahead if management still wants to pursue the higher-growth path","Motors segment remains structurally challenged - commoditized, margin-thin (17.7% FY25 gross margin), losing share to competitor pricing in EMEA, and now missing its largest US customer entirely - while core recurring-SaaS revenue is still just 3.8% of total revenue versus a 50% aspiration that remains years away and unproven at commercial scale (SCS 800/AoFrio iQ only just launched)","Track record of guidance misses and revisions (FY25 revenue missed the revised $86m guide; FY26 guidance was withdrawn, then re-set, then effectively lowered again by August 2026) underscores low earnings visibility for a thinly capitalized micro-cap exposed to unpredictable US trade policy"]};
+
+const dcfData = {"ticker":"AOF.NZ","company_name":"AoFrio Limited","valuation_date":"2026-08-08","current_price":0.065,"currency":"NZD","data_quality_warning":"AoFrio is a distressed micro-cap: FY2025 net debt $8.2m, cash $1.3m, 15-year loss history, and a May-June 2026 capital raise that fell $6.1m short of its $15m target. Base and Bear DCF scenarios below imply equity value at or below zero once net debt is subtracted from a decade of thin projected owner FCF -- the stock's positive market value reflects option value on the IoT/SaaS ramp (SCS 800 / AoFrio iQ) that a discounted-cash-flow model built on realized financials cannot fully capture. Read this DCF as a downside/base-case floor check, not a precise fair-value estimate. Displayed intrinsic values are floored at $0.00 (limited liability); raw (unfloored, potentially negative) values are also reported for transparency.","inputs":{"shares_outstanding_fy2025":434.232042,"shares_outstanding_post_raise":561.4,"post_raise_basis":"FY2025 434.232m + May-2026 Wairahi placement 65.135m (NZ$4.559m @ $0.07) + 1-for-7 rights issue ~62.01m shares (implied by $4.341m of the combined $8.9m raised, at $0.07/share, on the pre-placement register) = ~561.4m shares. This is an estimate reconciled against the disclosed $8.9m total raised; exact post-raise register should be confirmed against the next quarterly/annual report.","net_debt":8.211,"net_debt_basis":"FY2025: TotalDebt $9.553m - Cash $1.342m = $8.211m. Does not yet reflect any FY2026 raise proceeds retained as cash or used to pay down debt -- next filing should be used to true this up.","fy2026_revenue_estimate":71.1,"fy2026_basis":"1H26 actual $33.8m (Motors $10.6m, IoT $23.2m) + 2H26 estimate: Motors flat at 1H26's post-customer-loss run-rate (~$10.6m), IoT +5% YoY vs 2H25 (deceleration from 1H26's 6.8% pace). FY2026 total ~$71.1m, -14.5% YoY, consistent with management's Aug-2026 guidance that full-year revenue improvement over FY25 ($83.2m) 'now appears unlikely' and within the analysis brief's -15%/-20% guide range.","sbc_pct_of_revenue_latest":0.019,"sbc_source":"10-K/annual report cash flow statement (StockBasedComp column, AOF.NZ_Metrics.csv) -- SBC has been consistently negligible for this company (0.02%-0.13% of revenue, FY2021-FY2025), unlike SaaS peers; modeled forward at a flat 0.1% of revenue.","interest_income":0,"interest_income_note":"Not material -- company holds net debt, not net cash; no interest-income deduction required.","additional_dilution_mechanism":"Base/Bear scenarios model further dilutive equity raises (at a conservative $0.07/share, matching the 2026 placement/rights price) whenever cumulative owner-FCF burn exceeds an assumed $8.9m liquidity headroom (current cash + facility capacity beyond the already-completed 2026 raise). This is funding-driven dilution, not SBC-driven, reflecting the company's realistic path to needing more capital given multi-year negative FCF. Bull case requires no further dilution because it turns FCF-positive within 2-3 years.","units":"millions"},"historical_growth":{"revenue_3yr_cagr":3.8,"revenue_5yr_cagr":17.7,"eps_3yr_cagr":null,"eps_5yr_cagr":null,"equity_3yr_cagr":-12.6,"equity_5yr_cagr":1.5,"fcf_3yr_cagr":null,"fcf_5yr_cagr":null,"selected_growth_rate":null,"growth_rate_source":"none_usable -- bottom_up_revenue_build","growth_divergence_warning":"Historical CAGRs are not usable growth anchors for this DCF. EPS has been near-zero/negative in 6 of the last 8 years (no meaningful compounding to measure); reported FCF was negative in 6 of the last 8 years (FY2018-2025), so no FCF CAGR is computable; equity CAGR is actually NEGATIVE over 3 years (-12.6%) as accumulated losses erode the FY2022 capital raise, and revenue CAGR is dominated by the FY2020 COVID trough base effect (17.7% 5yr) rather than organic strength. None of the standard CAGR anchors are appropriate. This DCF instead builds revenue bottom-up from the realized 1H2026 Motors/IoT segment split and management's FY2026 guidance walk-back, per the analysis brief.","notes":"Reported FCF has been negative in FY2018, FY2019, FY2020, FY2022, FY2023, FY2024 and FY2025 (6 of last 8 years); only FY2021 (+$1.7m) and the small FY2024 (-$0.14m, near breakeven) were close to positive. FY2025 FCF of -$5.26m was driven by capex ($9.08m, ~10.9% of revenue, mostly capitalized SaaS platform development) outrunning operating cash flow. SBC has never been a material driver of the gap between reported and owner FCF for this company (always <0.15% of revenue) -- the entire adjustment here is about capex intensity and working capital, not stock compensation."},"assumptions":{"base":{"revenue_growth_pct":[8,9,9,8,8,7,6,5,4,3],"ebitda_margin_path_pct":[2.5,3.5,4.5,5.5,6.5,7.3,8.0,8.6,9.2,9.8],"sbc_pct_path":[0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1],"da_pct_path":[4.3,4.2,4.1,4.0,3.9,3.8,3.7,3.6,3.5,3.5],"capex_pct_path":[9.5,8.5,7.5,6.8,6.2,5.7,5.3,5.0,4.8,4.6],"wc_capture_pct":12,"cash_tax_rate_path_pct":[0,0,5,12,18,21,28,28,28,28],"wacc":20,"terminal_growth":3,"terminal_cap_multiple":15,"narrative":"IoT (SCS Connect / SCS 800 / AoFrio iQ) gradually offsets the structurally smaller Motors book; capex stays elevated (capitalized development) then moderates slowly; EBITDA margin climbs from ~2.5% toward ~9.8% by year 10 as mix shifts and opex leverages, tracking below management's own 'self-funded' FY30 target (10% margin at $140m revenue) given the weaker FY26 starting point. One further dilutive raise (~27m shares, ~+5%) assumed to fund the multi-year cash burn before FCF turns durably positive around year 5-6."},"bull":{"revenue_growth_pct":[15,16,15,13,11,9,8,6,5,4],"ebitda_margin_path_pct":[3.5,5.5,7.5,9.5,11.0,12.3,13.5,14.5,15.3,16.0],"sbc_pct_path":[0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1],"da_pct_path":[4.3,4.2,4.1,4.0,3.9,3.8,3.7,3.6,3.5,3.5],"capex_pct_path":[9.5,9.0,8.5,7.8,7.0,6.3,5.8,5.4,5.0,4.8],"wc_capture_pct":12,"cash_tax_rate_path_pct":[0,5,12,18,22,26,28,28,28,28],"wacc":18,"terminal_growth":3.5,"terminal_cap_multiple":15,"narrative":"SCS 800 / AoFrio iQ commercial launch converts the 33 active trials into meaningful purchase orders in 2H26 and beyond; Food Retail vertical scales past its first LatAm supermarket order; recurring SaaS mix keeps rising toward the long-stated 50% target. EBITDA margin reaches 16% by year 10 -- still well short of the 'aspirational' $300m/EBITDA $50m (16.7% margin) FY30 target, since that target implies a much faster ramp than modeled here. No further dilution needed; FCF turns durably positive by year 3."},"bear":{"revenue_growth_pct":[-2,2,3,3,3,3,3,2,2,2],"ebitda_margin_path_pct":[1.0,1.5,2.0,2.3,2.6,2.8,3.0,3.1,3.2,3.3],"sbc_pct_path":[0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1],"da_pct_path":[4.3,4.2,4.1,4.0,3.9,3.8,3.7,3.6,3.5,3.5],"capex_pct_path":[9.0,7.5,6.5,5.8,5.3,5.0,4.8,4.6,4.5,4.4],"wc_capture_pct":12,"cash_tax_rate_path_pct":[0,0,0,0,5,10,15,18,20,22],"wacc":23,"terminal_growth":1.5,"terminal_cap_multiple":10,"narrative":"SCS 800 / AoFrio iQ trials fail to convert to meaningful purchase orders; Motors keeps bleeding share to EMEA competitor pricing with no replacement for the lost US customer; recurring SaaS revenue stays a rounding error. Owner FCF never turns positive within the 10-year horizon (still -$0.8m in year 10) as capex-heavy platform investment outruns a stagnant, low-margin revenue base. Repeated dilutive raises (~205m new shares cumulative, +37% to the post-2026-raise count) required to fund the ongoing burn -- consistent with the going-concern-adjacent risk flagged in the qualitative analysis."}},"projections":{"base":{"years":["FY2027","FY2028","FY2029","FY2030","FY2031","FY2032","FY2033","FY2034","FY2035","FY2036"],"revenue":[76.79,83.7,91.23,98.53,106.41,113.86,120.69,126.73,131.8,135.75],"adj_ebitda":[1.92,2.929,4.105,5.419,6.917,8.312,9.655,10.899,12.125,13.304],"sbc":[0.077,0.084,0.091,0.099,0.106,0.114,0.121,0.127,0.132,0.136],"d_and_a":[3.302,3.515,3.741,3.941,4.15,4.327,4.466,4.562,4.613,4.751],"ebit":[-1.459,-0.67,0.274,1.379,2.66,3.871,5.069,6.21,7.381,8.417],"cash_tax_rate_pct":null,"nopat":[-1.459,-0.67,0.26,1.214,2.181,3.058,3.65,4.471,5.314,6.06],"capex":[7.295,7.114,6.842,6.7,6.598,6.49,6.397,6.336,6.326,6.245],"working_capital":[0.683,0.829,0.904,0.876,0.946,0.894,0.82,0.724,0.608,0.474],"owner_fcf":[-4.769,-3.439,-1.938,-0.669,0.68,1.789,2.538,3.421,4.209,5.041],"owner_fcf_margin_pct":[-6.21,-4.11,-2.12,-0.68,0.64,1.57,2.1,2.7,3.19,3.71],"shares_outstanding":[561.4,561.4,579.21,588.77,588.77,588.77,588.77,588.77,588.77,588.77],"discount_factors":[0.8333,0.6944,0.5787,0.4823,0.4019,0.3349,0.2791,0.2326,0.1938,0.1615],"pv_fcf":[-3.974,-2.388,-1.121,-0.323,0.273,0.599,0.708,0.796,0.816,0.814]},"bull":{"years":["FY2027","FY2028","FY2029","FY2030","FY2031","FY2032","FY2033","FY2034","FY2035","FY2036"],"revenue":[81.76,94.85,109.07,123.25,136.81,149.13,161.06,170.72,179.25,186.42],"adj_ebitda":[2.862,5.217,8.181,11.709,15.049,18.342,21.742,24.754,27.426,29.828],"sbc":[0.082,0.095,0.109,0.123,0.137,0.149,0.161,0.171,0.179,0.186],"d_and_a":[3.516,3.984,4.472,4.93,5.336,5.667,5.959,6.146,6.274,6.525],"ebit":[-0.736,1.138,3.599,6.656,9.577,12.527,15.622,18.438,20.973,23.117],"cash_tax_rate_pct":null,"nopat":[-0.736,1.081,3.168,5.458,7.47,9.27,11.248,13.275,15.1,16.644],"capex":[7.768,8.536,9.271,9.614,9.577,9.395,9.341,9.219,8.963,8.948],"working_capital":[1.28,1.57,1.707,1.702,1.627,1.478,1.432,1.16,1.024,0.86],"owner_fcf":[-3.708,-1.902,0.075,2.476,4.856,7.019,9.298,11.362,13.436,15.081],"owner_fcf_margin_pct":[-4.53,-2.0,0.07,2.01,3.55,4.71,5.77,6.66,7.5,8.09],"shares_outstanding":[561.4,561.4,561.4,561.4,561.4,561.4,561.4,561.4,561.4,561.4],"discount_factors":[0.8475,0.7182,0.6086,0.5158,0.4371,0.3704,0.3139,0.266,0.2255,0.1911],"pv_fcf":[-3.142,-1.366,0.046,1.277,2.122,2.6,2.919,3.023,3.029,2.881]},"bear":{"years":["FY2027","FY2028","FY2029","FY2030","FY2031","FY2032","FY2033","FY2034","FY2035","FY2036"],"revenue":[69.68,71.07,73.2,75.4,77.66,79.99,82.39,84.04,85.72,87.43],"adj_ebitda":[0.697,1.066,1.464,1.734,2.019,2.24,2.472,2.605,2.743,2.885],"sbc":[0.07,0.071,0.073,0.075,0.078,0.08,0.082,0.084,0.086,0.087],"d_and_a":[2.996,2.985,3.001,3.016,3.029,3.04,3.048,3.025,3.0,3.06],"ebit":[-2.369,-1.99,-1.61,-1.357,-1.087,-0.88,-0.659,-0.504,-0.343,-0.262],"cash_tax_rate_pct":null,"nopat":[-2.369,-1.99,-1.61,-1.357,-1.087,-0.88,-0.659,-0.504,-0.343,-0.262],"capex":[6.271,5.33,4.758,4.373,4.116,4.0,3.955,3.866,3.857,3.847],"working_capital":[-0.171,0.167,0.256,0.264,0.271,0.28,0.288,0.198,0.202,0.206],"owner_fcf":[-5.815,-4.168,-3.112,-2.451,-1.903,-1.56,-1.277,-1.147,-0.998,-0.843],"owner_fcf_margin_pct":[-8.34,-5.86,-4.25,-3.25,-2.45,-1.95,-1.55,-1.36,-1.16,-0.96],"shares_outstanding":[561.4,576.87,621.32,656.33,683.52,705.81,724.06,740.44,754.7,766.75],"discount_factors":[0.813,0.661,0.5374,0.4369,0.3552,0.2888,0.2348,0.1909,0.1552,0.1262],"pv_fcf":[-4.727,-2.755,-1.672,-1.071,-0.676,-0.451,-0.3,-0.219,-0.155,-0.106]}},"valuation":{"base":{"sum_pv_fcf":-3.801,"terminal_fcf":5.192,"gordon_terminal_value":30.543,"cap_terminal_value":75.617,"terminal_value":30.543,"terminal_value_bound":"gordon","pv_terminal":4.933,"enterprise_value":1.132,"net_debt":8.211,"equity_value_raw":-7.079,"equity_value_floored":0,"final_year_shares":588.77,"intrinsic_value_raw":-0.012,"intrinsic_value":0,"upside_pct":-100.0,"terminal_pct_of_value":435.7,"implied_exit_multiple":6.1},"bull":{"sum_pv_fcf":13.39,"terminal_fcf":15.609,"gordon_terminal_value":107.646,"cap_terminal_value":226.213,"terminal_value":107.646,"terminal_value_bound":"gordon","pv_terminal":20.567,"enterprise_value":33.957,"net_debt":8.211,"equity_value_raw":25.746,"equity_value_floored":25.746,"final_year_shares":561.4,"intrinsic_value_raw":0.0459,"intrinsic_value":0.0459,"upside_pct":-29.4,"terminal_pct_of_value":60.6,"implied_exit_multiple":7.1},"bear":{"sum_pv_fcf":-12.132,"terminal_fcf":-0.856,"gordon_terminal_value":-3.982,"cap_terminal_value":-8.435,"terminal_value":-3.982,"terminal_value_bound":"gordon_negative_fcf","pv_terminal":-0.502,"enterprise_value":-12.634,"net_debt":8.211,"equity_value_raw":-20.845,"equity_value_floored":0,"final_year_shares":766.75,"intrinsic_value_raw":-0.0272,"intrinsic_value":0,"upside_pct":-100.0,"terminal_pct_of_value":4.0,"implied_exit_multiple":4.7}},"entry_price":{"hurdle_rate":0.15,"base":{"years_to_terminal":10,"pv_interim_fcf_at_hurdle":-2.778,"pv_terminal_at_hurdle":7.55,"net_debt":8.211,"entry_price_raw":-0.0058,"entry_price":0,"entry_discount_from_current":100.0},"bull":{"years_to_terminal":10,"pv_interim_fcf_at_hurdle":17.008,"pv_terminal_at_hurdle":26.609,"net_debt":8.211,"entry_price_raw":0.0631,"entry_price":0.0631,"entry_discount_from_current":3.0},"bear":{"years_to_terminal":10,"pv_interim_fcf_at_hurdle":-14.623,"pv_terminal_at_hurdle":-0.984,"net_debt":8.211,"entry_price_raw":-0.0311,"entry_price":0,"entry_discount_from_current":100.0}},"sensitivity":{"scenario":"base","wacc_range":[16,18,20,22,24],"terminal_growth_range":[1,2,3,4,5],"matrix":[[-0.006,-0.005,-0.0037,-0.0023,-0.0006],[-0.0101,-0.0094,-0.0086,-0.0077,-0.0066],[-0.0131,-0.0126,-0.012,-0.0114,-0.0107],[-0.0152,-0.0149,-0.0145,-0.0141,-0.0136],[-0.0169,-0.0166,-0.0163,-0.0161,-0.0157]],"matrix_note":"Values floored implicitly NOT applied here (raw values shown) so the reader can see how far below zero base-case equity value sits across the WACC/terminal-growth space; even the most favorable corner (WACC 16%, terminal growth 5%) remains negative (-$0.0006/share)."},"probability_weighted":{"weights":{"bull":0.2,"base":0.5,"bear":0.3},"weight_rationale":"Base gets the largest weight as the most likely trajectory (gradual IoT offset of Motors decline, consistent with management's own 'self-funded' path being more credible near-term than the 'aspirational' path). Bear is weighted above the usual 25% given the crystallized customer-concentration risk, undersubscribed capital raise and thin liquidity -- this is not merely a growth-deceleration bear case but a real going-concern-adjacent scenario. Bull is weighted below its usual 25-30% because it requires the still-unproven SCS 800/AoFrio iQ commercial ramp (first POs not yet booked as of Aug-2026) to succeed at a scale well beyond anything demonstrated to date.","weighted_iv_raw":-0.005,"weighted_iv":0.0092,"weighted_upside_pct":-85.9},"wacc_rationale":{"base_wacc_pct":20,"stack":{"risk_free_rate_pct":4.5,"equity_risk_premium_pct":5.5,"levered_beta_proxy":1.5,"capm_cost_of_equity_pct":12.75,"micro_cap_premium_pct":3.0,"illiquidity_premium_pct":2.5,"customer_concentration_premium_pct":2.0,"funding_risk_premium_pct":2.0,"full_stack_total_pct":22.25,"applied_base_wacc_pct":20},"rationale":"Full risk-premium stack sums to 22.25% (CAPM 12.75% + micro-cap 3.0% + illiquidity 2.5% + customer concentration 2.0% + funding risk 2.0%), reflecting AoFrio's genuinely elevated risk: NZX micro-cap (market cap ~NZ$30-45m), thin trading, crystallized single-customer loss, and a 2026 capital raise that fell 41% short of its $15m target with cash down to $1.3-1.4m. Applied base-case WACC is moderated to 20% (below the full stack) for comparability with similar-risk NZX micro-caps already modeled (AGL.NZ 17%, 2CC.NZ 19%), while still sitting above both as AOF's combination of realized customer loss AND undersubscribed raise AND multi-year negative FCF is a materially worse combination of risks than either comparable. Bull case uses 18% (successful execution reduces funding/concentration risk); bear case uses 23% (funding risk fully realized, approaching distress-level discounting)."},"sanity_check":{"market_implied_ev_ebitda_fy25":12.8,"dcf_vs_market_divergence":"The DCF's base and bear scenarios imply equity value at or below zero, while the market prices AOF.NZ at ~NZ$36-45m enterprise value (~12.8x FY2025 EBITDA of $3.5m, or ~25x an FY2026 EBITDA estimate of ~$1.8m at a 2.5% margin). This is a genuine and material divergence, not a modeling error: a component-built DCF discounting realized financials at a risk-appropriate 20% WACC cannot capture the option value the market is plausibly pricing into a business with (a) a large, still-unconverted connected-device installed base (3.2m units, $17.8m deferred revenue), (b) a newly launched SaaS platform (SCS 800/AoFrio iQ, 33 active trials) with asymmetric upside if it converts, and (c) strategic/takeout optionality given the tiny market cap. Treat the DCF outputs as a fundamentals-only floor/stress-test, not a complete estimate of fair value -- the bull case ($0.046, still -29% below market) is the closest analogue to what the market may be pricing, and even that requires successful commercial execution not yet evidenced in bookings.","leverage_check":"Net debt ($8.2m) alone is roughly 18-23% of the market's implied enterprise value (~$36-45m) and exceeds the DCF's own computed enterprise value in the base case ($1.1m) by more than 7x -- this single fact is what drives base-case equity value to roughly zero and should be the primary risk the reader takes away from this model, independent of any single assumption.","capex_intensity_check":"FY2025 capex was 10.9% of revenue (up from 2.5% in FY2021), consistent with the qualitative analysis's warning that capitalized SaaS development is a real, recurring cost. This model keeps capex at 8.5-9.5% of revenue through year 2-3 before moderating only slowly to ~4.6-4.8% by year 10 -- deliberately NOT assuming the recent capex spike evaporates, per the modelling guidance.","market_cap_post_raise_shares":36.49,"ev_market_implied":44.7}};
+
+// ============ PARSE CSV ============
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => obj[h.trim()] = values[i]?.trim());
+        return obj;
+    });
+}
+
+const data = parseCSV(csvData);
+data.sort((a, b) => {
+    const parseDate = (p) => {
+        const year = parseInt(p.match(/\d{4}/)?.[0] || '0');
+        const isH1 = p.includes('H1');
+        const isFY = p.startsWith('FY');
+        const subOrder = isH1 ? 3 : isFY ? 7 : 0;
+        return year * 10 + subOrder;
+    };
+    return parseDate(a.Period) - parseDate(b.Period);
+});
+
+const fyData = data.filter(d => d.Period.startsWith('FY'));
+const h1Data = data.filter(d => d.Period.startsWith('H1'));
+
+// ============ HELPERS ============
+const colors = { primary: '#00d4aa', secondary: '#00b894', tertiary: '#0984e3', quaternary: '#6c5ce7', warning: '#fdcb6e', danger: '#ff6b6b' };
+
+function n(v) { return v === undefined || v === null || v === '' ? null : parseFloat(v); }
+function fmtM(v, dp) {
+    if (v === null || v === undefined || isNaN(v)) return 'N/A';
+    dp = dp === undefined ? 1 : dp;
+    return '$' + v.toFixed(dp) + 'M';
+}
+function fmtPct(v, dp) {
+    if (v === null || v === undefined || isNaN(v)) return 'N/A';
+    dp = dp === undefined ? 1 : dp;
+    return v.toFixed(dp) + '%';
+}
+function calcYoYChange(current, previous) {
+    if (previous === null || current === null || previous === undefined || current === undefined) return null;
+    if (previous === 0) return null;
+    return ((current - previous) / Math.abs(previous) * 100).toFixed(1);
+}
+
+// ============ KPI CARDS ============
+function renderKPIs() {
+    const latest = fyData[fyData.length - 1];
+    const prior = fyData[fyData.length - 2];
+
+    const rev = n(latest.Revenue), revPrior = n(prior.Revenue);
+    const gm = n(latest.GrossMargin), gmPrior = n(prior.GrossMargin);
+    const ebitda = n(latest.EBITDA), ebitdaPrior = n(prior.EBITDA);
+    const ni = n(latest.NetIncome), niPrior = n(prior.NetIncome);
+    const fcf = n(latest.FreeCashFlow), fcfPrior = n(prior.FreeCashFlow);
+    const equity = n(latest.ShareholdersEquity), equityPrior = n(prior.ShareholdersEquity);
+    const shares = n(latest.SharesOutstanding), sharesPrior = n(prior.SharesOutstanding);
+    const netDebt = n(latest.TotalDebt) - n(latest.CashAndEquivalents);
+    const netDebtPrior = n(prior.TotalDebt) - n(prior.CashAndEquivalents);
+
+    const kpis = [
+        { label: 'FY2025 Revenue', value: fmtM(rev, 1), change: calcYoYChange(rev, revPrior), suffix: '% YoY' },
+        { label: 'Gross Margin', value: fmtPct(gm), change: (gm - gmPrior).toFixed(1), suffix: 'pp YoY' },
+        { label: 'EBITDA', value: fmtM(ebitda, 2), change: calcYoYChange(ebitda, ebitdaPrior), suffix: '% YoY' },
+        { label: 'Net Income', value: fmtM(ni, 2), change: null, suffix: '' },
+        { label: 'Free Cash Flow', value: fmtM(fcf, 2), change: null, suffix: '' },
+        { label: "Shareholders' Equity", value: fmtM(equity, 2), change: calcYoYChange(equity, equityPrior), suffix: '% YoY' },
+        { label: 'Shares Outstanding', value: (shares).toFixed(1) + 'M', change: calcYoYChange(shares, sharesPrior), suffix: '% YoY' },
+        { label: 'Net Debt', value: fmtM(netDebt, 2), change: calcYoYChange(netDebt, netDebtPrior), suffix: '% YoY', inverse: true }
+    ];
+
+    const grid = document.getElementById('kpiGrid');
+    grid.innerHTML = kpis.map(k => {
+        let changeHtml = '';
+        if (k.change !== null && !isNaN(k.change)) {
+            let isPositive = parseFloat(k.change) >= 0;
+            if (k.inverse) isPositive = !isPositive;
+            changeHtml = `<div class="kpi-change ${isPositive ? 'positive' : 'negative'}">${parseFloat(k.change) >= 0 ? '+' : ''}${k.change}${k.suffix}</div>`;
+        }
+        return `
+            <div class="kpi-card">
+                <div class="kpi-value">${k.value}</div>
+                <div class="kpi-label">${k.label}</div>
+                ${changeHtml}
+            </div>
+        `;
+    }).join('');
+}
+
+// ============ OVERVIEW ============
+function toggleOverview() {
+    const btn = document.querySelector('.overview-toggle');
+    const content = document.getElementById('overviewContent');
+    btn.classList.toggle('active');
+    content.classList.toggle('active');
+}
+
+function renderOverview() {
+    const grid = document.getElementById('overviewGrid');
+    let html = '';
+
+    html += `<div class="overview-card">
+        <h3>Company Overview</h3>
+        <p>${analysis.overview}</p>
+    </div>`;
+
+    html += `<div class="overview-card">
+        <h3>Business Model</h3>
+        <p>${analysis.business_model.summary}</p>
+        <ul>${analysis.business_model.revenue_streams.map(rs => `
+            <li class="revenue-stream"><span>${rs.name} <span class="trend-${rs.trend.split(' ')[0].includes('grow') ? 'growing' : rs.trend.split(' ')[0].includes('declin') ? 'declining' : 'stable'}">(${rs.trend})</span></span><span class="percent">${rs.percent}%</span></li>
+        `).join('')}</ul>
+    </div>`;
+
+    html += `<div class="overview-card">
+        <h3>Competitive Position</h3>
+        <p><strong>Competitors:</strong> ${analysis.competitive_position.main_competitors.join(', ')}</p>
+        <p><strong>Moat Factors:</strong></p>
+        <ul>${analysis.competitive_position.moat_factors.map(m => `<li><strong>${m.factor}</strong> (${m.strength}): ${m.description}</li>`).join('')}</ul>
+    </div>`;
+
+    html += `<div class="overview-card">
+        <h3>Growth Drivers</h3>
+        <ul>${analysis.growth_drivers.map(g => `<li>${g}</li>`).join('')}</ul>
+    </div>`;
+
+    const allRisks = [].concat(analysis.risks.business, analysis.risks.financial, analysis.risks.regulatory, analysis.risks.macro);
+    html += `<div class="overview-card risks">
+        <h3>Key Risks</h3>
+        <ul>${allRisks.map(r => `<li><span class="risk-${r.severity.replace('-', '-')}">[${r.severity.toUpperCase()}]</span> <strong>${r.risk}</strong>: ${r.description}</li>`).join('')}</ul>
+    </div>`;
+
+    html += `<div class="overview-card bull">
+        <h3>Bull Case</h3>
+        <ul>${analysis.bull_case.map(b => `<li>${b}</li>`).join('')}</ul>
+    </div>`;
+
+    html += `<div class="overview-card bear">
+        <h3>Bear Case</h3>
+        <ul>${analysis.bear_case.map(b => `<li>${b}</li>`).join('')}</ul>
+    </div>`;
+
+    html += `<div class="overview-card">
+        <h3>Recent Developments</h3>
+        <ul>${analysis.recent_developments.map(d => `<li><strong>${d.date}:</strong> ${d.event}</li>`).join('')}</ul>
+    </div>`;
+
+    grid.innerHTML = html;
+}
+
+// ============ GUIDANCE ============
+function renderGuidance() {
+    if (!analysis.guidance || !analysis.guidance.items || analysis.guidance.items.length === 0) {
+        document.getElementById('guidanceSection').style.display = 'none';
+        return;
+    }
+    const guidance = analysis.guidance;
+    document.getElementById('guidanceAsOf').textContent = guidance.as_of || '';
+    document.getElementById('guidanceFY').textContent = guidance.fiscal_year || '';
+
+    const grid = document.getElementById('guidanceGrid');
+    grid.innerHTML = guidance.items.map(item => {
+        let vsClass = item.vs_prior ? item.vs_prior.toLowerCase().split(' ')[0].replace(/[^a-z]/g, '') : 'new';
+        if (!['raised', 'lowered', 'maintained', 'new'].includes(vsClass)) vsClass = 'maintained';
+        const vsLabel = item.vs_prior ? item.vs_prior.charAt(0).toUpperCase() + item.vs_prior.slice(1) : 'New';
+        return `
+            <div class="guidance-card">
+                <div class="guidance-metric">${item.metric}</div>
+                <div class="guidance-target">${item.target}</div>
+                <div class="guidance-period">${item.period}</div>
+                <span class="guidance-vs-prior ${vsClass}">${vsLabel}</span>
+                ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+
+    const commentary = document.getElementById('guidanceCommentary');
+    if (guidance.management_commentary) {
+        commentary.textContent = guidance.management_commentary;
+        commentary.style.display = 'block';
+    } else {
+        commentary.style.display = 'none';
+    }
+}
+
+// ============ CHARTS ============
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } } },
+    scales: {
+        x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+function freshScales() {
+    return { x: { ...chartDefaults.scales.x }, y: { ...chartDefaults.scales.y } };
+}
+
+const chartRegistry = {};
+function toggleLogScale(canvasId, btn) {
+    const chart = chartRegistry[canvasId];
+    if (!chart) return;
+    const toLog = chart.options.scales.y.type !== 'logarithmic';
+    chart.options.scales.y.type = toLog ? 'logarithmic' : 'linear';
+    btn.classList.toggle('active', toLog);
+    chart.update();
+}
+
+function renderCharts() {
+    const fyLabels = fyData.map(d => d.Period.replace('FY', ''));
+    const h1Labels = h1Data.map(d => d.Period);
+
+    // Revenue chart
+    chartRegistry['revenueChart'] = new Chart(document.getElementById('revenueChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{ label: 'Revenue (NZD M)', data: fyData.map(d => n(d.Revenue)), backgroundColor: colors.primary }]
+        },
+        options: { ...chartDefaults, scales: freshScales(), plugins: { legend: { display: false } } }
+    });
+
+    // H1 vs FY chart
+    const fyMap = {};
+    fyData.forEach(d => { fyMap[d.Period.replace('FY', '')] = n(d.Revenue); });
+    const h1Map = {};
+    h1Data.forEach(d => { h1Map[d.Period.replace('H1-', '')] = n(d.Revenue); });
+    const allYears = [...new Set([...Object.keys(fyMap), ...Object.keys(h1Map)])].sort();
+    chartRegistry['h1fyChart'] = new Chart(document.getElementById('h1fyChart'), {
+        type: 'bar',
+        data: {
+            labels: allYears,
+            datasets: [
+                { label: 'H1 Revenue', data: allYears.map(y => h1Map[y] ?? null), backgroundColor: colors.tertiary },
+                { label: 'Full-Year Revenue', data: allYears.map(y => fyMap[y] ?? null), backgroundColor: colors.primary }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+
+    // Gross margin trend
+    chartRegistry['grossMarginChart'] = new Chart(document.getElementById('grossMarginChart'), {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [{ label: 'Gross Margin %', data: fyData.map(d => n(d.GrossMargin)), borderColor: colors.primary, backgroundColor: 'rgba(0,212,170,0.15)', fill: true, tension: 0.3 }]
+        },
+        options: { ...chartDefaults, scales: freshScales(), plugins: { legend: { display: false } } }
+    });
+
+    // Gross profit vs cost of revenue
+    chartRegistry['grossProfitChart'] = new Chart(document.getElementById('grossProfitChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'Gross Profit', data: fyData.map(d => n(d.GrossProfit)), backgroundColor: colors.primary },
+                { label: 'Cost of Revenue', data: fyData.map(d => Math.abs(n(d.CostOfRevenue))), backgroundColor: colors.danger }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+
+    // EBITDA vs Net Income
+    chartRegistry['ebitdaNiChart'] = new Chart(document.getElementById('ebitdaNiChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'EBITDA', data: fyData.map(d => n(d.EBITDA)), backgroundColor: colors.primary },
+                { label: 'Net Income', data: fyData.map(d => n(d.NetIncome)), backgroundColor: colors.warning }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+
+    // Margins %
+    chartRegistry['marginsChart'] = new Chart(document.getElementById('marginsChart'), {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'Operating Margin %', data: fyData.map(d => n(d.OperatingMargin)), borderColor: colors.tertiary, backgroundColor: 'transparent', tension: 0.3 },
+                { label: 'Net Margin %', data: fyData.map(d => n(d.NetMargin)), borderColor: colors.danger, backgroundColor: 'transparent', tension: 0.3 }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+
+    // EPS
+    chartRegistry['epsChart'] = new Chart(document.getElementById('epsChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{ label: 'EPS (NZD)', data: fyData.map(d => n(d.EPS)), backgroundColor: fyData.map(d => n(d.EPS) >= 0 ? colors.primary : colors.danger) }]
+        },
+        options: { ...chartDefaults, scales: freshScales(), plugins: { legend: { display: false } } }
+    });
+
+    // OCF/CapEx/FCF
+    chartRegistry['fcfChart'] = new Chart(document.getElementById('fcfChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'Operating Cash Flow', data: fyData.map(d => n(d.OperatingCashFlow)), backgroundColor: colors.tertiary },
+                { label: 'CapEx', data: fyData.map(d => n(d.CapEx)), backgroundColor: colors.warning },
+                { label: 'Free Cash Flow', data: fyData.map(d => n(d.FreeCashFlow)), backgroundColor: fyData.map(d => n(d.FreeCashFlow) >= 0 ? colors.primary : colors.danger), type: 'line', borderColor: colors.primary, fill: false, tension: 0.2 }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+
+    // CapEx intensity
+    chartRegistry['capexIntensityChart'] = new Chart(document.getElementById('capexIntensityChart'), {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [{ label: 'CapEx % of Revenue', data: fyData.map(d => (Math.abs(n(d.CapEx)) / n(d.Revenue) * 100)), borderColor: colors.quaternary, backgroundColor: 'rgba(108,92,231,0.15)', fill: true, tension: 0.3 }]
+        },
+        options: { ...chartDefaults, scales: freshScales(), plugins: { legend: { display: false } } }
+    });
+
+    // Shares outstanding
+    chartRegistry['sharesChart'] = new Chart(document.getElementById('sharesChart'), {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [{ label: 'Shares Outstanding (M)', data: fyData.map(d => n(d.SharesOutstanding)), borderColor: colors.warning, backgroundColor: 'rgba(253,203,110,0.15)', fill: true, tension: 0.2 }]
+        },
+        options: { ...chartDefaults, scales: freshScales(), plugins: { legend: { display: false } } }
+    });
+
+    // Equity
+    chartRegistry['equityChart'] = new Chart(document.getElementById('equityChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{ label: "Shareholders' Equity", data: fyData.map(d => n(d.ShareholdersEquity)), backgroundColor: colors.secondary }]
+        },
+        options: { ...chartDefaults, scales: freshScales(), plugins: { legend: { display: false } } }
+    });
+
+    // Cash vs debt
+    chartRegistry['cashDebtChart'] = new Chart(document.getElementById('cashDebtChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'Cash', data: fyData.map(d => n(d.CashAndEquivalents)), backgroundColor: colors.primary },
+                { label: 'Total Debt', data: fyData.map(d => n(d.TotalDebt)), backgroundColor: colors.danger }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+}
+
+// ============ METRIC MODAL DESCRIPTIONS ============
+const metricDescriptions = {
+    revenue: {
+        title: "Annual Revenue",
+        content: `<p><strong>Revenue</strong> is AoFrio's total annual sales across its two segments: Motors and Fans (EC motors for commercial fridges) and IoT/Connected Solutions (SCS controllers plus AoFrio iQ SaaS).</p>
+        <div class="metric-highlight"><strong>For AoFrio:</strong> FY2025 revenue reached a record NZ$83.2m (+4.4%), but the story inverted in 2026 -- 1H26 revenue fell 21.5% YoY entirely because Motors collapsed 50.5% after AoFrio lost its largest US customer to tariff-driven onshoring. IoT revenue kept growing (+6.8% in 1H26) and is now the majority of the business.</p>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Whether IoT growth can keep outpacing Motors' structural decline</li>
+            <li>Recovery (or not) of Motors demand once the tariff/onshoring shock is fully lapped</li>
+            <li>Whether SCS 800 / AoFrio iQ purchase orders (expected 2H26) start showing up in reported revenue</li>
+        </ul>`
+    },
+    h1fy: {
+        title: "H1 vs Full-Year Revenue",
+        content: `<p>AoFrio reports half-year (H1) results at the interim mark and full-year (FY) results at year-end. This chart keeps the two series separate so H1 (typically the seasonally lighter half) isn't blended into one misleading trend line with FY totals.</p>
+        <div class="metric-highlight"><strong>For AoFrio:</strong> H1-2026 revenue of $33.8m implies a weak run-rate against FY2025's $83.2m unless 2H26 recovers -- consistent with management's August 2026 admission that "the improvement in full-year revenue now appears unlikely."</p>
+        <p><strong>What to watch:</strong> Compare each H1 figure to roughly half the prior FY to gauge whether the business is tracking ahead or behind its own history.</p>`
+    },
+    grossMargin: {
+        title: "Gross Margin Trend",
+        content: `<p><strong>Gross Margin</strong> = Gross Profit / Revenue. This is the single most important structural metric for AoFrio's investment case.</p>
+        <div class="metric-highlight"><strong>For AoFrio:</strong> Gross margin has climbed from just 3.3% in FY2010 to 31.7% in FY2025 -- almost entirely because the higher-margin IoT segment (42.5% gross margin in FY25) has grown to dominate the lower-margin Motors segment (17.7% gross margin in FY25). The mix shift is the whole bull thesis in one chart.</p>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Continued upward drift as IoT's revenue share rises (it was 69% of FY25 revenue)</li>
+            <li>Any stalling would suggest Motors pricing pressure is outweighing IoT mix gains</li>
+        </ul>`
+    },
+    grossProfit: {
+        title: "Gross Profit vs Cost of Revenue",
+        content: `<p>Shows the absolute dollar split between what AoFrio spends making its products (contract manufacturing in Vietnam, components) and what it keeps as gross profit.</p>
+        <div class="metric-highlight"><strong>For AoFrio:</strong> Cost of revenue has grown roughly in line with revenue for years, but gross profit has grown faster since 2018 as the IoT mix shift took hold -- gross profit reached $26.4m in FY2025 versus under $1m in FY2010.</p>
+        <p><strong>What to watch:</strong> A widening gap (gross profit growing faster than cost of revenue) confirms the margin story is intact.</p>`
+    },
+    ebitdaNi: {
+        title: "EBITDA vs Net Income",
+        content: `<p><strong>EBITDA</strong> strips out depreciation/amortization (much of it from capitalized SCS/iQ software development) and financing costs, showing underlying operating cash generation before those non-cash and financing items. <strong>Net Income</strong> is the bottom-line statutory result.</p>
+        <div class="metric-highlight"><strong>For AoFrio:</strong> EBITDA turned durably positive from FY2016 onward and reached $3.5m in FY2025 (aided by a one-off $1.2m R&D tax credit in 1H26), but Net Income has stayed negative or near breakeven in most years -- rising D&A from capitalized SaaS platform spend and finance costs on growing debt are the main drags below the EBITDA line.</p>
+        <p><strong>What to watch:</strong> The gap between EBITDA and Net Income; a widening gap signals rising D&A/interest burden from the capex-heavy IoT platform build.</p>`
+    },
+    margins: {
+        title: "Operating & Net Margin",
+        content: `<p>Operating Margin = Operating Income / Revenue. Net Margin = Net Income / Revenue. Both measure profitability after overhead, unlike gross margin which only nets out cost of goods sold.</p>
+        <div class="metric-highlight"><strong>For AoFrio:</strong> Both margins have been consistently negative or barely positive for most of the company's history -- FY2025 operating margin was -0.1% and net margin -2.5%. This reflects heavy R&D and SG&A spend relative to a still-small revenue base as the company builds out its IoT/SaaS platform.</p>
+        <p><strong>What to watch:</strong> Sustained improvement toward breakeven and beyond would validate the operating-leverage thesis behind the mix shift.</p>`
+    },
+    eps: {
+        title: "Earnings Per Share",
+        content: `<p><strong>EPS</strong> = Net Income / weighted-average shares outstanding. Note the 20:1 share consolidation in 2011 causes the sharp break in per-share figures between FY2010 and FY2011.</p>
+        <div class="metric-highlight"><strong>For AoFrio:</strong> EPS has been negative in almost every year shown, reflecting the company's long loss-making history. FY2021's positive EPS ($0.0126) was an outlier year. Given repeated share issuance, EPS trends understate the true per-share dilution investors have experienced.</p>
+        <p><strong>What to watch:</strong> AoFrio has never paid a dividend; EPS here is purely a profitability signal, not a cash-return signal.</p>`
+    },
+    fcf: {
+        title: "Operating Cash Flow, CapEx & Free Cash Flow",
+        content: `<p><strong>Free Cash Flow</strong> = Operating Cash Flow &minus; CapEx. For AoFrio, CapEx increasingly consists of capitalized development spend on SCS 800 controllers and the AoFrio iQ SaaS platform, not just plant/equipment.</p>
+        <div class="metric-highlight"><strong>For AoFrio:</strong> FCF has been negative in 6 of the last 8 fiscal years. FY2025 FCF was -$5.26m as CapEx ($9.08m, ~10.9% of revenue) outran operating cash flow ($3.82m) -- the platform build is expensive and not yet self-funding.</p>
+        <p><strong>What to watch:</strong> Whether CapEx intensity moderates as SCS 800/AoFrio iQ near full commercial launch, and whether operating cash flow grows enough to close the gap without further dilutive capital raises.</p>`
+    },
+    capexIntensity: {
+        title: "CapEx Intensity (% of Revenue)",
+        content: `<p>CapEx as a percentage of revenue shows how much of every sales dollar AoFrio is reinvesting into capitalized product/platform development and equipment.</p>
+        <div class="metric-highlight"><strong>For AoFrio:</strong> CapEx intensity has risen sharply, from roughly 2-5% of revenue in the mid-2010s to 10.9% in FY2025, driven by capitalized SCS 800/AoFrio iQ software development. This is a key reason reported Free Cash Flow understates near-term cash burn relative to EBITDA.</p>
+        <p><strong>What to watch:</strong> A sustained decline in this ratio, once the SaaS platform build matures, would be the clearest signal the company is approaching self-funding status.</p>`
+    },
+    shares: {
+        title: "Shares Outstanding (Dilution History)",
+        content: `<p>Tracks the total shares on issue at each fiscal year-end. Note the 20:1 share consolidation executed in 2011, which explains the sharp drop between FY2010 (673.7m shares) and FY2011 (67.4m shares) -- it is a reverse split, not a buyback.</p>
+        <div class="metric-highlight"><strong>For AoFrio:</strong> Since the 2011 consolidation, share count has grown from 67.4m to 434.2m by FY2025 -- more than 6x dilution over 14 years -- driven by repeated capital raises to fund losses. The May-June 2026 placement and rights issue add a further ~127m shares (to ~561m), continuing this long dilution history.</p>
+        <p><strong>What to watch:</strong> Whether the company can reach sustainable positive FCF before needing further dilutive raises; the DCF's bear case models an additional ~205m shares of cumulative future dilution if the burn continues.</p>`
+    },
+    equity: {
+        title: "Shareholders' Equity",
+        content: `<p><strong>Shareholders' Equity</strong> = Total Assets &minus; Total Liabilities. It reflects the book value attributable to shareholders after all capital raises and accumulated losses.</p>
+        <div class="metric-highlight"><strong>For AoFrio:</strong> Equity has been volatile and structurally thin -- it fell from $18.3m (FY2010) to as low as $2.7m (FY2016) as losses accumulated, was rebuilt via capital raises to $23.8m (FY2022), and has since eroded again to $15.9m (FY2025) as continued losses outpace new capital. This is not a steady compounding equity story.</p>
+        <p><strong>What to watch:</strong> Whether the FY2026 capital raise (partially completed, $8.9m of $15m target) stabilizes or merely delays further equity erosion.</p>`
+    },
+    cashDebt: {
+        title: "Cash vs Total Debt",
+        content: `<p>Compares cash and cash equivalents on hand against total interest-bearing debt (bank borrowings and trade finance facilities).</p>
+        <div class="metric-highlight"><strong>For AoFrio:</strong> The company moved from a net cash position in several mid-2010s/2020s years to a widening net debt position -- FY2025 net debt was $8.2m (debt $9.55m vs cash just $1.34m), up sharply from $2.5m the prior year, reflecting reliance on trade finance and extended supplier terms to fund working capital and the SaaS platform build.</p>
+        <p><strong>What to watch:</strong> Cash levels below ~$1.5m alongside rising debt are a genuine liquidity stress signal for a company of this size; this is the single biggest driver of the DCF's near-zero base-case equity value.</p>`
+    }
+};
+
+function openModal(key) {
+    const desc = metricDescriptions[key];
+    if (!desc) return;
+    document.getElementById('modalTitle').textContent = desc.title;
+    document.getElementById('modalBody').innerHTML = desc.content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ============ DCF SECTION ============
+let currentScenario = 'base';
+
+function initDCF() {
+    if (!dcfData || !dcfData.valuation) return;
+
+    document.getElementById('dcfCurrent').textContent = '$' + dcfData.current_price.toFixed(3);
+
+    if (dcfData.historical_growth.growth_divergence_warning) {
+        document.getElementById('growthWarning').style.display = 'flex';
+        document.getElementById('warningText').textContent = dcfData.historical_growth.growth_divergence_warning;
+    }
+
+    const base = dcfData.assumptions.base;
+    document.getElementById('growthSlider').value = base.revenue_growth_pct[0];
+    document.getElementById('waccSlider').value = base.wacc;
+    document.getElementById('terminalSlider').value = base.terminal_growth;
+
+    document.getElementById('growthValue').textContent = base.revenue_growth_pct[0] + '%';
+    document.getElementById('waccValue').textContent = base.wacc + '%';
+    document.getElementById('terminalValue').textContent = base.terminal_growth + '%';
+
+    document.getElementById('growthHint').textContent = 'Bottom-up revenue build (Motors/IoT segment split), not a historical CAGR';
+
+    renderDCFInputs();
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    switchScenario('base');
+}
+
+function renderDCFInputs() {
+    const inputs = dcfData.inputs;
+    const formatNum = (val) => {
+        if (Math.abs(val) >= 1000) return '$' + (val / 1000).toFixed(2) + 'B';
+        return '$' + val.toFixed(2) + 'M';
+    };
+
+    const baseFCF = dcfData.projections.base.owner_fcf[0]; // Year 1 projected owner FCF as representative
+    const lastActualFCF = -5.259; // FY2025 reported FCF, for context
+    document.getElementById('baseFCF').textContent = formatNum(lastActualFCF);
+    const sbcEl = document.getElementById('sbcBreakdown');
+    if (sbcEl) {
+        sbcEl.textContent = 'FY2025 reported FCF (SBC immaterial, <0.15% of revenue); DCF starts from bottom-up revenue build';
+    }
+
+    const shares = inputs.shares_outstanding_post_raise;
+    document.getElementById('sharesOut').textContent = shares.toFixed(1) + 'M';
+    const dilEl = document.getElementById('dilutionNote');
+    if (dilEl) {
+        dilEl.textContent = 'Post May-June 2026 placement + rights issue (from 434.2M FY25)';
+    }
+
+    const netDebt = inputs.net_debt;
+    const netDebtEl = document.getElementById('netDebt');
+    netDebtEl.textContent = formatNum(netDebt);
+    netDebtEl.style.color = '#ff6b6b'; // net debt, red
+
+    renderFCFProjections();
+}
+
+function renderFCFProjections() {
+    const scenario = dcfData.projections[currentScenario];
+    const years = scenario.years;
+    const fcf = scenario.owner_fcf;
+
+    let html = `
+        <div class="fcf-projection-item header">Year</div>
+        <div class="fcf-projection-item header">${years[0]}</div>
+        <div class="fcf-projection-item header">${years[1]}</div>
+        <div class="fcf-projection-item header">${years[2]}</div>
+        <div class="fcf-projection-item header">${years[3]}</div>
+        <div class="fcf-projection-item header">${years[4]}</div>
+    `;
+    html += `<div class="fcf-projection-item"><div class="fcf-value">Owner FCF</div></div>`;
+    for (let i = 0; i < 5; i++) {
+        const val = fcf[i];
+        const color = val >= 0 ? '#00d4aa' : '#ff6b6b';
+        html += `<div class="fcf-projection-item">
+            <div class="fcf-value" style="color:${color}">${val >= 0 ? '+' : ''}$${val.toFixed(2)}M</div>
+        </div>`;
+    }
+    document.getElementById('fcfProjectionTable').innerHTML = html;
+}
+
+function calculateDCF(scenarioName, growthOverride, waccOverride, terminalOverride) {
+    // Use the pre-computed component-built projections from dcfData, but allow
+    // WACC/terminal growth slider overrides to re-derive PV of the SAME cash flow stream.
+    const proj = dcfData.projections[scenarioName];
+    const wacc = waccOverride / 100;
+    const terminalGrowth = terminalOverride / 100;
+    const years = proj.owner_fcf.length;
+
+    let pvFCF = 0;
+    let pvFCFHurdle = 0;
+    const hurdle = dcfData.entry_price.hurdle_rate;
+    for (let i = 0; i < years; i++) {
+        const fcf = proj.owner_fcf[i];
+        pvFCF += fcf / Math.pow(1 + wacc, i + 1);
+        pvFCFHurdle += fcf / Math.pow(1 + hurdle, i + 1);
+    }
+
+    const terminalFCF = proj.owner_fcf[years - 1] * (1 + terminalGrowth);
+    let terminalValue;
+    if (wacc <= terminalGrowth || terminalFCF <= 0) {
+        // Guard against divide-by-zero/negative denominators; fall back to the JSON's stored terminal value
+        terminalValue = dcfData.valuation[scenarioName].terminal_value;
+    } else {
+        terminalValue = terminalFCF / (wacc - terminalGrowth);
+    }
+    const pvTerminal = terminalValue / Math.pow(1 + wacc, years);
+    const pvTerminalHurdle = terminalValue / Math.pow(1 + hurdle, years);
+
+    const enterpriseValue = pvFCF + pvTerminal;
+    const netDebt = dcfData.inputs.net_debt;
+    const equityValueRaw = enterpriseValue - netDebt;
+    const finalShares = proj.shares_outstanding[years - 1];
+    const ivRaw = equityValueRaw / finalShares;
+    const iv = Math.max(0, ivRaw);
+
+    const entryPriceRaw = (pvFCFHurdle + pvTerminalHurdle - netDebt) / finalShares;
+    const entryPrice = Math.max(0, entryPriceRaw);
+
+    return { iv, ivRaw, entryPrice, entryPriceRaw, pvFCF, pvTerminal, enterpriseValue };
+}
+
+window.updateDCFDisplay = function () {
+    const growth = parseFloat(document.getElementById('growthSlider').value);
+    const wacc = parseFloat(document.getElementById('waccSlider').value);
+    const terminal = parseFloat(document.getElementById('terminalSlider').value);
+
+    document.getElementById('growthValue').textContent = growth + '%';
+    document.getElementById('waccValue').textContent = wacc + '%';
+    document.getElementById('terminalValue').textContent = terminal + '%';
+
+    const result = calculateDCF(currentScenario, growth, wacc, terminal);
+
+    document.getElementById('dcfIV').textContent = '$' + result.iv.toFixed(3);
+    document.getElementById('dcfEntry').textContent = '$' + result.entryPrice.toFixed(3);
+
+    const upside = ((result.iv - dcfData.current_price) / dcfData.current_price * 100);
+    const upsideEl = document.getElementById('dcfUpside');
+    upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(0) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+    upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+    const sub = document.querySelector('.dcf-card.highlight .dcf-sublabel');
+    if (sub) sub.textContent = `Owner FCF — floored at $0.00 (raw: ${result.ivRaw >= 0 ? '+' : '-'}$${Math.abs(result.ivRaw).toFixed(3)})`;
+
+    const wiv = dcfData.probability_weighted.weighted_iv;
+    document.getElementById('dcfWeighted').textContent = '$' + wiv.toFixed(3);
+    const wUpEl = document.getElementById('dcfWeightedUpside');
+    if (wUpEl) {
+        const wUp = (wiv - dcfData.current_price) / dcfData.current_price * 100;
+        wUpEl.textContent = (wUp >= 0 ? '+' : '') + wUp.toFixed(0) + '% ' + (wUp >= 0 ? 'upside' : 'downside');
+        wUpEl.className = 'dcf-change ' + (wUp >= 0 ? 'positive' : 'negative');
+    }
+
+    const grid = document.getElementById('assumptionGrid');
+    if (grid) {
+        const scenarioAssump = dcfData.assumptions[currentScenario];
+        grid.innerHTML = `
+            <div class="assumption-item"><div class="label">Year 1 Rev Growth</div><div class="value">${growth}%</div></div>
+            <div class="assumption-item"><div class="label">Year 10 Rev Growth</div><div class="value">${scenarioAssump.revenue_growth_pct[9]}%</div></div>
+            <div class="assumption-item"><div class="label">Year 10 EBITDA Margin</div><div class="value">${scenarioAssump.ebitda_margin_path_pct[9]}%</div></div>
+            <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc}%</div></div>
+            <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${terminal}%</div></div>
+            <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa;">$${result.iv.toFixed(3)}</div></div>
+            <div class="assumption-item"><div class="label">Entry Price (15% hurdle)</div><div class="value" style="color:#00d4aa;">$${result.entryPrice.toFixed(3)}</div></div>
+        `;
+    }
+};
+
+window.switchScenario = function (scenario) {
+    currentScenario = scenario;
+
+    document.querySelectorAll('.scenario-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.scenario === scenario);
+    });
+
+    const assumptions = dcfData.assumptions[scenario];
+
+    document.getElementById('growthSlider').value = assumptions.revenue_growth_pct[0];
+    document.getElementById('waccSlider').value = assumptions.wacc;
+    document.getElementById('terminalSlider').value = assumptions.terminal_growth;
+
+    document.getElementById('scenarioNarrative').textContent = assumptions.narrative;
+
+    renderFCFProjections();
+    updateDCFDisplay();
+};
+
+function renderHistoricalGrowth() {
+    const growth = dcfData.historical_growth;
+    const grid = document.getElementById('growthGrid');
+
+    const metrics = [
+        { key: 'revenue_3yr_cagr', label: 'Revenue 3Y' },
+        { key: 'revenue_5yr_cagr', label: 'Revenue 5Y' },
+        { key: 'eps_3yr_cagr', label: 'EPS 3Y' },
+        { key: 'eps_5yr_cagr', label: 'EPS 5Y' },
+        { key: 'equity_3yr_cagr', label: 'Equity 3Y' },
+        { key: 'equity_5yr_cagr', label: 'Equity 5Y' },
+        { key: 'fcf_3yr_cagr', label: 'FCF 3Y' },
+        { key: 'fcf_5yr_cagr', label: 'FCF 5Y' }
+    ];
+
+    grid.innerHTML = metrics.map(m => {
+        const rate = growth[m.key];
+        if (rate === null || rate === undefined) {
+            return `<div class="growth-item"><div class="metric">${m.label}</div><div class="rate na">N/A</div></div>`;
+        }
+        const colorClass = rate >= 0 ? 'positive' : 'negative';
+        return `
+            <div class="growth-item">
+                <div class="metric">${m.label}</div>
+                <div class="rate ${colorClass}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const table = document.getElementById('sensitivityMatrix');
+    const currentPrice = dcfData.current_price;
+
+    let html = '<tr><th>WACC \\ Term G</th>';
+    sens.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+    html += '</tr>';
+
+    sens.wacc_range.forEach((wacc, i) => {
+        html += `<tr><th>${wacc}%</th>`;
+        sens.matrix[i].forEach((val, j) => {
+            const isHighlight = wacc === dcfData.assumptions.base.wacc && sens.terminal_growth_range[j] === dcfData.assumptions.base.terminal_growth;
+            const colorClass = val >= currentPrice ? 'above-current' : 'below-current';
+            html += `<td class="${isHighlight ? 'highlight' : colorClass}">$${val.toFixed(4)}</td>`;
+        });
+        html += '</tr>';
+    });
+
+    table.innerHTML = html;
+}
+
+// ============ INIT ============
+renderKPIs();
+renderOverview();
+renderGuidance();
+renderCharts();
+initDCF();
+
+(function () {
+    var growthSlider = document.getElementById('growthSlider');
+    var waccSlider = document.getElementById('waccSlider');
+    var terminalSlider = document.getElementById('terminalSlider');
+    if (growthSlider) { growthSlider.oninput = window.updateDCFDisplay; growthSlider.onchange = window.updateDCFDisplay; }
+    if (waccSlider) { waccSlider.oninput = window.updateDCFDisplay; waccSlider.onchange = window.updateDCFDisplay; }
+    if (terminalSlider) { terminalSlider.oninput = window.updateDCFDisplay; terminalSlider.onchange = window.updateDCFDisplay; }
+})();
+</script>
+</body>
+</html>
