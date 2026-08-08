@@ -59,6 +59,8 @@ for f in sorted((HERE / "logs").glob("*.jsonl")):
                 info = json.loads(p.read_text())
             except json.JSONDecodeError:
                 pass
+        if info.get("needs_review") is False:
+            continue
         if info.get("updated_by") not in ("claude", "human", "manual"):
             name_missing.append((ticker, f"{len(bad)} name-missing quarantine(s)"))
 
@@ -87,7 +89,7 @@ for t, n in sorted(attempts.items(), key=lambda kv: -kv[1]):
     if n < 2 or t in promoted_ever:
         continue
     info = json.loads((REPO / "research" / t / "info.json").read_text()) if (REPO / "research" / t / "info.json").exists() else {}
-    if info.get("updated_by") in ("claude", "human", "manual") or info.get("ir_url"):
+    if info.get("needs_review") is False or info.get("updated_by") in ("claude", "human", "manual") or info.get("ir_url"):
         continue
     if not (REPO / "research" / t / "PDFs").is_dir() or not any((REPO / "research" / t / "PDFs").iterdir()):
         repeat_empty.append((t, n))
