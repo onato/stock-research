@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-"""Deterministic NZX adapter — update mode only.
+"""Deterministic NZX adapter — updates and full seeding.
 
 nzx.com is Next.js; the company announcements page hydrates the CURRENT
 year's announcements (typed ANNREP/HALFYR/FLLYR...) in __NEXT_DATA__, and
-attachment PDFs download from a public api.nzx.com URL. Back-years are not
-in the initial HTML (the listing API is 403 to scripts), so this adapter
-only serves the nightly update case: anything newer than what we hold.
-Seeding still falls through to the archive/model path.
+attachment PDFs download from a public api.nzx.com URL. Back-years come
+from the per-year listing the site's own client uses,
+  api.nzx.com/public/company/{CompanyID}/announcements/{YEAR}/all.json
+(the CompanyID, e.g. FPH000000, is read from the page hydration — it is
+NOT always the ticker code, e.g. AFC.NZ is IRG000000). Seed mode
+(--after-year 0) walks the last BACK_YEARS of listings; periods already
+held in research/{TICKER}/ are skipped, so seeding and thin-holdings
+backfill are the same call.
 
 Fattest-attachment rule (ASX cover-letter lesson): when an announcement has
 several PDFs, take the largest by Content-Length.
@@ -15,11 +19,14 @@ Exit 0 = ran cleanly; nonzero = failed (caller falls back).
 
 Usage: nzx.py TAH.NZ --dest DIR --after-year 2025
 """
+import datetime
 import json
 import re
 import subprocess
 import sys
 from pathlib import Path
+
+BACK_YEARS = 8
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
 # Small NZX companies often never lodge a glossy ANNREP — the FLLYR results
@@ -58,12 +65,30 @@ def main() -> int:
 
     d = next_data(f"https://www.nzx.com/companies/{code}/announcements")
     items = []
+    company_id = None
     for q in d.get("props", {}).get("pageProps", {}).get("dehydratedState", {}).get("queries", []):
-        if q.get("queryKey", [None])[0] == "announcements":
+        key = q.get("queryKey") or [None]
+        if key[0] == "announcements":
             items += (q.get("state", {}).get("data", {}) or {}).get("data", []) or []
+            if len(key) >= 3:
+                company_id = key[2]
     if not items:
         print(f"nzx-adapter: no hydrated announcements for {ticker}")
         return 1
+
+    if after == 0:
+        if company_id:
+            this_year = datetime.date.today().year
+            for year in range(this_year - 1, this_year - 1 - BACK_YEARS, -1):
+                url = (f"https://api.nzx.com/public/company/{company_id}"
+                       f"/announcements/{year}/all.json")
+                try:
+                    raw = json.loads(get(url))
+                    items += (raw.get("data") if isinstance(raw, dict) else raw) or []
+                except Exception as e:
+                    print(f"nzx-adapter: {year} listing failed ({e})")
+        else:
+            print("nzx-adapter: no companyId in hydration — current year only")
 
     plan = {}
     for a in items:
@@ -76,12 +101,19 @@ def main() -> int:
         m = re.search(r"20(\d\d)", title) or re.search(r"FY(\d\d)\b", title)
         year = 2000 + int(m[1]) if m else None
         if year is None:
-            import datetime
             year = datetime.datetime.fromtimestamp(a.get("releaseDate", 0)).year
         if after and year <= after:
             continue
         period = f"FY{year}" if typ == "Annual" else f"H1-{year}"
         plan.setdefault((typ, period), a["id"])
+
+    # Skip periods already held (PDF or extracted text) so seed mode doubles
+    # as backfill for thin holdings and re-runs stay idempotent.
+    repo = Path(__file__).resolve().parents[3]
+    held = {p.stem for sub, ext in (("PDFs", "pdf"), ("Extracted", "txt"))
+            for p in (repo / "research" / ticker / sub).glob(f"{ticker}_*.{ext}")}
+    plan = {k: v for k, v in plan.items()
+            if f"{ticker}_{k[0]}_{k[1]}" not in held}
 
     if not plan:
         print(f"nzx-adapter: nothing newer than {after} for {ticker}")

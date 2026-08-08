@@ -79,6 +79,10 @@ INVENTORY=$(python3 "$HERE/missing.py" "$TICKER")
 # for updates; seeds fall through to archive/model.
 if [[ "$TICKER" == *.NZ ]]; then
   AFTER_YEAR=$(python3 -c "import sys; sys.path.insert(0,'$HERE'); from missing import scan; print(scan('$TICKER')['newest_year'])")
+  # Thin holdings (<3 filings) get the full deterministic backfill: seed mode
+  # walks the per-year announcement listings and skips periods already held.
+  N_EXT=$(ls "$REPO/research/$TICKER/Extracted"/*.txt 2>/dev/null | wc -l | tr -d ' ')
+  [ "$N_EXT" -lt 3 ] && AFTER_YEAR=0
   if python3 "$HERE/adapters/nzx.py" "$TICKER" --dest "$STAGING" --after-year "$AFTER_YEAR"; then
     STAGED=$(ls "$STAGING"/*.pdf 2>/dev/null | wc -l | tr -d " ")
     if [ "$STAGED" -ge 1 ] || [ "$AFTER_YEAR" -gt 0 ]; then
