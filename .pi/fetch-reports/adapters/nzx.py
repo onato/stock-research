@@ -63,7 +63,13 @@ def main() -> int:
     # give a placeholder ticker its first real filings and enable updates.
     code = ticker.split(".")[0]
 
-    d = next_data(f"https://www.nzx.com/companies/{code}/announcements")
+    try:
+        d = next_data(f"https://www.nzx.com/companies/{code}/announcements")
+    except subprocess.CalledProcessError as e:
+        # Delisted/renamed codes fail the page fetch; that is a clean
+        # fall-back-to-model case, not a crash.
+        print(f"nzx-adapter: announcements page unreachable for {ticker} ({e})")
+        return 1
     items = []
     company_id = None
     for q in d.get("props", {}).get("pageProps", {}).get("dehydratedState", {}).get("queries", []):
