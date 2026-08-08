@@ -5,6 +5,7 @@
 # else in here is one piece of that.
 
 SCRIPTS := scripts
+PY      := uv run python3
 STATE   := state
 SCREEN  := .claude/skills/screen-investments/screen.py
 
@@ -35,7 +36,7 @@ help: ## Show this help
 
 run: ## Research the next few tickers, score them, report fixes, then rank everything
 	@echo "==> baseline (so the cost delta is measurable afterwards)"
-	@python3 $(SCRIPTS)/cost_report.py --baseline $(STATE)/cost_baseline.json \
+	@$(PY) $(SCRIPTS)/cost_report.py --baseline $(STATE)/cost_baseline.json \
 	  >/dev/null 2>&1 || true
 	@# TICKER=X researches just that one; otherwise take the next TICKERS
 	@# from the queue. Without this, `make run TICKER=X` would silently
@@ -49,25 +50,25 @@ else
 endif
 	@echo
 	@echo "==> scoring"
-	@python3 $(SCRIPTS)/run_evals.py --all >/dev/null 2>&1 || true
+	@$(PY) $(SCRIPTS)/run_evals.py --all >/dev/null 2>&1 || true
 	@echo
 	@$(MAKE) --no-print-directory digest
 	@echo
 	@$(MAKE) --no-print-directory screen
 
 digest: ## Cost + quality + suggested fixes for the last batch
-	@python3 $(SCRIPTS)/after_run.py
+	@$(PY) $(SCRIPTS)/after_run.py
 
 screen: ## Rank every ticker by upside to weighted IV, at live prices
 	@echo "=================================================================="
 	@echo " SCREENER LEADERBOARD"
 	@echo "=================================================================="
-	@python3 $(SCREEN) --live --top $(LEADERBOARD) \
+	@$(PY) $(SCREEN) --live --top $(LEADERBOARD) \
 	  --json $(STATE)/last_screen.json --html index.html 2>/dev/null \
-	  || python3 $(SCREEN) --top $(LEADERBOARD) --html index.html
+	  || $(PY) $(SCREEN) --top $(LEADERBOARD) --html index.html
 
 status: ## What is researched, what is stale, what is queued
-	@python3 $(SCRIPTS)/select_ticker.py 2>&1 | grep -E '^(ticker|mode)=' | sed 's/^/  next  /'
+	@$(PY) $(SCRIPTS)/select_ticker.py 2>&1 | grep -E '^(ticker|mode)=' | sed 's/^/  next  /'
 	@echo "  researched   $$(ls -d research/*/Reports 2>/dev/null | wc -l | tr -d ' ') tickers"
 	@echo "  scorecards   $$(ls $(STATE)/scores/*.json 2>/dev/null | wc -l | tr -d ' ')"
 	@echo "  ledger rows  $$(wc -l < evals/ledger.jsonl 2>/dev/null | tr -d ' ')"
@@ -82,64 +83,64 @@ research: ## Research one ticker with live progress (TICKER=AGL.NZ)
 
 facts: ## Rebuild the DuckDB facts table for one ticker (fast, no model)
 	@test -n "$(TICKER)" || { echo "usage: make facts TICKER=AGL.NZ" >&2; exit 2; }
-	python3 $(SCRIPTS)/build_facts.py $(TICKER) --show
+	$(PY) $(SCRIPTS)/build_facts.py $(TICKER) --show
 
 facts-xbrl: ## Structured extraction for a US filer via SEC XBRL (TICKER=PYPL)
 	@test -n "$(TICKER)" || { echo "usage: make facts-xbrl TICKER=PYPL" >&2; exit 2; }
-	python3 $(SCRIPTS)/build_facts_xbrl.py $(TICKER) --show
+	$(PY) $(SCRIPTS)/build_facts_xbrl.py $(TICKER) --show
 
 evals: ## Tier-1 eval for one ticker (TICKER=AGL.NZ)
 	@test -n "$(TICKER)" || { echo "usage: make evals TICKER=AGL.NZ" >&2; exit 2; }
-	python3 $(SCRIPTS)/run_evals.py $(TICKER)
+	$(PY) $(SCRIPTS)/run_evals.py $(TICKER)
 
 evals-all: ## Tier-1 eval for every ticker; scorecards to state/scores/
-	python3 $(SCRIPTS)/run_evals.py --all
+	$(PY) $(SCRIPTS)/run_evals.py --all
 
 test: ## Run the deterministic test suite (gates every commit touching scripts/)
-	python3 -m pytest
+	uv run pytest
 
 # Ruff is version-pinned so local and CI agree; bumping it is a deliberate
 # commit (the rule set is pinned in pyproject.toml for the same reason).
 lint: ## Ruff + shellcheck; the technical-debt gate
-	uvx ruff@0.16.1 check .
+	uv run ruff check .
 	shellcheck -S warning $(SCRIPTS)/*.sh
 
-# Mypy is pinned for the same reason as ruff; the config lives in pyproject.toml.
-# --python-executable lets the isolated uvx mypy resolve the interpreter's real
-# site-packages (duckdb etc.) instead of demanding stubs it can't see.
+# Mypy and ruff are exact-pinned in pyproject's dev group (the gates must
+# only move by deliberate commit); running them inside the uv env lets mypy
+# see the real site-packages (duckdb etc.) without stub gymnastics.
 typecheck: ## Mypy over scripts/; part of the technical-debt gate
-	uvx mypy@1.19.0 --python-executable "$$(command -v python3)" scripts
+	uv run mypy scripts
 
 # The floor only ratchets up: raise it when coverage rises, never lower it.
 coverage: ## Test suite with line coverage over scripts/; fails under the floor
-	python3 -m pytest --cov=$(SCRIPTS) --cov-report=term-missing:skip-covered \
+	uv run pytest --cov=$(SCRIPTS) --cov-report=term-missing:skip-covered \
 	  --cov-fail-under=95
 
 test-country: ## One country's parser tests (COUNTRY=nzx)
 	@test -n "$(COUNTRY)" || { echo "usage: make test-country COUNTRY=nzx" >&2; exit 2; }
-	python3 -m pytest tests/parsers/test_$(COUNTRY).py -v
+	uv run pytest tests/parsers/test_$(COUNTRY).py -v
 
 cost: ## Per-ticker cost report from run transcripts
-	python3 $(SCRIPTS)/cost_report.py
+	$(PY) $(SCRIPTS)/cost_report.py
 
 exchange-eval: ## Extraction coverage per exchange (free, no model calls)
-	python3 $(SCRIPTS)/exchange_eval.py $(if $(EXCHANGE),--exchange $(EXCHANGE),) $(if $(VERBOSE),--verbose,)
+	$(PY) $(SCRIPTS)/exchange_eval.py $(if $(EXCHANGE),--exchange $(EXCHANGE),) $(if $(VERBOSE),--verbose,)
 
 screen-metrics: ## Compare core metrics across tickers, normalized (PERIOD=FY2024)
-	python3 $(SCRIPTS)/screen_metrics.py --period $(or $(PERIOD),FY2024) $(if $(METRIC),--metric $(METRIC),)
+	$(PY) $(SCRIPTS)/screen_metrics.py --period $(or $(PERIOD),FY2024) $(if $(METRIC),--metric $(METRIC),)
 
 check-currency: ## Flag tickers whose recorded currency contradicts their filings
-	python3 $(SCRIPTS)/check_currency.py $(TICKER)
+	$(PY) $(SCRIPTS)/check_currency.py $(TICKER)
 
 gaps: ## What the extractor could not parse (the improvement backlog)
-	python3 $(SCRIPTS)/log_gap.py --report
+	$(PY) $(SCRIPTS)/log_gap.py --report
 
 ledger: ## Append TICKER's current DCF to the prediction ledger
 	@test -n "$(TICKER)" || { echo "usage: make ledger TICKER=AGL.NZ" >&2; exit 2; }
-	python3 $(SCRIPTS)/ledger.py append $(TICKER)
+	$(PY) $(SCRIPTS)/ledger.py append $(TICKER)
 
 ledger-backfill: ## Log every existing DCF.json to the ledger (idempotent)
-	python3 $(SCRIPTS)/ledger.py backfill
+	$(PY) $(SCRIPTS)/ledger.py backfill
 
 queue-prune: ## Drop delisted tickers from the queue (no model, costs nothing)
-	python3 $(SCRIPTS)/prune_queue.py
+	$(PY) $(SCRIPTS)/prune_queue.py
