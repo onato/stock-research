@@ -53,8 +53,8 @@ done
 # Score the output and snapshot the prediction before committing, so the
 # scorecard and ledger row land in the same commit as the artifacts they
 # describe. Eval failures never fail the run -- they are a report, not a gate.
-python3 "$REPO_ROOT/scripts/run_evals.py" "$TICKER" || true
-python3 "$REPO_ROOT/scripts/ledger.py" append "$TICKER" || true
+uv run --project "$REPO_ROOT" python3 "$REPO_ROOT/scripts/run_evals.py" "$TICKER" || true
+uv run --project "$REPO_ROOT" python3 "$REPO_ROOT/scripts/ledger.py" append "$TICKER" || true
 
 # Commit whatever was produced, even on a non-zero exit -- a partial run
 # still leaves useful extracted text and metrics on disk.

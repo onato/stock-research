@@ -61,7 +61,7 @@ for i in $(seq 1 "$COUNT"); do
   : > "$GITHUB_OUTPUT"
 
   # Weekend check is skipped locally; the budget still applies.
-  if ! python3 scripts/guard.py --max-runs 8 --ignore-weekend $BUDGET_ARGS; then
+  if ! uv run --project "$REPO_ROOT" python3 scripts/guard.py --max-runs 8 --ignore-weekend $BUDGET_ARGS; then
     echo "Guard failed unexpectedly." >&2
     exit 1
   fi
@@ -72,7 +72,7 @@ for i in $(seq 1 "$COUNT"); do
   fi
 
   : > "$GITHUB_OUTPUT"
-  python3 scripts/select_ticker.py --override "$TICKER" >/dev/null || exit 1
+  uv run --project "$REPO_ROOT" python3 scripts/select_ticker.py --override "$TICKER" >/dev/null || exit 1
   T="$(read_out ticker)"
   MODE="$(read_out mode)"
 

@@ -23,7 +23,7 @@ finish() {
   [ -f "$STAGING/ir_url.txt" ] && learned_url=$(head -1 "$STAGING/ir_url.txt")
   echo "--- gate ---"
   local gate_out
-  gate_out=$(python3 "$HERE/gate.py" "$TICKER")
+  gate_out=$(uv run --project "$REPO" python3 "$HERE/gate.py" "$TICKER")
   echo "$gate_out"
   # Trust-gated source learning: a gate-promoted run is the strong signal and
   # may overwrite. A NOTHING-NEW run still located the IR page; keep that as
@@ -31,7 +31,7 @@ finish() {
   if [ -n "$learned_url" ]; then
     local promoted=0
     echo "$gate_out" | grep -q "\[promoted\]" && promoted=1
-    LEARNED_URL="$learned_url" PROMOTED="$promoted" python3 -c "
+    LEARNED_URL="$learned_url" PROMOTED="$promoted" uv run --project "$REPO" python3 -c "
 import os, sys; sys.path.insert(0, '$HERE')
 from company_info import load, write
 url = os.environ['LEARNED_URL'].strip()
@@ -69,21 +69,21 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
   rmdir "$lockdir" 2>/dev/null
 }
 
-COMPANY=$(python3 "$HERE/resolve_name.py" "$TICKER")
+COMPANY=$(uv run --project "$REPO" python3 "$HERE/resolve_name.py" "$TICKER")
 echo "company: $COMPANY"
 
-INVENTORY=$(python3 "$HERE/missing.py" "$TICKER")
+INVENTORY=$(uv run --project "$REPO" python3 "$HERE/missing.py" "$TICKER")
 
-# NZX adapter: update-mode only (current-year announcements are hydrated in
-# the page; back-years are not reachable deterministically). Authoritative
-# for updates; seeds fall through to archive/model.
+# NZX adapter: authoritative for updates AND seeding — back-years come from
+# the per-year listing API (see adapters/nzx.py); only an empty result falls
+# through to archive/model.
 if [[ "$TICKER" == *.NZ ]]; then
-  AFTER_YEAR=$(python3 -c "import sys; sys.path.insert(0,'$HERE'); from missing import scan; print(scan('$TICKER')['newest_year'])")
+  AFTER_YEAR=$(uv run --project "$REPO" python3 -c "import sys; sys.path.insert(0,'$HERE'); from missing import scan; print(scan('$TICKER')['newest_year'])")
   # Thin holdings (<3 filings) get the full deterministic backfill: seed mode
   # walks the per-year announcement listings and skips periods already held.
   N_EXT=$(ls "$REPO/research/$TICKER/Extracted"/*.txt 2>/dev/null | wc -l | tr -d ' ')
   [ "$N_EXT" -lt 3 ] && AFTER_YEAR=0
-  if python3 "$HERE/adapters/nzx.py" "$TICKER" --dest "$STAGING" --after-year "$AFTER_YEAR"; then
+  if uv run --project "$REPO" python3 "$HERE/adapters/nzx.py" "$TICKER" --dest "$STAGING" --after-year "$AFTER_YEAR"; then
     STAGED=$(ls "$STAGING"/*.pdf 2>/dev/null | wc -l | tr -d " ")
     if [ "$STAGED" -ge 1 ] || [ "$AFTER_YEAR" -gt 0 ]; then
       finish
@@ -96,8 +96,8 @@ fi
 # ASX registry adapter: authoritative for updates; on an empty seed result we
 # fall through to the AnnualReports/model path below.
 if [[ "$TICKER" == *.AX ]]; then
-  AFTER_YEAR=$(python3 -c "import sys; sys.path.insert(0,'$HERE'); from missing import scan; print(scan('$TICKER')['newest_year'])")
-  if python3 "$HERE/adapters/asx.py" "$TICKER" --dest "$STAGING" --after-year "$AFTER_YEAR"; then
+  AFTER_YEAR=$(uv run --project "$REPO" python3 -c "import sys; sys.path.insert(0,'$HERE'); from missing import scan; print(scan('$TICKER')['newest_year'])")
+  if uv run --project "$REPO" python3 "$HERE/adapters/asx.py" "$TICKER" --dest "$STAGING" --after-year "$AFTER_YEAR"; then
     STAGED=$(ls "$STAGING"/*.pdf 2>/dev/null | wc -l | tr -d " ")
     if [ "$STAGED" -ge 1 ] || [ "$AFTER_YEAR" -gt 0 ]; then
       finish
@@ -115,7 +115,7 @@ case "$TICKER" in
     # possible (zero wrong-company risk); the model still handles updates and
     # interims. Fall through to the model when the archive has little.
     if echo "$INVENTORY" | grep -q "no filings"; then
-      python3 "$HERE/adapters/annualreports.py" "$TICKER" --dest "$STAGING" || true
+      uv run --project "$REPO" python3 "$HERE/adapters/annualreports.py" "$TICKER" --dest "$STAGING" || true
       STAGED=$(ls "$STAGING"/*.pdf 2>/dev/null | wc -l | tr -d " ")
       if [ "$STAGED" -ge 3 ]; then
         finish
@@ -125,15 +125,15 @@ case "$TICKER" in
     fi
     ;;
   *.HK)
-    AFTER_YEAR=$(python3 -c "import sys; sys.path.insert(0,'$HERE'); from missing import scan; print(scan('$TICKER')['newest_year'])")
-    if python3 "$HERE/adapters/hkex.py" "$TICKER" --dest "$STAGING" --after-year "$AFTER_YEAR"; then
+    AFTER_YEAR=$(uv run --project "$REPO" python3 -c "import sys; sys.path.insert(0,'$HERE'); from missing import scan; print(scan('$TICKER')['newest_year'])")
+    if uv run --project "$REPO" python3 "$HERE/adapters/hkex.py" "$TICKER" --dest "$STAGING" --after-year "$AFTER_YEAR"; then
       finish
       exit 0
     fi
     echo "hkex-adapter failed — falling back to the model"
     ;;
 esac
-QUIRK=$(python3 "$HERE/company_info.py" quirks "$TICKER")
+QUIRK=$(uv run --project "$REPO" python3 "$HERE/company_info.py" quirks "$TICKER")
 
 cd "$STAGING"   # bare-filename downloads land in staging by construction
 # perl alarm = per-ticker watchdog: a hung tool call (e.g. a filesystem-wide
@@ -168,7 +168,7 @@ fi)
 Strategy (do it the cheap way): use AT MOST 1-2 web searches — just enough to find the company's investor/reports page — then use fetch_content on that page to enumerate ALL report links in one pass. NEVER run one search per year. If report URLs follow an obvious pattern (e.g. .../Annual-Report-2024.pdf), derive the other years from the pattern and check each with curl -I instead of searching. Download files one at a time with individual curl commands — no multi-URL bash scripts with set -e (one bad URL kills the whole batch).
 Rules: you are already in the correct working directory — use RELATIVE paths only ('.', './file.pdf') for every file operation; never use absolute paths and never list or search any directory outside the current one. Never run make, git, claude, or a nested pi. Finish by listing the files you downloaded (or NOTHING-NEW)." \
   2>&1
-} 2>/dev/null | python3 "$HERE/pi_progress.py"
+} 2>/dev/null | uv run --project "$REPO" python3 "$HERE/pi_progress.py"
 if [ "${PIPESTATUS[0]}" -eq 142 ]; then
   echo "watchdog: pi killed after 15 min on $TICKER — will be retried on a later pass"
 fi

@@ -5,6 +5,7 @@
 set -u
 trap 'echo "interrupted — stopping"; exit 130' INT TERM
 HERE="$(cd "$(dirname "$0")" && pwd)"
+REPO="$(cd "$HERE/../.." && pwd)"
 for t in "$@"; do
   if [ -n "${FETCH_DEADLINE:-}" ] && [ "$(date +%H%M)" -ge "$FETCH_DEADLINE" ]; then
     echo "=== deadline $FETCH_DEADLINE reached — stopping pass ($t onward deferred) ==="
@@ -16,7 +17,7 @@ for t in "$@"; do
   echo "--------------- $t done in $(( $(date +%s) - start ))s ---------------"
 done
 echo "=============== summary $(date '+%T') ==============="
-tail -n 50 -q "$HERE"/logs/*.jsonl 2>/dev/null | python3 -c "
+tail -n 50 -q "$HERE"/logs/*.jsonl 2>/dev/null | uv run --project "$REPO" python3 -c "
 import json,sys
 rows=[json.loads(l) for l in sys.stdin]
 p=[r for r in rows if r['verdict']=='promoted']

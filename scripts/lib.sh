@@ -66,7 +66,7 @@ $batch_note" > "$log" 2>&1
 
 $batch_note" \
       | tee "$log" \
-      | python3 "$REPO_ROOT/scripts/progress.py"
+      | uv run --project "$REPO_ROOT" python3 "$REPO_ROOT/scripts/progress.py"
     rc=$?
     set +o pipefail
   fi
@@ -176,7 +176,7 @@ wait_for_rate_limit() {
 
   [ -f "$log" ] || return 0
 
-  secs=$(python3 - "$log" "${MAX_RL_SLEEP:-7200}" <<'PY'
+  secs=$(uv run --project "$REPO_ROOT" python3 - "$log" "${MAX_RL_SLEEP:-7200}" <<'PY'
 import json, sys, time
 
 log, cap = sys.argv[1], int(sys.argv[2])

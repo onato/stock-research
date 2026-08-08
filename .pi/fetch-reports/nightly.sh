@@ -33,7 +33,7 @@ ATTEMPTED=""
 START_TS="$(date +%FT%T)"
 
 seed_batch() {  # $1 = batch size; returns 1 when the queue is exhausted
-  local seeds=($(python3 "$HERE/next_new.py" "$1" --exclude "${ATTEMPTED#,}"))
+  local seeds=($(uv run --project "$REPO" python3 "$HERE/next_new.py" "$1" --exclude "${ATTEMPTED#,}"))
   [ ${#seeds[@]} -eq 0 ] && return 1
   echo "=== seeding $(date '+%F %T') — ${seeds[*]} ==="
   /usr/bin/caffeinate -s "$HERE/run.sh" "${seeds[@]}"
@@ -47,7 +47,7 @@ if [ -z "$BATCH" ]; then
   # and tickers attempted in the last 3 days are skipped — a corpus this size
   # only changes twice a year per company, so nightly full sweeps are waste.
   if [ "$(date '+%H%M')" -lt 0545 ]; then export FETCH_DEADLINE=0545; fi
-  TICKERS=($(printf '%s\n' "${TICKERS[@]}" | python3 -c "
+  TICKERS=($(printf '%s\n' "${TICKERS[@]}" | uv run --project "$REPO" python3 -c "
 import sys, datetime
 from pathlib import Path
 cutoff = (datetime.datetime.now() - datetime.timedelta(days=3)).isoformat()
@@ -81,7 +81,7 @@ fi
 # gitignored; create it with TELEGRAM_BOT_TOKEN=... and TELEGRAM_CHAT_ID=...).
 if [ -f "$HERE/telegram.env" ]; then
   . "$HERE/telegram.env"
-  SUMMARY="$(python3 "$HERE/summarize.py" --since "$START_TS")"
+  SUMMARY="$(uv run --project "$REPO" python3 "$HERE/summarize.py" --since "$START_TS")"
   MODE_LINE="nightly pass"; [ -n "$BATCH" ] && MODE_LINE="continuous run (batch $BATCH)"
   curl -sf --max-time 30 "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
     --data-urlencode chat_id="${TELEGRAM_CHAT_ID}" \

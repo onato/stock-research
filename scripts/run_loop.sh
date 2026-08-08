@@ -74,7 +74,7 @@ if [ ${#TICKERS[@]} -eq 0 ]; then
   while [ "${#TICKERS[@]}" -lt "$limit" ]; do
     EXCLUDE="$(IFS=,; echo "${TICKERS[*]:-}")"
     : > "$GITHUB_OUTPUT"
-    python3 scripts/select_ticker.py --override "" --exclude "$EXCLUDE" \
+    uv run --project "$REPO_ROOT" python3 scripts/select_ticker.py --override "" --exclude "$EXCLUDE" \
       >/dev/null 2>&1
     T="$(grep '^ticker=' "$GITHUB_OUTPUT" | cut -d= -f2-)"
     [ -z "$T" ] && break

@@ -7,11 +7,12 @@
 set -uo pipefail
 export NODE_OPTIONS="--disable-warning=ExperimentalWarning"   # silence pi's node noise in logs
 HERE="$(cd "$(dirname "$0")" && pwd)"
+REPO="$(cd "$HERE/../.." && pwd)"
 TICKER="$1"; CUTOFF="$2"
 STAGING="$HERE/staging/bench-$TICKER"
 mkdir -p "$STAGING"; rm -f "$STAGING"/*.pdf 2>/dev/null
 
-FAKE_INVENTORY=$(python3 -c "
+FAKE_INVENTORY=$(uv run --project "$REPO" python3 -c "
 import sys; sys.path.insert(0, '$HERE')
 from missing import scan, period_year
 r = scan('$TICKER')
@@ -20,7 +21,7 @@ for t, ps in sorted(r['filings'].items()):
     old = [p for p in ps if period_year(p) <= $CUTOFF]
     if old: print(f'  newest {t}: {max(old, key=period_year)}  ({len(old)} on file)')")
 
-QUIRK=$(python3 "$HERE/company_info.py" quirks "$TICKER")
+QUIRK=$(uv run --project "$REPO" python3 "$HERE/company_info.py" quirks "$TICKER")
 
 pi -p --no-session --provider ollama --model "gpt-oss-20b-64k:latest" \
   --tools read,bash,write,ls,find,grep,web_search,fetch_content \
@@ -41,4 +42,4 @@ Rules: write only inside $STAGING. Never run make, git, claude, or a nested pi. 
   2>&1 | tail -12
 
 echo "--- score ---"
-python3 "$HERE/score.py" "$TICKER" "$CUTOFF"
+uv run --project "$REPO" python3 "$HERE/score.py" "$TICKER" "$CUTOFF"
