@@ -89,14 +89,18 @@ def core_field(header: str) -> str | None:
     """Map a CSV header to its core column, or None if it is a company KPI."""
     name = schema.normalize(header)
     if name is None:
-        name = _strip_units(header)
+        name = strip_units(header)
     if name is None or name in NON_METRIC:
         return None
     return name
 
 
-def _strip_units(header: str) -> str | None:
-    """Retry normalize() with trailing unit/currency tokens removed."""
+def strip_units(header: str) -> str | None:
+    """Retry normalize() with trailing unit/currency tokens removed.
+
+    Public because normalize_csv.py resolves the same headers when it
+    rewrites a CSV onto the canonical column set.
+    """
     parts = re.split(r"[_\s]+", str(header).strip())
     while len(parts) > 1 and parts[-1].lower() in UNIT_TOKENS:
         parts.pop()
