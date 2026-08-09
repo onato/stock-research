@@ -20,7 +20,7 @@ PARALLEL ?= 2
 LEADERBOARD ?= 15   # rows shown by `make screen`
 
 .DEFAULT_GOAL := help
-.PHONY: help run digest status screen integrity missing research facts evals evals-all \
+.PHONY: help run digest status screen integrity missing prune-stubs research facts evals evals-all \
         cost gaps exchange-eval facts-xbrl screen-metrics check-currency ledger ledger-backfill queue-prune \
         screen-fundamentals backfill-units \
         test test-country lint coverage typecheck
@@ -81,6 +81,11 @@ missing: ## Which fields are missing on which tickers (JSONL; SCOPE=all, FORMAT=
 	  --scope $(or $(SCOPE),core8) --format $(or $(FORMAT),jsonl) \
 	  $(if $(TICKER),--ticker $(TICKER),) $(if $(FIELD),--field $(FIELD),) \
 	  $(if $(OUT),--out $(OUT),)
+
+# Pre-history rows (PINS FY2016: one comparative-carry equity figure for a
+# year the company was private) are not gaps; they cannot be re-extracted.
+prune-stubs: ## Delete pre-history rows from the metrics CSVs (WRITE=1 to apply)
+	@$(PY) $(SCRIPTS)/prune_stub_rows.py $(if $(WRITE),--write,--check) $(TICKER)
 
 status: ## What is researched, what is stale, what is queued
 	@$(PY) $(SCRIPTS)/select_ticker.py 2>&1 | grep -E '^(ticker|mode)=' | sed 's/^/  next  /'
