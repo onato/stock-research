@@ -50,13 +50,23 @@ do not summarize their contents."
   # is observable instead of silent. Without it, plain -p buffers everything
   # until completion, which is indistinguishable from a hang.
   if [ "$quiet" = "--quiet" ]; then
+    # Parallel runs still need to show movement: sending the stream only to
+    # the log left ~40 minutes per ticker with nothing on the terminal, which
+    # is indistinguishable from a hang. --tools-only keeps it to one short
+    # line per tool call, --label attributes it, and --heartbeat reports the
+    # long silences (a subagent can hold a single call for many minutes).
+    set -o pipefail
     claude --permission-mode bypassPermissions \
            --disallowed-tools "Bash(open *)" \
            --output-format stream-json --verbose \
            -p "/research-stock $ticker
 
-$batch_note" > "$log" 2>&1
+$batch_note" 2>&1 \
+      | tee "$log" \
+      | uv run --project "$REPO_ROOT" python3 "$REPO_ROOT/scripts/progress.py" \
+          --tools-only --label "$ticker" --heartbeat "${HEARTBEAT_SECS:-120}"
     rc=$?
+    set +o pipefail
   else
     set -o pipefail
     claude --permission-mode bypassPermissions \
@@ -159,16 +169,18 @@ with_git_lock() {
 # ---------------------------------------------------------------------------
 # wait_for_rate_limit <log>
 #
-# Scans a run's transcript for a rate_limit_event whose status is not
-# "allowed". If found, sleeps until the reported reset time and returns 1 so
-# the caller can retry the ticker; returns 0 when no limit was hit.
+# Sleeps until a rejected request's window resets, then returns 1 so the
+# caller can retry the ticker; returns 0 when nothing was blocked.
 #
 # During a long unattended drain this is the difference between surviving a
 # limit window and burning the rest of the queue on requests that cannot
-# succeed. resetsAt is a unix epoch (verified against a live event).
+# succeed.
 #
-# The sleep is clamped: never negative, and never longer than MAX_RL_SLEEP
-# (default 2h) so a bogus timestamp cannot park the loop indefinitely.
+# The decision lives in scripts/rate_limit.py so it can be tested. Only a
+# `rejected` status waits: `allowed_warning` means the request went through
+# (it reports quota utilisation), and honouring its seven-day resetsAt parked
+# the loop for the full MAX_RL_SLEEP ceiling while quota remained -- a batch
+# run that looked hung with nothing actually wrong.
 # ---------------------------------------------------------------------------
 wait_for_rate_limit() {
   local log="$1"
@@ -176,36 +188,8 @@ wait_for_rate_limit() {
 
   [ -f "$log" ] || return 0
 
-  secs=$(uv run --project "$REPO_ROOT" python3 - "$log" "${MAX_RL_SLEEP:-7200}" <<'PY'
-import json, sys, time
-
-log, cap = sys.argv[1], int(sys.argv[2])
-reset = None
-for line in open(log, errors="replace"):
-    line = line.strip()
-    if not line.startswith("{") or "rate_limit_event" not in line:
-        continue
-    try:
-        ev = json.loads(line)
-    except json.JSONDecodeError:
-        continue
-    if ev.get("type") != "rate_limit_event":
-        continue
-    info = ev.get("rate_limit_info") or {}
-    if info.get("status") in (None, "allowed"):
-        continue
-    r = info.get("resetsAt")
-    if isinstance(r, (int, float)):
-        # Keep the furthest reset seen; a run may log several events.
-        reset = r if reset is None else max(reset, r)
-
-if reset is None:
-    print(0)
-else:
-    # +30s of slack: waking exactly at the boundary tends to get rejected.
-    print(max(0, min(cap, int(reset - time.time()) + 30)))
-PY
-  ) || return 0
+  secs=$(uv run --project "$REPO_ROOT" python3 "$REPO_ROOT/scripts/rate_limit.py" \
+           "$log" "${MAX_RL_SLEEP:-7200}") || return 0
 
   [ "${secs:-0}" -gt 0 ] 2>/dev/null || return 0
 

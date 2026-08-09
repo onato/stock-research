@@ -39,8 +39,12 @@ def describe(tool: str, inp: Any) -> str:
         return f"WebFetch {shorten_url(inp.get('url', ''))}"
     if tool == "WebSearch":
         return f"WebSearch {inp.get('query', '')[:70]!r}"
-    if tool == "Task":
-        return f"Task[{inp.get('subagent_type', '?')}] {inp.get('description', '')[:60]}"
+    if tool in ("Task", "Agent"):
+        # Both spellings launch a subagent. These are the calls that run for
+        # many minutes, so naming which agent is working is the difference
+        # between "still working" and knowing what it is waiting on.
+        return (f"{tool}[{inp.get('subagent_type', '?')}] "
+                f"{inp.get('description', '')[:60]}")
     if tool == "Skill":
         return f"Skill /{inp.get('skill', '?')}"
     return tool
@@ -72,36 +76,75 @@ def content_blocks(ev: dict[str, Any]) -> list[dict[str, Any]]:
     return [b for b in content if isinstance(b, dict)]
 
 
+def _flag_value(argv: list[str], name: str, default: str = "") -> str:
+    """Value following `--name`, or `default` if the flag is absent."""
+    try:
+        return argv[argv.index(name) + 1]
+    except (ValueError, IndexError):
+        return default
+
+
 def main() -> int:
     # --tools-only drops the model's prose entirely, leaving just the tool
     # trace. Useful once you trust the run and only want to see movement.
     quiet_prose = "--tools-only" in sys.argv
 
+    # --label tags every line. run_loop runs several tickers concurrently and
+    # merges their streams; without a tag you cannot tell which one stalled.
+    label = _flag_value(sys.argv, "--label")
+    prefix = f"[{label}] " if label else ""
+
+    # --heartbeat N prints a "still working" line when N seconds pass with no
+    # event. The research run calls subagents that work for many minutes in
+    # one tool call, and that silence is indistinguishable from a hang -- the
+    # reason a batch run looked stuck.
+    try:
+        heartbeat = float(_flag_value(sys.argv, "--heartbeat", "0"))
+    except ValueError:
+        heartbeat = 0.0
+
     start = time.time()
     tools = 0
     model = None
+    last_tool = ""
+    last_event = time.monotonic()
 
     def stamp() -> str:
         el = int(time.time() - start)
         return f"[{el // 60:2d}:{el % 60:02d}]"
 
+    def say(text: str) -> None:
+        print(f"{prefix}{text}", flush=True)
+
+    def beat() -> None:
+        """Report the wait if this event followed a long silence."""
+        nonlocal last_event
+        now = time.monotonic()
+        if heartbeat and now - last_event >= heartbeat:
+            waited = int(now - last_event)
+            detail = f", still on {last_tool}" if last_tool else ""
+            say(f"{stamp()}   .. still working ({waited}s, "
+                f"{tools} tool call{'' if tools == 1 else 's'}{detail})")
+        last_event = now
+
     for raw in sys.stdin:
         line = raw.strip()
         if not line:
             continue
+        beat()
         try:
             ev = json.loads(line)
         except json.JSONDecodeError:
             # Not JSON (a stray warning, say) -- pass it through rather
             # than swallowing something that might explain a failure.
-            print(line, flush=True)
+            say(line)
             continue
 
         kind = ev.get("type")
 
         if kind == "system" and ev.get("subtype") == "init":
             model = ev.get("model", "?")
-            print(f"{stamp()} session started on {model}", flush=True)
+            say(f"{stamp()} session started on {model}")
 
         elif kind == "assistant":
             for block in content_blocks(ev):
@@ -114,13 +157,14 @@ def main() -> int:
                     if text and not quiet_prose:
                         first = text.split("\n", 1)[0].strip()
                         if first and len(first) > 3:
-                            print(f"{stamp()} {first[:100]}", flush=True)
+                            say(f"{stamp()} {first[:100]}")
                 elif btype == "tool_use":
                     tools += 1
-                    print(
-                        f"{stamp()}   -> {describe(block.get('name', '?'), block.get('input'))}",
-                        flush=True,
-                    )
+                    what = describe(block.get("name", "?"), block.get("input"))
+                    # Remembered so a heartbeat during a long call can say
+                    # what it is waiting on, not just that it is waiting.
+                    last_tool = what
+                    say(f"{stamp()}   -> {what}")
 
         elif kind == "user":
             # Tool results come back as user-role messages. Surface only
@@ -133,18 +177,15 @@ def main() -> int:
                             c.get("text", "") for c in content if isinstance(c, dict)
                         )
                     msg = str(content or "").strip().replace("\n", " ")
-                    print(f"{stamp()}   !! {msg[:110]}", flush=True)
+                    say(f"{stamp()}   !! {msg[:110]}")
 
         elif kind == "rate_limit_event":
             # No payload means nothing worth reporting -- skip rather than
             # printing a "RATE LIMIT: None (None)" line.
             info = ev.get("rate_limit_info") or {}
             if info and info.get("status") != "allowed":
-                print(
-                    f"{stamp()} RATE LIMIT: {info.get('status')} "
-                    f"({info.get('rateLimitType')})",
-                    flush=True,
-                )
+                say(f"{stamp()} RATE LIMIT: {info.get('status')} "
+                    f"({info.get('rateLimitType')})")
 
         elif kind == "result":
             cost = ev.get("total_cost_usd")
@@ -157,11 +198,11 @@ def main() -> int:
             if cost is not None:
                 bits.append(f"${cost:.2f}")
             status = "ERROR" if ev.get("is_error") else "done"
-            print(f"{stamp()} {status} -- {', '.join(bits)}", flush=True)
+            say(f"{stamp()} {status} -- {', '.join(bits)}")
             if ev.get("is_error"):
                 res = str(ev.get("result") or "").strip().replace("\n", " ")
                 if res:
-                    print(f"{stamp()} {res[:200]}", flush=True)
+                    say(f"{stamp()} {res[:200]}")
 
     return 0
 

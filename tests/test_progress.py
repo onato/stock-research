@@ -5,6 +5,7 @@ line, errors surface while successes stay quiet, and non-JSON input passes
 through rather than being swallowed (it might explain a failure).
 """
 
+import contextlib
 import io
 import json
 import sys
@@ -65,6 +66,15 @@ class TestDescribe:
         got = progress.describe(
             "Task", {"subagent_type": "dcf-analyst", "description": "Build DCF"})
         assert got == "Task[dcf-analyst] Build DCF"
+
+    def test_agent_shows_subagent_like_task(self):
+        # The repo's own agents are launched via `Agent`, not `Task`. Left
+        # unhandled it rendered as a bare "Agent", losing the one detail that
+        # matters during a multi-minute subagent call.
+        got = progress.describe(
+            "Agent", {"subagent_type": "financial-parser",
+                      "description": "adjudicate facts"})
+        assert got == "Agent[financial-parser] adjudicate facts"
 
     def test_skill_is_slash_prefixed(self):
         assert progress.describe(
@@ -208,3 +218,111 @@ class TestMain:
             {"type": "result", "num_turns": 0, "total_cost_usd": 0.0}])
         assert "$0.00" in out
         assert "0 turns" in out
+
+
+class TestLabel:
+    """`--label` tags every line, so concurrent tickers stay attributable.
+
+    run_loop runs several tickers at once; without a per-line tag the merged
+    streams are unreadable and you cannot tell which ticker stalled.
+    """
+
+    def test_label_prefixes_every_line(self, monkeypatch, capsys):
+        out = render(monkeypatch, capsys, [
+            {"type": "system", "subtype": "init", "model": "m"},
+            assistant(tool_use("Bash", {"description": "fetch filings"})),
+        ], argv=["--label", "AIA.NZ"])
+        for line in out.strip().splitlines():
+            assert line.startswith("[AIA.NZ]")
+
+    def test_without_a_label_lines_start_with_the_timestamp(self, monkeypatch,
+                                                            capsys):
+        out = render(monkeypatch, capsys, [
+            {"type": "system", "subtype": "init", "model": "m"}])
+        assert out.startswith("[ 0:00]")
+
+    def test_a_passthrough_line_is_labelled_too(self, monkeypatch, capsys):
+        out = render(monkeypatch, capsys, ["a stray warning"],
+                     argv=["--label", "V"])
+        assert out.startswith("[V] a stray warning")
+
+
+class TestHeartbeat:
+    """A long silent gap must still show movement.
+
+    The research run calls subagents that work for many minutes with no
+    intervening events. Without a heartbeat that stretch is indistinguishable
+    from a hang -- which is exactly what run_loop looked like.
+    """
+
+    def _clock(self, monkeypatch, times):
+        """Drive time.monotonic from a fixed sequence.
+
+        main() reads the clock once at start-up and then once per input line,
+        so `times` is [start, line1, line2, ...].
+        """
+        ticks = iter(times)
+        last = [times[-1]]
+
+        def fake():
+            with contextlib.suppress(StopIteration):
+                last[0] = next(ticks)
+            return last[0]
+
+        monkeypatch.setattr(progress.time, "monotonic", fake)
+
+    def test_a_long_gap_emits_a_heartbeat(self, monkeypatch, capsys):
+        # Two events 5 minutes apart with a 60s interval: the wait must be
+        # reported rather than passing in silence.
+        self._clock(monkeypatch, [0, 0, 300])
+        out = render(monkeypatch, capsys, [
+            assistant(tool_use("Agent", {"subagent_type": "financial-parser",
+                                         "description": "adjudicate facts"})),
+            assistant(tool_use("Bash", {"description": "export csv"})),
+        ], argv=["--heartbeat", "60"])
+        assert "still working" in out
+
+    def test_the_heartbeat_names_the_last_tool(self, monkeypatch, capsys):
+        # "Still working" alone does not say what it is waiting on.
+        self._clock(monkeypatch, [0, 0, 300])
+        out = render(monkeypatch, capsys, [
+            assistant(tool_use("Agent", {"subagent_type": "financial-parser",
+                                         "description": "adjudicate"})),
+            assistant(tool_use("Bash", {"description": "export"})),
+        ], argv=["--heartbeat", "60"])
+        assert "financial-parser" in out.split("still working", 1)[1]
+
+    def test_a_short_gap_stays_quiet(self, monkeypatch, capsys):
+        self._clock(monkeypatch, [0, 0, 5])
+        out = render(monkeypatch, capsys, [
+            assistant(tool_use("Bash", {"description": "one"})),
+            assistant(tool_use("Bash", {"description": "two"})),
+        ], argv=["--heartbeat", "60"])
+        assert "still working" not in out
+
+    def test_heartbeat_is_off_by_default(self, monkeypatch, capsys):
+        self._clock(monkeypatch, [0, 0, 9999])
+        out = render(monkeypatch, capsys, [
+            assistant(tool_use("Bash", {"description": "one"})),
+            assistant(tool_use("Bash", {"description": "two"})),
+        ])
+        assert "still working" not in out
+
+    def test_the_heartbeat_carries_the_label(self, monkeypatch, capsys):
+        self._clock(monkeypatch, [0, 0, 300])
+        out = render(monkeypatch, capsys, [
+            assistant(tool_use("Bash", {"description": "one"})),
+            assistant(tool_use("Bash", {"description": "two"})),
+        ], argv=["--heartbeat", "60", "--label", "SEK.NZ"])
+        beat = [ln for ln in out.splitlines() if "still working" in ln]
+        assert len(beat) == 1
+        assert beat[0].startswith("[SEK.NZ]")
+
+    def test_the_heartbeat_reports_the_running_tool_count(self, monkeypatch,
+                                                          capsys):
+        self._clock(monkeypatch, [0, 0, 300])
+        out = render(monkeypatch, capsys, [
+            assistant(tool_use("Bash", {"description": "one"})),
+            assistant(tool_use("Bash", {"description": "two"})),
+        ], argv=["--heartbeat", "60"])
+        assert "1 tool" in out.split("still working", 1)[1]
