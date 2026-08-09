@@ -20,7 +20,7 @@ PARALLEL ?= 2
 LEADERBOARD ?= 15   # rows shown by `make screen`
 
 .DEFAULT_GOAL := help
-.PHONY: help run digest status screen integrity missing prune-stubs research facts evals evals-all \
+.PHONY: help run digest status screen integrity missing prune-stubs standardize-scale research facts evals evals-all \
         cost gaps exchange-eval facts-xbrl screen-metrics check-currency ledger ledger-backfill queue-prune \
         screen-fundamentals backfill-units \
         test test-country lint coverage typecheck
@@ -86,6 +86,11 @@ missing: ## Which fields are missing on which tickers (JSONL; SCOPE=all, FORMAT=
 # year the company was private) are not gaps; they cannot be re-extracted.
 prune-stubs: ## Delete pre-history rows from the metrics CSVs (WRITE=1 to apply)
 	@$(PY) $(SCRIPTS)/prune_stub_rows.py $(if $(WRITE),--write,--check) $(TICKER)
+
+# A number cannot reveal its own scale: AAPL's 416,161 is millions and
+# 0285.HK's 179,477 is thousands. Every CSV has to say which it is.
+standardize-scale: ## Put every CSV in millions and label Units/Currency (WRITE=1 to apply)
+	@$(PY) $(SCRIPTS)/standardize_scale.py $(if $(WRITE),--write,--check) $(TICKER)
 
 status: ## What is researched, what is stale, what is queued
 	@$(PY) $(SCRIPTS)/select_ticker.py 2>&1 | grep -E '^(ticker|mode)=' | sed 's/^/  next  /'
