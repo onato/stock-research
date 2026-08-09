@@ -109,6 +109,41 @@ class TestGapDetection:
         assert missing_fields.scan(repo) == []
 
 
+class TestReportingSpan:
+    def test_pre_history_years_are_not_reported_as_gaps(self, repo):
+        # PINS FY2016 predates the IPO and holds one comparative figure. No
+        # re-extraction can fill it, so flagging seven missing fields there
+        # is noise that buries the gaps that can be fixed.
+        stub = ["FY2016", "", "", "", "", "", "", "-448.286", ""]
+        make(repo, "PINS", CORE, [stub, full("FY2017"), full("FY2018")])
+        assert missing_fields.scan(repo) == []
+
+    def test_a_gap_inside_the_span_is_still_reported(self, repo):
+        stub = ["FY2016", "", "", "", "", "", "", "-448.286", ""]
+        make(repo, "PINS", CORE, [stub, full("FY2017"),
+                                  gap("FY2018", "CapEx")])
+        rows = missing_fields.scan(repo)
+        assert [r["field"] for r in rows] == ["CapEx"]
+        assert rows[0]["periods"] == ["FY2018"]
+
+    def test_kpi_heavy_filer_keeps_its_history_in_the_gap_report(self, repo):
+        # Same guard as integrity_report: a bank/holdco thin on core-8 in
+        # every year must not have its early years silently dropped.
+        headers = ["Period", "NetIncome", "ShareholdersEquity",
+                   "TotalInterestIncome", "NetInterestIncome"]
+        rows = [dict.fromkeys(headers, "1") | {"Period": f"FY{y}"}
+                for y in (2022, 2023, 2024)]
+        d = repo / "research" / "SRBK" / "Reports"
+        d.mkdir(parents=True)
+        with open(d / "SRBK_Metrics.csv", "w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=headers)
+            w.writeheader()
+            w.writerows(rows)
+        found = missing_fields.scan(repo)
+        periods = {p for r in found for p in r["periods"]}
+        assert periods == {"FY2022", "FY2023", "FY2024"}
+
+
 class TestScope:
     def test_default_scope_is_the_core_eight(self, repo):
         make(repo, "T", CORE, [full("FY2024")])
@@ -155,7 +190,9 @@ class TestFilters:
 
 class TestOutputFormats:
     def test_jsonl_is_one_object_per_line(self, repo):
-        make(repo, "PINS", CORE, [gap("FY2024", "CapEx"),
+        # Distinct years: rows are deduplicated by period, so two gaps in the
+        # same FY would collapse to one row and only one gap would show.
+        make(repo, "PINS", CORE, [gap("FY2023", "CapEx"),
                                   gap("FY2024", "EPS")])
         buf = io.StringIO()
         missing_fields.write_jsonl(missing_fields.scan(repo), buf)

@@ -133,6 +133,53 @@ def read_csv_rows(path: pathlib.Path) -> list[dict[str, str]]:
         return []
 
 
+# A leading year counts as pre-history when it carries less than this share
+# of the fields the ticker's median year carries. Measured against the
+# ticker's OWN median rather than a fixed field count: IFT.NZ (infra holdco)
+# and SRBK (bank) populate only 2 of 8 core fields in every year because
+# their economics live in KPI columns, and any absolute threshold would
+# delete their entire real history.
+SPARSE_RATIO = 0.4
+
+
+def populated(row: dict[str, str]) -> int:
+    """How many columns of any kind this row actually carries a value for."""
+    return sum(1 for k, v in row.items()
+               if k and (v or "").strip()
+               and (schema.normalize(k) or "") not in NON_METRIC)
+
+
+def reporting_span(by_year: dict[int, dict[str, str]]) -> list[int]:
+    """Leading years that predate the company's real reporting history.
+
+    PINS IPO'd in 2019 and its FY2016 row holds a single equity figure
+    carried in from a 10-K comparative; no re-extraction can ever fill it.
+    Such a year is not a gap, so it is reported as out of scope rather than
+    counted against the ticker.
+
+    Only *leading* years are trimmed. A sparse year inside the span is a real
+    extraction failure and must keep being reported, and trailing sparse
+    years were the phantom-annual-row bug now fixed in build_facts_xbrl.
+    """
+    years = sorted(by_year)
+    if len(years) < 2:
+        return []
+    counts = [populated(by_year[y]) for y in years]
+    # Compare against the ticker's fullest year, not its median: XYZ carries
+    # four empty rows before two real ones, which drags the median onto a
+    # stub and makes every year look normal relative to it.
+    reference = max(counts)
+    if reference <= 0:
+        return []
+    cutoff = reference * SPARSE_RATIO
+    out: list[int] = []
+    for year, count in zip(years, counts, strict=True):
+        if count >= cutoff:
+            break
+        out.append(year)
+    return out
+
+
 def score_csv(path: pathlib.Path) -> dict[str, Any]:
     """Year depth and per-field fill for one ticker's metrics CSV.
 
@@ -144,6 +191,7 @@ def score_csv(path: pathlib.Path) -> dict[str, Any]:
     empty: dict[str, Any] = {
         "fy_years": 0, "complete_years": 0, "cell_fill_pct": 0.0,
         "first_year": None, "latest_year": None,
+        "first_reporting_year": None, "out_of_scope_years": [],
         "per_field_fill": {}, "missing_fields": [],
     }
     if not rows:
@@ -177,6 +225,14 @@ def score_csv(path: pathlib.Path) -> dict[str, Any]:
     if not by_year:
         return empty
 
+    # Years before the company reported are not gaps; drop them from every
+    # score so the percentages describe the history that actually exists.
+    out_of_scope = reporting_span(by_year)
+    for y in out_of_scope:
+        by_year.pop(y, None)
+    if not by_year:
+        return empty
+
     filled = total = 0
     complete = 0
     field_hits: dict[str, int] = dict.fromkeys(headers, 0)
@@ -204,6 +260,8 @@ def score_csv(path: pathlib.Path) -> dict[str, Any]:
         "cell_fill_pct": round(100 * filled / total, 1) if total else 0.0,
         "first_year": min(by_year),
         "latest_year": max(by_year),
+        "first_reporting_year": min(by_year),
+        "out_of_scope_years": out_of_scope,
         "per_field_fill": per_field,
         "missing_fields": missing,
     }
@@ -289,11 +347,9 @@ def scan(root: pathlib.Path | str) -> list[dict[str, Any]]:
             "has_analysis": (reports / f"{ticker}_Analysis.json").is_file(),
             "has_dashboard": (reports / f"{ticker}_Dashboard.html").is_file(),
         }
-        rec.update(score_csv(csv_path) if rec["has_csv"] else {
-            "fy_years": 0, "complete_years": 0, "cell_fill_pct": 0.0,
-            "first_year": None, "latest_year": None,
-            "per_field_fill": {}, "missing_fields": [],
-        })
+        # score_csv() on a nonexistent path returns the same empty shape, so
+        # every record carries the same keys whether or not a CSV exists.
+        rec.update(score_csv(csv_path))
         rec["db_status"] = (
             db_status(reports / f"{ticker}.duckdb", rec["fy_years"],
                       rec["complete_years"])

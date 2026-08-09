@@ -195,6 +195,83 @@ class TestCompleteness:
         assert rec["cell_fill_pct"] == 0.0
 
 
+class TestReportingSpan:
+    """Years before a company reported are not gaps to be filled.
+
+    PINS IPO'd in 2019; its FY2016 row holds one number carried in from a 10-K
+    comparative and its oldest filing is FY2019. Counting seven missing fields
+    there buries the gaps that can actually be fixed.
+    """
+
+    def test_a_sparse_leading_year_is_out_of_scope(self, repo):
+        rows = [full_year(f"FY{y}") for y in (2018, 2019, 2020)]
+        stub = {"Period": "FY2017", "ShareholdersEquity": "-448.286"}
+        write_csv(repo, "PINS", [stub, *rows])
+        rec = scan_one(repo, "PINS")
+        assert rec["first_reporting_year"] == 2018
+        assert rec["out_of_scope_years"] == [2017]
+        assert rec["fy_years"] == 3          # the stub is not a year of data
+
+    def test_several_sparse_leading_years_are_all_trimmed(self, repo):
+        # XYZ carries four consecutive empty rows before its real history.
+        stubs = [{"Period": f"FY{y}"} for y in (2015, 2016, 2017, 2018)]
+        rows = [full_year(f"FY{y}") for y in (2019, 2020)]
+        write_csv(repo, "XYZ", [*stubs, *rows])
+        rec = scan_one(repo, "XYZ")
+        assert rec["out_of_scope_years"] == [2015, 2016, 2017, 2018]
+        assert rec["fy_years"] == 2
+
+    def test_a_kpi_heavy_filer_keeps_its_whole_history(self, repo):
+        # IFT.NZ (infra holdco) and SRBK (bank) populate only 2 of 8 core
+        # fields in EVERY year -- their economics live in KPI columns. A rule
+        # keyed on core-8 alone would delete their entire real history, so the
+        # comparison is against the ticker's own median populated-field count.
+        headers = ["Period", "ShareholdersEquity", "SharesOutstanding",
+                   "ShareOfEBITDAF", "NetParentSurplus", "NetDebt",
+                   "PortfolioValue"]
+        rows = [dict.fromkeys(headers, "1") | {"Period": f"FY{y}"}
+                for y in (2022, 2023, 2024, 2025)]
+        write_csv(repo, "IFT.NZ", rows, headers=headers)
+        rec = scan_one(repo, "IFT.NZ")
+        assert rec["out_of_scope_years"] == []
+        assert rec["fy_years"] == 4
+        assert rec["first_reporting_year"] == 2022
+
+    def test_a_mid_history_hole_is_never_out_of_scope(self, repo):
+        # A sparse year INSIDE the span is a real extraction failure and must
+        # keep being reported, however thin it is.
+        write_csv(repo, "T", [
+            full_year("FY2020"),
+            {"Period": "FY2021", "Revenue": "5"},
+            full_year("FY2022"),
+        ])
+        rec = scan_one(repo, "T")
+        assert rec["out_of_scope_years"] == []
+        assert rec["fy_years"] == 3
+
+    def test_a_uniformly_thin_ticker_is_not_trimmed(self, repo):
+        # Every year equally sparse means a systematic extraction gap, not
+        # pre-history: there is no year to be sparse *relative to*.
+        write_csv(repo, "V", [{"Period": f"FY{y}", "Revenue": "1"}
+                              for y in (2020, 2021, 2022)])
+        rec = scan_one(repo, "V")
+        assert rec["out_of_scope_years"] == []
+        assert rec["fy_years"] == 3
+
+    def test_a_single_year_ticker_is_never_trimmed(self, repo):
+        write_csv(repo, "NEW", [{"Period": "FY2025", "Revenue": "1"}])
+        rec = scan_one(repo, "NEW")
+        assert rec["out_of_scope_years"] == []
+        assert rec["fy_years"] == 1
+
+    def test_out_of_scope_years_do_not_count_as_missing_fields(self, repo):
+        stub = {"Period": "FY2017", "ShareholdersEquity": "-1"}
+        write_csv(repo, "PINS", [stub, full_year("FY2018")])
+        rec = scan_one(repo, "PINS")
+        assert rec["complete_years"] == 1
+        assert rec["cell_fill_pct"] == 100.0   # scored over FY2018 only
+
+
 class TestTenYearGoal:
     def test_ten_complete_years_meets_the_goal(self, repo):
         write_csv(repo, "GOOD",

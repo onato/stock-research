@@ -83,7 +83,20 @@ def scan(root: pathlib.Path | str, *, scope: str = "core8",
             if name:
                 by_field.setdefault(ir.DISPLAY.get(name, name), []).append(h)
 
-        fy = [r for r in rows if ir.is_fy(r.get("Period") or "")]
+        # Years before the company reported are not gaps to be filled -- see
+        # ir.reporting_span(). Sharing the helper is what keeps this list and
+        # the integrity dashboard from disagreeing about what counts.
+        by_year: dict[int, dict[str, str]] = {}
+        for r in rows:
+            period = r.get("Period") or ""
+            if not ir.is_fy(period):
+                continue
+            y = ir.year_of(period)
+            if y is not None:
+                by_year.setdefault(y, r)
+        out_of_scope = set(ir.reporting_span(by_year))
+
+        fy = [r for y, r in sorted(by_year.items()) if y not in out_of_scope]
         if not fy:
             continue
 
@@ -103,6 +116,9 @@ def scan(root: pathlib.Path | str, *, scope: str = "core8",
                 "missing_count": len(missing),
                 "fy_years": len(fy),
                 "periods": missing,
+                # Reported, not hidden: a consumer can see that early years
+                # were excluded and why the span starts where it does.
+                "out_of_scope_years": sorted(out_of_scope),
             })
 
     # Worst first: the biggest gaps are where a fix pays off most.
@@ -120,12 +136,17 @@ def write_json(rows: list[dict[str, Any]], fh: TextIO) -> None:
 
 def write_csv(rows: list[dict[str, Any]], fh: TextIO) -> None:
     cols = ["ticker", "exchange", "field", "absent_column",
-            "missing_count", "fy_years", "periods"]
+            "missing_count", "fy_years", "periods", "out_of_scope_years"]
     w = csv.DictWriter(fh, fieldnames=cols)
     w.writeheader()
     for r in rows:
-        # Space-separated so the cell stays one CSV field without quoting.
-        w.writerow({**r, "periods": " ".join(r["periods"])})
+        # Space-separated so each cell stays one CSV field without quoting.
+        w.writerow({
+            **r,
+            "periods": " ".join(r["periods"]),
+            "out_of_scope_years": " ".join(
+                str(y) for y in r.get("out_of_scope_years", [])),
+        })
 
 
 WRITERS = {"jsonl": write_jsonl, "json": write_json, "csv": write_csv}
