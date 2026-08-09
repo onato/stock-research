@@ -45,6 +45,7 @@ class Criteria:
     min_revenue_cagr_5y: float | None = None
     min_revenue_growth_5y_total: float | None = None
     min_earnings_cagr_5y: float | None = None
+    min_earnings_growth_5y_total: float | None = None
     min_revenue_growth_1y: float | None = None
     min_earnings_growth_1y: float | None = None
     min_roe: float | None = None
@@ -61,6 +62,7 @@ class Criteria:
             ("revenue_cagr_5y", ">=", self.min_revenue_cagr_5y),
             ("revenue_growth_5y_total", ">=", self.min_revenue_growth_5y_total),
             ("earnings_cagr_5y", ">=", self.min_earnings_cagr_5y),
+            ("earnings_growth_5y_total", ">=", self.min_earnings_growth_5y_total),
             ("revenue_growth_1y", ">=", self.min_revenue_growth_1y),
             ("earnings_growth_1y", ">=", self.min_earnings_growth_1y),
             ("roe", ">=", self.min_roe),
@@ -233,6 +235,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--min-revenue-cagr-5y", type=float)
     ap.add_argument("--min-revenue-growth-5y-total", type=float)
     ap.add_argument("--min-earnings-cagr-5y", type=float)
+    ap.add_argument("--min-earnings-growth-5y-total", type=float)
     ap.add_argument("--min-revenue-growth-1y", type=float)
     ap.add_argument("--min-earnings-growth-1y", type=float)
     ap.add_argument("--min-roe", type=float)
@@ -256,6 +259,7 @@ def main(argv: list[str] | None = None) -> int:
         min_revenue_cagr_5y=args.min_revenue_cagr_5y,
         min_revenue_growth_5y_total=args.min_revenue_growth_5y_total,
         min_earnings_cagr_5y=args.min_earnings_cagr_5y,
+        min_earnings_growth_5y_total=args.min_earnings_growth_5y_total,
         min_revenue_growth_1y=args.min_revenue_growth_1y,
         min_earnings_growth_1y=args.min_earnings_growth_1y,
         min_roe=args.min_roe, min_de=args.min_de, max_de=args.max_de,

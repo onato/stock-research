@@ -24,6 +24,7 @@ Every value that cannot be computed is None with a reason string attached, so
 the screener can say why a ticker dropped out instead of silently omitting it.
 """
 
+import json
 import pathlib
 import sys
 from dataclasses import dataclass, field
@@ -44,11 +45,19 @@ _BASIS_RANK: dict[str, int] = {"4Q": 0, "FY+H1": 1, "FY": 2, "NONE": 3}
 NUMERIC = ["revenue", "net_income", "free_cash_flow", "shareholders_equity",
            "total_debt", "shares_outstanding", "operating_cash_flow", "ebitda"]
 
-_QUARTERS = ("Q1", "Q2", "Q3", "Q4")
-
 # The DCF's chosen forward-growth proxy. Stored as a PERCENT (18.96 == 18.96%).
 # SDL.NZ spells the key differently; both are the same quantity.
 _GROWTH_KEYS = ("selected_growth_rate", "historical_cagr")
+
+# Quote denominations that are a hundredth of their currency. An LSE price is
+# quoted in pence against filings in pounds, so the two are the same currency
+# at different scales -- converting lets the ordinary currency comparison do
+# the work. WISE.L's DCF records `price_currency: "GBp"` explicitly, which is
+# why this is read rather than inferred from the ticker suffix.
+MINOR_UNITS: dict[str, tuple[str, float]] = {
+    "GBp": ("GBP", 100.0), "GBX": ("GBP", 100.0),
+    "ZAc": ("ZAR", 100.0), "ILA": ("ILS", 100.0),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,7 +80,6 @@ class Fundamentals:
     debt_to_equity: float | None = None
     derived_eps: float | None = None
     peg: float | None = None
-    price: float | None = None
     reasons: tuple[str, ...] = field(default_factory=tuple)
 
 
@@ -241,9 +249,7 @@ def _growth_rate_pct(dcf: dict[str, Any] | None) -> float | None:
 
 
 def compute(ticker: str, rows: list[dict[str, Any]],
-            dcf: dict[str, Any] | None = None,
-            price: float | None = None,
-            price_currency: str | None = None) -> Fundamentals:
+            dcf: dict[str, Any] | None = None) -> Fundamentals:
     """Derive every screening field for one ticker."""
     reasons: list[str] = []
 
@@ -328,16 +334,17 @@ def compute(ticker: str, rows: list[dict[str, Any]],
             eps = ttm_ni / latest_sh
 
     # Price must be denominated the same way the financials are, or the P/E
-    # is a coincidence rather than a measurement.
-    if price is None:
-        price = _num((dcf or {}).get("current_price"))
-    if price_currency is None:
-        price_currency = (dcf or {}).get("currency")
+    # is a coincidence rather than a measurement. `price_currency` names the
+    # QUOTE's currency and `currency` the filings' -- WISE.L quotes GBp while
+    # reporting USD, so conflating the two hides the mismatch entirely.
+    price = _num((dcf or {}).get("current_price"))
+    quote_currency = (dcf or {}).get("price_currency") or (dcf or {}).get("currency")
+    if price is not None:
+        price, quote_currency = to_major_unit(price, quote_currency)
 
     price_ok = True
-    if price is not None and (
-            (bool(currency) and bool(price_currency) and price_currency != currency)
-            or _is_minor_unit(ticker, price, eps)):
+    if (price is not None and currency and quote_currency
+            and quote_currency != currency):
         reasons.append("price-currency-mismatch")
         price_ok = False
 
@@ -359,21 +366,24 @@ def compute(ticker: str, rows: list[dict[str, Any]],
         revenue_growth_5y_total=rev_total, earnings_growth_5y_total=eps_total,
         revenue_growth_1y=rev_growth, earnings_growth_1y=ni_growth,
         roe=roe, debt_to_equity=de, derived_eps=eps, peg=peg,
-        price=price if price_ok else None,
         reasons=tuple(reasons),
     )
 
 
-def _is_minor_unit(ticker: str, price: float, eps: float | None) -> bool:
-    """True when a quote looks like pence/cents against major-unit earnings.
+def to_major_unit(price: float, quote_currency: str | None) -> tuple[float, str | None]:
+    """Convert a minor-unit quote to its major unit: 885.6 GBp -> 8.856 GBP.
 
-    LSE prices are quoted in pence while filings report pounds (or, for
-    WISE.L, US dollars). A 100x gap between price and earnings-per-share is
-    the signature; 885.6 against an EPS of 0.4843 is a P/E of 1,829, not 18.
+    Only the denomination changes, never the currency, so the ordinary
+    `price_currency != currency` comparison can then decide the rest. That
+    keeps minor units out of the mismatch rule instead of beside it.
     """
-    if not ticker.endswith(".L") or eps is None or eps <= 0:
-        return False
-    return price / eps > 200
+    if not quote_currency:
+        return price, quote_currency
+    factor = MINOR_UNITS.get(quote_currency.strip())
+    if factor is None:
+        return price, quote_currency
+    major, divisor = factor
+    return price / divisor, major
 
 
 def load_rows(db: pathlib.Path) -> list[dict[str, Any]]:
@@ -392,8 +402,12 @@ def load_rows(db: pathlib.Path) -> list[dict[str, Any]]:
 
 
 def load_dcf(repo: pathlib.Path, ticker: str) -> dict[str, Any] | None:
-    import json
+    """The ticker's DCF, or None if absent or unreadable.
 
+    A malformed DCF must not abort a whole-corpus scan, so a parse failure is
+    the same as a missing file: the ticker simply loses its price and growth
+    proxy and says so in its reasons.
+    """
     path = repo / "research" / ticker / "Reports" / f"{ticker}_DCF.json"
     if not path.exists():
         return None

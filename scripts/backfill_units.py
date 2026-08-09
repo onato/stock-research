@@ -32,11 +32,13 @@ Usage:
 """
 
 import argparse
-import json
 import math
 import pathlib
 import sys
 from typing import Any
+
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
+import fundamentals
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
@@ -66,7 +68,13 @@ TOL_DEX = 0.02
 MIN_ANCHORS = 2
 
 
-def _num(value: Any) -> float | None:
+def _anchorable(value: Any) -> float | None:
+    """A number usable as a ratio anchor -- so never zero.
+
+    Stricter than fundamentals._num on purpose: zero is a legitimate metric
+    value (HLG.NZ genuinely carries no debt) but cannot establish a scale,
+    since every ratio against it is undefined.
+    """
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     v = float(value)
@@ -75,8 +83,8 @@ def _num(value: Any) -> float | None:
 
 def classify(db_value: Any, dcf_value: Any) -> str | None:
     """Name the DB's scale from one DB/DCF pair, or None if no decade fits."""
-    db = _num(db_value)
-    dcf = _num(dcf_value)
+    db = _anchorable(db_value)
+    dcf = _anchorable(dcf_value)
     if db is None or dcf is None:
         return None
     # A DB in thousands states 1000x the DCF's millions figure, so the ratio
@@ -97,7 +105,7 @@ def anchor_votes(rows: list[dict[str, Any]],
     """
     votes: dict[str, str] = {}
     for json_key, column in ANCHORS:
-        if json_key in votes or _num(inputs.get(json_key)) is None:
+        if _anchorable(inputs.get(json_key)) is None:
             continue
         for row in rows:
             scale = classify(row.get(column), inputs.get(json_key))
@@ -144,20 +152,9 @@ def apply_units(con: Any, units: str, dry_run: bool = True) -> int:
     """
     pending = _count_null_units(con)
     if dry_run or not pending:
-        return 0 if dry_run else int(pending)
+        return 0
     con.execute("UPDATE core_metrics SET units = ? WHERE units IS NULL", [units])
-    return int(pending)
-
-
-def _load_dcf(repo: pathlib.Path, ticker: str) -> dict[str, Any] | None:
-    path = repo / "research" / ticker / "Reports" / f"{ticker}_DCF.json"
-    if not path.exists():
-        return None
-    try:
-        data = json.loads(path.read_text())
-    except (OSError, ValueError):
-        return None
-    return data if isinstance(data, dict) else None
+    return pending
 
 
 def _rows(con: Any) -> list[dict[str, Any]]:
@@ -193,12 +190,12 @@ def main(argv: list[str] | None = None) -> int:
             null_rows = _count_null_units(con)
             if not null_rows:
                 continue
-            units, why = infer(ticker, _rows(con), _load_dcf(repo, ticker))
+            units, why = infer(ticker, _rows(con), fundamentals.load_dcf(repo, ticker))
             if units is None:
                 refused.append((ticker, why))
                 continue
-            n = apply_units(con, units, dry_run=not args.apply)
-            resolved.append((ticker, f"{units} -- {why}", n or null_rows))
+            apply_units(con, units, dry_run=not args.apply)
+            resolved.append((ticker, f"{units} -- {why}", null_rows))
         finally:
             con.close()
 

@@ -236,20 +236,69 @@ class TestPeg:
 
 
 class TestPriceCurrency:
-    """WISE.L: price 885.6 is GBP pence, financials are USD.
+    """A price must be denominated like the financials it divides.
 
-    `885.6 / 48.43` gives a P/E of 18.3 -- plausible, and wrong. Pence over
-    cents only approximates GBP over USD by coincidence.
+    WISE.L quotes GBP pence against USD filings; `885.6 / 48.43` gives a P/E
+    of 18.3 -- plausible, and wrong, because pence over cents approximates
+    GBP over USD only by coincidence.
+
+    The DCFs state the quote currency themselves (`price_currency`), so this
+    is read, never inferred from the ticker suffix or a magnitude threshold.
     """
 
     def test_pence_price_against_usd_financials_is_rejected(self):
         r = rows(("FY2026", {"net_income": 498.7, "shares_outstanding": 1029.7,
                              "currency": "USD"}))
         dcf = {"current_price": 885.6, "currency": "USD",
+               "price_currency": "GBp",
                "historical_growth": {"selected_growth_rate": 29.7}}
         f = fundamentals.compute("WISE.L", r, dcf=dcf)
         assert f.peg is None
         assert "price-currency-mismatch" in f.reasons
+
+    def test_price_currency_beats_the_reporting_currency(self):
+        """`currency` is the filings' currency; `price_currency` is the quote's.
+
+        Reading `currency` for both makes a GBp quote look like a USD one.
+        """
+        r = rows(("FY2026", {"net_income": 100.0, "shares_outstanding": 100.0,
+                             "currency": "USD"}))
+        dcf = {"current_price": 885.6, "currency": "USD",
+               "price_currency": "HKD",
+               "historical_growth": {"selected_growth_rate": 10.0}}
+        assert "price-currency-mismatch" in fundamentals.compute("T", r, dcf).reasons
+
+    def test_a_minor_unit_quote_is_converted_not_refused(self):
+        """GBp against GBP filings is a unit difference, not a currency one.
+
+        Dividing by 100 makes the general currency check handle it, instead
+        of a special case sitting beside the general rule.
+        """
+        r = rows(("FY2026", {"net_income": 100.0, "shares_outstanding": 100.0,
+                             "currency": "GBP"}))
+        dcf = {"current_price": 200.0, "currency": "GBP",
+               "price_currency": "GBp",
+               "historical_growth": {"selected_growth_rate": 10.0}}
+        f = fundamentals.compute("T", r, dcf=dcf)
+        assert "price-currency-mismatch" not in f.reasons
+        # 200p = GBP 2.00; EPS 1.00 -> PE 2.0 -> PEG 0.2
+        assert f.peg == pytest.approx(0.2)
+
+    def test_an_expensive_stock_is_not_mistaken_for_a_minor_unit(self):
+        """The old heuristic refused any .L ticker with price/eps > 200.
+
+        A genuine P/E of 250 is a valuation, not a denomination.
+        """
+        r = rows(("FY2026", {"net_income": 1.0, "shares_outstanding": 100.0,
+                             "currency": "GBP"}))
+        dcf = {"current_price": 25.0, "currency": "GBP",
+               "price_currency": "GBP",
+               "historical_growth": {"selected_growth_rate": 10.0}}
+        f = fundamentals.compute("EXPENSIVE.L", r, dcf=dcf)
+        assert "price-currency-mismatch" not in f.reasons
+        # EPS 1.0/100 = 0.01 -> PE 2500 -> PEG 250. Absurd, but a valuation,
+        # and the screener filters it on PEG rather than hiding it.
+        assert f.peg == pytest.approx(250.0)
 
     def test_matching_currency_is_accepted(self):
         r = rows(("FY2025", {"net_income": 39.5, "shares_outstanding": 59.0,
