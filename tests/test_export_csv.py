@@ -92,6 +92,34 @@ class TestAntiShrinkGuard:
         periods = [r[0] for r in rows[1:]]
         assert periods == ["FY2023", "FY2024"]
 
+    def test_refuses_when_more_rows_would_cost_populated_cells(
+            self, make_ticker, monkeypatch):
+        """Growing the row count is not proof the export is safe.
+
+        Re-exporting UBER turned a 26-row CSV into 44 rows while silently
+        dropping 325 populated cells -- CostOfRevenue, GrossProfit, TotalDebt
+        -- whose columns exist in the CSV but were never adjudicated into
+        core_metrics. LBTYA lost 108 the same way and PYPL 143. The row
+        count went UP in every case, so the period-count guard passed.
+        """
+        d = make_ticker("SYN")
+        make_db(d.parent.parent, "SYN", ["FY2022", "FY2023", "FY2024"])
+        out = d / "Reports" / "SYN_Metrics.csv"
+        # One period, but carrying a value the table has no column populated for.
+        out.write_text("Period,Revenue,CostOfRevenue\nFY2023,100,42\n")
+
+        assert run_main(monkeypatch, "SYN") == 1
+        assert "42" in out.read_text()
+
+    def test_force_still_discards_them(self, make_ticker, monkeypatch):
+        d = make_ticker("SYN")
+        make_db(d.parent.parent, "SYN", ["FY2022", "FY2023", "FY2024"])
+        out = d / "Reports" / "SYN_Metrics.csv"
+        out.write_text("Period,Revenue,CostOfRevenue\nFY2023,100,42\n")
+
+        assert run_main(monkeypatch, "SYN", "--force") == 0
+        assert "42" not in out.read_text()
+
     def test_growing_export_is_allowed(self, make_ticker, monkeypatch):
         d = make_ticker("SYN")
         make_db(d.parent.parent, "SYN", ["FY2022", "FY2023", "FY2024"])
