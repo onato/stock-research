@@ -206,8 +206,18 @@ def _cagr(values: dict[str, float], years: int,
     return (end / start) ** (1 / years) - 1, total
 
 
-def _growth(current: float | None, prior: float | None) -> float | None:
-    if current is None or prior is None or prior <= 0:
+def _growth(current: float | None, prior: float | None,
+            reasons: list[str], label: str) -> float | None:
+    """Period-on-period growth, refused when the base is not positive.
+
+    A percentage measured from a loss is meaningless: a swing from -8 to +30
+    would read as a large positive growth, and the sign flips unpredictably.
+    SEK.NZ hits this via its FY2023 loss.
+    """
+    if current is None or prior is None:
+        return None
+    if prior <= 0:
+        reasons.append(f"growth-nonpositive-base:{label}")
         return None
     return current / prior - 1
 
@@ -238,6 +248,7 @@ def compute(ticker: str, rows: list[dict[str, Any]],
 
     rev = _by_period(rows, "revenue")
     ni = _by_period(rows, "net_income")
+    fcf = _by_period(rows, "free_cash_flow")
     equity = _by_period(rows, "shareholders_equity")
     debt = _by_period(rows, "total_debt")
     shares = _by_period(rows, "shares_outstanding")
@@ -246,10 +257,17 @@ def compute(ticker: str, rows: list[dict[str, Any]],
     ttm_ni, ni_basis = ttm(rows, "net_income")
     ttm_fcf, fcf_basis = ttm(rows, "free_cash_flow")
 
-    for value, name in ((ttm_rev, "revenue"), (ttm_ni, "net_income"),
-                        (ttm_fcf, "free_cash_flow")):
-        if value is None:
-            reasons.append(f"no-ttm:{name}")
+    # metrics_normalized resolves unknown units to NULL across every money
+    # column at once. Reporting that as missing filings blames the source for
+    # what is really an unresolved scale -- AGL.NZ has 18 revenue rows and no
+    # units, and the fix is backfill_units, not re-extraction.
+    if not (rev or ni or fcf or equity or debt):
+        reasons.append("units-unresolved")
+    else:
+        for value, name in ((ttm_rev, "revenue"), (ttm_ni, "net_income"),
+                            (ttm_fcf, "free_cash_flow")):
+            if value is None:
+                reasons.append(f"no-ttm:{name}")
 
     # The row is only as strong as its weakest reconstruction -- but only
     # across fields that actually reconstructed. A field with no data at all
@@ -262,8 +280,8 @@ def compute(ticker: str, rows: list[dict[str, Any]],
     rev_cagr, rev_total = _cagr(rev, 5, reasons, "revenue")
     eps_cagr, eps_total = _cagr(ni, 5, reasons, "net_income")
 
-    rev_growth = _growth(ttm_rev, _prior_ttm(rev, rev_basis))
-    ni_growth = _growth(ttm_ni, _prior_ttm(ni, ni_basis))
+    rev_growth = _growth(ttm_rev, _prior_ttm(rev, rev_basis), reasons, "revenue")
+    ni_growth = _growth(ttm_ni, _prior_ttm(ni, ni_basis), reasons, "net_income")
 
     # ROE on AVERAGE equity: NZ balance sheets jump on capital raises (AGL.NZ
     # doubled its share count in FY2026), and point-in-time equity would

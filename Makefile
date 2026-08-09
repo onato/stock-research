@@ -22,6 +22,7 @@ LEADERBOARD ?= 15   # rows shown by `make screen`
 .DEFAULT_GOAL := help
 .PHONY: help run digest status screen integrity missing research facts evals evals-all \
         cost gaps exchange-eval facts-xbrl screen-metrics check-currency ledger ledger-backfill queue-prune \
+        screen-fundamentals backfill-units \
         test test-country lint coverage typecheck
 
 help: ## Show this help
@@ -142,6 +143,13 @@ exchange-eval: ## Extraction coverage per exchange (free, no model calls)
 
 screen-metrics: ## Compare core metrics across tickers, normalized (PERIOD=FY2024)
 	$(PY) $(SCRIPTS)/screen_metrics.py --period $(or $(PERIOD),FY2024) $(if $(METRIC),--metric $(METRIC),)
+
+screen-fundamentals: ## Screen on TTM/growth/ROE/D-E/PEG (EXCHANGE=NZX ARGS="--min-roe 0.15")
+	$(PY) $(SCRIPTS)/screen_fundamentals.py $(if $(EXCHANGE),--exchange $(EXCHANGE),) \
+	  $(if $(SUFFIX),--suffix $(SUFFIX),) $(ARGS)
+
+backfill-units: ## Infer missing core_metrics.units from DCF anchors (APPLY=1 to write)
+	$(PY) $(SCRIPTS)/backfill_units.py $(if $(APPLY),--apply,) $(if $(TICKER),--ticker $(TICKER),)
 
 check-currency: ## Flag tickers whose recorded currency contradicts their filings
 	$(PY) $(SCRIPTS)/check_currency.py $(TICKER)

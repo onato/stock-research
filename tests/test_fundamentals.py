@@ -269,6 +269,58 @@ class TestPriceCurrency:
         assert "price-currency-mismatch" in f.reasons
 
 
+class TestGrowthOffANegativeBase:
+    """A growth rate measured from a loss is not a growth rate.
+
+    SEK.NZ's prior-year TTM net income is -7.888 (the FY2023 loss). Dividing
+    by it would report a swing from loss to profit as a large positive
+    percentage, or flip sign unpredictably. Refusing is correct -- but the
+    reason must say so rather than looking like absent data.
+    """
+
+    def test_negative_prior_ttm_is_refused_with_a_reason(self):
+        r = rows(
+            ("FY2023", {"net_income": -14.466}),
+            ("H1 FY2023", {"net_income": 10.474}),
+            ("FY2024", {"net_income": 8.751}),
+            ("H1 FY2024", {"net_income": 17.052}),
+            ("H1 FY2025", {"net_income": 37.769}),
+            ("FY2025", {"net_income": 31.961}),
+        )
+        f = fundamentals.compute("SEK.NZ", r, dcf=None)
+        # ttm = 8.751 + 37.769 - 17.052 = 29.468 (positive)
+        assert f.ttm_net_income == pytest.approx(29.468)
+        # prior ttm = -14.466 + 17.052 - 10.474 = -7.888 (negative base)
+        assert f.earnings_growth_1y is None
+        assert "growth-nonpositive-base:net_income" in f.reasons
+
+
+class TestUnresolvedUnits:
+    """metrics_normalized nulls every money column when units are unknown.
+
+    Reporting that as `no-ttm:revenue` blames the filings for what is really
+    an unresolved scale -- AGL.NZ has 18 revenue rows but no units, and the
+    fix is backfill_units, not re-extraction.
+    """
+
+    def test_all_null_money_with_periods_present_says_units_unresolved(self):
+        r = [{"period": "FY2025", "currency": "NZD", "revenue": None,
+              "net_income": None, "free_cash_flow": None},
+             {"period": "H1 2026", "currency": "NZD", "revenue": None,
+              "net_income": None, "free_cash_flow": None}]
+        f = fundamentals.compute("AGL.NZ", r, dcf=None)
+        assert "units-unresolved" in f.reasons
+        assert "no-ttm:revenue" not in f.reasons
+
+    def test_a_genuine_gap_still_reports_no_ttm(self):
+        """SUM.NZ has revenue but zero net_income rows -- that IS missing data."""
+        r = [{"period": "FY2025", "currency": "NZD", "revenue": 361.8,
+              "net_income": None, "free_cash_flow": None}]
+        f = fundamentals.compute("SUM.NZ", r, dcf=None)
+        assert "units-unresolved" not in f.reasons
+        assert "no-ttm:net_income" in f.reasons
+
+
 class TestTtmBasisIsTheWeakest:
     def test_fy_basis_wins_when_any_field_falls_back(self):
         """Revenue reconstructs, FCF does not -- the row is FY-BASIS."""
