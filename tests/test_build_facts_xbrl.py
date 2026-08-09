@@ -78,6 +78,31 @@ class TestPeriodLabel:
         # Balance-sheet facts carry only an end date.
         assert bfx.period_label({"end": "2024-12-31"}) == "FY2024"
 
+    def test_instant_off_the_fiscal_year_end_is_a_quarter(self):
+        # An instant is a balance sheet AT a date. Labeling every one of them
+        # FY{year} put Reddit's 30-Jun-2026 balance sheet in a phantom FY2026
+        # row that had no revenue, while the real Q2 2026 row had revenue and
+        # no balance sheet. Only the year-end instant is the annual one.
+        assert bfx.period_label({"end": "2026-06-30"}, fy_end_month=12) \
+            == "Q2 2026"
+        assert bfx.period_label({"end": "2026-03-31"}, fy_end_month=12) \
+            == "Q1 2026"
+        assert bfx.period_label({"end": "2026-12-31"}, fy_end_month=12) \
+            == "FY2026"
+
+    def test_instant_honors_a_non_december_fiscal_year_end(self):
+        # Visa closes in September: the Sept instant is the year-end, and the
+        # December one is a quarter, the opposite of a calendar-year filer.
+        assert bfx.period_label({"end": "2025-09-30"}, fy_end_month=9) \
+            == "FY2025"
+        assert bfx.period_label({"end": "2025-12-31"}, fy_end_month=9) \
+            == "Q4 2025"
+
+    def test_instant_without_a_known_fiscal_year_end_stays_annual(self):
+        # No fiscal-year context (the default) keeps the old behaviour, so
+        # callers that cannot derive it are not silently changed.
+        assert bfx.period_label({"end": "2024-06-30"}) == "FY2024"
+
     def test_fy_field_is_ignored(self):
         # A 10-K restates prior years, so `fy` is the filing's year, not the
         # fact's. The dates are authoritative.
@@ -122,6 +147,38 @@ class TestPeriodLabel:
     def test_missing_end_is_none(self):
         assert bfx.period_label({}) is None
         assert bfx.period_label({"end": ""}) is None
+
+
+class TestFiscalYearEndMonth:
+    """The FY-end month comes from the filer's own annual durations.
+
+    Nothing in a bare instant fact says which month closes the year, so it is
+    read off the ~365-day duration facts, where the end month IS the year end.
+    """
+
+    def test_derived_from_annual_durations(self):
+        facts = {"facts": {"us-gaap": {"Revenues": {"units": {"USD": [
+            {"start": "2023-01-01", "end": "2023-12-31", "val": 1},
+            {"start": "2024-01-01", "end": "2024-12-31", "val": 2},
+            {"start": "2024-01-01", "end": "2024-03-31", "val": 3},
+        ]}}}}}
+        assert bfx.fiscal_year_end_month(facts) == 12
+
+    def test_september_filer(self):
+        facts = {"facts": {"us-gaap": {"Revenues": {"units": {"USD": [
+            {"start": "2023-10-01", "end": "2024-09-30", "val": 1},
+            {"start": "2024-10-01", "end": "2025-09-30", "val": 2},
+        ]}}}}}
+        assert bfx.fiscal_year_end_month(facts) == 9
+
+    def test_no_annual_durations_yields_none(self):
+        facts = {"facts": {"us-gaap": {"Revenues": {"units": {"USD": [
+            {"start": "2024-01-01", "end": "2024-03-31", "val": 1},
+        ]}}}}}
+        assert bfx.fiscal_year_end_month(facts) is None
+
+    def test_empty_facts_do_not_raise(self):
+        assert bfx.fiscal_year_end_month({}) is None
 
 
 class TestCikFor:

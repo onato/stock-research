@@ -97,11 +97,46 @@ def cik_for(ticker: str) -> int | None:
     return None
 
 
-def period_label(fact: dict[str, Any]) -> str | None:
+def fiscal_year_end_month(facts: dict[str, Any]) -> int | None:
+    """Which month closes this filer's year, read off its annual durations.
+
+    A bare instant fact says nothing about the fiscal calendar, but a ~365-day
+    duration does: the month it ends in IS the year end. Taking the most
+    common such month tolerates the odd 52/53-week straggler.
+    """
+    months: dict[int, int] = {}
+    gaap = (facts.get("facts") or {}).get("us-gaap") or {}
+    for entry in gaap.values():
+        for rows in (entry.get("units") or {}).values():
+            for f in rows:
+                start, end = f.get("start"), f.get("end")
+                if not start or not end:
+                    continue
+                try:
+                    if (_d(end) - _d(start)).days > 300:
+                        m = int(end[5:7])
+                        months[m] = months.get(m, 0) + 1
+                except (ValueError, IndexError):
+                    continue
+    if not months:
+        return None
+    return max(months, key=lambda m: (months[m], m))
+
+
+def period_label(fact: dict[str, Any],
+                 fy_end_month: int | None = None) -> str | None:
     """Derive the period from the fact's own dates, not its `fy`.
 
     A 10-K restates prior years, so `fy` is the filing's year rather than
     the fact's. start/end are authoritative.
+
+    An instant (balance sheet) is a position AT a date, and only the one
+    falling on the fiscal year end is the annual balance sheet. Labeling all
+    of them FY{year} put Reddit's 30-Jun-2026 balance sheet into a phantom
+    FY2026 row carrying no revenue, while the real Q2 2026 row carried
+    revenue and no balance sheet -- and, per concept, every non-year-end
+    quarter was dropped by the rank tie-break. Without `fy_end_month` the
+    caller has no fiscal context, so the old annual labeling stands.
     """
     end = fact.get("end", "")
     start = fact.get("start")
@@ -109,7 +144,11 @@ def period_label(fact: dict[str, Any]) -> str | None:
         return None
     year = end[:4]
     if not start:                       # instant (balance sheet)
-        return f"FY{year}"
+        month = int(end[5:7])
+        if fy_end_month is None or month == fy_end_month:
+            return f"FY{year}"
+        q = (month - 1) // 3 + 1
+        return f"Q{q} {year}"
     days = (_d(end) - _d(start)).days
     if days > 300:
         return f"FY{year}"
@@ -143,6 +182,7 @@ def collect(facts: dict[str, Any],
     out: dict[str, tuple[Any, Any]] = {}
     used: list[str] = []
     unit_seen: str | None = None
+    fy_end = fiscal_year_end_month(facts)
     for pref, concept in enumerate(concepts):
         entry = gaap.get(concept)
         if not entry:
@@ -151,7 +191,7 @@ def collect(facts: dict[str, Any],
         for unit, rows in entry.get("units", {}).items():
             unit_seen = unit_seen or unit
             for f in rows:
-                p = period_label(f)
+                p = period_label(f, fy_end)
                 if not p:
                     continue
                 # Prefer an annual statement over a 10-Q restatement, a
