@@ -15,28 +15,24 @@ import pathlib
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
+import periods
 import schema
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
 
 def sort_key(period: str | None) -> tuple[int, int, str]:
-    """Chronological, with half/quarter periods following their year.
+    """Chronological, with half/quarter periods preceding their full year.
 
     Dashboards plot in row order, so 'oldest first' matters.
+
+    Delegates to periods.py rather than re-deriving the grammar. The previous
+    implementation looped over tokens and let a trailing `FY2024` overwrite
+    the sub-rank the leading `Q1` had already set, so `Q1 FY2024` tied with
+    `FY2024` -- which is how 21 committed CSVs came to list a full year ahead
+    of the quarters it contains.
     """
-    p = (period or "").strip().upper()
-    year, sub = 0, 0
-    for token in p.replace("-", " ").split():
-        if token.isdigit() and len(token) == 4:
-            year = int(token)
-        elif token.startswith("FY") and token[2:].isdigit():
-            year, sub = int(token[2:]), 9      # full year sorts after its parts
-        elif token.startswith("H") and token[1:].isdigit():
-            sub = int(token[1:]) * 2
-        elif token.startswith("Q") and token[1:].isdigit():
-            sub = int(token[1:])
-    return (year, sub, p)
+    return periods.sort_key(period)
 
 
 def main() -> int:

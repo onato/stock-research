@@ -46,6 +46,10 @@ IRREGULAR_LABELS: frozenset[str] = frozenset(
     {"FY2016-Jun", "FY2017-15mo", "FY2018-6moStub", "FY2021 (10mo)"})
 
 _ANNUAL = re.compile(r"^FY(\d{4})$")
+# A bare `2024` names a year without asserting it is a full fiscal one, so it
+# sorts chronologically but never anchors a CAGR. Absent from the corpus today;
+# export_csv accepted it before this module existed, so it still does.
+_BARE_YEAR = re.compile(r"^(\d{4})$")
 _HALF = re.compile(r"^H([12]) (\d{4})$")
 _QUARTER = re.compile(r"^Q([1-4]) (\d{4})$")
 _MONTHS = re.compile(r"^(\d{1,2})M (\d{4})$")
@@ -125,6 +129,9 @@ def parse(label: str | None) -> Period:
         # Only the 9-month stub is a recognised reporting window; anything
         # else keeps its length but stays OTHER so no TTM path will use it.
         ptype = "9M" if months == 9 else "OTHER"
+    elif m := _BARE_YEAR.match(norm):
+        # Sorts by year, but stays OTHER: nothing states this is 12 months.
+        year = int(m.group(1))
 
     return Period(raw, year, ptype, months, (year or 0, _sub_rank(ptype), tie))
 

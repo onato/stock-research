@@ -6,7 +6,6 @@ the same six months, or that `FY2017-15mo` is not a comparable year.
 """
 
 import pathlib
-import re
 
 import export_csv
 import periods
@@ -21,18 +20,6 @@ def corpus_labels() -> list[str]:
         for line in CORPUS.read_text().splitlines()
         if line.strip() and not line.startswith("#")
     ]
-
-
-# Labels where the incumbent export_csv.sort_key is correct, so the two must
-# agree exactly. Excluded:
-#  * any label carrying an inner `FY####` after a separator (`Q1 FY2020`,
-#    `H1-FY2022`) -- the incumbent bug described in TestSortKeyMatchesExportCsv;
-#  * the irregulars, which the incumbent reads as ordinary full years but which
-#    this module deliberately demotes to OTHER (see TestIrregulars).
-UNAFFECTED = [
-    x for x in corpus_labels()
-    if not re.search(r"\S[\s-]+FY\d{4}", x) and x not in periods.IRREGULAR_LABELS
-]
 
 
 class TestParseFamilies:
@@ -114,30 +101,23 @@ class TestEquivalence:
 
 
 class TestSortKeyMatchesExportCsv:
-    """Characterisation against the incumbent export_csv.sort_key.
+    """export_csv.sort_key now delegates here, so the two cannot diverge.
 
-    They agree everywhere except the `Q# FY####` / `H# FY####` families, where
-    the incumbent has a bug: it loops over tokens and lets the trailing
-    `FY2020` overwrite the sub-rank already set by the leading `Q1`, so every
-    such interim collapses to sub-rank 9 and ties with its own full year.
-    WISE.L's committed CSV shows the damage -- it reads
-    `FY2023, Q1 FY2023, Q2 FY2023, ...`, plotting the full year before the
-    quarters it contains.
-
-    periods.sort_key fixes this. The divergence is asserted, not replicated,
-    so it cannot be reintroduced silently.
+    Before that, the incumbent looped over tokens and let a trailing `FY2020`
+    overwrite the sub-rank already set by a leading `Q1`, collapsing every
+    such interim onto its own full year. WISE.L's CSV showed the damage --
+    `FY2023, Q1 FY2023, Q2 FY2023, ...` -- and 21 committed CSVs were written
+    that way before the fix.
     """
 
-    def test_identical_where_the_incumbent_is_correct(self):
-        assert UNAFFECTED, "corpus should contain non-`X FY####` labels"
-        for label in UNAFFECTED:
+    def test_identical_for_every_corpus_label(self):
+        for label in corpus_labels():
             assert periods.sort_key(label) == export_csv.sort_key(label), label
 
     @pytest.mark.parametrize(
         ("label", "sub"), [("Q1 FY2020", 1), ("Q4 FY2026", 4), ("H1 FY2017", 2)])
     def test_interim_fy_labels_sort_before_their_full_year(self, label, sub):
         assert periods.sort_key(label)[1] == sub
-        assert export_csv.sort_key(label)[1] == 9      # the incumbent bug
         year = periods.parse(label).fiscal_year
         assert periods.sort_key(label) < periods.sort_key(f"FY{year}")
 
