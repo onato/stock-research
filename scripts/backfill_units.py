@@ -167,14 +167,14 @@ def _rows(con: Any) -> list[dict[str, Any]]:
     return [dict(zip(cols, r, strict=True)) for r in res]
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--apply", action="store_true",
                     help="write the resolved units (default is a dry run)")
     ap.add_argument("--ticker", nargs="*", default=[])
     ap.add_argument("--root", default=None)
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     import duckdb
 

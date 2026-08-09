@@ -146,15 +146,18 @@ def _ttm_at(values: dict[str, float], year: int) -> tuple[float | None, TtmBasis
     return None, "NONE"
 
 
-def ttm(rows: list[dict[str, Any]], key: str) -> tuple[float | None, TtmBasis]:
-    """Trailing twelve months for one field, with the basis actually used."""
-    values = _by_period(rows, key)
-    if not values:
-        return None, "NONE"
+def _ttm_resolved(values: dict[str, float]) -> tuple[float | None, TtmBasis, int | None]:
+    """TTM plus the fiscal year it was actually built from.
 
+    The anchor year matters: MSFT's newest year holds only Q1-Q3, so the TTM
+    falls back to the FY below it. A prior-period comparison must step back
+    from THAT year, not from the newest label present.
+    """
+    if not values:
+        return None, "NONE", None
     year = _latest_year(values)
     if year is None:
-        return None, "NONE"
+        return None, "NONE", None
 
     # The newest year may hold only a stray interim (an H2, or a lone Q2).
     # Walk back until a year yields a real window rather than declaring the
@@ -163,20 +166,26 @@ def ttm(rows: list[dict[str, Any]], key: str) -> tuple[float | None, TtmBasis]:
     for candidate in range(year, oldest - 1, -1):
         value, basis = _ttm_at(values, candidate)
         if basis != "NONE":
-            return value, basis
-    return None, "NONE"
+            return value, basis, candidate
+    return None, "NONE", None
+
+
+def ttm(rows: list[dict[str, Any]], key: str) -> tuple[float | None, TtmBasis]:
+    """Trailing twelve months for one field, with the basis actually used."""
+    value, basis, _ = _ttm_resolved(_by_period(rows, key))
+    return value, basis
 
 
 def _prior_ttm(values: dict[str, float], basis: TtmBasis) -> float | None:
-    """The same reconstruction one fiscal year earlier.
+    """The same reconstruction one fiscal year before the one the TTM used.
 
     Mixing a TTM numerator with an FY denominator fabricates growth, so the
     prior period must use the identical basis or the comparison is refused.
     """
-    year = _latest_year(values)
-    if year is None or basis == "NONE":
+    _, current_basis, anchor = _ttm_resolved(values)
+    if anchor is None or basis == "NONE" or current_basis != basis:
         return None
-    value, prior_basis = _ttm_at(values, year - 1)
+    value, prior_basis = _ttm_at(values, anchor - 1)
     return value if prior_basis == basis else None
 
 

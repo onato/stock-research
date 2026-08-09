@@ -269,6 +269,29 @@ class TestPriceCurrency:
         assert "price-currency-mismatch" in f.reasons
 
 
+class TestPriorPeriodIsAnchoredToTheOneUsed:
+    """The prior TTM must step back from the period the TTM actually used.
+
+    MSFT's real shape: FY2025 is complete, FY2026 has Q1-Q3 only. The TTM
+    falls back to FY2025, so the comparison must be FY2024 -- not FY2025
+    again, which is what stepping back from the max year (2026) yields and
+    which reports a flat 0.000 growth for a company growing ~15%.
+    """
+
+    def test_partial_latest_year_does_not_compare_a_value_to_itself(self):
+        r = rows(
+            ("FY2024", {"revenue": 245122.0}),
+            ("FY2025", {"revenue": 281724.0}),
+            ("Q1 FY2026", {"revenue": 77673.0}),
+            ("Q2 FY2026", {"revenue": 81273.0}),
+            ("Q3 FY2026", {"revenue": 82886.0}),
+        )
+        f = fundamentals.compute("MSFT", r, dcf=None)
+        assert f.ttm_revenue == pytest.approx(281724.0)
+        assert f.revenue_growth_1y == pytest.approx(281724.0 / 245122.0 - 1)
+        assert f.revenue_growth_1y > 0.10
+
+
 class TestGrowthOffANegativeBase:
     """A growth rate measured from a loss is not a growth rate.
 
