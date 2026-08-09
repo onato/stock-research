@@ -139,6 +139,43 @@ def emit(ticker: str | None, mode: str) -> None:
     print(payload, end="")
 
 
+def emit_batch(tickers: list[str], mode: str) -> None:
+    """One `ticker=` line per pick, then a single `mode=`.
+
+    Same shape as emit() for a single ticker, so a caller reading
+    `grep '^ticker='` works either way.
+    """
+    out = os.environ.get("GITHUB_OUTPUT")
+    payload = "".join(f"ticker={t}\n" for t in tickers) or "ticker=\n"
+    payload += f"mode={mode}\n"
+    if out:
+        with open(out, "a") as fh:
+            fh.write(payload)
+    print(payload, end="")
+
+
+def pick_batch(count: int, exclude: Iterable[str] = ()) -> list[str]:
+    """Up to `count` tickers, new ones first then the stalest refreshes.
+
+    Exists so a caller can reserve a whole batch in one process. run_loop
+    used to call this script once per ticker, each spawning `uv run python3`;
+    with no -n that enumerated all 1748 unresearched tickers, roughly two
+    minutes of silence before any output -- which reads as a hang.
+    """
+    taken = set(exclude)
+    picked: list[str] = []
+    for chooser in (pick_new, pick_stalest):
+        while len(picked) < count:
+            ticker = chooser(taken)
+            if not ticker:
+                break            # this source is exhausted; try the next
+            taken.add(ticker)
+            picked.append(ticker)
+        if len(picked) >= count:
+            break
+    return picked
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--override", default="", help="Force this ticker (manual dispatch)")
@@ -152,11 +189,30 @@ def main() -> int:
             "caller must say which names it has already handed out."
         ),
     )
+    ap.add_argument(
+        "--count", type=int, default=1,
+        help="Reserve this many tickers in one call, new ones first.",
+    )
     args = ap.parse_args()
 
     exclude = {t.strip() for t in args.exclude.split(",") if t.strip()}
 
     override = args.override.strip()
+    if args.count > 1 and not override:
+        picked = pick_batch(args.count, exclude)
+        if not picked:
+            emit_batch([], "none")
+            print("Nothing to do: queue empty and no existing DCFs.",
+                  file=sys.stderr)
+            return 0
+        # `new` unless every pick was a refresh; the caller only uses this
+        # to describe the batch, not to branch per ticker.
+        mode = "new" if not has_reports(picked[0]) else "refresh"
+        emit_batch(picked, mode)
+        print(f"Reserved {len(picked)} ticker(s): {', '.join(picked[:8])}"
+              f"{' ...' if len(picked) > 8 else ''}", file=sys.stderr)
+        return 0
+
     if override:
         mode = "refresh" if has_reports(override) else "new"
         emit(override, mode)

@@ -78,19 +78,21 @@ mkdir -p "$LOG_DIR" "$(dirname "$JOBLOG")"
 # means "a previous run died, retry it"), so --exclude carries the claim.
 # ---------------------------------------------------------------------------
 if [ ${#TICKERS[@]} -eq 0 ]; then
-  GITHUB_OUTPUT="$(mktemp)"; export GITHUB_OUTPUT
   limit="$COUNT"
-  [ "$limit" -eq 0 ] && limit=100000     # effectively "the whole queue"
+  # No -n means "drain the queue". Reserving all 1748 unresearched tickers
+  # took ~2min of silence before any output -- indistinguishable from a hang
+  # -- so an unbounded run reserves a working set and picks up the rest on
+  # the next invocation (--resume is on by default).
+  if [ "$limit" -eq 0 ]; then
+    limit=200
+    echo "No -n given: reserving up to $limit ticker(s). Re-run to continue."
+  fi
+  echo "Building queue..."
 
-  while [ "${#TICKERS[@]}" -lt "$limit" ]; do
-    EXCLUDE="$(IFS=,; echo "${TICKERS[*]:-}")"
-    : > "$GITHUB_OUTPUT"
-    uv run --project "$REPO_ROOT" python3 scripts/select_ticker.py --override "" --exclude "$EXCLUDE" \
-      >/dev/null 2>&1
-    T="$(grep '^ticker=' "$GITHUB_OUTPUT" | cut -d= -f2-)"
-    [ -z "$T" ] && break
-    TICKERS+=("$T")
-  done
+  GITHUB_OUTPUT="$(mktemp)"; export GITHUB_OUTPUT
+  uv run --project "$REPO_ROOT" python3 scripts/select_ticker.py \
+    --override "" --count "$limit" >/dev/null 2>&1
+  mapfile -t TICKERS < <(grep '^ticker=' "$GITHUB_OUTPUT" | cut -d= -f2- | grep -v '^$')
   rm -f "$GITHUB_OUTPUT"
 else
   # Tickers named on the command line get the same policy the queue does:

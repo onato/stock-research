@@ -253,3 +253,69 @@ class TestMain:
                 runpy.run_module("select_ticker", run_name="__main__")
         assert ei.value.code == 0
         assert capsys.readouterr().out == "ticker=NO.SUCH.TICKER\nmode=new\n"
+
+
+class TestBatch:
+    """`--count N` returns N tickers from one process.
+
+    run_loop built its queue by calling this script once per ticker, each
+    spawning `uv run python3`. With no -n that meant enumerating all 1748
+    unresearched tickers -- about two minutes of silence before the first
+    line of output, which reads as a hang.
+    """
+
+    def run(self, monkeypatch, *argv):
+        monkeypatch.setattr(sys, "argv", ["select_ticker.py", *argv])
+        return st.main()
+
+    def test_count_returns_several_tickers(self, st_repo, monkeypatch, capsys):
+        write_queue(st_repo, "priority.txt", ["A", "B", "C"])
+        assert self.run(monkeypatch, "--count", "3") == 0
+        assert capsys.readouterr().out == "ticker=A\nticker=B\nticker=C\nmode=new\n"
+
+    def test_count_never_repeats_a_ticker(self, st_repo, monkeypatch, capsys):
+        # Asking for more than the queue holds must not loop on the last
+        # pick: each reservation has to exclude the ones already handed out.
+        write_queue(st_repo, "priority.txt", ["A", "B"])
+        assert self.run(monkeypatch, "--count", "5") == 0
+        lines = capsys.readouterr().out.splitlines()
+        picked = [ln.split("=", 1)[1] for ln in lines
+                  if ln.startswith("ticker=")]
+        assert picked == ["A", "B"]          # stops when the queue runs dry
+
+    def test_count_stops_at_the_queue_end(self, st_repo, monkeypatch, capsys):
+        write_queue(st_repo, "priority.txt", ["A"])
+        assert self.run(monkeypatch, "--count", "10") == 0
+        picked = [ln for ln in capsys.readouterr().out.splitlines()
+                  if ln.startswith("ticker=")]
+        assert picked == ["ticker=A"]
+
+    def test_count_falls_back_to_stale_refreshes(self, st_repo, monkeypatch,
+                                                 capsys):
+        write_queue(st_repo, "priority.txt", ["A"])
+        give_reports(st_repo, "A")
+        give_dcf(st_repo, "A", "2026-01-01")
+        give_dcf(st_repo, "OLD", "2020-01-01")
+        assert self.run(monkeypatch, "--count", "2") == 0
+        picked = [ln.split("=", 1)[1] for ln in
+                  capsys.readouterr().out.splitlines()
+                  if ln.startswith("ticker=")]
+        assert "OLD" in picked
+
+    def test_count_honours_exclude(self, st_repo, monkeypatch, capsys):
+        write_queue(st_repo, "priority.txt", ["A", "B", "C"])
+        assert self.run(monkeypatch, "--count", "3", "--exclude", "B") == 0
+        picked = [ln.split("=", 1)[1] for ln in
+                  capsys.readouterr().out.splitlines()
+                  if ln.startswith("ticker=")]
+        assert picked == ["A", "C"]
+
+    def test_count_one_matches_the_single_ticker_form(self, st_repo,
+                                                      monkeypatch, capsys):
+        write_queue(st_repo, "priority.txt", ["A"])
+        assert self.run(monkeypatch, "--count", "1") == 0
+        assert capsys.readouterr().out == "ticker=A\nmode=new\n"
+
+    def test_empty_queue_is_a_clean_noop(self, st_repo, monkeypatch, capsys):
+        assert self.run(monkeypatch, "--count", "5") == 0
+        assert capsys.readouterr().out == "ticker=\nmode=none\n"
