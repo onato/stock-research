@@ -36,6 +36,51 @@ to NULL — never an assumed scale (SEK.NZ once read as NZ$411bn revenue from a
 defaulted thousands→millions guess; a missing row is obvious, a plausible wrong one
 is not).
 
+`scripts/backfill_units.py` recovers a missing `units` by comparing DB values against
+the same quantities independently written in `{TICKER}_DCF.json` (`inputs.total_debt`,
+`last_fcf`, `shares_outstanding`, `cash`). Two or more anchors must agree unanimously
+on one decade; anything less leaves NULL. Dry-run is the default (`make backfill-units`,
+`APPLY=1` to write) and it only ever fills NULL rows, so it is idempotent.
+
+**`facts.units_hint` is NOT a units source.** It records the scale printed on the
+filing page, but the financial-parser agent already rescaled the value before writing
+`core_metrics` — so the hint describes the input, not the stored number. Measured:
+2CC.NZ's facts say `thousands` 1758 times over rows that are plainly millions (39.8
+for a company doing ~NZ$80m/yr); AGL.NZ, SUM.NZ and OCA.NZ are the same. Using it
+reintroduces the SEK.NZ bug.
+
+## Cross-Ticker Screening
+
+`make screen-fundamentals EXCHANGE=NZX ARGS="--min-roe 0.15 --max-de 1"` filters every
+researched ticker on TTM, growth, ROE, D/E and PEG. It is a different question from
+`make screen`, which ranks by DCF upside from the `_DCF.json` files.
+
+Everything is derived fresh from `metrics_normalized` on each run; there is no cached
+screening table. Three rules the derivations exist to enforce:
+
+- **TTM is reconstructed, not assumed.** NZX filers report half-yearly, so a TTM is
+  `FY(Y-1) + H1(Y) − H1(Y-1)`, not a sum of four quarters. Where no true TTM is
+  available the row falls back to the latest FY and is tagged `FY-BASIS`, excluded
+  from PASS unless `--allow-fy-basis`.
+- **Never use the `eps` column for anything cross-ticker.** 13 tickers store EPS in
+  cents (WISE.L, ANZ.NZ, AIA.NZ, ATM.NZ, EBO.NZ, SPK.NZ, ARG.NZ, AFI.NZ, OCA.NZ,
+  SDL.NZ, 9999.HK, MELI) and 5 have a shares-scale bug (AFT.NZ, APL.NZ, DCBO, XPEL,
+  FIG). `metrics_normalized` deliberately leaves per-share figures unscaled. Derive
+  EPS as `ttm_net_income / shares_outstanding` instead.
+- **A price must be denominated like the financials it divides.** WISE.L quotes GBP
+  pence against USD filings, and `885.6 / 48.43` yields a plausible P/E of 18.3 that
+  is pure coincidence. Such rows are refused with `price-currency-mismatch`.
+
+PEG uses the DCF's `historical_growth.selected_growth_rate` (stored as a **percent**)
+as a forward proxy — it is not an analyst estimate, and the output says so.
+
+Period labels come in 13 format families across 2,274 labels; `scripts/periods.py` is
+the single parser. `H1 2026`, `H1-2026`, `H1 FY2026` and `H1-FY2026` all name the same
+six months of **fiscal** 2026. Do not hand-roll period parsing — note that the older
+`export_csv.sort_key` mis-sorts `Q# FY####` labels (it lets the trailing `FY` overwrite
+the quarter's rank), which is why 21 committed CSVs are currently ordered with the full
+year ahead of its own quarters.
+
 ## Parser Architecture (open/closed)
 
 `scripts/build_facts.py` is only the CLI facade. Parsing lives in `scripts/parsers/`:
