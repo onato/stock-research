@@ -124,6 +124,11 @@ printf '  %s\n' "${TICKERS[@]}" | head -12
 [ "${#TICKERS[@]}" -gt 12 ] && echo "  ... and $(( ${#TICKERS[@]} - 12 )) more"
 echo "Logs:   $LOG_DIR/"
 echo "Joblog: $JOBLOG"
+# Concurrent traces share one terminal, which is readable only up to a point.
+# Suggested rather than launched: opening windows unasked is a nuisance.
+if [ -n "${TMUX:-}" ] && [ "$JOBS" -gt 1 ]; then
+  echo "Watch:  scripts/watch_run.sh   (one pane per ticker)"
+fi
 echo ""
 
 if [ "$DRY_RUN" = "1" ]; then

@@ -24,9 +24,13 @@
 research_ticker() {
   local ticker="$1" quiet="${2:-}"
   local log="$LOG_DIR/$ticker.log"
+  local stream="$LOG_DIR/$ticker.stream"
   local start rc elapsed
 
   mkdir -p "$LOG_DIR"
+  # Truncated per run so a pane tailing it shows this attempt, not the last
+  # one's output followed by this one's.
+  : > "$stream"
   start=$(date +%s)
 
   # Appended to the skill invocation. Batch runs are unattended, so the
@@ -55,6 +59,11 @@ do not summarize their contents."
     # is indistinguishable from a hang. --tools-only keeps it to one short
     # line per tool call, --label attributes it, and --heartbeat reports the
     # long silences (a subagent can hold a single call for many minutes).
+    # The rendered trace goes two places. `$stream` is what watch_run.sh's
+    # per-ticker tmux pane tails, so it carries no [TICKER] prefix -- the pane
+    # border already names it, and the prefix costs ~10 columns of command
+    # text. stdout keeps the prefix, because without tmux several tickers
+    # share one terminal and the tag is the only thing telling them apart.
     set -o pipefail
     claude --permission-mode bypassPermissions \
            --disallowed-tools "Bash(open *)" \
@@ -64,7 +73,9 @@ do not summarize their contents."
 $batch_note" 2>&1 \
       | tee "$log" \
       | uv run --project "$REPO_ROOT" python3 "$REPO_ROOT/scripts/progress.py" \
-          --tools-only --label "$ticker" --heartbeat "${HEARTBEAT_SECS:-120}"
+          --tools-only --heartbeat "${HEARTBEAT_SECS:-120}" \
+      | tee "$stream" \
+      | sed "s/^/[$ticker] /"
     rc=$?
     set +o pipefail
   else
