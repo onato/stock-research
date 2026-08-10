@@ -62,6 +62,23 @@ def _valuation_date(repo: pathlib.Path, ticker: str) -> dt.date | None:
     return None
 
 
+def is_skipped(repo: pathlib.Path, ticker: str) -> bool:
+    """True when info.json marks this ticker as not worth researching.
+
+    Commenting a ticker out of the queue stops the selector reaching it, but
+    a pasted ticker list bypasses the queue entirely. CRP.NZ was suspended
+    from NZX quotation on 3-Aug-2026 -- its quote is frozen, so any
+    price-based ratio is meaningless -- and cost $4.10 to rediscover that.
+    Malformed metadata never skips: silently dropping a ticker from every run
+    is worse than researching it once more.
+    """
+    path = repo / "research" / ticker / "info.json"
+    try:
+        return bool(json.loads(path.read_text()).get("skip_research"))
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return False
+
+
 def age_days(repo: pathlib.Path, ticker: str) -> int | None:
     """How old this ticker's research is, or None if it has none.
 
@@ -97,6 +114,9 @@ def eligible(repo: pathlib.Path | str, tickers: list[str], *,
     fresh: list[str] = []
     stale: list[tuple[int, str]] = []
     for ticker in clean:
+        # --force is a deliberate override, so it beats the skip flag too.
+        if not force and is_skipped(repo, ticker):
+            continue
         age = age_days(repo, ticker)
         if age is None:
             fresh.append(ticker)          # never researched: highest priority

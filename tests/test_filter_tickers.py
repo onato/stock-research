@@ -101,6 +101,50 @@ class TestSkipping:
             ["ALF.NZ"]
 
 
+class TestSkipResearch:
+    """`skip_research` in info.json excludes a ticker from bulk runs.
+
+    CRP.NZ was suspended from NZX quotation on 3-Aug-2026 after a TSXV
+    delisting: the NZ$0.038 quote is frozen, the company is a pre-revenue
+    explorer with a going-concern warning, and it reports in CAD while quoted
+    in NZD. A DCF on it is meaningless, but it still cost $4.10 to rediscover
+    that. Commenting it out of the queue stops the selector reaching it;
+    this stops a pasted ticker list reaching it too.
+    """
+
+    def _mark(self, repo, ticker, **extra):
+        d = repo / "research" / ticker
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "info.json").write_text(json.dumps({"skip_research": True,
+                                                 **extra}))
+
+    def test_a_skipped_ticker_is_dropped(self, repo):
+        self._mark(repo, "CRP.NZ", skip_reason="suspended")
+        assert filter_tickers.eligible(repo, ["CRP.NZ", "OK.NZ"]) == ["OK.NZ"]
+
+    def test_force_overrides_the_skip(self, repo):
+        # A deliberate re-run must still be possible.
+        self._mark(repo, "CRP.NZ")
+        assert filter_tickers.eligible(repo, ["CRP.NZ"], force=True) == \
+            ["CRP.NZ"]
+
+    def test_skip_research_false_is_not_a_skip(self, repo):
+        d = repo / "research" / "OK.NZ"
+        d.mkdir(parents=True)
+        (d / "info.json").write_text(json.dumps({"skip_research": False}))
+        assert filter_tickers.eligible(repo, ["OK.NZ"]) == ["OK.NZ"]
+
+    def test_an_unparseable_info_json_does_not_skip(self, repo):
+        # Malformed metadata must not silently drop a ticker from every run.
+        d = repo / "research" / "ODD.NZ"
+        d.mkdir(parents=True)
+        (d / "info.json").write_text("{not json")
+        assert filter_tickers.eligible(repo, ["ODD.NZ"]) == ["ODD.NZ"]
+
+    def test_no_info_json_does_not_skip(self, repo):
+        assert filter_tickers.eligible(repo, ["NEW.NZ"]) == ["NEW.NZ"]
+
+
 class TestOrdering:
     def test_unresearched_tickers_come_before_stale_ones(self, repo):
         # "new first, then refresh the stalest" -- the policy select_ticker

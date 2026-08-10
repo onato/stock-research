@@ -31,10 +31,41 @@ export PUSH LOG_DIR
 
 . "$REPO_ROOT/scripts/lib.sh"
 
+# Deliverables are the definition of done. A run can finish its work and
+# still end on a limit message, which the CLI reports as is_error -- CCC.NZ
+# and CHI.NZ both had every file on disk, exited 1, and were retried for
+# another ~$6 each.
+have_deliverables() {
+  for want in "_Metrics.csv" "_DCF.json" "_Dashboard.html"; do
+    [ -f "$REPO_ROOT/research/$1/Reports/$1$want" ] || return 1
+  done
+  return 0
+}
+
 attempt=0
 while : ; do
   research_ticker "$TICKER" --quiet
   rc=$?
+
+  if have_deliverables "$TICKER"; then
+    # Finished, whatever the exit status said. Retrying would redo work
+    # already paid for.
+    rc=0
+    break
+  fi
+
+  # A weekly window resets days out; no sleep inside this run reaches it, so
+  # stop and let --resume pick the ticker up after the reset rather than
+  # sleeping the cap and re-rejecting. Exit 4 tells run_loop to halt.
+  if reset_epoch=$(uv run --project "$REPO_ROOT" python3 \
+       "$REPO_ROOT/scripts/rate_limit.py" --unreachable \
+       "$LOG_DIR/$TICKER.log" "${MAX_RL_SLEEP:-7200}" 2>/dev/null); then
+    when="$(date -r "$reset_epoch" '+%d %b %H:%M' 2>/dev/null || echo "$reset_epoch")"
+    echo "[$TICKER] rate limit resets $when -- too far off to wait out." >&2
+    echo "[$TICKER] stopping; re-run after the reset (--resume continues)." >&2
+    rc=4
+    break
+  fi
 
   # A rate-limit rejection is not a failure of this ticker -- it means the
   # request never got a fair chance. Sleep until the window resets and try
@@ -73,7 +104,10 @@ missing=""
 for want in "_Metrics.csv" "_DCF.json" "_Dashboard.html"; do
   [ -f "$REPO_ROOT/research/$TICKER/Reports/$TICKER$want" ] || missing="$missing $want"
 done
-if [ -n "$missing" ]; then
+# rc=4 already says "stopped on an unreachable rate limit", which is why the
+# deliverables are missing. Reporting it as INCOMPLETE too would suggest a
+# re-run of this ticker rather than a wait.
+if [ -n "$missing" ] && [ "$rc" != "4" ]; then
   echo "[$TICKER] INCOMPLETE -- missing:$missing" >&2
   echo "[$TICKER] a clean exit with no deliverable usually means a step was" >&2
   echo "[$TICKER] left running in the background; re-run this ticker." >&2

@@ -133,28 +133,52 @@ fi
 
 START=$(date +%s)
 
+# GNU parallel's --resume skips by SEQUENCE NUMBER, not by argument: with a
+# shared joblog, job #1 of a new run is "already done" because job #1 of an
+# older run is recorded. That made every subsequent invocation exit in 0h00m
+# without running anything. Each run therefore gets its own joblog, which
+# preserves resume WITHIN a run (interrupt and re-run with the same file)
+# while a new run always starts clean. The stable path stays as the record
+# of the most recent run, for the summary below and `make status`.
+RUN_JOBLOG="${JOBLOG%.tsv}.$(date +%Y%m%d-%H%M%S).tsv"
+
 # --line-buffer + --tagstring keep concurrent output attributable per ticker.
 # --resume reads the joblog and skips arguments that already completed.
 printf '%s\n' "${TICKERS[@]}" \
-  | parallel -j "$JOBS" --joblog "$JOBLOG" $RESUME \
+  | parallel -j "$JOBS" --joblog "$RUN_JOBLOG" $RESUME \
              --line-buffer --tagstring '[{}]' \
              "$REPO_ROOT/scripts/research_one.sh" {}
 PAR_RC=$?
+
+# This run's record becomes the current one; the timestamped file is kept so
+# an interrupted run can be resumed against it.
+cp -f "$RUN_JOBLOG" "$JOBLOG" 2>/dev/null || true
+
+# Exit 4 from any ticker means an unreachable rate-limit window: the rest of
+# the queue cannot succeed either, so say so once rather than letting every
+# remaining ticker fail the same way.
+if awk 'NR>1 && $7==4 {found=1} END{exit !found}' "$RUN_JOBLOG" 2>/dev/null; then
+  echo ""
+  echo "STOPPED: rate limit resets beyond what a single run can wait out."
+  echo "Re-run after the reset; --resume is on by default."
+fi
 
 ELAPSED=$(( $(date +%s) - START ))
 
 echo ""
 echo "=============================================="
 printf ' Finished in %dh%02dm\n' $((ELAPSED / 3600)) $(((ELAPSED % 3600) / 60))
-if [ -f "$JOBLOG" ]; then
+if [ -f "$RUN_JOBLOG" ]; then
+  # This run only -- the shared joblog accumulates every past run, which
+  # made the summary report failures from days ago as if they were this run's.
   # Column 7 of parallel's joblog is the exit status.
-  ok=$(awk 'NR>1 && $7==0' "$JOBLOG" | wc -l | tr -d ' ')
-  bad=$(awk 'NR>1 && $7!=0' "$JOBLOG" | wc -l | tr -d ' ')
+  ok=$(awk 'NR>1 && $7==0' "$RUN_JOBLOG" | wc -l | tr -d ' ')
+  bad=$(awk 'NR>1 && $7!=0' "$RUN_JOBLOG" | wc -l | tr -d ' ')
   echo " Succeeded: $ok   Failed: $bad"
   if [ "${bad:-0}" -gt 0 ]; then
     echo " Failed tickers:"
-    awk 'NR>1 && $7!=0 {print "   " $NF}' "$JOBLOG"
-    echo " Re-run them with: scripts/run_loop.sh <TICKER>..."
+    awk 'NR>1 && $7!=0 {print "   " $NF}' "$RUN_JOBLOG"
+    echo " Re-run them with: scripts/run_loop.sh --force <TICKER>..."
   fi
 fi
 echo "=============================================="
