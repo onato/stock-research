@@ -140,7 +140,10 @@ def screen(args):
             flags.append("NO_IV")
 
         upside = None
-        if iv and price:
+        if iv is not None and price:
+            # `iv` of 0.0 is a real verdict (CBD.NZ: receivership waterfall
+            # leaves nil to equity), so test against None -- a truthiness
+            # check demoted worthless-equity names to "no data".
             upside = round((iv / price - 1) * 100, 1)
 
         rows.append({
@@ -529,7 +532,8 @@ def main():
     print("-" * len(hdr))
     for i, r in enumerate(ranked[: args.top], 1):
         age = f"{r['days_old']}d" if r.get("days_old") is not None else "?"
-        iv = f"{r['weighted_iv']:.2f}" if r.get("weighted_iv") else "—"
+        iv = (f"{r['weighted_iv']:.2f}"
+              if r.get("weighted_iv") is not None else "—")
         print(f"{i:>2} {r['ticker']:<9}{fmt_price(r):>9} {r['price_src']:<7}{iv:>9}"
               f"{r['upside_pct']:>8.1f}%  {age:>5}  {','.join(r['flags']) or 'ok'}")
 
@@ -537,7 +541,8 @@ def main():
         print("\nNot ranked (need attention before they can be compared):")
         for r in unranked:
             print(f"   {r['ticker']:<9} {','.join(r['flags']) or 'no data'}"
-                  + (f"  (price={fmt_price(r)})" if r.get('price') else ""))
+                  + (f"  (price={fmt_price(r)})"
+                     if r.get('price') is not None else ""))
 
     stale = [r for r in ranked if any(f.startswith('STALE') for f in r['flags'])]
     drift = [r for r in ranked if any(f.startswith('PRICE_DRIFT') for f in r['flags'])]

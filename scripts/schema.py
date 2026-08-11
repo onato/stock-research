@@ -41,6 +41,10 @@ CORE_COLUMNS: list[tuple[str, str, str]] = [
     ("shares_outstanding",   "DOUBLE", "SharesOutstanding"),
     ("stock_based_comp",     "DOUBLE", "StockBasedComp"),
     ("dividend_per_share",   "DOUBLE", "DividendPerShare"),
+    ("ebitda_before_significant",              "DOUBLE", "EBITDABeforeSignificant"),
+    ("revenue_continuing",                     "DOUBLE", "RevenueContinuing"),
+    ("ebitda_continuing_before_significant",   "DOUBLE", "EBITDAContinuingBeforeSignificant"),
+    ("ebit_continuing_before_significant",     "DOUBLE", "EBITContinuingBeforeSignificant"),
     ("units",                "TEXT",   "Units"),
     ("currency",             "TEXT",   "Currency"),
 ]
@@ -87,6 +91,14 @@ ALIASES: dict[str, str] = {
     "stockbasedcomp": "stock_based_comp", "sbc": "stock_based_comp",
     "sharebasedcomp": "stock_based_comp",
     "stockbasedcompensation": "stock_based_comp",
+    "ebitdabeforesignificant": "ebitda_before_significant",
+    "ebitdabeforesignificantitems": "ebitda_before_significant",
+    "revenuecontinuing": "revenue_continuing",
+    "continuingrevenue": "revenue_continuing",
+    "ebitdacontinuingbeforesignificant": "ebitda_continuing_before_significant",
+    "ebitdabeforesignificantcontinuing": "ebitda_continuing_before_significant",
+    "ebitcontinuingbeforesignificant": "ebit_continuing_before_significant",
+    "ebitbeforesignificantcontinuing": "ebit_continuing_before_significant",
     "units": "units", "currency": "currency",
 }
 
