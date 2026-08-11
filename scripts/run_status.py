@@ -46,6 +46,9 @@ STATE_FOR_EXIT = {
     0: "done",
     3: "incomplete",
     4: "rate-limited",
+    # Never attempted: the run halted on a rate limit first, so the ticker is
+    # still queued rather than broken.
+    5: "stood-down",
 }
 
 REDRAW_SECONDS = 5.0
@@ -211,7 +214,7 @@ def render(root: pathlib.Path, joblog: pathlib.Path | str | None = None,
         return "no run found (no recent activity in state/logs/)"
     # Active tickers first -- they are the ones worth watching.
     order = {"running": 0, "pending": 1, "rate-limited": 2, "incomplete": 3,
-             "failed": 4, "done": 5}
+             "failed": 4, "stood-down": 5, "done": 6}
     rows.sort(key=lambda r: (order.get(r["state"], 9), r["ticker"]))
 
     head = (f"{'TICKER':<10} {'STATE':<13} {'ELAPSED':>8} {'IDLE':>7} "

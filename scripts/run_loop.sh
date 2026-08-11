@@ -147,6 +147,14 @@ START=$(date +%s)
 # of the most recent run, for the summary below and `make status`.
 RUN_JOBLOG="${JOBLOG%.tsv}.$(date +%Y%m%d-%H%M%S).tsv"
 
+# Cleared per run: a leftover halt from a previous batch would make every
+# ticker exit immediately. research_one.sh creates it when it meets a window
+# too far out to wait for, and the other workers stand down rather than
+# failing identically one slot at a time.
+HALT_FILE="$LOG_DIR/.halt-rate-limit"
+export HALT_FILE
+rm -f "$HALT_FILE"
+
 # --line-buffer + --tagstring keep concurrent output attributable per ticker.
 # --resume reads the joblog and skips arguments that already completed.
 printf '%s\n' "${TICKERS[@]}" \
@@ -165,7 +173,12 @@ cp -f "$RUN_JOBLOG" "$JOBLOG" 2>/dev/null || true
 if awk 'NR>1 && $7==4 {found=1} END{exit !found}' "$RUN_JOBLOG" 2>/dev/null; then
   echo ""
   echo "STOPPED: rate limit resets beyond what a single run can wait out."
+  [ -f "$HALT_FILE" ] && sed 's/^/  /' "$HALT_FILE"
+  skipped=$(awk 'NR>1 && $7==5' "$RUN_JOBLOG" | wc -l | tr -d ' ')
+  [ "${skipped:-0}" -gt 0 ] && \
+    echo "  $skipped ticker(s) stood down and are still queued."
   echo "Re-run after the reset; --resume is on by default."
+  rm -f "$HALT_FILE"
 fi
 
 ELAPSED=$(( $(date +%s) - START ))
@@ -178,11 +191,14 @@ if [ -f "$RUN_JOBLOG" ]; then
   # made the summary report failures from days ago as if they were this run's.
   # Column 7 of parallel's joblog is the exit status.
   ok=$(awk 'NR>1 && $7==0' "$RUN_JOBLOG" | wc -l | tr -d ' ')
-  bad=$(awk 'NR>1 && $7!=0' "$RUN_JOBLOG" | wc -l | tr -d ' ')
+  # Exit 5 is "stood down because the run halted" -- those tickers were never
+  # attempted and are still queued, so counting them as failures would
+  # misreport a rate limit as 173 broken tickers.
+  bad=$(awk 'NR>1 && $7!=0 && $7!=5' "$RUN_JOBLOG" | wc -l | tr -d ' ')
   echo " Succeeded: $ok   Failed: $bad"
   if [ "${bad:-0}" -gt 0 ]; then
     echo " Failed tickers:"
-    awk 'NR>1 && $7!=0 {print "   " $NF}' "$RUN_JOBLOG"
+    awk 'NR>1 && $7!=0 && $7!=5 {print "   " $NF}' "$RUN_JOBLOG"
     echo " Re-run them with: scripts/run_loop.sh --force <TICKER>..."
   fi
 fi

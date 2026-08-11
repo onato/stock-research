@@ -147,6 +147,16 @@ class TestState:
                                     joblog=tmp_path / "state" / "joblog.tsv")
         assert row["state"] == "rate-limited"
 
+    def test_exit_five_is_reported_as_stood_down(self, tmp_path):
+        # rc=5 means the run halted on a rate limit before this ticker was
+        # attempted. It is still queued, so calling it "failed" turned one
+        # rate limit into 173 apparent failures.
+        write_log(tmp_path, "WBC.NZ", tool("Bash"))
+        write_joblog(tmp_path, (1, 0, 5, "WBC.NZ"))
+        row = run_status.ticker_row(tmp_path, "WBC.NZ",
+                                    joblog=tmp_path / "state" / "joblog.tsv")
+        assert row["state"] == "stood-down"
+
     def test_exit_three_is_reported_as_incomplete(self, tmp_path):
         write_log(tmp_path, "CRP.NZ", tool("Bash"))
         write_joblog(tmp_path, (1, 2573, 3, "CRP.NZ"))

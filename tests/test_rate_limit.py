@@ -82,6 +82,58 @@ class TestBlocking:
         assert rate_limit.seconds_to_wait(log) < 1000
 
 
+class TestSessionLimitIsWaitable:
+    """A session limit is worth sleeping out; a weekly one is not.
+
+    WIN.NZ hit a five_hour rejection whose window reset 188 minutes later.
+    MAX_RL_SLEEP capped the sleep at 120, so is_unreachable() -- which was
+    comparing against that same cap -- declared the wait unwaitable and
+    aborted. 173 tickers then burned a queue slot each at exit 4 in ~17
+    seconds, for $0 and no output, when sleeping three hours would have
+    worked.
+
+    The cap is a safety valve on how long to sleep. It must not decide
+    whether a wait is worth taking: that depends on the window, and the two
+    numbers are unrelated.
+    """
+
+    def test_a_three_hour_session_reset_is_waitable(self, tmp_path):
+        log = write_log(tmp_path, event("rejected", resets_in=188 * 60,
+                                        kind="five_hour"))
+        assert rate_limit.is_unreachable(log) is False
+        assert rate_limit.seconds_to_wait(log) > 11000
+
+    def test_a_five_hour_window_is_waitable_at_its_full_span(self, tmp_path):
+        # The whole point of the window: waiting it out always terminates.
+        log = write_log(tmp_path, event("rejected", resets_in=5 * 3600,
+                                        kind="five_hour"))
+        assert rate_limit.is_unreachable(log) is False
+        assert rate_limit.seconds_to_wait(log) > 5 * 3600
+
+    def test_a_weekly_reset_days_out_stays_unreachable(self, tmp_path):
+        log = write_log(tmp_path, event("rejected", resets_in=4 * 86400,
+                                        kind="seven_day_overage_included"))
+        assert rate_limit.is_unreachable(log) is True
+
+    def test_the_boundary_is_the_max_wait_not_the_sleep_cap(self, tmp_path):
+        # Just inside MAX_WAIT: sleep it. Just outside: give up and resume.
+        inside = write_log(tmp_path,
+                           event("rejected",
+                                 resets_in=rate_limit.MAX_WAIT - 600))
+        assert rate_limit.is_unreachable(inside) is False
+        outside = tmp_path / "far.log"
+        outside.write_text(json.dumps(
+            event("rejected", resets_in=rate_limit.MAX_WAIT + 600)) + "\n")
+        assert rate_limit.is_unreachable(outside) is True
+
+    def test_the_wait_is_not_truncated_below_the_reset(self, tmp_path):
+        # Waking before the window resets just re-rejects, which is what
+        # made the old 120-minute cap useless for a 188-minute window.
+        log = write_log(tmp_path, event("rejected", resets_in=4 * 3600,
+                                        kind="five_hour"))
+        assert rate_limit.seconds_to_wait(log) >= 4 * 3600
+
+
 class TestUnreachableResets:
     """A reset beyond the cap cannot be waited out inside one run.
 
@@ -216,7 +268,7 @@ class TestCli:
                                                  capsys):
         log = write_log(tmp_path, event("rejected", resets_in=10 * 3600))
         got = int(self._run(monkeypatch, capsys, str(log), "not-a-number"))
-        assert got == pytest.approx(7200, abs=60)
+        assert got == pytest.approx(rate_limit.DEFAULT_CAP, abs=60)
 
     def test_no_arguments_is_a_usage_error(self, monkeypatch, capsys):
         monkeypatch.setattr(sys, "argv", ["rate_limit.py"])

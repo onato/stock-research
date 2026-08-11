@@ -31,7 +31,22 @@ import time
 # `allowed_warning` -- means work is still getting through.
 BLOCKING = {"rejected"}
 
-DEFAULT_CAP = 7200          # 2h: a bogus timestamp must not park the loop
+# Two different numbers, previously conflated -- which is the bug that aborted
+# 173 tickers.
+#
+# MAX_WAIT is how long a wait can be and still be worth taking. A session
+# ("five_hour") window is at most five hours away and waiting it out always
+# terminates, so 6h covers the worst case with slack. A weekly window resets
+# days out; sleeping toward it inside one run just re-rejects, so anything
+# past this returns to the caller as unreachable and the run resumes later.
+MAX_WAIT = 6 * 3600
+#
+# DEFAULT_CAP is the safety valve on the sleep itself: a bogus far-future
+# timestamp must not park the loop indefinitely. It is deliberately >= MAX_WAIT
+# so that a wait judged worth taking is actually slept in full. WIN.NZ's window
+# reset 188 minutes out while this was 120, so the sleep woke an hour early and
+# was rejected again.
+DEFAULT_CAP = MAX_WAIT
 SLACK = 30                  # waking exactly on the boundary tends to re-reject
 
 
@@ -100,15 +115,17 @@ def reset_at(log: pathlib.Path | str) -> float | None:
     return latest
 
 
-def is_unreachable(log: pathlib.Path | str, cap: int = DEFAULT_CAP,
+def is_unreachable(log: pathlib.Path | str, cap: int = MAX_WAIT,
                    now: float | None = None) -> bool:
-    """True when the window resets further out than a single run can wait.
+    """True when the window resets further out than a wait can sensibly cover.
 
-    The weekly quota resets days away, so sleeping the cap and retrying only
-    re-rejects -- CCC.NZ burned 8.4 hours and $11.96 that way, redoing a
-    ticker whose deliverables were already on disk. The caller should stop
-    the run and resume after the reset instead of sleeping into a guaranteed
-    rejection.
+    Judged against MAX_WAIT, *not* the sleep cap. Those were the same number
+    once, and a five_hour window resetting 188 minutes out was declared
+    unwaitable because the cap happened to be 120 -- 173 tickers then aborted
+    at exit 4 in seconds each. A session window always terminates and is
+    worth sleeping; a weekly one resets days out, where sleeping only
+    re-rejects (CCC.NZ burned 8.4 hours and $11.96 that way), so the caller
+    stops and resumes after the reset.
     """
     when = reset_at(log)
     if when is None:

@@ -31,6 +31,19 @@ export PUSH LOG_DIR
 
 . "$REPO_ROOT/scripts/lib.sh"
 
+# Set by whichever worker first meets a rate-limit window too far out to wait
+# for. Every other worker checks it on entry and leaves immediately: without
+# this, 173 tickers each took a queue slot and failed identically in ~17
+# seconds on 2026-08-10, marking three quarters of the queue failed for a
+# limit that had nothing to do with them. GNU parallel's --halt cannot key on
+# a specific exit code, so the signal is a file.
+HALT_FILE="${HALT_FILE:-$LOG_DIR/.halt-rate-limit}"
+
+if [ -f "$HALT_FILE" ]; then
+  echo "[$TICKER] skipped -- run halted on a rate limit (see $HALT_FILE)." >&2
+  exit 5
+fi
+
 # Deliverables are the definition of done. A run can finish its work and
 # still end on a limit message, which the CLI reports as is_error -- CCC.NZ
 # and CHI.NZ both had every file on disk, exited 1, and were retried for
@@ -63,6 +76,9 @@ while : ; do
     when="$(date -r "$reset_epoch" '+%d %b %H:%M' 2>/dev/null || echo "$reset_epoch")"
     echo "[$TICKER] rate limit resets $when -- too far off to wait out." >&2
     echo "[$TICKER] stopping; re-run after the reset (--resume continues)." >&2
+    # Tell the other workers, so the rest of the queue is not consumed one
+    # identical failure at a time.
+    printf 'rate limit resets %s\n' "$when" > "$HALT_FILE" 2>/dev/null || true
     rc=4
     break
   fi
