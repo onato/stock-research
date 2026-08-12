@@ -28,6 +28,7 @@ import datetime as dt
 import html
 import json
 import os
+import re
 import urllib.request
 
 YF_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{t}?range=1d&interval=1d"
@@ -69,6 +70,30 @@ def fetch_live_price(ticker):
         return None, None
 
 
+CCY_RE = re.compile(r"^[A-Za-z]{3}$")
+
+
+def currency_code(*candidates):
+    """The first candidate that is an actual currency code.
+
+    Two DCFs describe a mixed denomination in prose rather than a code:
+    HFL.NZ carries "NZD (outputs) / GBP (fundamentals)" and AFI.NZ "AUD
+    (fundamentals) / NZD (reported valuation outputs)". Printed verbatim,
+    that is a 34-character cell in a column where every other row is three,
+    and it stretches the whole leaderboard past the viewport -- and it makes
+    the CCY flag unreadable too.
+
+    Both carry a clean top-level `currency`, so the code is recoverable.
+    Prose is never returned: an unlabelled price beats a wrong or unreadable
+    label, and the mixed denomination is a property of the model that a
+    three-letter cell cannot honestly convey anyway.
+    """
+    for value in candidates:
+        if isinstance(value, str) and CCY_RE.match(value.strip()):
+            return value.strip()
+    return None
+
+
 def load_dcf(path):
     try:
         with open(path) as f:
@@ -104,7 +129,8 @@ def screen(args):
         pw = d.get("probability_weighted") or {}
         iv = pw.get("weighted_iv")
         stored_price = d.get("current_price")
-        ccy = (d.get("inputs") or {}).get("currency")
+        ccy = currency_code((d.get("inputs") or {}).get("currency"),
+                            d.get("currency"))
         vdate = d.get("valuation_date")
         adate = None
         if ana_path:
