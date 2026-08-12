@@ -28,6 +28,7 @@ import datetime as dt
 import html
 import json
 import os
+import pathlib
 import re
 import urllib.request
 
@@ -68,6 +69,31 @@ def fetch_live_price(ticker):
         return meta.get("regularMarketPrice"), meta.get("currency")
     except Exception:
         return None, None
+
+
+def price_symbol(root, ticker):
+    """The Yahoo symbol to quote for this ticker -- usually its own name.
+
+    The folder name is not always the tradeable symbol. BGI.NZ was renamed
+    to RTO.NZ on 1-May-2024, so Yahoo serves BGI.NZ as a dead symbol frozen
+    at $0.004 while RTO.NZ trades at $0.119. DOW.NZ is Downer EDI's
+    near-dormant NZX secondary line quoting $0.00063 NZD, while the DCF is
+    built on the ASX primary at ~$7.80 AUD -- dividing an AUD intrinsic
+    value by that NZD quote put DOW.NZ first on the leaderboard at +26,884%.
+
+    `aliases` in info.json is deliberately NOT consulted: it is search
+    metadata listing former names and cross-listings, and treating any of
+    them as the quote source would silently reprice a ticker against a
+    different listing. Only an explicit `price_symbol` redirects.
+    """
+    try:
+        info = json.loads((pathlib.Path(root) / ticker
+                           / "info.json").read_text())
+        symbol = info.get("price_symbol")
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return ticker
+    return symbol.strip() if isinstance(symbol, str) and symbol.strip() \
+        else ticker
 
 
 CCY_RE = re.compile(r"^[A-Za-z]{3}$")
@@ -149,7 +175,8 @@ def screen(args):
         # price selection
         live_price = live_ccy = None
         if args.live:
-            live_price, live_ccy = fetch_live_price(ticker)
+            live_price, live_ccy = fetch_live_price(
+                price_symbol(args.root, ticker))
 
         price = live_price or stored_price
         price_src = "live" if live_price else "stored"

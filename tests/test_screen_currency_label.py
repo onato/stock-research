@@ -95,3 +95,52 @@ class TestCurrencyLabel:
         html = screen_dcf.row_html(1, rows[0], "", {})
         assert "(fundamentals)" not in html
         assert "(outputs)" not in html
+
+
+class TestPriceSymbolOverride:
+    """The folder name is not always the symbol to quote.
+
+    Two corpus tickers are priced against the wrong Yahoo symbol:
+
+      BGI.NZ  renamed to RTO.NZ on 1-May-2024. BGI.NZ is a dead symbol
+              frozen at $0.004; RTO.NZ trades at $0.119, ~30x higher.
+      DOW.NZ  Downer EDI's near-dormant NZX secondary line quotes
+              $0.00063 NZD while the ASX primary (DOW.AX) trades $7.68
+              AUD -- which is what the DCF is built on (7.80 AUD).
+
+    DOW.NZ is the visible damage: dividing an AUD intrinsic value by a
+    $0.00063 NZD quote ranked it first on the leaderboard at +26,884%.
+    info.json carries an `aliases` list already, so the fix is an explicit
+    `price_symbol` the screener quotes instead of the folder name.
+    """
+
+    def with_info(self, root, ticker, **info):
+        (root / ticker / "Reports").mkdir(parents=True, exist_ok=True)
+        (root / ticker / f"{ticker}_DCF.json")  # placeholder, unused
+        (root / ticker / "info.json").write_text(json.dumps(info))
+
+    def test_price_symbol_is_used_when_present(self, tmp_path):
+        add_ticker(tmp_path, "BGI.NZ", inputs_currency="NZD",
+                   top_currency="NZD")
+        self.with_info(tmp_path, "BGI.NZ", price_symbol="RTO.NZ")
+        assert screen_dcf.price_symbol(tmp_path, "BGI.NZ") == "RTO.NZ"
+
+    def test_folder_name_is_the_default(self, tmp_path):
+        add_ticker(tmp_path, "DCBO", inputs_currency="USD",
+                   top_currency="USD")
+        assert screen_dcf.price_symbol(tmp_path, "DCBO") == "DCBO"
+
+    def test_missing_info_falls_back_to_folder_name(self, tmp_path):
+        assert screen_dcf.price_symbol(tmp_path, "NOPE") == "NOPE"
+
+    def test_malformed_info_never_raises(self, tmp_path):
+        (tmp_path / "XX").mkdir(parents=True)
+        (tmp_path / "XX" / "info.json").write_text("{not json")
+        assert screen_dcf.price_symbol(tmp_path, "XX") == "XX"
+
+    def test_aliases_alone_do_not_override(self, tmp_path):
+        """`aliases` is search metadata; only `price_symbol` redirects quotes."""
+        add_ticker(tmp_path, "HFL.NZ", inputs_currency="NZD",
+                   top_currency="NZD")
+        self.with_info(tmp_path, "HFL.NZ", aliases=["HFEL.L", "HFEL"])
+        assert screen_dcf.price_symbol(tmp_path, "HFL.NZ") == "HFL.NZ"
