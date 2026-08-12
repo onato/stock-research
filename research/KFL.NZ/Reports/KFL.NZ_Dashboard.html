@@ -1,0 +1,1705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kingfish Limited (KFL.NZ) Financial Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 20px;
+}
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+}
+.header h1 {
+    font-size: 2.5rem;
+    background: linear-gradient(90deg, #00d4aa, #00b894);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+}
+.header p { color: #888; font-size: 1.1rem; }
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.kpi-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.kpi-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 212, 170, 0.2);
+}
+.kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+.kpi-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.kpi-change { font-size: 0.9rem; margin-top: 5px; }
+.kpi-change.positive { color: #00d4aa; }
+.kpi-change.negative { color: #ff6b6b; }
+.kpi-change.neutral { color: #fdcb6e; }
+/* Guidance Section */
+.guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+.guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 8px; }
+.guidance-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.guidance-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px; }
+.guidance-meta { font-size: 0.85rem; color: #888; }
+.guidance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.guidance-card { background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 18px; border: 1px solid rgba(255, 255, 255, 0.1); transition: transform 0.2s ease; }
+.guidance-card:hover { transform: translateY(-2px); }
+.guidance-metric { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.guidance-target { font-size: 1.3rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; }
+.guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
+.guidance-vs-prior { display: inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+.guidance-vs-prior.raised { background: rgba(0, 212, 170, 0.15); color: #00d4aa; }
+.guidance-vs-prior.lowered { background: rgba(255, 107, 107, 0.15); color: #ff6b6b; }
+.guidance-vs-prior.maintained { background: rgba(255, 255, 255, 0.1); color: #888; }
+.guidance-vs-prior.new { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
+.guidance-notes { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
+.guidance-commentary { background: rgba(255, 255, 255, 0.03); border-radius: 10px; padding: 16px 20px; border-left: 3px solid #00d4aa; font-style: italic; color: #b0b0b0; line-height: 1.6; }
+.guidance-commentary::before { content: '"'; font-size: 1.5rem; color: #00d4aa; margin-right: 4px; }
+.section-title {
+    font-size: 1.5rem;
+    color: #fff;
+    margin: 40px auto 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid rgba(0, 212, 170, 0.3);
+    max-width: 1400px;
+}
+.section-caption {
+    max-width: 1400px;
+    margin: -10px auto 20px;
+    color: #999;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+.charts-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 25px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+.chart-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    padding: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.chart-card.full-width { grid-column: 1 / -1; }
+.chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.chart-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.chart-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px; }
+.help-btn {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: rgba(0, 212, 170, 0.2);
+    border: 1px solid #00d4aa;
+    color: #00d4aa;
+    font-size: 14px; font-weight: bold;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s ease;
+}
+.help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.chart-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.log-toggle {
+    padding: 3px 10px; border-radius: 12px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #888;
+    font-size: 11px; font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.log-toggle:hover { border-color: #00d4aa; color: #00d4aa; }
+.log-toggle.active { background: rgba(0, 212, 170, 0.2); border-color: #00d4aa; color: #00d4aa; }
+.chart-caption { font-size: 0.82rem; color: #888; margin-top: 10px; line-height: 1.5; font-style: italic; }
+.chart-wrapper { position: relative; height: 300px; }
+.chart-wrapper.tall { height: 340px; }
+.modal-overlay {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.7); z-index: 1000;
+    justify-content: center; align-items: center; padding: 20px;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+    background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%);
+    border-radius: 16px; max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto;
+    border: 1px solid rgba(0, 212, 170, 0.3);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.modal-header { padding: 20px 25px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); display: flex; justify-content: space-between; align-items: center; }
+.modal-header h3 { color: #00d4aa; font-size: 1.4rem; margin: 0; }
+.modal-close {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(255, 107, 107, 0.2);
+    border: 1px solid #ff6b6b; color: #ff6b6b;
+    font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+.modal-close:hover { background: #ff6b6b; color: #fff; }
+.modal-body { padding: 25px; line-height: 1.7; }
+.modal-body p { margin-bottom: 15px; }
+.modal-body strong { color: #00d4aa; }
+.modal-body ul { margin: 15px 0; padding-left: 20px; }
+.modal-body li { margin-bottom: 8px; }
+.metric-highlight { background: rgba(0, 212, 170, 0.1); border-left: 3px solid #00d4aa; padding: 12px 15px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+/* Investment Overview Section */
+.overview-section { max-width: 1400px; margin: 0 auto 30px; }
+.overview-toggle {
+    width: 100%;
+    background: rgba(0, 212, 170, 0.1);
+    border: 1px solid rgba(0, 212, 170, 0.3);
+    border-radius: 12px;
+    padding: 16px 24px;
+    color: #00d4aa;
+    font-size: 1.1rem; font-weight: 600;
+    cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center;
+    transition: all 0.2s ease;
+}
+.overview-toggle:hover { background: rgba(0, 212, 170, 0.2); }
+.overview-toggle .arrow { transition: transform 0.3s ease; }
+.overview-toggle.active .arrow { transform: rotate(180deg); }
+.overview-content {
+    display: none;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    padding: 30px;
+    margin-top: -12px;
+}
+.overview-content.active { display: block; }
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+.overview-card { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.overview-card h3 { color: #00d4aa; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+.overview-card p { margin-bottom: 12px; line-height: 1.6; }
+.overview-card ul { list-style: none; padding: 0; margin: 0; }
+.overview-card li { padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); line-height: 1.5; }
+.overview-card li:last-child { border-bottom: none; }
+.overview-card.bull h3 { color: #00d4aa; }
+.overview-card.bear h3 { color: #ff6b6b; }
+.overview-card.risks h3 { color: #fdcb6e; }
+.risk-high { color: #ff6b6b; }
+.risk-moderate { color: #fdcb6e; }
+.risk-low { color: #00d4aa; }
+.revenue-stream { display: flex; justify-content: space-between; align-items: center; }
+.revenue-stream .percent { color: #00d4aa; font-weight: 600; }
+.trend-growing { color: #00d4aa; }
+.trend-stable { color: #888; }
+.trend-declining { color: #ff6b6b; }
+.trend-volatile { color: #fdcb6e; }
+/* LIC callout banner */
+.lic-banner {
+    max-width: 1400px; margin: 0 auto 30px;
+    background: rgba(253, 203, 110, 0.1);
+    border: 1px solid rgba(253, 203, 110, 0.35);
+    border-radius: 12px;
+    padding: 18px 24px;
+    color: #f0d9a8;
+    line-height: 1.6;
+    display: flex; gap: 14px; align-items: flex-start;
+}
+.lic-banner .icon { font-size: 1.4rem; flex-shrink: 0; }
+.lic-banner strong { color: #fdcb6e; }
+/* DCF Valuation Section */
+.dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+.dcf-warning {
+    background: rgba(253, 203, 110, 0.15);
+    border: 1px solid rgba(253, 203, 110, 0.4);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 25px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    color: #fdcb6e;
+    line-height: 1.6;
+}
+.warning-icon { font-size: 1.3rem; flex-shrink: 0; }
+.dcf-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+.dcf-card { background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 24px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.1); transition: transform 0.3s ease; }
+.dcf-card:hover { transform: translateY(-3px); }
+.dcf-card.highlight { background: rgba(0, 212, 170, 0.1); border-color: rgba(0, 212, 170, 0.3); }
+.dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.dcf-value { font-size: 2.2rem; font-weight: bold; color: #00d4aa; }
+.dcf-card:not(.highlight) .dcf-value { color: #fff; }
+.dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+.dcf-change.positive { color: #00d4aa; }
+.dcf-change.negative { color: #ff6b6b; }
+.dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
+.dcf-inputs { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+.dcf-inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.dcf-input-card { background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 12px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.05); }
+.dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #00d4aa; }
+.dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
+.fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
+.fcf-projection-table { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; background: rgba(0, 0, 0, 0.2); border-radius: 8px; padding: 12px; }
+.fcf-projection-item { text-align: center; }
+.fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
+.fcf-projection-item .year { font-size: 0.75rem; color: #888; margin-bottom: 2px; }
+.fcf-projection-item .fcf-value { font-size: 1rem; color: #e0e0e0; font-weight: 500; }
+.fcf-projection-item .growth-rate { font-size: 0.75rem; color: #00d4aa; margin-top: 2px; }
+.dcf-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; margin-bottom: 30px; padding: 25px; background: rgba(255, 255, 255, 0.03); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.slider-group { display: flex; flex-direction: column; gap: 10px; }
+.slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+.slider-group label span { color: #00d4aa; font-weight: 600; }
+.slider-group input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); outline: none; }
+.slider-group input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #00d4aa; cursor: pointer; transition: transform 0.2s; }
+.slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.slider-hint { font-size: 0.8rem; color: #666; }
+.scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+.scenario-tab { padding: 10px 24px; border: 1px solid rgba(255, 255, 255, 0.2); background: transparent; color: #888; border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s; }
+.scenario-tab:hover { border-color: rgba(0, 212, 170, 0.5); color: #e0e0e0; }
+.scenario-tab.active { background: rgba(0, 212, 170, 0.15); border-color: #00d4aa; color: #00d4aa; }
+.scenario-details { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; margin-bottom: 30px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.scenario-details h4 { color: #00d4aa; margin-bottom: 15px; }
+.assumption-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+.assumption-item { text-align: center; }
+.assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+.assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
+.sensitivity-section { margin-bottom: 30px; }
+.sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; }
+.sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255, 255, 255, 0.03); border-radius: 8px; overflow: hidden; }
+.sensitivity-table th, .sensitivity-table td { padding: 12px 16px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); }
+.sensitivity-table th { background: rgba(0, 212, 170, 0.1); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td { color: #e0e0e0; }
+.sensitivity-table td.highlight { background: rgba(0, 212, 170, 0.15); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td.below-current { color: #ff6b6b; }
+.sensitivity-table td.above-current { color: #00d4aa; }
+.historical-growth { margin-bottom: 30px; }
+.historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
+.growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
+.growth-item { background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 15px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); }
+.growth-item .metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
+.growth-item .rate { font-size: 1.2rem; font-weight: 600; }
+.growth-item .rate.positive { color: #00d4aa; }
+.growth-item .rate.negative { color: #ff6b6b; }
+.growth-item.selected { border-color: #00d4aa; background: rgba(0, 212, 170, 0.1); }
+.dcf-download { text-align: center; margin-top: 30px; }
+.download-btn { display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; background: rgba(0, 212, 170, 0.15); border: 1px solid #00d4aa; border-radius: 8px; color: #00d4aa; text-decoration: none; font-weight: 600; transition: all 0.2s; }
+.download-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.download-icon { font-size: 1.2rem; }
+
+@media (max-width: 768px) {
+    .charts-container { grid-template-columns: 1fr; }
+    .overview-grid { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.8rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Kingfish Limited (KFL.NZ)</h1>
+    <p>Closed-End Listed Investment Company &mdash; Managed by Fisher Funds &mdash; FY ends 31 March</p>
+</div>
+
+<div class="lic-banner">
+    <span class="icon">&#9432;</span>
+    <div><strong>Reading note:</strong> Kingfish is a closed-end fund, not an operating company. It has no revenue, gross margin, EBITDA or free cash flow in the normal sense. The CSV's "Revenue" column is total investment income (dividends + interest + mark-to-market gains/losses on the portfolio) and is <strong>negative</strong> in FY2022, FY2023 and FY2026 &mdash; it is relabelled "Total Income (incl. mark-to-market)" throughout this dashboard and is never shown on a log scale. The metric that matters here is <strong>NAV per share</strong>, not earnings.</div>
+</div>
+
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid">
+            <div class="overview-card">
+                <h3>Company Overview</h3>
+                <p id="ovOverview"></p>
+            </div>
+            <div class="overview-card">
+                <h3>Business Model</h3>
+                <p id="ovBizSummary"></p>
+                <ul id="ovRevenueStreams"></ul>
+            </div>
+            <div class="overview-card">
+                <h3>Competitive Position</h3>
+                <p><strong>Competitors:</strong> <span id="ovCompetitors"></span></p>
+                <p><strong>Moat factors:</strong></p>
+                <ul id="ovMoat"></ul>
+            </div>
+            <div class="overview-card">
+                <h3>Growth Drivers</h3>
+                <ul id="ovGrowth"></ul>
+            </div>
+            <div class="overview-card risks">
+                <h3>Key Risks</h3>
+                <ul id="ovRisks"></ul>
+            </div>
+            <div class="overview-card bull">
+                <h3>Bull Case</h3>
+                <ul id="ovBull"></ul>
+            </div>
+            <div class="overview-card bear">
+                <h3>Bear Case</h3>
+                <ul id="ovBear"></ul>
+            </div>
+            <div class="overview-card">
+                <h3>Recent Developments</h3>
+                <ul id="ovRecent"></ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf"></span> | <span id="guidanceFY"></span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<h2 class="section-title">NAV Erosion &mdash; The Core Story</h2>
+<div class="section-caption">NAV per share has fallen from $1.57 (FY2019) to $1.20 (FY2026) while shares on issue have risen 81%. Total net assets grew only because new shares were issued via warrants and the dividend reinvestment plan &mdash; not because existing holders' capital compounded.</div>
+<div class="charts-container">
+    <div class="chart-card full-width">
+        <div class="chart-header">
+            <h3>NAV per Share vs Shares on Issue</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('navDilution')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper tall"><canvas id="navDilutionChart"></canvas></div>
+        <div class="chart-caption">This divergence &mdash; falling NAV per share while the share count climbs &mdash; IS the dilution / return-of-capital story. Existing shareholders' per-share claim on the fund has shrunk every year new shares were issued below intrinsic NAV growth.</div>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>NAV per Share vs Share Price</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('navVsPrice')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="navPriceChart"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Discount / Premium to Adjusted NAV</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('discount')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="discountChart"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Adjusted NAV Return vs Benchmark (S&amp;P/NZX50G)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('returnVsBenchmark')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="returnBenchmarkChart"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Assets &amp; Cash</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('netAssetsChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('netAssets')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="netAssetsChart"></canvas></div>
+    </div>
+</div>
+
+<h2 class="section-title">Is the Distribution Covered?</h2>
+<div class="section-caption">The ~9% headline yield is funded first from the fixed 2%-of-NAV-per-quarter policy, not from what the portfolio actually earns. When dividends paid exceed income received and net profit, the balance comes out of shareholders' own capital.</div>
+<div class="charts-container">
+    <div class="chart-card full-width">
+        <div class="chart-header">
+            <h3>Dividends Paid vs Income Received vs Net Profit/(Loss)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('coverage')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper tall"><canvas id="coverageChart"></canvas></div>
+        <div class="chart-caption">FY2026: dividends paid $38.1m vs dividend + interest income of just $10.5m and a net LOSS of $13.6m &mdash; the distribution was not remotely covered by either income or total return.</div>
+    </div>
+
+    <div class="chart-card full-width">
+        <div class="chart-header">
+            <h3>Total Income (incl. Mark-to-Market) &amp; Net Income by Year</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('totalIncome')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper tall"><canvas id="totalIncomeChart"></canvas></div>
+        <div class="chart-caption">"Total Income" is NOT operating revenue &mdash; it is dividends/interest received plus realised and unrealised changes in the fair value of the portfolio, which swings the P&amp;L from profit to loss year to year. Never plotted on a log scale because it goes negative (FY2022, FY2023, FY2026).</div>
+    </div>
+</div>
+
+<h2 class="section-title">Portfolio Composition</h2>
+<div class="section-caption">At 31 March 2026. Concentrated in five holdings (~60% of the portfolio) across NZ blue-chip healthcare, infrastructure and industrials.</div>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Top Holdings</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('holdings')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="holdingsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Sector Weights</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('sectors')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="sectorsChart"></canvas></div>
+    </div>
+</div>
+
+<h2 class="section-title">DCF Valuation</h2>
+
+<div class="dcf-section">
+  <div class="dcf-warning">
+    <span class="warning-icon">&#9888;</span>
+    <span id="warningText"></span>
+  </div>
+
+  <div class="dcf-summary">
+    <div class="dcf-card highlight">
+      <div class="dcf-label">Intrinsic Value (Base)</div>
+      <div class="dcf-value" id="dcfIV">$0.97</div>
+      <div class="dcf-change negative" id="dcfUpside">-19% downside</div>
+      <div class="dcf-sublabel">NAV-per-share compounding + exit P/NAV, discounted at cost of equity</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Entry Price (15% CAGR)</div>
+      <div class="dcf-value" id="dcfEntry">$0.80</div>
+      <div class="dcf-sublabel">Buy below for a 15% annual return (incl. dividends + exit NAV)</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Current Price</div>
+      <div class="dcf-value" id="dcfCurrent">$1.20</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Prob-Weighted IV</div>
+      <div class="dcf-value" id="dcfWeighted">$0.96</div>
+      <div class="dcf-change" id="dcfWeightedUpside"></div>
+      <div class="dcf-sublabel">30% Bear / 45% Base / 25% Bull</div>
+    </div>
+  </div>
+
+  <div class="dcf-inputs">
+    <h4>DCF Model Inputs</h4>
+    <div class="dcf-inputs-grid">
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Statutory NAV / Share</div>
+        <div class="dcf-input-value" id="baseFCF">$1.20</div>
+        <div class="dcf-input-note" id="sbcBreakdown">31-Mar-2026, used as conservative projection anchor</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Shares Outstanding</div>
+        <div class="dcf-input-value" id="sharesOut">358.8M</div>
+        <div class="dcf-input-note" id="dilutionNote">Held flat &mdash; no warrant series outstanding after May-2026 lapse</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Net Debt</div>
+        <div class="dcf-input-value" id="netDebt">$0M</div>
+        <div class="dcf-input-note">Zero borrowings by mandate &mdash; NAV already nets everything</div>
+      </div>
+    </div>
+    <div class="fcf-projections">
+      <h5>Projected NAV per Share &amp; Dividends (5-Year, Base Case)</h5>
+      <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+    </div>
+  </div>
+
+  <div class="dcf-controls">
+    <div class="slider-group">
+      <label>Gross Portfolio Return: <span id="growthValue">6.5%</span></label>
+      <input type="range" id="growthSlider" min="0" max="15" value="6.5" step="0.5" oninput="updateDCFDisplay()">
+      <div class="slider-hint" id="growthHint">Long-run NZ blue-chip equity total return assumption</div>
+    </div>
+    <div class="slider-group">
+      <label>Cost of Equity: <span id="waccValue">10%</span></label>
+      <input type="range" id="waccSlider" min="7" max="14" value="10" step="0.5" oninput="updateDCFDisplay()">
+    </div>
+    <div class="slider-group">
+      <label>Exit Price / NAV: <span id="terminalValue">0.95x</span></label>
+      <input type="range" id="terminalSlider" min="0.8" max="1.15" value="0.95" step="0.01" oninput="updateDCFDisplay()">
+    </div>
+  </div>
+
+  <div class="scenario-tabs">
+    <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+    <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+    <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+  </div>
+
+  <div class="scenario-details" id="scenarioDetails">
+    <h4>Assumptions</h4>
+    <div class="assumption-grid" id="assumptionGrid"></div>
+  </div>
+
+  <div class="sensitivity-section">
+    <h4>Sensitivity Analysis: Intrinsic Value by Cost of Equity &amp; Exit Price-to-NAV</h4>
+    <table class="sensitivity-table" id="sensitivityMatrix"></table>
+  </div>
+
+  <div class="historical-growth">
+    <h4>Historical NAV per Share Growth (CAGR)</h4>
+    <div class="growth-grid" id="growthGrid"></div>
+  </div>
+
+  <div class="dcf-download">
+    <a href="KFL.NZ_DCF_Model.xlsx" class="download-btn" download>
+      <span class="download-icon">&#8681;</span> Download Excel Model
+    </a>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ============ EMBEDDED DATA ============
+const csvData = `Period,Revenue,CostOfRevenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,EBITDA,NetIncome,NetMargin,EPS,OperatingCashFlow,CapEx,FreeCashFlow,ShareholdersEquity,TotalAssets,TotalLiabilities,TotalDebt,CashAndEquivalents,SharesOutstanding,StockBasedComp,DividendPerShare,EBITDABeforeSignificant,RevenueContinuing,EBITDAContinuingBeforeSignificant,EBITContinuingBeforeSignificant,Units,Currency
+FY2019,56.312,,,,47.142,,,47.063,,24.24,,,,310.621,,,0.0,,197.889673,,,,,,,millions,NZD
+FY2020,7.729,,,,1.772,,,1.742,,0.75,,,,345.404,,,0.0,,248.587907,,,,,,,millions,NZD
+FY2021,155.966,,,,142.733,,,142.713,,56.28,,,,551.447,,,0.0,,312.037141,,,,,,,millions,NZD
+FY2022,-10.654,,,,-17.286,,,-17.306,,-5.49,,,,505.409,,,0.0,,320.875194,,,,,,,millions,NZD
+FY2023,-14.671,,,,-19.446,,,-19.469,,,,,,461.584,,,0.0,,330.213075,,,,,,,millions,NZD
+FY2024,26.766,,,,19.929,,,19.905,,5.96,,,,457.621,,,0.0,,340.543107,,,,,,,millions,NZD
+FY2025,48.233,,,,40.832,,,40.81,,11.9,,,,469.898,470.595,0.697,0.0,15.339,348.300808,,,,,,,millions,NZD
+FY2026,-8.303,,,,-13.538,,,-13.557,,-3.85,,,,431.37,432.083,0.713,0.0,7.016,358.844193,,,,,,,millions,NZD`;
+
+const analysis = {
+  "ticker": "KFL.NZ",
+  "name": "Kingfish Limited",
+  "company_name": "Kingfish Limited",
+  "sector": "Listed Investment Company / NZ Equities Fund",
+  "analysis_date": "2026-08-12",
+  "overview": "Kingfish Limited is a closed-end listed investment company (LIC) on the NZX Main Board (listed 31 March 2004) that holds a concentrated portfolio of quality, growing New Zealand companies, both listed and unlisted. It is externally managed by Fisher Funds Management Limited under the 'STEEPP' quality-growth investment process. At 31 March 2026 the company held total assets of $432.1m, almost entirely (98%) invested in equities ($422.1m), funded solely by equity (zero debt) with $431.4m of net assets.",
+  "business_model": {
+    "summary": "Kingfish earns no operating revenue; it generates 'income' from dividends received on portfolio holdings, interest on cash, and (the dominant swing factor) unrealised/realised changes in the fair value of its investment portfolio. FY2026: dividend and interest income $10.5m, net investment losses -$18.9m, operating expenses and tax -$5.3m, net loss -$13.6m. The company pays shareholders a fixed quarterly cash distribution equal to 2% of average NAV (~8%/year), funded from a mix of income, capital gains and, when those are insufficient, return of capital -- FY2026 dividends paid ($38.1m) far exceeded both dividend income ($10.1m) and the net result (a $13.6m loss), meaning the distribution mechanically eroded NAV per share this year.",
+    "revenue_streams": [
+      {"name": "Dividend income from portfolio companies", "percent": null, "trend": "stable", "note": "$10.1m FY2026"},
+      {"name": "Interest income on cash", "percent": null, "trend": "stable", "note": "$0.4m FY2026"},
+      {"name": "Net change in fair value of investments (realised + unrealised)", "percent": null, "trend": "volatile", "note": "-$18.9m FY2026 vs prior year strongly positive; this line dominates the P&L swing"}
+    ],
+    "customer_type": "Retail and wholesale NZ investors buying listed LIC shares (not B2B/B2C in the operating sense)",
+    "geographic_mix": "100% New Zealand-domiciled underlying investments (NZX-listed and select unlisted NZ companies)"
+  },
+  "competitive_position": {
+    "main_competitors": [
+      "Barramundi Limited (BRM.NZ) -- sister Fisher Funds LIC, Australasian growth focus",
+      "Marlin Global Limited (MLN.NZ) -- sister Fisher Funds LIC, international equities",
+      "Direct NZX50 index funds/ETFs (e.g. Smartshares NZ Top 50 (FNZ), Kernel NZ 20)",
+      "Milford Asset Management (unlisted/KiwiSaver active NZ equity funds)",
+      "Fisher Funds' own unit trust equivalents (e.g. Premium New Zealand Fund)",
+      "Direct retail stock-picking / other NZ-focused managed funds"
+    ],
+    "market_position": "One of a small number of NZX-listed closed-end vehicles giving retail investors packaged exposure to concentrated NZ growth equities, including limited access to unlisted names; sub-scale relative to global LIC peers and increasingly competing against near-zero-fee passive NZX50 index products.",
+    "moat_factors": [
+      {"factor": "Access to unlisted NZ growth companies", "strength": "weak-to-moderate", "description": "Portfolio can include unlisted holdings retail investors otherwise cannot access, but current portfolio (per FY2026 top 10) is overwhelmingly listed large/mid caps"},
+      {"factor": "Brand / long track record", "strength": "moderate", "description": "22-year listed history and Fisher Funds brand recognition in NZ retail investment community"},
+      {"factor": "Single-vehicle diversification and tax efficiency", "strength": "weak", "description": "PIE tax treatment and one-ticket diversified NZ exposure, but replicable cheaply via index funds"},
+      {"factor": "Switching costs", "strength": "very weak", "description": "No lock-in; shares trade freely on NZX and can be sold/switched into an index fund at any time"}
+    ],
+    "weaknesses": [
+      "No durable competitive moat versus low-cost NZX50 index ETFs, which have negligible fees versus Kingfish's management/performance fee structure",
+      "Concentrated, small/mid-cap NZ-only mandate with limited liquidity in the underlying market",
+      "Persistent NAV erosion driven by a distribution policy that is frequently uncovered by earnings",
+      "Structural share dilution via warrants (struck near/below NAV) and a discounted (3%) Dividend Reinvestment Plan",
+      "Closed-end structure means share price can and does trade at a discount to NAV, an additional structural drag for sellers"
+    ]
+  },
+  "growth_drivers": [
+    "Potential re-rating of the NZ small/mid-cap market from cyclically depressed levels (NZ economy only beginning to recover as of FY2026)",
+    "Portfolio companies' own earnings growth (e.g. Fisher & Paykel Healthcare margin expansion, Infratil's CDC Data Centres AI-driven demand, Mercury's generation build-out, Contact Energy's Contact31+ growth plan)",
+    "Active share buyback programme (up to 5% of shares on issue) when the share price trades at a meaningful discount to NAV, which is modestly NAV-accretive",
+    "Management fee rebate mechanism reduces fee drag automatically when performance is weak (FY2026 fee cut from 1.25% to 0.85% of adjusted NAV, saving $1.9m), partially cushioning bad years",
+    "High shareholder appetite for the discounted (3%) Dividend Reinvestment Plan (38% participation) supports steady demand for new shares",
+    "Continued NZ interest rate cuts feeding through to household spending power, a tailwind for domestically-exposed holdings (Mainfreight, Vulcan Steel, Freightways, Summerset)"
+  ],
+  "risks": {
+    "business": [
+      {"risk": "Concentrated portfolio", "severity": "high", "description": "Top 5 holdings (F&P Healthcare 19%, Infratil 17%, Mainfreight 8%, Summerset 8%, Auckland Airport 8%) are ~60% of the portfolio; company-specific shocks in any one name materially move NAV"},
+      {"risk": "Small, illiquid underlying market", "severity": "moderate", "description": "Entire mandate is NZX-listed/unlisted NZ companies, a market with limited breadth, depth and liquidity relative to global peers"},
+      {"risk": "Underperformance versus benchmark", "severity": "moderate", "description": "FY2026 gross performance return of -2.1% badly lagged the S&P/NZX50G's +5.2%, driven by underperforming positions in Vista (-55%), EBOS (-39%), Vulcan Steel (-27%) and Summerset (-19%)"}
+    ],
+    "financial": [
+      {"risk": "NAV per share erosion", "severity": "high", "description": "NAV/share has fallen from $1.57 (FY2019) to $1.20 (FY2026), a -3.8%/yr decline over 7 years, despite total net assets rising -- the distribution policy (2% of average NAV per quarter, ~8%/yr) is not covered by dividend income or total returns in most years and functions substantially as return of capital"},
+      {"risk": "Dilution from warrants and DRP", "severity": "high", "description": "Shares on issue have grown 81% since FY2019 (197.9m to 358.8m) largely via warrant exercises struck near/below NAV and a DRP offered at a 3% discount to market price, diluting existing holders' per-share NAV"},
+      {"risk": "Discount to NAV volatility", "severity": "moderate", "description": "Share price traded at times more than a 6% discount to adjusted NAV during FY2026; a widening discount is an additional loss for sellers on top of any NAV decline"}
+    ],
+    "regulatory": [
+      {"risk": "PIE/tax regime changes", "severity": "low", "description": "Any adverse change to NZ's Portfolio Investment Entity tax treatment for LICs would reduce the vehicle's relative tax efficiency"},
+      {"risk": "Climate/ESG reporting scope changes", "severity": "low", "description": "NZ government narrowed CRD mandatory reporting scope in Oct 2025; Kingfish ceased to be a climate reporting entity from 2026 -- a modest compliance-cost relief, not a risk, but signals regulatory flux"}
+    ],
+    "macro": [
+      {"risk": "NZ economic cyclicality", "severity": "high", "description": "NZ economy showed only tentative recovery through FY2026 before the March 2026 Middle East conflict / Strait of Hormuz closure drove higher fuel prices and interest-rate uncertainty, hitting cyclical holdings (Mainfreight, Vulcan Steel) and rate-sensitive names (Summerset)"},
+      {"risk": "Interest rate sensitivity", "severity": "moderate", "description": "Both the discount rate applied to growth-company valuations and NZ mortgage-linked consumer spending (affecting retail/housing-exposed holdings) are sensitive to RBNZ rate moves"},
+      {"risk": "Global risk sentiment / tariffs", "severity": "moderate", "description": "US tariff policy (NZ rate raised 10%->15% in FY2026) and broader geopolitical shocks flow through to small open-economy NZ equity valuations"}
+    ],
+    "execution": [
+      {"risk": "Manager dependency", "severity": "moderate", "description": "Performance entirely dependent on Fisher Funds' stock-picking; FY2026 underperformance versus benchmark shows this can go materially wrong in a single year"},
+      {"risk": "Board/manager turnover", "severity": "low", "description": "Two new independent directors appointed in the past 12 months (Dan Coman, 1 Oct 2025; Simon Flood, 1 Jun 2026) -- routine renewal, not disruptive, but worth monitoring for continuity"}
+    ]
+  },
+  "recent_developments": [
+    {"date": "2026-08-07", "event": "Annual shareholders' meeting held (Ellerslie Event Centre, Auckland) following FY2026 annual report release"},
+    {"date": "2026-06-22", "event": "FY2026 Annual Report released: net loss -$13.6m (FY2025: +$40.8m profit), adjusted NAV return -3.2%, NAV per share fell to $1.20 from $1.35"},
+    {"date": "2026-06-01", "event": "Simon Flood appointed as new independent director"},
+    {"date": "2026-05-01", "event": "Exercise date for KFLWI warrant series (allotted 1 May 2025, one warrant per four shares); final exercise price set at $1.24 (reduced from initial $1.35 strike via dividend adjustments totalling 10.84 cps); only 1.40% of the 86.96m warrants on issue were exercised, with the remaining ~85.7m lapsing -- reflecting the share price trading close to/below the strike"},
+    {"date": "2026-03", "event": "Middle East conflict and Strait of Hormuz closure triggered a sharp NZ market and portfolio drawdown (NZX50 -5.8% in March 2026), swinging Kingfish's FY26 result from profit to loss"},
+    {"date": "2025-10-01", "event": "Dan Coman appointed to the Kingfish board"},
+    {"date": "2025-10", "event": "NZ Government announced narrowing of mandatory Climate-related Disclosures regime; Kingfish (sub-$1bn market cap) ceases to be a Climate Reporting Entity from 2026"},
+    {"date": "FY2026", "event": "Management fee automatically stepped down from 1.25% to 0.85% of adjusted NAV under the fee-rebate formula because gross portfolio performance trailed the 90-day bank bill index, saving shareholders $1.9m in fees"},
+    {"date": "FY2026", "event": "Share buyback programme repurchased 0.7m shares (FY2025: 4.8m) while the share price traded at times more than 6% below adjusted NAV"}
+  ],
+  "guidance": {
+    "as_of": "FY2026 Annual Report (22 June 2026)",
+    "fiscal_year": "FY2027 (year ending 31 March 2027)",
+    "items": [
+      {
+        "metric": "Quarterly distribution",
+        "target": "2.0% of average NAV per quarter (~8% annualised)",
+        "period": "Ongoing / FY2027",
+        "vs_prior": "maintained",
+        "notes": "Next dividend confirmed at 2.49 cps, payable 26 June 2026, record date 4 June 2026. Policy has been held constant for years despite NAV/share decline -- no formal EPS, revenue or margin guidance is provided as Kingfish is an investment company, not an operating business"
+      },
+      {
+        "metric": "Management fee rate",
+        "target": "Floating between 0.75% and 1.25% of adjusted NAV depending on performance vs 90-day bank bill index",
+        "period": "FY2027",
+        "vs_prior": "maintained (mechanical formula, not discretionary guidance)",
+        "notes": "FY2026 rate was 0.85% after the rebate; performance fee (10% of returns above NZ 90-day bank bill + 7% hurdle, subject to a high-water mark, currently $1.15, and capped at 1.25% of adjusted NAV) was not payable in FY2026 given the net loss"
+      },
+      {
+        "metric": "Share buyback authority",
+        "target": "Up to 5% of shares on issue",
+        "period": "Ongoing",
+        "vs_prior": "maintained",
+        "notes": "Discretionary, used opportunistically when the share price trades at a meaningful discount to adjusted NAV; repurchased shares are held as treasury stock and recycled through the DRP"
+      }
+    ],
+    "management_commentary": "The Chair called FY2026 'disappointing' with a net loss of $13.6m and adjusted NAV return of -3.2%, driven by the portfolio's gross performance return of -2.1% badly lagging the S&P/NZX50G's +5.2%. The Manager (Fisher Funds) stated it 'remains confident in the Manager's investment strategy to focus on well-managed, quality businesses' and does not believe the underperformance in Mainfreight, Vulcan Steel and Summerset reflects company-specific issues, viewing it instead as cyclical/sentiment-driven. No explicit forward return or NAV target was given; management characterised current valuations as attractive for 'patient, long-term investors' given more favourable entry points after the FY2026 drawdown."
+  },
+  "bull_case": [
+    "Trades close to NAV currently (roughly 1-2% discount as at mid-2026), removing the 'double discount' risk that has hurt returns in prior years and offering reasonable value if the discount stays contained or closes further",
+    "High, consistent quarterly cash distribution (~8% of NAV annualised) appeals to income-seeking investors even though part is return of capital, and the discounted DRP lets long-term holders compound at a slight discount",
+    "Concentrated exposure to high-quality NZ growth franchises (Fisher & Paykel Healthcare, Infratil/CDC data centres, Mercury, Contact Energy, Auckland Airport) that management argues remain fundamentally sound despite a weak FY2026 share price year, with several names guiding to multi-year earnings growth (Mercury underlying earnings to grow ~30% over 5 years, Contact EBITDAF to $1.2-1.3bn, Infratil's CDC benefiting from AI-driven data centre demand)",
+    "Automatic fee-rebate mechanism aligns manager incentives with performance and reduced the effective fee load in the recent weak year (1.25% down to 0.85%), and no performance fee is paid without clearing a high water mark",
+    "Access to a professionally-managed, single-ticket, tax-efficient (PIE) vehicle for NZ small/mid-cap and select unlisted exposure that would be difficult for retail investors to replicate directly, with active buybacks providing some discount-management support"
+  ],
+  "bear_case": [
+    "NAV per share has fallen from $1.57 (FY2019) to $1.20 (FY2026), a -3.8%/yr decline, because the fixed 8%-of-NAV annual distribution is not covered by portfolio income or total returns in most years -- FY2026 alone paid out $38.1m in dividends against only $10.1m of dividend income and a $13.6m net loss, meaning the 'yield' is substantially an unsustainable return of investors' own capital",
+    "Persistent shareholder dilution: shares on issue have grown 81% since FY2019 via warrants issued near/below NAV and a DRP offered at a 3% discount to market price, both of which transfer value from non-participating to participating/exercising shareholders and structurally cap per-share NAV growth even when the underlying portfolio performs",
+    "Fee drag on a sub-scale, single-country equity mandate: even after the FY2026 rebate to 0.85%, the OPEX ratio (1.1%) is several multiples the cost of a passive NZX50 index fund, and a 10% performance fee above a high hurdle plus base fees compounds against investors over time",
+    "Concentrated, illiquid exposure to one small equity market: top 5 holdings are ~60% of the portfolio, and FY2026 gross performance (-2.1%) badly lagged the S&P/NZX50G benchmark (+5.2%), showing single-year manager underperformance risk on top of NZ market-specific cyclicality (tariffs, Middle East oil shock, interest rates)",
+    "An investor seeking NZ equity exposure could buy a low-cost NZX50 index ETF at a fraction of Kingfish's fee load and without warrant/DRP dilution risk or discount-to-NAV volatility, raising the question of what durable value the LIC wrapper and active management add net of costs, particularly given the 5-year adjusted NAV return of only +0.5% p.a."
+  ]
+};
+
+const dcfData = {
+  "ticker": "KFL.NZ",
+  "company_name": "Kingfish Limited",
+  "valuation_date": "2026-08-12",
+  "current_price": 1.20,
+  "currency": "NZD",
+  "units": "millions except per-share figures",
+  "valuation_philosophy": "Kingfish is a closed-end listed investment company (LIC) on the NZX, managed by Fisher Funds, holding a concentrated portfolio of quality NZ companies (F&P Healthcare ~19%, Infratil ~17%, Mainfreight ~8%, Summerset ~8%, Auckland Airport ~8%). It has NO operating revenue, NO EBITDA, and reported 'Revenue'/NetIncome in the Metrics.csv are total investment income including mark-to-market swings (negative in FY2022/23/26) -- an FCF/WACC/Gordon-growth DCF is structurally inapplicable, exactly as for the other LICs in this research folder (BIT.NZ, AFI.NZ, BIF.NZ). This model instead uses NAV-per-share compounding x exit price-to-NAV, discounted at cost of equity: (a) split the portfolio's total return into fees, the cash distribution, and the residual change in NAV per share, then compound NAV/share forward; (b) apply a scenario exit P/NAV multiple to the year-5 NAV; (c) intrinsic value = PV(5 years of dividends per share) + PV(year-5 NAV/share x exit P/NAV), discounted at cost of equity. CRITICAL POINT: the ~8-9% headline dividend yield is NOT free income stacked on top of NAV growth -- it is funded first from the portfolio's own total return, and only the RESIDUAL after fees and the fixed 8%-of-NAV distribution shows up as NAV growth (which, on realistic assumptions, is negative). This is not a modelling assumption; it already happened -- statutory NAV/share fell from $1.57 (FY2019) to $1.20 (FY2026), a -3.8%/yr CAGR, even as total net assets grew, because 358.8m shares (vs 197.9m in FY2019, +81%) were issued via warrants and a 3%-discounted DRP. FY2026 alone paid $38.1m of dividends against only $10.5m of dividend/interest income and a $13.6m net LOSS -- the distribution is substantially return of capital, mechanically eroding NAV/share. Kingfish also currently trades at only a ~1% discount to NAV (vs a 5-6.5% discount in FY2023-25 and an 11.6% PREMIUM in FY2022) -- unlike most LICs in this book there is no discount-closing catalyst available to a new buyer; the buyer pays close to full NAV for a portfolio of NZ blue chips plus a ~1.1% annual fee load (management fee 0.75-1.25% of adjusted NAV, floating with performance, plus a 10% performance fee above a bank-bill+7% hurdle) that a passive NZX50 index fund would avoid almost entirely. The honest framing: Kingfish is an income-distribution vehicle suited to investors who want NZ blue-chip equity exposure plus a steady (if capital-eroding) quarterly cash stream, not a compounding growth investment. If the base case below is negative against the $1.20 market price, that is the model's genuine conclusion, not an input error -- it is reported as such rather than adjusted to manufacture upside.",
+  "wacc_rationale": "Cost of equity is built up as NZ risk-free rate (~4.5%, 10yr NZGB) + equity risk premium (~6.0%) for a diversified large/mid-cap NZ equity portfolio, which nets to roughly 10.5% unlevered. Kingfish itself carries ZERO debt (net assets ARE the NAV, no leveraged-beta adjustment needed) so no leverage uplift applies. A small downward adjustment versus a raw 10.5% is justified because the underlying portfolio (F&P Healthcare, Infratil, Mainfreight, Summerset, Auckland Airport) is blue-chip/large-cap, not small-cap -- so no large small-cap illiquidity premium is layered on. A small offsetting premium is added for the structural agency/fee drag and the closed-end wrapper's own (thinner) NZX liquidity versus its constituents. Net: base case cost of equity 10.0%, bull 9.5% (manager outperformance reduces perceived agency risk), bear 10.5% (persistent underperformance/fee drag raises the required return). The SAME rate is used consistently to discount both dividends and the exit value, and is exposed in the standard `wacc` assumption field so dashboard sliders operate on it directly.",
+  "inputs": {
+    "shares_outstanding": 358.844193,
+    "shares_outstanding_post_warrant_exercise": 360.062618,
+    "shares_note": "358,844,193 shares on issue at 31-Mar-2026 (FY2026 year end) is used as the base for the projection. A further 1,218,425 shares were issued 6-May-2026 from the 1.40% take-up of the KFLWI warrant exercise (the remaining 85.7m warrants lapsed), taking the count to ~360.06m -- a <0.4% difference, immaterial to per-share NAV projections and not separately modelled.",
+    "nav_per_share": 1.20,
+    "nav_per_share_note": "FY2026 statutory (as-reported) NAV per share at 31-Mar-2026, used as the conservative projection anchor. The most recent weekly disclosure (29-Jul-2026) showed an undiluted NAV of $1.2977, ~8% higher, reflecting the post-year-end market recovery; using the lower statutory figure is the conservative choice and is directly comparable to the audited net-assets figure below.",
+    "net_assets": 431.370,
+    "net_assets_prior_year": 469.898,
+    "cash_and_equivalents": 7.016,
+    "investments_at_fair_value": 422.093,
+    "total_debt": 0,
+    "net_debt": 0,
+    "net_debt_note": "Kingfish carries ZERO borrowings by mandate -- net assets ARE the NAV. Net debt is NOT subtracted anywhere in this model (unlike an operating-company DCF); NAV per share already nets everything.",
+    "last_fcf": null,
+    "reported_fcf": null,
+    "fcf_not_applicable_note": "Free cash flow is not a meaningful concept for a closed-end investment company -- operating cash flow reflects portfolio buying/selling, not earnings, and there is no capex/working-capital cycle. The economically equivalent basis used throughout this model is dividend/interest income received (FY2026: $10.5m, or ~2.9cps) versus the $38.1m ($10.84cps) actually distributed -- the gap is return of capital. This income figure is NOT used as a DCF base; see valuation_philosophy.",
+    "sbc": null,
+    "sbc_incl_equity_taxes": null,
+    "sbc_pct_of_revenue": null,
+    "sbc_pct_path": null,
+    "interest_income": null,
+    "sbc_source": "not applicable -- Kingfish is an externally-managed LIC (Fisher Funds) with no employees and no share-based compensation scheme",
+    "buyback_cash": 0.9,
+    "buyback_cash_note": "0.7m shares repurchased in FY2026 (FY2025: 4.8m) at a market price close to $1.19-1.28, approx $0.9m cash outflow; used tactically when the discount to NAV widens, authority capped at 5% of shares on issue. Not material enough to change the projected share count and is not separately modelled as an offset -- buybacks below NAV are mildly NAV-accretive and are implicitly folded into the fee-drag/net-return assumption rather than modelled as a discrete mechanic.",
+    "uncovered_dilution": null,
+    "annual_share_growth_pct": 0.0,
+    "projected_shares": [358.844193, 358.844193, 358.844193, 358.844193, 358.844193],
+    "projected_shares_note": "Held flat for projection purposes. Warrant/DRP dilution is a real historical driver of the NAV/share CAGR (shares +81% since FY2019) but is not separately re-modelled forward since there is no current warrant series outstanding after the May-2026 KFLWI lapse; NAV/share growth is instead calculated directly (net return minus distribution) which already captures the economics of any future issuance below NAV as a further drag not explicitly quantified here.",
+    "dividend_per_share_ttm": 0.1084,
+    "dividend_policy": "2.0% of average NAV paid EACH QUARTER (~8% annualised); next dividend 2.49cps payable 26-Jun-2026",
+    "dividend_yield_pct_approx": 9.0,
+    "currency": "NZD"
+  },
+  "historical_growth": {
+    "nav_per_share_history": {
+      "FY2018": 1.45, "FY2019": 1.57, "FY2020": 1.39, "FY2021": 1.77,
+      "FY2022": 1.58, "FY2023": 1.40, "FY2024": 1.34, "FY2025": 1.35, "FY2026": 1.20
+    },
+    "nav_per_share_7yr_cagr": -3.77,
+    "nav_per_share_5yr_cagr": -7.48,
+    "nav_per_share_3yr_cagr": -5.01,
+    "adjusted_nav_return_series_pct": {
+      "FY2022": -3.5, "FY2023": -3.6, "FY2024": 4.6, "FY2025": 8.9, "FY2026": -3.2
+    },
+    "adjusted_nav_return_5yr_annualised_pct": 0.5,
+    "gross_return_5yr_annualised_pct": 1.8,
+    "benchmark_5yr_annualised_pct": 0.6,
+    "fy2026_gross_return_vs_benchmark": "gross performance return -2.1% vs S&P/NZX50G +5.2%, underperformance of 7.3pp",
+    "revenue_3yr_cagr": null,
+    "revenue_5yr_cagr": null,
+    "revenue_not_meaningful_note": "The 'Revenue' column in the Metrics.csv is total investment income including realised/unrealised mark-to-market portfolio movements and is negative in FY2022 (-10.654), FY2023 (-14.671) and FY2026 (-8.303) -- a CAGR over a series that changes sign is not computable/meaningful and is left null.",
+    "eps_3yr_cagr": null,
+    "eps_5yr_cagr": null,
+    "eps_not_meaningful_note": "EPS is dominated by unrealised mark-to-market portfolio swings (FY2021 EPS 56.28c vs FY2022 -5.49c on a similar share base) and is not a proxy for a repeatable operating trend.",
+    "equity_7yr_cagr": 4.80,
+    "equity_5yr_cagr": -4.79,
+    "equity_3yr_cagr": -2.23,
+    "equity_cagr_note": "Net assets (equity) grew over 7 years despite falling NAV/share purely because shares on issue rose 81% (197.9m to 358.8m) via warrant exercises and a discounted DRP; net assets have actually SHRUNK over the last 3 and 5 years (FY2026 $431.4m vs FY2021 $551.4m) as the FY2022-23 and FY2026 losses combined with the uncovered distribution outpaced new issuance.",
+    "fcf_3yr_cagr": null,
+    "fcf_5yr_cagr": null,
+    "fcf_not_meaningful_note": "See inputs.fcf_not_applicable_note -- no FCF concept applies to a closed-end fund.",
+    "selected_growth_rate": -3.77,
+    "growth_rate_source": "nav_per_share_7yr_cagr",
+    "growth_divergence_warning": "Equity (net assets) CAGR (+4.8% 7yr) diverges sharply from NAV-per-share CAGR (-3.8% 7yr) -- a textbook LIC dilution pattern, not a data error. Net asset growth is entirely a function of gross share issuance (warrants struck near/below NAV, DRP at a 3% discount) outrunning the NAV-per-share decline; it says nothing about whether existing shareholders are being made better or worse off. NAV-per-share is used as the growth driver for this reason, consistent with the equivalent treatment for BIT.NZ/AFI.NZ/BIF.NZ in this research folder.",
+    "notes": "The defining historical fact for KFL.NZ is that NAV per share has fallen at a -3.8%/yr CAGR over 7 years (-7.5%/yr over the most recent 5) while total net assets rose, entirely due to a distribution policy (~8%/yr of NAV) that is structurally uncovered by the portfolio's actual total return in most years, funded by ongoing share issuance below/near NAV. The 5-year adjusted-NAV-return of only +0.5% p.a. (vs benchmark +0.6% p.a.) shows the manager has barely broken even net of fees over the period, even before the distribution policy's mechanical erosion of NAV/share is layered on."
+  },
+  "assumptions": {
+    "base": {
+      "gross_portfolio_return_pct": 6.5,
+      "fee_drag_pct": 1.1,
+      "net_return_pct": 5.4,
+      "distribution_rate_pct_of_nav": 8.0,
+      "implied_nav_per_share_growth_pct": -2.6,
+      "exit_price_to_nav": 0.95,
+      "wacc": 10.0,
+      "rationale": "Gross return of 6.5%/yr approximates a long-run NZX50G-type total return for a diversified blue-chip NZ portfolio, roughly consistent with Kingfish's own 5yr benchmark annualised return of 0.6% blended toward a more normal long-run NZ equity return assumption (the trailing 5yr figure is depressed by two down years, FY2022 and FY2026, that should not simply be extrapolated). Fee drag of 1.1% matches the FY2026 OPEX ratio. Net return of 5.4% against an 8%-of-NAV distribution policy implies NAV/share DECLINES ~2.6%/yr -- materially less severe than the realised 7yr CAGR (-3.8%) because the FY2019-2026 period included two sharp drawdowns (FY2020 COVID, FY2022-23 rate shock) this projection does not assume repeat. Exit P/NAV of 0.95 is the mid of the 5yr historical discount range (0.93-1.12x, ex the FY2022 premium outlier), i.e. a modest reversion from today's near-par 0.99x back toward the more typical discount regime."
+    },
+    "bull": {
+      "gross_portfolio_return_pct": 9.5,
+      "fee_drag_pct": 1.15,
+      "net_return_pct": 8.35,
+      "distribution_rate_pct_of_nav": 8.0,
+      "implied_nav_per_share_growth_pct": 0.35,
+      "exit_price_to_nav": 1.00,
+      "wacc": 9.5,
+      "rationale": "Manager adds genuine alpha and NZ small/mid caps re-rate from currently subdued levels (Chair explicitly frames current valuations as attractive entry points for 'patient, long-term investors'); portfolio names with disclosed multi-year growth plans (Mercury underlying earnings +30% over 5yr, Contact EBITDAF to $1.2-1.3bn, Infratil's CDC AI-driven data-centre demand) deliver. Fee drag is modelled HIGHER (1.15% vs 1.1% base), not lower, because strong performance re-engages the 10% performance fee above the bank-bill+7% hurdle (currently dormant, high-water mark $1.15) -- reflecting the mechanical fee structure honestly rather than assuming fees fall in the good case. Net return of 8.35% against the fixed 8% distribution leaves NAV/share roughly FLAT (+0.35%/yr), i.e. the distribution becomes approximately covered rather than reversed. Exit P/NAV of 1.00 assumes the fund continues to trade at par, as it does today."
+    },
+    "bear": {
+      "gross_portfolio_return_pct": 3.0,
+      "fee_drag_pct": 1.2,
+      "net_return_pct": 1.8,
+      "distribution_rate_pct_of_nav": 8.0,
+      "implied_nav_per_share_growth_pct": -6.2,
+      "exit_price_to_nav": 0.90,
+      "wacc": 10.5,
+      "rationale": "NZ market stagnates (consistent with the FY2026 pattern of NZX50G volatility around geopolitical/oil shocks and a manager that has now underperformed its benchmark by 7.3pp in the latest year), and the manager continues to lag as concentrated single-name risk (top 5 = ~60% of the portfolio; FY2026 was hurt by Vista -55%, EBOS -39%, Vulcan Steel -27%, Summerset -19%) repeats. Fee drag rises slightly (1.2%) as the automatic rebate mechanism only partially offsets a mediocre-but-not-catastrophic result. Against a fixed 8% distribution, net return of only 1.8% implies NAV/share erodes ~6.2%/yr -- close to the realised 5yr CAGR of -7.5%. Exit P/NAV of 0.90 assumes the discount re-widens beyond the FY2024 level (6.5%) as investor patience with a persistently underperforming, uncovered-distribution vehicle wanes."
+    }
+  },
+  "projections": {
+    "base": {
+      "years": ["FY2027", "FY2028", "FY2029", "FY2030", "FY2031"],
+      "nav_per_share": [1.1688, 1.1384, 1.1088, 1.0800, 1.0519],
+      "dividend_per_share": [0.0960, 0.0935, 0.0911, 0.0887, 0.0864],
+      "year5_nav_per_share": 1.0519,
+      "year5_exit_price_per_share": 0.9993
+    },
+    "bull": {
+      "years": ["FY2027", "FY2028", "FY2029", "FY2030", "FY2031"],
+      "nav_per_share": [1.2042, 1.2084, 1.2126, 1.2169, 1.2211],
+      "dividend_per_share": [0.0960, 0.0963, 0.0967, 0.0970, 0.0974],
+      "year5_nav_per_share": 1.2211,
+      "year5_exit_price_per_share": 1.2211
+    },
+    "bear": {
+      "years": ["FY2027", "FY2028", "FY2029", "FY2030", "FY2031"],
+      "nav_per_share": [1.1256, 1.0558, 0.9904, 0.9290, 0.8714],
+      "dividend_per_share": [0.0960, 0.0900, 0.0845, 0.0792, 0.0743],
+      "year5_nav_per_share": 0.8714,
+      "year5_exit_price_per_share": 0.7843
+    }
+  },
+  "valuation": {
+    "base": {
+      "sum_pv_dividends": 0.3472,
+      "pv_terminal": 0.6205,
+      "terminal_value": 0.9993,
+      "enterprise_value": null,
+      "equity_value": null,
+      "intrinsic_value": 0.9677,
+      "upside": -19.36,
+      "terminal_pct_of_value": 64.1,
+      "implied_exit_multiple": "n/a -- LIC valuation uses P/NAV, not an earnings multiple; exit P/NAV = 0.95",
+      "note": "intrinsic_value = PV(5yr dividends) + PV(year-5 NAV/share x exit P/NAV), both discounted at 10.0% cost of equity. No 'net debt' subtraction (Kingfish has none) and no separate enterprise/equity value split -- NAV per share already nets everything."
+    },
+    "bull": {
+      "sum_pv_dividends": 0.3710,
+      "pv_terminal": 0.7757,
+      "terminal_value": 1.2211,
+      "intrinsic_value": 1.1467,
+      "upside": -4.44,
+      "terminal_pct_of_value": 67.6
+    },
+    "bear": {
+      "sum_pv_dividends": 0.3214,
+      "pv_terminal": 0.4760,
+      "terminal_value": 0.7843,
+      "intrinsic_value": 0.7975,
+      "upside": -33.55,
+      "terminal_pct_of_value": 59.7
+    }
+  },
+  "entry_price": {
+    "hurdle_rate": 0.15,
+    "methodology": "Price today at which buying now, collecting base-case projected dividends per share for 5 years, and exiting at year-5 NAV/share x base-case exit P/NAV (0.95) earns a 15% IRR. Uses the base-case dividend/NAV path (the decelerating actual projection, not a constant growth proxy), discounted at 15% rather than the 10.0% cost of equity. Because Kingfish's realistic total return (~5.4% net of fees, against an 8%-of-NAV payout that erodes NAV/share ~2.6%/yr) is far below a 15% hurdle, the entry price implied is well below both intrinsic value and the current market price -- this is the correct, expected output for a fund earning single-digit total returns, not a modelling error.",
+    "base": {
+      "years_to_terminal": 5,
+      "pv_dividends_at_hurdle": 0.2967,
+      "pv_terminal_at_hurdle": 0.5079,
+      "net_debt": 0,
+      "entry_price": 0.8046,
+      "entry_discount_from_current_pct": -32.95
+    }
+  },
+  "sensitivity": {
+    "row_label": "cost_of_equity_pct",
+    "column_label": "exit_price_to_nav",
+    "wacc_range": [8.0, 9.0, 10.0, 11.0, 12.0],
+    "exit_pnav_range": [0.85, 0.90, 0.95, 1.00, 1.05],
+    "methodology": "Base-case NAV/dividend path (gross return 6.5%, fee drag 1.1%, distribution 8% of NAV -> NAV/share declining 2.6%/yr) held constant; each cell varies only the discount rate (row) and the year-5 exit price-to-NAV multiple (column). NOTE: for a closed-end fund the second sensitivity axis is exit P/NAV, not 'terminal growth' -- there is no Gordon-growth terminal value in this model.",
+    "matrix": [
+      [0.9739, 1.0097, 1.0455, 1.0813, 1.1171],
+      [0.9372, 0.9714, 1.0056, 1.0398, 1.0739],
+      [0.9024, 0.9350, 0.9677, 1.0004, 1.0330],
+      [0.8693, 0.9005, 0.9317, 0.9629, 0.9941],
+      [0.8378, 0.8677, 0.8975, 0.9274, 0.9572]
+    ]
+  },
+  "probability_weighted": {
+    "weights": {"bear": 0.30, "base": 0.45, "bull": 0.25},
+    "weights_rationale": "Bear weighted above the standard 25% because the central dynamic (a distribution policy exceeding realistic total return, mechanically eroding NAV/share) is not a hypothetical risk but the pattern actually observed over 7 of the last 8 years (NAV/share fell in 6 of 8 years shown). Bull is held at only 25% because it requires BOTH a return to genuine manager outperformance (reversing the FY2026 -7.3pp benchmark miss) AND the discount to stay at today's unusually tight ~1% level.",
+    "weighted_iv": 0.9614,
+    "weighted_upside_pct": -19.88
+  },
+  "sanity_check": {
+    "ran": true,
+    "passed": true,
+    "applicable_multiples_note": "Standard P/E and EV/EBITDA gates are NOT APPLICABLE to a closed-end investment company -- NetIncome/EPS is dominated by unrealised mark-to-market portfolio swings (not a repeatable earnings stream) and there is no EBITDA concept (no operating business, no revenue, no cost base to derive it from). Both are recorded as null below. The meaningful multiple for a LIC is PRICE-TO-NAV, which is used instead.",
+    "pe": null,
+    "ev_ebitda": null,
+    "pb_i.e._price_to_nav": {
+      "implied_pnav_base_case": 0.806,
+      "implied_pnav_bull_case": 0.955,
+      "implied_pnav_bear_case": 0.665,
+      "current_price_to_nav": 1.0,
+      "historical_pnav_series": {"FY2022": 1.116, "FY2023": 0.943, "FY2024": 0.935, "FY2025": 0.948, "FY2026": 0.990},
+      "historical_pnav_5yr_avg_ex_fy2022_outlier": 0.954,
+      "historical_pnav_5yr_max": 1.116
+    },
+    "trip_threshold": "implied P/NAV > 1.5x historical 5yr max (1.116 x 1.5 = 1.674)",
+    "trip_reasons": [],
+    "diagnosis": "PASS. Base-case implied P/NAV of 0.806x sits comfortably BELOW the entire 5-year historical range (0.935x-1.116x), let alone the 1.674x trip threshold -- the model is not assuming any unrealistic re-rating. If anything the base case implies the market SHOULD price Kingfish at a wider discount than the ~1% it currently trades at (current_price / nav0 = 1.20/1.20 = 1.0), which is the honest, expected direction of the result given the NAV-erosion dynamic documented in valuation_philosophy. Standard P/E and EV/EBITDA checks were skipped as structurally inapplicable to a closed-end fund with no operating earnings base -- this is a schema-consistency null, not a missing data point.",
+    "direction_of_conclusion": "The model finds Kingfish roughly FAIRLY-TO-SLIGHTLY-OVER priced at $1.20 (base case -19.4%, weighted -19.9%), consistent with the current ~1% discount to NAV being unusually tight versus the 5yr average ~5% discount, and consistent with the qualitative bear case (uncovered distribution policy, persistent benchmark underperformance, high fee load versus passive alternatives)."
+  }
+};
+
+// ============ HARDCODED SUPPLEMENTARY DATA (verified from FY2026 annual report, not in CSV) ============
+const navPerShareHistory = { "FY2018":1.45, "FY2019":1.57, "FY2020":1.39, "FY2021":1.77, "FY2022":1.58, "FY2023":1.40, "FY2024":1.34, "FY2025":1.35, "FY2026":1.20 };
+const sharePriceHistory = { "FY2022":1.75, "FY2023":1.32, "FY2024":1.25, "FY2025":1.28, "FY2026":1.19 };
+const discountPremiumHistory = { "FY2022":-11.6, "FY2023":5.7, "FY2024":6.5, "FY2025":5.2, "FY2026":1.0 }; // negative = premium
+const adjNavReturnHistory = { "FY2022":-3.5, "FY2023":-3.6, "FY2024":4.6, "FY2025":8.9, "FY2026":-3.2 };
+const benchmarkReturnHistory = { "FY2022":null, "FY2023":null, "FY2024":null, "FY2025":null, "FY2026":5.2 }; // only FY2026 disclosed precisely
+const dividendsPaidHistory = { "FY2025": 38.6, "FY2026": 38.1 }; // $m, approx from DPS x avg shares; FY2026 stated explicitly
+const incomeReceivedHistory = { "FY2025": null, "FY2026": 10.5 }; // $m dividend+interest income
+const topHoldings = [
+    { name: "Fisher & Paykel Healthcare", pct: 19 },
+    { name: "Infratil", pct: 17 },
+    { name: "Mainfreight", pct: 8 },
+    { name: "Summerset", pct: 8 },
+    { name: "Auckland Airport", pct: 8 },
+    { name: "Other holdings", pct: 40 }
+];
+const sectorWeights = [
+    { name: "Healthcare", pct: 32 },
+    { name: "Industrials", pct: 24 },
+    { name: "Financials", pct: 17 },
+    { name: "Utilities", pct: 14 },
+    { name: "Other/Cash", pct: 13 }
+];
+
+// ============ CSV PARSE ============
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => obj[h.trim()] = values[i]?.trim());
+        return obj;
+    });
+}
+const data = parseCSV(csvData);
+data.sort((a, b) => {
+    const parseDate = (p) => {
+        const year = parseInt(p.match(/\d{4}/)?.[0] || '0');
+        const isFY = p.startsWith('FY');
+        return year * 10 + (isFY ? 7 : 0);
+    };
+    return parseDate(a.Period) - parseDate(b.Period);
+});
+const fyData = data.filter(d => d.Period.startsWith('FY'));
+
+// ============ UTIL ============
+const colors = { primary: '#00d4aa', secondary: '#00b894', tertiary: '#0984e3', quaternary: '#6c5ce7', warning: '#fdcb6e', danger: '#ff6b6b', muted: '#888' };
+const palette = [colors.primary, colors.tertiary, colors.quaternary, colors.warning, colors.danger, '#a29bfe', '#55efc4', '#fab1a0'];
+
+function fmtM(n) { if (n === null || n === undefined || isNaN(n)) return 'N/A'; return '$' + n.toFixed(1) + 'M'; }
+function fmtPct(n, dp) { if (n === null || n === undefined || isNaN(n)) return 'N/A'; dp = dp === undefined ? 1 : dp; return (n >= 0 ? '+' : '') + n.toFixed(dp) + '%'; }
+function fmtPrice(n) { if (n === null || n === undefined || isNaN(n)) return 'N/A'; return '$' + n.toFixed(2); }
+
+// ============ OVERVIEW ============
+function toggleOverview() {
+    const btn = document.querySelector('.overview-toggle');
+    const content = document.getElementById('overviewContent');
+    btn.classList.toggle('active');
+    content.classList.toggle('active');
+}
+
+function renderOverview() {
+    document.getElementById('ovOverview').textContent = analysis.overview;
+    document.getElementById('ovBizSummary').textContent = analysis.business_model.summary;
+    document.getElementById('ovRevenueStreams').innerHTML = analysis.business_model.revenue_streams.map(r =>
+        `<li><span class="revenue-stream"><span>${r.name}</span><span class="percent trend-${r.trend}">${r.note || ''}</span></span></li>`
+    ).join('');
+    document.getElementById('ovCompetitors').textContent = analysis.competitive_position.main_competitors.join('; ');
+    document.getElementById('ovMoat').innerHTML = analysis.competitive_position.moat_factors.map(m =>
+        `<li><strong>${m.factor}</strong> (${m.strength}) &mdash; ${m.description}</li>`
+    ).join('');
+    document.getElementById('ovGrowth').innerHTML = analysis.growth_drivers.map(g => `<li>${g}</li>`).join('');
+
+    const allRisks = [].concat(
+        analysis.risks.business || [], analysis.risks.financial || [],
+        analysis.risks.regulatory || [], analysis.risks.macro || [], analysis.risks.execution || []
+    );
+    document.getElementById('ovRisks').innerHTML = allRisks.map(r =>
+        `<li><span class="risk-${r.severity}">&#9679;</span> <strong>${r.risk}</strong> &mdash; ${r.description}</li>`
+    ).join('');
+
+    document.getElementById('ovBull').innerHTML = analysis.bull_case.map(b => `<li>${b}</li>`).join('');
+    document.getElementById('ovBear').innerHTML = analysis.bear_case.map(b => `<li>${b}</li>`).join('');
+    document.getElementById('ovRecent').innerHTML = analysis.recent_developments.map(r =>
+        `<li><strong>${r.date}</strong>: ${r.event}</li>`
+    ).join('');
+}
+
+// ============ GUIDANCE ============
+function renderGuidance() {
+    if (!analysis.guidance || !analysis.guidance.items || analysis.guidance.items.length === 0) {
+        document.getElementById('guidanceSection').style.display = 'none';
+        return;
+    }
+    const guidance = analysis.guidance;
+    document.getElementById('guidanceAsOf').textContent = guidance.as_of || '';
+    document.getElementById('guidanceFY').textContent = guidance.fiscal_year || '';
+
+    const grid = document.getElementById('guidanceGrid');
+    grid.innerHTML = guidance.items.map(item => {
+        const vsClass = item.vs_prior ? item.vs_prior.toLowerCase().split(' ')[0] : 'new';
+        const vsLabel = item.vs_prior ? item.vs_prior.charAt(0).toUpperCase() + item.vs_prior.slice(1) : 'New';
+        return `
+            <div class="guidance-card">
+                <div class="guidance-metric">${item.metric}</div>
+                <div class="guidance-target">${item.target}</div>
+                <div class="guidance-period">${item.period}</div>
+                <span class="guidance-vs-prior ${vsClass}">${vsLabel}</span>
+                ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+
+    const commentary = document.getElementById('guidanceCommentary');
+    if (guidance.management_commentary) {
+        commentary.textContent = guidance.management_commentary;
+        commentary.style.display = 'block';
+    } else {
+        commentary.style.display = 'none';
+    }
+}
+
+// ============ KPI CARDS ============
+function renderKPIs() {
+    const kpis = [
+        {
+            label: 'NAV per Share',
+            value: '$1.20',
+            change: 'vs $1.35 FY2025',
+            changeClass: 'negative'
+        },
+        {
+            label: 'Share Price',
+            value: '$1.20',
+            change: 'as at 12-Aug-2026',
+            changeClass: 'neutral'
+        },
+        {
+            label: 'Discount to NAV',
+            value: '1.0%',
+            change: 'vs 5.2% FY2025',
+            changeClass: 'neutral'
+        },
+        {
+            label: 'Dividend Yield',
+            value: '~9.0%',
+            change: '10.84 cps paid FY2026',
+            changeClass: 'neutral'
+        },
+        {
+            label: 'Net Assets',
+            value: '$431.4M',
+            change: 'vs $469.9M FY2025',
+            changeClass: 'negative'
+        },
+        {
+            label: 'Shares on Issue',
+            value: '358.8M',
+            change: '+81% since FY2019',
+            changeClass: 'negative'
+        },
+        {
+            label: 'FY2026 Adj. NAV Return',
+            value: '-3.2%',
+            change: '5yr annualised +0.5%',
+            changeClass: 'negative'
+        },
+        {
+            label: 'Gross Return vs Benchmark',
+            value: '-2.1% vs +5.2%',
+            change: '-7.3pp underperformance',
+            changeClass: 'negative'
+        }
+    ];
+    document.getElementById('kpiGrid').innerHTML = kpis.map(k => `
+        <div class="kpi-card">
+            <div class="kpi-value">${k.value}</div>
+            <div class="kpi-label">${k.label}</div>
+            <div class="kpi-change ${k.changeClass}">${k.change}</div>
+        </div>
+    `).join('');
+}
+
+// ============ CHART DEFAULTS ============
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } } },
+    scales: {
+        x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+function freshScales() {
+    return { x: { ...chartDefaults.scales.x }, y: { ...chartDefaults.scales.y } };
+}
+function freshScalesRight() {
+    return {
+        x: { ...chartDefaults.scales.x },
+        y: { ...chartDefaults.scales.y, position: 'left' },
+        y1: { ...chartDefaults.scales.y, position: 'right', grid: { display: false } }
+    };
+}
+
+const chartRegistry = {};
+function toggleLogScale(canvasId, btn) {
+    const chart = chartRegistry[canvasId];
+    if (!chart) return;
+    const toLog = chart.options.scales.y.type !== 'logarithmic';
+    chart.options.scales.y.type = toLog ? 'logarithmic' : 'linear';
+    btn.classList.toggle('active', toLog);
+    chart.update();
+}
+
+// ============ CHARTS ============
+function renderCharts() {
+    const navYears = Object.keys(navPerShareHistory);
+    const navValues = navYears.map(y => navPerShareHistory[y]);
+    const shareYears = fyData.map(d => d.Period);
+    const sharesOutstanding = fyData.map(d => parseFloat(d.SharesOutstanding));
+
+    // 1. NAV per Share vs Shares on Issue (signature chart)
+    chartRegistry['navDilutionChart'] = new Chart(document.getElementById('navDilutionChart'), {
+        type: 'line',
+        data: {
+            labels: navYears,
+            datasets: [
+                {
+                    label: 'NAV per Share ($)',
+                    data: navValues,
+                    borderColor: colors.danger,
+                    backgroundColor: 'rgba(255,107,107,0.1)',
+                    yAxisID: 'y',
+                    tension: 0.2,
+                    fill: true
+                },
+                {
+                    label: 'Shares on Issue (M)',
+                    data: navYears.map(y => {
+                        const match = fyData.find(d => d.Period === y);
+                        return match ? parseFloat(match.SharesOutstanding) : null;
+                    }),
+                    borderColor: colors.tertiary,
+                    backgroundColor: 'rgba(9,132,227,0.1)',
+                    yAxisID: 'y1',
+                    tension: 0.2
+                }
+            ]
+        },
+        options: {
+            ...chartDefaults,
+            scales: {
+                x: { ...chartDefaults.scales.x },
+                y: { ...chartDefaults.scales.y, position: 'left', title: { display: true, text: 'NAV per Share ($)', color: '#888' } },
+                y1: { ...chartDefaults.scales.y, position: 'right', grid: { display: false }, title: { display: true, text: 'Shares on Issue (M)', color: '#888' } }
+            }
+        }
+    });
+
+    // 2. NAV per Share vs Share Price
+    const priceYears = Object.keys(sharePriceHistory);
+    chartRegistry['navPriceChart'] = new Chart(document.getElementById('navPriceChart'), {
+        type: 'line',
+        data: {
+            labels: priceYears,
+            datasets: [
+                { label: 'NAV per Share', data: priceYears.map(y => navPerShareHistory[y]), borderColor: colors.primary, backgroundColor: 'rgba(0,212,170,0.1)', tension: 0.2 },
+                { label: 'Share Price', data: priceYears.map(y => sharePriceHistory[y]), borderColor: colors.warning, backgroundColor: 'rgba(253,203,110,0.1)', tension: 0.2 }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+
+    // 3. Discount / Premium to NAV
+    chartRegistry['discountChart'] = new Chart(document.getElementById('discountChart'), {
+        type: 'bar',
+        data: {
+            labels: Object.keys(discountPremiumHistory),
+            datasets: [{
+                label: 'Discount (+) / Premium (-) to Adjusted NAV (%)',
+                data: Object.values(discountPremiumHistory),
+                backgroundColor: Object.values(discountPremiumHistory).map(v => v < 0 ? colors.danger : colors.primary)
+            }]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+
+    // 4. Adjusted NAV Return vs Benchmark
+    const retYears = Object.keys(adjNavReturnHistory);
+    chartRegistry['returnBenchmarkChart'] = new Chart(document.getElementById('returnBenchmarkChart'), {
+        type: 'bar',
+        data: {
+            labels: retYears,
+            datasets: [
+                { label: 'Adjusted NAV Return (%)', data: retYears.map(y => adjNavReturnHistory[y]), backgroundColor: colors.tertiary },
+                { label: 'S&P/NZX50G Benchmark (%)', data: retYears.map(y => benchmarkReturnHistory[y]), backgroundColor: colors.warning }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+
+    // 5. Net Assets & Cash (log-eligible, all positive)
+    chartRegistry['netAssetsChart'] = new Chart(document.getElementById('netAssetsChart'), {
+        type: 'line',
+        data: {
+            labels: fyData.map(d => d.Period),
+            datasets: [
+                { label: 'Net Assets ($M)', data: fyData.map(d => parseFloat(d.ShareholdersEquity)), borderColor: colors.primary, backgroundColor: 'rgba(0,212,170,0.1)', tension: 0.2, fill: true },
+                { label: 'Cash ($M)', data: fyData.map(d => d.CashAndEquivalents ? parseFloat(d.CashAndEquivalents) : null), borderColor: colors.quaternary, backgroundColor: 'rgba(108,92,231,0.1)', tension: 0.2 }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+
+    // 6. Coverage: Dividends Paid vs Income Received vs Net Profit/(Loss)
+    const covYears = ['FY2025', 'FY2026'];
+    chartRegistry['coverageChart'] = new Chart(document.getElementById('coverageChart'), {
+        type: 'bar',
+        data: {
+            labels: covYears,
+            datasets: [
+                { label: 'Dividends Paid ($M)', data: covYears.map(y => dividendsPaidHistory[y]), backgroundColor: colors.danger },
+                { label: 'Dividend + Interest Income Received ($M)', data: covYears.map(y => incomeReceivedHistory[y]), backgroundColor: colors.primary },
+                { label: 'Net Profit / (Loss) ($M)', data: covYears.map(y => {
+                    const match = fyData.find(d => d.Period === y);
+                    return match ? parseFloat(match.NetIncome) : null;
+                }), backgroundColor: colors.tertiary }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+
+    // 7. Total Income & Net Income by Year
+    chartRegistry['totalIncomeChart'] = new Chart(document.getElementById('totalIncomeChart'), {
+        type: 'bar',
+        data: {
+            labels: fyData.map(d => d.Period),
+            datasets: [
+                { label: 'Total Income incl. Mark-to-Market ($M)', data: fyData.map(d => parseFloat(d.Revenue)), backgroundColor: fyData.map(d => parseFloat(d.Revenue) < 0 ? colors.danger : colors.primary) },
+                { label: 'Net Profit / (Loss) ($M)', data: fyData.map(d => parseFloat(d.NetIncome)), backgroundColor: colors.tertiary, type: 'line', borderColor: colors.tertiary, tension: 0.2 }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+
+    // 8. Top Holdings doughnut
+    chartRegistry['holdingsChart'] = new Chart(document.getElementById('holdingsChart'), {
+        type: 'doughnut',
+        data: {
+            labels: topHoldings.map(h => h.name),
+            datasets: [{ data: topHoldings.map(h => h.pct), backgroundColor: palette }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#e0e0e0', font: { size: 10 } } } } }
+    });
+
+    // 9. Sector Weights doughnut
+    chartRegistry['sectorsChart'] = new Chart(document.getElementById('sectorsChart'), {
+        type: 'doughnut',
+        data: {
+            labels: sectorWeights.map(s => s.name),
+            datasets: [{ data: sectorWeights.map(s => s.pct), backgroundColor: palette }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#e0e0e0', font: { size: 10 } } } } }
+    });
+}
+
+// ============ MODALS ============
+const metricDescriptions = {
+    navDilution: {
+        title: "NAV per Share vs Shares on Issue",
+        content: `
+            <p><strong>NAV per share</strong> is Kingfish's net assets divided by shares on issue &mdash; the closed-end fund equivalent of book value per share. <strong>Shares on issue</strong> have risen every year via warrant exercises and the Dividend Reinvestment Plan (DRP).</p>
+            <div class="metric-highlight"><strong>For Kingfish:</strong> NAV/share fell from $1.57 (FY2019) to $1.20 (FY2026), a -3.8%/yr CAGR, while shares on issue rose 81% (197.9m to 358.8m). Total net assets actually grew over the period purely because new share issuance outran the per-share decline &mdash; existing holders' claim on the fund shrank even as the fund's total size grew.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Whether NAV/share stabilises or continues its multi-year decline</li>
+                <li>New warrant series (the KFLWI series mostly lapsed in May-2026) which would reopen a dilution channel</li>
+                <li>DRP participation rate (~38%) &mdash; every DRP share issued at a 3% discount to market price dilutes non-participants</li>
+            </ul>
+        `
+    },
+    navVsPrice: {
+        title: "NAV per Share vs Share Price",
+        content: `
+            <p>The <strong>share price</strong> is what the market actually pays; <strong>NAV per share</strong> is the fund's own accounting of its per-share worth. The gap between them is the discount or premium.</p>
+            <div class="metric-highlight"><strong>For Kingfish:</strong> the share price traded at an 11.6% PREMIUM to NAV in FY2022 (investor enthusiasm), then swung to 5-6.5% discounts in FY2023-25, and now sits near par (~1% discount) at FY2026.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>A widening discount is a double loss for a seller: both NAV and the discount can fall together</li>
+                <li>A narrow discount (as now) removes the "buy at a discount" margin of safety a new investor would otherwise have</li>
+            </ul>
+        `
+    },
+    discount: {
+        title: "Discount / Premium to Adjusted NAV",
+        content: `
+            <p>Closed-end funds trade on the stock exchange at a price set by supply and demand, which can differ from their NAV. A positive number here means the share price trades at a <strong>discount</strong> (below NAV); negative means a <strong>premium</strong>.</p>
+            <div class="metric-highlight"><strong>For Kingfish:</strong> the discount has ranged from an 11.6% premium (FY2022) to a 6.5% discount (FY2024), and is currently only about 1% &mdash; unusually tight versus the ~5% five-year average.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Kingfish uses buybacks (up to 5% of shares) when the discount widens meaningfully, which is mildly NAV-accretive</li>
+                <li>A tight discount, as now, means a buyer gets little to no "discount to NAV" margin of safety</li>
+            </ul>
+        `
+    },
+    returnVsBenchmark: {
+        title: "Adjusted NAV Return vs Benchmark",
+        content: `
+            <p><strong>Adjusted NAV return</strong> is management's preferred underlying-performance metric: it adds back cumulative dividends paid so it isn't mechanically dragged down by the distribution policy. It is compared against the <strong>S&amp;P/NZX50G</strong>, the broad NZ equity market benchmark.</p>
+            <div class="metric-highlight"><strong>For Kingfish:</strong> FY2026 adjusted NAV return was -3.2%, with gross portfolio performance of -2.1% badly lagging the benchmark's +5.2% (a 7.3 percentage point miss). The 5-year annualised adjusted NAV return is only +0.5%, versus a +0.6% benchmark &mdash; the manager has barely broken even net of fees over five years.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Consistent multi-year underperformance versus the benchmark questions the value of active management fees over a passive NZX50 index fund</li>
+                <li>Concentrated single-name misses (Vista -55%, EBOS -39%, Vulcan Steel -27%, Summerset -19% in FY2026) show the stock-picking risk of a concentrated portfolio</li>
+            </ul>
+        `
+    },
+    netAssets: {
+        title: "Net Assets & Cash",
+        content: `
+            <p><strong>Net assets</strong> (total assets minus liabilities) is Kingfish's total capital base, almost entirely invested in NZ equities (98% at FY2026) with a small cash buffer.</p>
+            <div class="metric-highlight"><strong>For Kingfish:</strong> net assets peaked at $551.4m in FY2021 and have since fallen to $431.4m in FY2026 &mdash; the FY2022-23 and FY2026 losses, combined with the uncovered distribution policy, have outpaced new share issuance in recent years.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Net assets growing only via share issuance (not per-share value creation) is a warning sign, not a positive</li>
+                <li>Kingfish carries zero debt, so net assets equal NAV directly &mdash; there is no leverage to inflate or complicate this figure</li>
+            </ul>
+        `
+    },
+    coverage: {
+        title: "Distribution Coverage",
+        content: `
+            <p>Kingfish pays a fixed quarterly distribution equal to <strong>2% of average NAV</strong> (about 8% annualised), regardless of how much income or capital gain the portfolio actually generates in a given year.</p>
+            <div class="metric-highlight"><strong>For Kingfish:</strong> FY2026 paid $38.1m in dividends against only $10.5m of dividend and interest income received, and a net LOSS of $13.6m. Neither income nor total return came close to covering the distribution &mdash; the shortfall came out of shareholders' own capital, directly reducing NAV per share.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Any year where dividends paid exceed income received AND net profit is a year where the distribution is substantially return of capital</li>
+                <li>A high "yield" quoted on Kingfish shares is not equivalent to sustainable income &mdash; check this coverage relationship every year</li>
+            </ul>
+        `
+    },
+    totalIncome: {
+        title: "Total Income (incl. Mark-to-Market)",
+        content: `
+            <p>Kingfish's "Total Income" is NOT operating revenue. It combines dividend income received from portfolio companies, interest on cash, and &mdash; the dominant swing factor &mdash; realised and unrealised changes in the fair value of the investment portfolio.</p>
+            <div class="metric-highlight"><strong>For Kingfish:</strong> this figure was negative in FY2022 (-$10.7m), FY2023 (-$14.7m) and FY2026 (-$8.3m) purely because the NZ equity market fell or the portfolio underperformed in those years &mdash; not because of any operating problem. It is never shown on a log scale in this dashboard because log axes cannot represent negative values.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Don't mistake a positive year for "growth" &mdash; it mostly reflects market direction, not durable business improvement</li>
+                <li>The stable, small dividend+interest income component (~$10.5m FY2026) is the only genuinely repeatable part of this line</li>
+            </ul>
+        `
+    },
+    holdings: {
+        title: "Top Holdings",
+        content: `
+            <p>Kingfish's portfolio is concentrated in a small number of large NZ companies. The top 5 holdings make up roughly 60% of the total portfolio.</p>
+            <div class="metric-highlight"><strong>For Kingfish (31-Mar-2026):</strong> Fisher &amp; Paykel Healthcare 19%, Infratil 17%, Mainfreight 8%, Summerset 8%, Auckland Airport 8%.</div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Company-specific shocks in any top holding materially move Kingfish's NAV given the concentration</li>
+                <li>Changes in weighting over time signal active repositioning by the manager</li>
+            </ul>
+        `
+    },
+    sectors: {
+        title: "Sector Weights",
+        content: `
+            <p>Sector allocation shows how Kingfish's portfolio is spread across the NZ economy.</p>
+            <div class="metric-highlight"><strong>For Kingfish (31-Mar-2026):</strong> Healthcare 32%, Industrials 24%, Financials 17%, Utilities 14%, Other/Cash 13%.</div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Heavy Healthcare and Industrials weighting ties performance closely to F&amp;P Healthcare and Mainfreight/Infratil specifically</li>
+                <li>Utilities exposure (Mercury, Contact) provides some defensiveness against cyclical swings elsewhere in the book</li>
+            </ul>
+        `
+    }
+};
+
+function openModal(key) {
+    const m = metricDescriptions[key];
+    if (!m) return;
+    document.getElementById('modalTitle').textContent = m.title;
+    document.getElementById('modalBody').innerHTML = m.content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ============ DCF SECTION ============
+let currentScenario = 'base';
+
+function initDCF() {
+    if (!dcfData || !dcfData.valuation) return;
+
+    document.getElementById('dcfCurrent').textContent = '$' + dcfData.current_price.toFixed(2);
+
+    document.getElementById('warningText').innerHTML =
+        "Kingfish is valued on <strong>NAV-per-share compounding + exit price-to-NAV</strong>, not a standard FCF DCF, because a closed-end fund has no revenue, EBITDA or free cash flow. " +
+        "The ~9% headline yield is largely <strong>return of capital</strong> &mdash; NAV per share has fallen from $1.57 (FY2019) to $1.20 (FY2026) even as total net assets grew from ongoing share issuance. " +
+        "The shares currently trade at only a ~1% discount to NAV (versus a ~5% five-year average), so there is <strong>no discount-closing catalyst</strong> available to a new buyer. " +
+        "Kingfish is best understood as an income-distribution vehicle for investors who want NZ blue-chip exposure plus a steady (if capital-eroding) quarterly cash stream &mdash; not a compounding growth investment.";
+
+    const base = dcfData.assumptions.base;
+    document.getElementById('growthSlider').value = base.gross_portfolio_return_pct;
+    document.getElementById('waccSlider').value = base.wacc;
+    document.getElementById('terminalSlider').value = base.exit_price_to_nav;
+
+    document.getElementById('growthValue').textContent = base.gross_portfolio_return_pct + '%';
+    document.getElementById('waccValue').textContent = base.wacc + '%';
+    document.getElementById('terminalValue').textContent = base.exit_price_to_nav.toFixed(2) + 'x';
+
+    document.getElementById('growthHint').textContent = 'Long-run NZ blue-chip equity total return assumption (gross, before fees)';
+
+    renderDCFInputs();
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    updateDCFDisplay();
+    switchScenario('base');
+}
+
+function renderDCFInputs() {
+    const inputs = dcfData.inputs;
+    document.getElementById('baseFCF').textContent = '$' + inputs.nav_per_share.toFixed(2);
+    document.getElementById('sbcBreakdown').textContent = '31-Mar-2026 statutory NAV, used as conservative projection anchor';
+
+    const shares = inputs.shares_outstanding;
+    document.getElementById('sharesOut').textContent = shares.toFixed(1) + 'M';
+    document.getElementById('dilutionNote').textContent = 'Held flat — no warrant series outstanding after May-2026 lapse';
+
+    document.getElementById('netDebt').textContent = '$0M';
+
+    renderFCFProjections();
+}
+
+function renderFCFProjections() {
+    const scenario = dcfData.projections[currentScenario];
+    const navPath = scenario.nav_per_share;
+    const divPath = scenario.dividend_per_share;
+    const baseNav = dcfData.inputs.nav_per_share;
+
+    let html = `
+        <div class="fcf-projection-item header">Base</div>
+        <div class="fcf-projection-item header">Year 1</div>
+        <div class="fcf-projection-item header">Year 2</div>
+        <div class="fcf-projection-item header">Year 3</div>
+        <div class="fcf-projection-item header">Year 4</div>
+        <div class="fcf-projection-item header">Year 5</div>
+    `;
+    html += `<div class="fcf-projection-item">
+        <div class="fcf-value">$${baseNav.toFixed(2)}</div>
+        <div class="growth-rate">-</div>
+    </div>`;
+    for (let i = 0; i < 5; i++) {
+        const prevNav = i === 0 ? baseNav : navPath[i - 1];
+        const growth = ((navPath[i] - prevNav) / prevNav * 100).toFixed(1);
+        html += `<div class="fcf-projection-item">
+            <div class="fcf-value">$${navPath[i].toFixed(2)}</div>
+            <div class="growth-rate">${growth >= 0 ? '+' : ''}${growth}% <span style="color:#888">(div $${divPath[i].toFixed(3)})</span></div>
+        </div>`;
+    }
+    document.getElementById('fcfProjectionTable').innerHTML = html;
+}
+
+// Calculate DCF: NAV-per-share compounding + exit P/NAV, discounted at cost of equity
+function calculateDCF(grossReturn, wacc, exitPNAV) {
+    const years = 5;
+    const hurdle = 0.15;
+    const baseNav = dcfData.inputs.nav_per_share;
+    const feeDrag = dcfData.assumptions.base.fee_drag_pct; // held constant from base case
+    const distributionRate = dcfData.assumptions.base.distribution_rate_pct_of_nav; // 8.0% fixed policy
+
+    const netReturn = grossReturn - feeDrag;
+    const navGrowthRate = netReturn - distributionRate; // % per year
+
+    let nav = baseNav;
+    let pvDividends = 0;
+    let pvDividendsHurdle = 0;
+    const navPath = [];
+    const divPath = [];
+
+    for (let i = 0; i < years; i++) {
+        const dividend = nav * (distributionRate / 100);
+        nav = nav * (1 + navGrowthRate / 100);
+        navPath.push(nav);
+        divPath.push(dividend);
+        pvDividends += dividend / Math.pow(1 + wacc / 100, i + 1);
+        pvDividendsHurdle += dividend / Math.pow(1 + hurdle, i + 1);
+    }
+
+    const year5Nav = navPath[years - 1];
+    const exitValue = year5Nav * exitPNAV;
+    const pvTerminal = exitValue / Math.pow(1 + wacc / 100, years);
+    const pvTerminalHurdle = exitValue / Math.pow(1 + hurdle, years);
+
+    const iv = pvDividends + pvTerminal;
+    const entryPrice = pvDividendsHurdle + pvTerminalHurdle;
+
+    return { iv, entryPrice, pvDividends, pvTerminal, navPath, divPath };
+}
+
+function updateDCFDisplay() {
+    const grossReturn = parseFloat(document.getElementById('growthSlider').value);
+    const wacc = parseFloat(document.getElementById('waccSlider').value);
+    const exitPNAV = parseFloat(document.getElementById('terminalSlider').value);
+
+    document.getElementById('growthValue').textContent = grossReturn + '%';
+    document.getElementById('waccValue').textContent = wacc + '%';
+    document.getElementById('terminalValue').textContent = exitPNAV.toFixed(2) + 'x';
+
+    const result = calculateDCF(grossReturn, wacc, exitPNAV);
+
+    document.getElementById('dcfIV').textContent = '$' + result.iv.toFixed(2);
+    document.getElementById('dcfEntry').textContent = '$' + result.entryPrice.toFixed(2);
+
+    const upside = ((result.iv - dcfData.current_price) / dcfData.current_price * 100);
+    const upsideEl = document.getElementById('dcfUpside');
+    upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(0) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+    upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+    const wiv = dcfData.probability_weighted.weighted_iv;
+    document.getElementById('dcfWeighted').textContent = '$' + wiv.toFixed(2);
+    const wUpEl = document.getElementById('dcfWeightedUpside');
+    if (wUpEl) {
+        const wUp = (wiv - dcfData.current_price) / dcfData.current_price * 100;
+        wUpEl.textContent = (wUp >= 0 ? '+' : '') + wUp.toFixed(0) + '% ' + (wUp >= 0 ? 'upside' : 'downside');
+        wUpEl.className = 'dcf-change ' + (wUp >= 0 ? 'positive' : 'negative');
+    }
+
+    const grid = document.getElementById('assumptionGrid');
+    if (grid) {
+        grid.innerHTML = `
+            <div class="assumption-item"><div class="label">Gross Portfolio Return</div><div class="value">${grossReturn}%</div></div>
+            <div class="assumption-item"><div class="label">Cost of Equity</div><div class="value">${wacc}%</div></div>
+            <div class="assumption-item"><div class="label">Exit Price / NAV</div><div class="value">${exitPNAV.toFixed(2)}x</div></div>
+            <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa;">$${result.iv.toFixed(2)}</div></div>
+            <div class="assumption-item"><div class="label">Entry Price</div><div class="value" style="color:#00d4aa;">$${result.entryPrice.toFixed(2)}</div></div>
+        `;
+    }
+}
+
+function switchScenario(scenario) {
+    currentScenario = scenario;
+    document.querySelectorAll('.scenario-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.scenario === scenario);
+    });
+
+    const assumptions = dcfData.assumptions[scenario];
+    const valuation = dcfData.valuation[scenario];
+
+    document.getElementById('growthSlider').value = assumptions.gross_portfolio_return_pct;
+    document.getElementById('waccSlider').value = assumptions.wacc;
+    document.getElementById('terminalSlider').value = assumptions.exit_price_to_nav;
+
+    renderFCFProjections();
+
+    const grid = document.getElementById('assumptionGrid');
+    grid.innerHTML = `
+        <div class="assumption-item"><div class="label">Gross Portfolio Return</div><div class="value">${assumptions.gross_portfolio_return_pct}%</div></div>
+        <div class="assumption-item"><div class="label">Fee Drag</div><div class="value">${assumptions.fee_drag_pct}%</div></div>
+        <div class="assumption-item"><div class="label">Net Return</div><div class="value">${assumptions.net_return_pct}%</div></div>
+        <div class="assumption-item"><div class="label">Implied NAV/Share Growth</div><div class="value" style="color:${assumptions.implied_nav_per_share_growth_pct >= 0 ? '#00d4aa' : '#ff6b6b'};">${assumptions.implied_nav_per_share_growth_pct >= 0 ? '+' : ''}${assumptions.implied_nav_per_share_growth_pct}%</div></div>
+        <div class="assumption-item"><div class="label">Exit Price / NAV</div><div class="value">${assumptions.exit_price_to_nav.toFixed(2)}x</div></div>
+        <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa;">$${valuation.intrinsic_value.toFixed(2)}</div></div>
+    `;
+
+    updateDCFDisplay();
+}
+
+// Exposed for the inline onclick= handlers and slider bindings in the markup above.
+window.switchScenario = switchScenario;
+window.updateDCFDisplay = updateDCFDisplay;
+
+function renderHistoricalGrowth() {
+    const growth = dcfData.historical_growth;
+    const grid = document.getElementById('growthGrid');
+    const metrics = [
+        { key: 'nav_per_share_3yr_cagr', label: 'NAV/Share 3Y' },
+        { key: 'nav_per_share_5yr_cagr', label: 'NAV/Share 5Y' },
+        { key: 'nav_per_share_7yr_cagr', label: 'NAV/Share 7Y' },
+        { key: 'equity_3yr_cagr', label: 'Net Assets 3Y' },
+        { key: 'equity_5yr_cagr', label: 'Net Assets 5Y' },
+        { key: 'equity_7yr_cagr', label: 'Net Assets 7Y' },
+        { key: 'adjusted_nav_return_5yr_annualised_pct', label: 'Adj NAV Return 5Y' },
+        { key: 'benchmark_5yr_annualised_pct', label: 'Benchmark 5Y' }
+    ];
+    const selectedSource = growth.growth_rate_source;
+    grid.innerHTML = metrics.map(m => {
+        const rate = growth[m.key];
+        if (rate === null || rate === undefined) return '';
+        const isSelected = m.key === selectedSource;
+        const colorClass = rate >= 0 ? 'positive' : 'negative';
+        return `
+            <div class="growth-item ${isSelected ? 'selected' : ''}">
+                <div class="metric">${m.label}</div>
+                <div class="rate ${colorClass}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const table = document.getElementById('sensitivityMatrix');
+    const currentPrice = dcfData.current_price;
+
+    let html = '<tr><th>Cost of Equity \\ Exit P/NAV</th>';
+    sens.exit_pnav_range.forEach(pnav => {
+        html += `<th>${pnav.toFixed(2)}x</th>`;
+    });
+    html += '</tr>';
+
+    sens.wacc_range.forEach((wacc, i) => {
+        html += `<tr><th>${wacc.toFixed(1)}%</th>`;
+        sens.matrix[i].forEach((val, j) => {
+            const isHighlight = wacc === dcfData.assumptions.base.wacc &&
+                               sens.exit_pnav_range[j] === dcfData.assumptions.base.exit_price_to_nav;
+            const colorClass = val >= currentPrice ? 'above-current' : 'below-current';
+            html += `<td class="${isHighlight ? 'highlight' : colorClass}">$${val.toFixed(2)}</td>`;
+        });
+        html += '</tr>';
+    });
+
+    table.innerHTML = html;
+}
+
+// ============ INIT ============
+renderOverview();
+renderGuidance();
+renderKPIs();
+renderCharts();
+initDCF();
+
+(function() {
+    var growthSlider = document.getElementById('growthSlider');
+    var waccSlider = document.getElementById('waccSlider');
+    var terminalSlider = document.getElementById('terminalSlider');
+    if (growthSlider) { growthSlider.oninput = window.updateDCFDisplay; growthSlider.onchange = window.updateDCFDisplay; }
+    if (waccSlider) { waccSlider.oninput = window.updateDCFDisplay; waccSlider.onchange = window.updateDCFDisplay; }
+    if (terminalSlider) { terminalSlider.oninput = window.updateDCFDisplay; terminalSlider.onchange = window.updateDCFDisplay; }
+})();
+</script>
+
+</body>
+</html>
