@@ -35,6 +35,12 @@ FY2026 guidance: **20–22% CC** net revenue growth. 55%+ EBITDA margin target p
 | **CONTINUED DECEL** | +13% to +16.5% | €1,236–1,274m | Downtrend intact. Base case IV is if anything generous. |
 | **BREAKDOWN** | < +13% | < €1,236m | Thesis break. CC guidance likely cut. Bear case → base. |
 
+> **These bands classify the PRINT. They do NOT map to good/bad news.** See "THE KEY
+> FINDING" below: on the corrected model even an 8% FY26 leaves ~+11% upside. A
+> "CONTINUED DECEL" print is only bad news if it signals a *permanent* ~−3pp shift in
+> the whole decade path. Classify the half here, then judge durability separately —
+> and let durability, not this table, drive the verdict.
+
 Note: Q1-2026 already printed 620.8. So H1 total ≥ €1,301m requires Q2 ≥ €680m
 (+21.5% on the implied Q2-2025 ~€472.7m). Sanity-check the Q2 stub, don't just read
 the half.
@@ -90,6 +96,58 @@ H1-2026 reported YoY maps to a scenario directly:
 - **~18%** → base holds, €1,047.67 stands, stock still cheap
 - **~15%** → bear driver live, weighted value falls toward the price
 - **<15%** → below even bear FY26; the +15.6% margin of safety is gone
+
+### CORRECTION APPLIED 12-Aug-2026 (pre-print): SBC 3.0% → 1.85%
+
+The workbook's 3.0%-of-net-revenue SBC was flagged in its own Model_Info as an
+estimate. Actual, from the committed CSV:
+
+| FY2020 | FY2021 | FY2022 | FY2023 | FY2024 | FY2025 |
+|---|---|---|---|---|---|
+| 1.47% | 1.20% | 0.79% | 2.37% | 1.87% | **1.84%** |
+
+FY2023-25 average ≈ **1.85%**. Replacing 3.0% with 1.85% flat:
+
+| | Bear | Base | Bull | **Weighted** |
+|---|---|---|---|---|
+| workbook | 571.11 | 1047.67 | 1418.27 | 1105.89 |
+| SBC-corrected | **589.22** | **1060.03** | **1428.33** | **1118.31** |
+
+Weighted value **€1,105.89 → €1,118.31** (+€12.50), upside vs €933.20
+**+18.5% → +19.8%**. Small, and it moves in the *favourable* direction — so it
+cannot rescue a bad print, and it is not a reason to act on its own.
+
+Replication check: the Python rebuild reproduces the workbook to within €0.11/share
+on every scenario, so these deltas are trustworthy. (`scratchpad/rep.py`)
+
+### THE KEY FINDING — one bad half is nearly irrelevant; the PATH is everything
+
+Sensitivity on the SBC-corrected model:
+
+**Changing FY2026 alone** (rest of the 10-yr path untouched):
+| FY26 growth | 20% | 18% | 16% | 14% | 12% | 10% | 8% |
+|---|---|---|---|---|---|---|---|
+| Weighted | 1128 | 1113 | 1097 | 1082 | 1066 | 1051 | 1035 |
+| Upside | +20.9% | +19.3% | +17.6% | +15.9% | +14.3% | +12.6% | +11.0% |
+
+**FY26 growth could halve from 20% to 8% and the stock would still show ~+11%
+upside.** A single-year miss is worth ~€1.30/share per point of growth. It barely
+matters.
+
+**Shifting the WHOLE growth path** (i.e. deceleration is permanent, not a blip):
+| shift | 0 | −2pp | −4pp | −6pp | −8pp | −10pp |
+|---|---|---|---|---|---|---|
+| Weighted | 1118 | 995 | 888 | 797 | 720 | 657 |
+| Upside | +19.8% | +6.6% | **−4.9%** | −14.6% | −22.8% | −29.6% |
+
+**Break-even is a persistent ~−3pp shift across the entire decade.** That is the
+real bar. Margin is second-order: a −4pp margin shift only costs ~7% of value.
+
+**Therefore the H1 verdict must NOT be graded on the H1 number itself.** It must be
+graded on whether H1 is evidence of a *permanent* re-rating of the growth path.
+Ask: is this FX/mix/one-off (noise, ignore), or take-rate/competitive/structural
+(repricing, act)? The pillar mix and the FY26 cc guidance action carry far more
+information than the headline half.
 
 ### Reverse read (the sanity anchor)
 At 10.5% required return and flat 53% EBITDA margin, **€933 already implies only ~13%
