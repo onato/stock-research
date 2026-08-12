@@ -27,6 +27,8 @@ import json
 import pathlib
 import re
 
+import refresh_plan
+
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
 # Exchange-suffixed or bare symbols. Anything else in a queue file is prose:
@@ -98,8 +100,16 @@ def age_days(repo: pathlib.Path, ticker: str) -> int | None:
 
 def eligible(repo: pathlib.Path | str, tickers: list[str], *,
              limit: int = 0, stale_days: int = DEFAULT_STALE_DAYS,
-             force: bool = False) -> list[str]:
-    """The supplied tickers still worth researching, in priority order."""
+             force: bool = False,
+             require_new_filings: bool = False) -> list[str]:
+    """The supplied tickers still worth researching, in priority order.
+
+    `require_new_filings` narrows a refresh to tickers that actually have an
+    unparsed filing. Age alone is a poor proxy: of 20 tickers stale by
+    valuation_date, 19 had no new filing at all, so re-running the parser
+    would re-derive identical financials at ~$6 each. It never affects
+    never-researched tickers, which have nothing to compare against.
+    """
     repo = pathlib.Path(repo)
 
     seen: set[str] = set()
@@ -121,6 +131,10 @@ def eligible(repo: pathlib.Path | str, tickers: list[str], *,
         if age is None:
             fresh.append(ticker)          # never researched: highest priority
         elif force or age >= stale_days:
+            # --force is an explicit override, so it beats this gate too.
+            if (require_new_filings and not force
+                    and not refresh_plan.has_new_filings(repo, ticker)):
+                continue
             stale.append((age, ticker))
 
     # Oldest valuation first among refreshes; supplied order among new ones.
@@ -139,10 +153,13 @@ def main() -> int:
                         f"{DEFAULT_STALE_DAYS})")
     p.add_argument("--force", action="store_true",
                    help="keep researched tickers regardless of age")
+    p.add_argument("--require-new-filings", action="store_true",
+                   help="refresh only tickers with an unparsed filing")
     args = p.parse_args()
 
     for ticker in eligible(REPO, args.tickers, limit=args.limit,
-                           stale_days=args.stale_days, force=args.force):
+                           stale_days=args.stale_days, force=args.force,
+                           require_new_filings=args.require_new_filings):
         print(ticker)
     return 0
 

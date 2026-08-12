@@ -7,7 +7,7 @@
 #
 # Usage:
 #   run_loop.sh                  # drain the whole queue, 4 at a time
-#   run_loop.sh -n 20            # stop after 20 tickers
+#   run_loop.sh -n 10            # stop after 10 tickers
 #   run_loop.sh -j 2             # 2 concurrent instead of 4
 #   run_loop.sh --no-push        # commit locally, don't push
 #   run_loop.sh --dry-run        # print the queue and exit (no Claude, no cost)
@@ -32,30 +32,71 @@ set -uo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
-JOBS=4
-COUNT=0                 # 0 = drain the whole queue
+JOBS=2
+COUNT=0 # 0 = drain the whole queue
 PUSH=1
-RESUME="--resume"       # on by default: an interrupted drain should continue
+RESUME="--resume" # on by default: an interrupted drain should continue
 DRY_RUN=0
 FORCE=0
 STALE_DAYS=45
+# Age alone is a poor proxy for "needs the parser": of 20 tickers stale by
+# valuation_date, 19 had no unparsed filing. Off by default so an explicit
+# invocation still behaves as it always has.
+REQUIRE_NEW=0
 TICKERS=()
 LOG_DIR="state/logs"
 JOBLOG="state/joblog.tsv"
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    -n|--count)   COUNT="$2"; shift 2 ;;
-    -j|--jobs)    JOBS="$2"; shift 2 ;;
-    --no-push)    PUSH=0; shift ;;
-    --resume)     RESUME="--resume"; shift ;;   # kept: harmless, now default
-    --no-resume)  RESUME=""; shift ;;
-    --force)      FORCE=1; shift ;;
-    --stale-days) STALE_DAYS="$2"; shift 2 ;;
-    --dry-run)    DRY_RUN=1; shift ;;
-    -h|--help)    sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    -*)           echo "Unknown option: $1" >&2; exit 2 ;;
-    *)            TICKERS+=("$1"); shift ;;
+  -n | --count)
+    COUNT="$2"
+    shift 2
+    ;;
+  -j | --jobs)
+    JOBS="$2"
+    shift 2
+    ;;
+  --no-push)
+    PUSH=0
+    shift
+    ;;
+  --resume)
+    RESUME="--resume"
+    shift
+    ;; # kept: harmless, now default
+  --no-resume)
+    RESUME=""
+    shift
+    ;;
+  --force)
+    FORCE=1
+    shift
+    ;;
+  --stale-days)
+    STALE_DAYS="$2"
+    shift 2
+    ;;
+  --require-new-filings)
+    REQUIRE_NEW=1
+    shift
+    ;;
+  --dry-run)
+    DRY_RUN=1
+    shift
+    ;;
+  -h | --help)
+    sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'
+    exit 0
+    ;;
+  -*)
+    echo "Unknown option: $1" >&2
+    exit 2
+    ;;
+  *)
+    TICKERS+=("$1")
+    shift
+    ;;
   esac
 done
 
@@ -63,7 +104,9 @@ export PUSH LOG_DIR
 . "$REPO_ROOT/scripts/lib.sh"
 require_tools
 command -v parallel >/dev/null || {
-  echo "ERROR: GNU parallel not found (brew install parallel)" >&2; exit 1; }
+  echo "ERROR: GNU parallel not found (brew install parallel)" >&2
+  exit 1
+}
 
 mkdir -p "$LOG_DIR" "$(dirname "$JOBLOG")"
 
@@ -89,7 +132,8 @@ if [ ${#TICKERS[@]} -eq 0 ]; then
   fi
   echo "Building queue..."
 
-  GITHUB_OUTPUT="$(mktemp)"; export GITHUB_OUTPUT
+  GITHUB_OUTPUT="$(mktemp)"
+  export GITHUB_OUTPUT
   uv run --project "$REPO_ROOT" python3 scripts/select_ticker.py \
     --override "" --count "$limit" >/dev/null 2>&1
   mapfile -t TICKERS < <(grep '^ticker=' "$GITHUB_OUTPUT" | cut -d= -f2- | grep -v '^$')
@@ -98,19 +142,21 @@ else
   # Tickers named on the command line get the same policy the queue does:
   # drop anything already researched and still fresh, drop lines that are not
   # tickers at all (state/backlog.txt carries a prose GAP note), and honour
-  # -n. Without this, `run_loop.sh -n 20 $(cat state/backlog.txt)` re-ran six
+  # -n. Without this, `run_loop.sh -n 10 $(cat state/backlog.txt)` re-ran six
   # finished tickers, ignored the limit, and queued all 782 entries.
   SUPPLIED=${#TICKERS[@]}
   FORCE_FLAG=()
   [ "$FORCE" = "1" ] && FORCE_FLAG=(--force)
+  [ "$REQUIRE_NEW" = "1" ] && FORCE_FLAG+=(--require-new-filings)
   mapfile -t TICKERS < <(
     uv run --project "$REPO_ROOT" python3 scripts/filter_tickers.py \
       --limit "$COUNT" --stale-days "$STALE_DAYS" \
-      "${FORCE_FLAG[@]}" "${TICKERS[@]}")
-  skipped=$(( SUPPLIED - ${#TICKERS[@]} ))
+      "${FORCE_FLAG[@]}" "${TICKERS[@]}"
+  )
+  skipped=$((SUPPLIED - ${#TICKERS[@]}))
   if [ "$skipped" -gt 0 ]; then
     echo "Skipping $skipped of $SUPPLIED supplied (already researched, not a" \
-         "ticker, or beyond -n). Use --force to re-research."
+      "ticker, or beyond -n). Use --force to re-research."
   fi
 fi
 
@@ -121,7 +167,7 @@ fi
 
 echo "Queue: ${#TICKERS[@]} ticker(s), ${JOBS} at a time"
 printf '  %s\n' "${TICKERS[@]}" | head -12
-[ "${#TICKERS[@]}" -gt 12 ] && echo "  ... and $(( ${#TICKERS[@]} - 12 )) more"
+[ "${#TICKERS[@]}" -gt 12 ] && echo "  ... and $((${#TICKERS[@]} - 12)) more"
 echo "Logs:   $LOG_DIR/"
 echo "Joblog: $JOBLOG"
 # Concurrent traces share one terminal, which is readable only up to a point.
@@ -157,10 +203,10 @@ rm -f "$HALT_FILE"
 
 # --line-buffer + --tagstring keep concurrent output attributable per ticker.
 # --resume reads the joblog and skips arguments that already completed.
-printf '%s\n' "${TICKERS[@]}" \
-  | parallel -j "$JOBS" --joblog "$RUN_JOBLOG" $RESUME \
-             --line-buffer --tagstring '[{}]' \
-             "$REPO_ROOT/scripts/research_one.sh" {}
+printf '%s\n' "${TICKERS[@]}" |
+  parallel -j "$JOBS" --joblog "$RUN_JOBLOG" $RESUME \
+    --line-buffer --tagstring '[{}]' \
+    "$REPO_ROOT/scripts/research_one.sh" {}
 PAR_RC=$?
 
 # This run's record becomes the current one; the timestamped file is kept so
@@ -175,13 +221,13 @@ if awk 'NR>1 && $7==4 {found=1} END{exit !found}' "$RUN_JOBLOG" 2>/dev/null; the
   echo "STOPPED: rate limit resets beyond what a single run can wait out."
   [ -f "$HALT_FILE" ] && sed 's/^/  /' "$HALT_FILE"
   skipped=$(awk 'NR>1 && $7==5' "$RUN_JOBLOG" | wc -l | tr -d ' ')
-  [ "${skipped:-0}" -gt 0 ] && \
+  [ "${skipped:-0}" -gt 0 ] &&
     echo "  $skipped ticker(s) stood down and are still queued."
   echo "Re-run after the reset; --resume is on by default."
   rm -f "$HALT_FILE"
 fi
 
-ELAPSED=$(( $(date +%s) - START ))
+ELAPSED=$(($(date +%s) - START))
 
 echo ""
 echo "=============================================="

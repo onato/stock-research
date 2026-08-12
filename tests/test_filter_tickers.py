@@ -183,6 +183,55 @@ class TestLimit:
         assert got == ["A.NZ", "B.NZ"]
 
 
+class TestRequireNewFilings:
+    """Stale-by-date is not the same question as has-new-data.
+
+    Of 20 tickers stale by valuation_date, 19 had no unparsed filing at all.
+    Sending those through the parser re-derives numbers that cannot have
+    moved, at ~$6 each.
+    """
+
+    def with_filings(self, repo, ticker, *, filings, csv_periods, days_old):
+        researched(repo, ticker, days_old=days_old)
+        base = repo / "research" / ticker
+        (base / "Extracted").mkdir(parents=True, exist_ok=True)
+        for name in filings:
+            (base / "Extracted" / name).write_text("x")
+        rows = "\n".join(f"{p},1" for p in csv_periods)
+        (base / "Reports" / f"{ticker}_Metrics.csv").write_text(
+            "Period,Revenue\n" + rows)
+
+    def test_require_new_filings_drops_stale_without_filings(self, repo):
+        self.with_filings(repo, "DCBO", filings=["DCBO_6K_Q1-2026.txt"],
+                          csv_periods=["Q1-2026"], days_old=60)
+        got = filter_tickers.eligible(repo, ["DCBO"], require_new_filings=True)
+        assert got == []
+
+    def test_require_new_filings_keeps_stale_with_new_data(self, repo):
+        self.with_filings(repo, "HK", filings=["HK_Quarterly_Q1-2026.txt"],
+                          csv_periods=["FY2025"], days_old=60)
+        got = filter_tickers.eligible(repo, ["HK"], require_new_filings=True)
+        assert got == ["HK"]
+
+    def test_require_new_filings_defaults_off(self, repo):
+        self.with_filings(repo, "DCBO", filings=["DCBO_6K_Q1-2026.txt"],
+                          csv_periods=["Q1-2026"], days_old=60)
+        assert filter_tickers.eligible(repo, ["DCBO"]) == ["DCBO"]
+
+    def test_never_researched_is_unaffected(self, repo):
+        # The gate is about refreshes; a new ticker has nothing to compare.
+        got = filter_tickers.eligible(repo, ["NEW.NZ"],
+                                      require_new_filings=True)
+        assert got == ["NEW.NZ"]
+
+    def test_force_overrides_the_gate(self, repo):
+        self.with_filings(repo, "DCBO", filings=["DCBO_6K_Q1-2026.txt"],
+                          csv_periods=["Q1-2026"], days_old=60)
+        got = filter_tickers.eligible(repo, ["DCBO"], force=True,
+                                      require_new_filings=True)
+        assert got == ["DCBO"]
+
+
 class TestCli:
     def _run(self, monkeypatch, capsys, repo, *argv):
         monkeypatch.setattr("sys.argv", ["filter_tickers.py", *argv])

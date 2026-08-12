@@ -319,3 +319,41 @@ class TestBatch:
     def test_empty_queue_is_a_clean_noop(self, st_repo, monkeypatch, capsys):
         assert self.run(monkeypatch, "--count", "5") == 0
         assert capsys.readouterr().out == "ticker=\nmode=none\n"
+
+
+class TestRequireNewFilings:
+    """The queue path gets the same gate the explicit path does.
+
+    Age alone is a poor proxy for "needs the parser": of 20 tickers stale by
+    valuation_date, 19 had no unparsed filing at all.
+    """
+
+    def with_data(self, repo, ticker, *, filings, csv_periods, date):
+        give_dcf(repo, ticker, valuation_date=date)
+        base = repo / "research" / ticker
+        (base / "Extracted").mkdir(parents=True, exist_ok=True)
+        for name in filings:
+            (base / "Extracted" / name).write_text("x")
+        rows = "\n".join(f"{p},1" for p in csv_periods)
+        (base / "Reports" / f"{ticker}_Metrics.csv").write_text(
+            "Period,Revenue\n" + rows)
+
+    def test_stalest_skips_tickers_without_new_filings(self, st_repo):
+        self.with_data(st_repo, "DCBO", filings=["DCBO_6K_Q1-2026.txt"],
+                       csv_periods=["Q1-2026"], date="2020-01-01")
+        self.with_data(st_repo, "HK", filings=["HK_Quarterly_Q1-2026.txt"],
+                       csv_periods=["FY2025"], date="2024-01-01")
+        # DCBO is older, but only HK has data the parser has not seen.
+        assert st.pick_stalest(require_new_filings=True) == "HK"
+
+    def test_defaults_off_keeps_existing_ordering(self, st_repo):
+        self.with_data(st_repo, "DCBO", filings=["DCBO_6K_Q1-2026.txt"],
+                       csv_periods=["Q1-2026"], date="2020-01-01")
+        self.with_data(st_repo, "HK", filings=["HK_Quarterly_Q1-2026.txt"],
+                       csv_periods=["FY2025"], date="2024-01-01")
+        assert st.pick_stalest() == "DCBO"
+
+    def test_returns_none_when_nothing_has_new_data(self, st_repo):
+        self.with_data(st_repo, "DCBO", filings=["DCBO_6K_Q1-2026.txt"],
+                       csv_periods=["Q1-2026"], date="2020-01-01")
+        assert st.pick_stalest(require_new_filings=True) is None

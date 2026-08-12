@@ -20,6 +20,8 @@ import sys
 from collections.abc import Iterable
 from pathlib import Path
 
+import refresh_plan
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 QUEUE_DIR = REPO_ROOT / "queue"
 
@@ -101,18 +103,27 @@ def pick_new(exclude: Iterable[str] = ()) -> str | None:
     return None
 
 
-def pick_stalest(exclude: Iterable[str] = ()) -> str | None:
+def pick_stalest(exclude: Iterable[str] = (), *,
+                 require_new_filings: bool = False) -> str | None:
     """Oldest DCF by its internal `valuation_date`.
 
     Deliberately not file mtime: actions/checkout stamps every file with the
     checkout time, which would make an mtime ranking arbitrary in CI. A
     missing or unparseable date sorts first so those get refreshed soonest.
+
+    `require_new_filings` restricts the pick to tickers with a filing the CSV
+    has not absorbed. Age alone is a poor proxy for needing the parser: of 20
+    tickers stale by valuation_date, 19 had no unparsed filing, so refreshing
+    them re-derives identical financials at ~$6 each. Off by default.
     """
     exclude = set(exclude)
     candidates = []
     for dcf in REPO_ROOT.glob("research/*/Reports/*_DCF.json"):
         ticker = dcf.parent.parent.name
         if ticker in exclude:
+            continue
+        if require_new_filings and not refresh_plan.has_new_filings(
+                REPO_ROOT, ticker):
             continue
         try:
             data = json.loads(dcf.read_text())

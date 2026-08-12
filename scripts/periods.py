@@ -82,11 +82,16 @@ def _normalize(label: str) -> str:
     return _INNER_FY.sub("", s)
 
 
-def _sub_rank(ptype: PeriodType) -> int:
+def sub_rank(ptype: PeriodType) -> int:
     """Ordering within a fiscal year; the full year sorts after its parts.
 
     Matches export_csv.sort_key, which every committed CSV is already
     ordered by.
+
+    Public because `refresh_plan` compares periods by
+    (fiscal_year, sub_rank) rather than by `sort_key`: sort_key ties on the
+    raw uppercased label, so `Q1-2026` sorts above `Q1 2026` on separator
+    alone, which is a spelling difference and not a chronological one.
     """
     if ptype == "FY":
         return 9
@@ -95,6 +100,10 @@ def _sub_rank(ptype: PeriodType) -> int:
     if ptype.startswith("Q"):
         return int(ptype[1])
     return 0
+
+
+# Retained so existing internal callers keep working.
+_sub_rank = sub_rank
 
 
 def parse(label: str | None) -> Period:

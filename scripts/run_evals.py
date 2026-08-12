@@ -299,6 +299,22 @@ def check_dcf(ticker: str, card: Card) -> None:
     card.add("dcf_entry_price", "pass" if eps else "warn",
              "" if eps else "no numeric entry price found")
 
+    # refresh_price.py updates price-derived numbers for free but never
+    # rewrites prose, because a claim like "the entry price is 15.6% above
+    # the current price" is not repaired by swapping the figure -- at DCBO's
+    # new price that entry point is 12.1% BELOW the market. So the gap is
+    # recorded and surfaced here until a scoped agent reconciles it.
+    refreshed = dcf.get("price_refresh")
+    if not isinstance(refreshed, dict):
+        card.add("dcf_prose_price_stale", "skip", "no price-only refresh")
+    elif refreshed.get("prose_is_stale"):
+        paths = refreshed.get("prose_paths_quoting_previous_price") or []
+        card.add("dcf_prose_price_stale", "warn",
+                 f"{len(paths)} prose field(s) still quote "
+                 f"{refreshed.get('previous_price')}: {list(paths)[:3]}")
+    else:
+        card.add("dcf_prose_price_stale", "pass")
+
     inputs = dcf.get("inputs")
     has_sbc = isinstance(inputs, dict) and any(
         "sbc" in k.lower() or "stock_based" in k.lower() for k in inputs)

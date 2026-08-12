@@ -174,3 +174,38 @@ class TestMain:
             with pytest.raises(SystemExit) as ei:
                 runpy.run_module("ledger", run_name="__main__")
         assert ei.value.code == 2
+
+
+class TestPriceOnlyRefreshNeverAppends:
+    """A price tick is an outcome, not a prediction.
+
+    row_key includes current_price (see TestRowKey.test_price_change_is_a_new
+    _forecast), so a price-only refresh would otherwise mint a ledger row for
+    a forecast nobody made and corrupt the scoring dataset. Suppression is
+    structural: refresh_price never calls ledger, and research_one.sh -- the
+    only caller of `ledger.py append` -- is not on the tier-0 path.
+    """
+
+    def test_refresh_price_does_not_import_ledger(self):
+        import refresh_price
+        src = Path(refresh_price.__file__).read_text()
+        assert "import ledger" not in src
+        assert "ledger.append" not in src
+
+    def test_price_only_refresh_appends_no_row(self, make_ticker,
+                                               pinned_identity):
+        import refresh_price
+        d = install_dcf(make_ticker, "FRFHF")
+        ledger.append(["FRFHF"])
+        before = ledger.LEDGER.read_text()
+
+        dcf = d / "Reports" / "FRFHF_DCF.json"
+        doc = json.loads(dcf.read_text())
+        price = doc.get("current_price")
+        if not isinstance(price, (int, float)) or price <= 0:
+            pytest.skip("fixture carries no usable current_price")
+        refresh_price.refresh(d.parent.parent, "FRFHF", price * 1.4,
+                              doc.get("currency"), apply=True)
+
+        # The refresh must not have appended; only an explicit append can.
+        assert ledger.LEDGER.read_text() == before

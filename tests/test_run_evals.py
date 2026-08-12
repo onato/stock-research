@@ -538,3 +538,33 @@ class TestCard:
         card = E.Card()
         card.add("a", "warn")
         assert card.summary()["score"] is None
+
+
+class TestProsePriceStale:
+    """A price-only refresh leaves prose quoting the old figure.
+
+    refresh_price.py fixes the numbers for free but must never rewrite the
+    sentences around them -- 101 of 113 corpus DCFs quote the price inside
+    claims that change with it. The gap is recorded, not hidden, so it stays
+    visible until a scoped agent reconciles it.
+    """
+
+    def test_price_refresh_stale_prose_warns(self, make_ticker):
+        doc = minimal_dcf()
+        doc["price_refresh"] = {
+            "prose_is_stale": True,
+            "prose_paths_quoting_previous_price": ["investment_thesis.key_insight"],
+        }
+        checks = dcf_checks(make_ticker, doc)
+        assert checks["dcf_prose_price_stale"]["status"] == "warn"
+
+    def test_reconciled_prose_passes(self, make_ticker):
+        doc = minimal_dcf()
+        doc["price_refresh"] = {"prose_is_stale": False,
+                                "prose_paths_quoting_previous_price": []}
+        checks = dcf_checks(make_ticker, doc)
+        assert checks["dcf_prose_price_stale"]["status"] == "pass"
+
+    def test_never_refreshed_is_skipped(self, make_ticker):
+        checks = dcf_checks(make_ticker, minimal_dcf())
+        assert checks["dcf_prose_price_stale"]["status"] == "skip"

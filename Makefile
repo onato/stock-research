@@ -39,6 +39,13 @@ run: ## Research the next few tickers, score them, report fixes, then rank every
 	@echo "==> baseline (so the cost delta is measurable afterwards)"
 	@$(PY) $(SCRIPTS)/cost_report.py --baseline $(STATE)/cost_baseline.json \
 	  >/dev/null 2>&1 || true
+	@# Free numeric write-back first. A stale price does not invalidate a
+	@# valuation -- weighted_iv and entry_price are price-independent -- so
+	@# refreshing the derived upsides here keeps tickers off the ~$$6
+	@# research path when only the market moved.
+	@echo "==> refreshing drifted prices (free, no model)"
+	@$(MAKE) --no-print-directory refresh-price APPLY=1 || true
+	@echo
 	@# TICKER=X researches just that one; otherwise take the next TICKERS
 	@# from the queue. Without this, `make run TICKER=X` would silently
 	@# ignore the argument and research something else entirely.
@@ -47,7 +54,7 @@ ifdef TICKER
 	@$(SCRIPTS)/run_loop.sh -j 1 $(TICKER)
 else
 	@echo "==> researching $(TICKERS) ticker(s), $(PARALLEL) at a time"
-	@$(SCRIPTS)/run_loop.sh -n $(TICKERS) -j $(PARALLEL)
+	@$(SCRIPTS)/run_loop.sh -n $(TICKERS) -j $(PARALLEL) --require-new-filings
 endif
 	@echo
 	@echo "==> scoring"
@@ -59,6 +66,15 @@ endif
 
 digest: ## Cost + quality + suggested fixes for the last batch
 	@$(PY) $(SCRIPTS)/after_run.py
+
+refresh-plan: ## What each ticker actually needs: tier 0-3, no model, free
+	@$(PY) $(SCRIPTS)/refresh_plan.py $(if $(TICKER),--ticker $(TICKER),--all) \
+	  $(if $(TIER),--tier $(TIER),)
+
+refresh-price: ## Rewrite price-derived DCF numbers from live quotes (APPLY=1 to write)
+	@$(PY) $(SCRIPTS)/refresh_price.py \
+	  $(if $(APPLY),--apply,--check) \
+	  $(if $(TICKER),--ticker $(TICKER),--all)
 
 screen: ## Rank every ticker by upside to weighted IV, at live prices
 	@echo "=================================================================="
