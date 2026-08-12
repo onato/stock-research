@@ -201,3 +201,120 @@ class TestCheckMode:
         row = ["FY2024"] + ["1"] * (len(schema.CSV_HEADERS) - 1)
         write(csv_path, schema.CSV_HEADERS, [row])
         assert normalize_csv.plan_file(csv_path)["would_change"] is False
+
+
+class TestCli:
+    """The command line. It rewrites committed CSVs, so --check has to be
+    provably read-only and --write must do exactly what --check reported.
+
+    main() had no coverage at all: the module sat at 67%, and this is the tool
+    that reshaped all 61 non-canonical files.
+    """
+
+    def _corpus(self, tmp_path, ticker, headers, rows):
+        """rows are lists, matching this module's write() helper."""
+        d = tmp_path / "research" / ticker / "Reports"
+        d.mkdir(parents=True, exist_ok=True)
+        path = d / f"{ticker}_Metrics.csv"
+        write(path, headers, rows)
+        return path
+
+    def _run(self, monkeypatch, tmp_path, *argv):
+        monkeypatch.setattr(normalize_csv, "REPO", tmp_path)
+        monkeypatch.setattr("sys.argv", ["normalize_csv.py", *argv])
+        return normalize_csv.main()
+
+    def test_check_reports_without_writing(self, tmp_path, monkeypatch, capsys):
+        p = self._corpus(tmp_path, "T", ["Period", "NetProfit"],
+                         [["FY2024", "10"]])
+        before = p.read_text()
+        assert self._run(monkeypatch, tmp_path, "--check") == 0
+        out = capsys.readouterr().out
+        assert "would rewrite 1 file" in out
+        assert "nothing written" in out
+        assert p.read_text() == before
+
+    def test_write_rewrites_the_file(self, tmp_path, monkeypatch, capsys):
+        p = self._corpus(tmp_path, "T", ["Period", "NetProfit"],
+                         [["FY2024", "10"]])
+        assert self._run(monkeypatch, tmp_path, "--write") == 0
+        assert "rewrote 1 file" in capsys.readouterr().out
+        assert read(p)[0][:len(schema.CSV_HEADERS)] == schema.CSV_HEADERS
+
+    def test_an_already_canonical_file_is_counted_not_rewritten(
+            self, tmp_path, monkeypatch, capsys):
+        row = ["FY2024"] + ["1"] * (len(schema.CSV_HEADERS) - 1)
+        p = self._corpus(tmp_path, "OK", schema.CSV_HEADERS, [row])
+        before = p.read_text()
+        assert self._run(monkeypatch, tmp_path, "--write") == 0
+        assert "1 already canonical" in capsys.readouterr().out
+        assert p.read_text() == before
+
+    def test_collisions_are_reported(self, tmp_path, monkeypatch, capsys):
+        # AAPL/ASML/ADYEY/SFM all carry EPSBasic beside EPSDiluted. Which one
+        # won has to be visible, since it changes the number a DCF reads.
+        self._corpus(tmp_path, "AAPL",
+                     ["Period", "EPSBasic", "EPSDiluted"],
+                     [["FY2024", "0.65", "0.64"]])
+        assert self._run(monkeypatch, tmp_path, "--check") == 0
+        out = capsys.readouterr().out
+        assert "collision" in out
+        assert "EPSBasic lost to EPSDiluted" in out
+
+    def test_a_named_ticker_limits_the_scope(self, tmp_path, monkeypatch,
+                                             capsys):
+        keep = self._corpus(tmp_path, "OTHER", ["Period", "NetProfit"],
+                            [["FY2024", "5"]])
+        self._corpus(tmp_path, "T", ["Period", "NetProfit"],
+                     [["FY2024", "10"]])
+        before = keep.read_text()
+        assert self._run(monkeypatch, tmp_path, "--write", "T") == 0
+        assert keep.read_text() == before
+
+    def test_verbose_lists_renames_during_a_write(self, tmp_path, monkeypatch,
+                                                  capsys):
+        self._corpus(tmp_path, "T", ["Period", "NetProfit"],
+                     [["FY2024", "10"]])
+        assert self._run(monkeypatch, tmp_path, "--write", "--verbose") == 0
+        assert "NetProfit->NetIncome" in capsys.readouterr().out
+
+    def test_no_csvs_is_an_error(self, tmp_path, monkeypatch, capsys):
+        (tmp_path / "research").mkdir()
+        assert self._run(monkeypatch, tmp_path, "--check") == 1
+        assert "no Metrics CSVs" in capsys.readouterr().err
+
+    def test_check_is_the_default_mode(self, tmp_path, monkeypatch, capsys):
+        p = self._corpus(tmp_path, "T", ["Period", "NetProfit"],
+                         [["FY2024", "10"]])
+        before = p.read_text()
+        assert self._run(monkeypatch, tmp_path) == 0
+        assert p.read_text() == before
+
+
+class TestDefensiveReads:
+    """A rewriter must fail closed: unreadable input leaves the file alone."""
+
+    def test_an_unreadable_file_is_left_alone(self, tmp_path):
+        # A directory where a CSV belongs: never a traceback, never a rewrite.
+        p = tmp_path / "T_Metrics.csv"
+        p.mkdir()
+        assert normalize_csv.plan_file(p)["would_change"] is False
+        assert normalize_csv.normalize_file(p) is False
+
+    def test_binary_content_is_left_alone(self, csv_path):
+        csv_path.write_bytes(b"\xff\xfe\x00\x01 not text")
+        before = csv_path.read_bytes()
+        assert normalize_csv.normalize_file(csv_path) is False
+        assert csv_path.read_bytes() == before
+
+    def test_a_blank_header_column_is_skipped(self, csv_path):
+        # A trailing comma leaves an unnamed column; it must not become a KPI.
+        write(csv_path, ["Period", "", "Revenue"], [["FY2024", "x", "100"]])
+        normalize_csv.normalize_file(csv_path)
+        assert "" not in read(csv_path)[0]
+
+    def test_an_entirely_blank_row_is_dropped(self, csv_path):
+        write(csv_path, ["Period", "Revenue"],
+              [["FY2024", "100"], ["", ""]])
+        normalize_csv.normalize_file(csv_path)
+        assert len(read(csv_path)) == 2      # header + the one real row

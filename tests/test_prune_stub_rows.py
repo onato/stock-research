@@ -158,3 +158,112 @@ class TestIdempotent:
         after = csv_path.read_text()
         assert prune_stub_rows.prune_file(csv_path) == []
         assert csv_path.read_text() == after
+
+
+class TestCli:
+    """The command line, which is how this actually gets used.
+
+    It rewrites committed CSVs, so --check must be provably read-only and
+    --write must delete exactly what --check reported. Neither path had any
+    coverage: the module sat at 64% with the whole of main() untested.
+    """
+
+    def _corpus(self, tmp_path, ticker, rows, headers=None):
+        d = tmp_path / "research" / ticker / "Reports"
+        d.mkdir(parents=True, exist_ok=True)
+        write(d / f"{ticker}_Metrics.csv", rows, headers=headers)
+        return d / f"{ticker}_Metrics.csv"
+
+    def _run(self, monkeypatch, tmp_path, *argv):
+        monkeypatch.setattr(prune_stub_rows, "REPO", tmp_path)
+        monkeypatch.setattr("sys.argv", ["prune_stub_rows.py", *argv])
+        return prune_stub_rows.main()
+
+    def test_check_reports_without_writing(self, tmp_path, monkeypatch, capsys):
+        p = self._corpus(tmp_path, "PINS",
+                         [{"Period": "FY2016", "ShareholdersEquity": "-448.3"},
+                          full("FY2017"), full("FY2018")])
+        before = p.read_text()
+        assert self._run(monkeypatch, tmp_path, "--check") == 0
+        out = capsys.readouterr().out
+        assert "FY2016" in out
+        assert "would delete 1 row" in out
+        assert "nothing written" in out
+        assert p.read_text() == before
+
+    def test_write_deletes_the_reported_rows(self, tmp_path, monkeypatch,
+                                             capsys):
+        p = self._corpus(tmp_path, "PINS",
+                         [{"Period": "FY2016", "ShareholdersEquity": "-448.3"},
+                          full("FY2017"), full("FY2018")])
+        assert self._run(monkeypatch, tmp_path, "--write") == 0
+        assert "deleted 1 row" in capsys.readouterr().out
+        assert [r["Period"] for r in read(p)] == ["FY2017", "FY2018"]
+
+    def test_a_named_ticker_limits_the_scope(self, tmp_path, monkeypatch,
+                                             capsys):
+        keep = self._corpus(tmp_path, "OTHER",
+                            [{"Period": "FY2016",
+                              "ShareholdersEquity": "-1"},
+                             full("FY2017"), full("FY2018")])
+        self._corpus(tmp_path, "PINS",
+                     [{"Period": "FY2016", "ShareholdersEquity": "-1"},
+                      full("FY2017"), full("FY2018")])
+        assert self._run(monkeypatch, tmp_path, "--write", "PINS") == 0
+        # OTHER was not named, so its stub row survives untouched.
+        assert [r["Period"] for r in read(keep)] == ["FY2016", "FY2017",
+                                                    "FY2018"]
+
+    def test_a_blocked_row_is_reported_as_kept(self, tmp_path, monkeypatch,
+                                               capsys):
+        # The safety rule is the point of the tool: a year the span heuristic
+        # flagged but which holds real data must be named, not silently kept.
+        self._corpus(tmp_path, "T",
+                     [{"Period": "FY2016", "Revenue": "100"},
+                      full("FY2017"), full("FY2018"), full("FY2019")])
+        assert self._run(monkeypatch, tmp_path, "--check") == 0
+        out = capsys.readouterr().out
+        assert "KEPT" in out
+        assert "would delete 0 row" in out
+
+    def test_a_clean_corpus_reports_nothing_to_do(self, tmp_path, monkeypatch,
+                                                  capsys):
+        self._corpus(tmp_path, "T", [full("FY2023"), full("FY2024")])
+        assert self._run(monkeypatch, tmp_path, "--check") == 0
+        assert "would delete 0 row" in capsys.readouterr().out
+
+    def test_no_csvs_is_an_error(self, tmp_path, monkeypatch, capsys):
+        (tmp_path / "research").mkdir()
+        assert self._run(monkeypatch, tmp_path, "--check") == 1
+        assert "no Metrics CSVs" in capsys.readouterr().err
+
+    def test_check_is_the_default_mode(self, tmp_path, monkeypatch, capsys):
+        # Bare invocation must never write: this deletes rows.
+        p = self._corpus(tmp_path, "PINS",
+                         [{"Period": "FY2016", "ShareholdersEquity": "-1"},
+                          full("FY2017"), full("FY2018")])
+        before = p.read_text()
+        assert self._run(monkeypatch, tmp_path) == 0
+        assert p.read_text() == before
+
+
+class TestDefensiveReads:
+    """Deletion must fail closed: unreadable input is never pruned."""
+
+    def test_an_unreadable_file_yields_an_empty_plan(self, tmp_path):
+        p = tmp_path / "T_Metrics.csv"
+        p.mkdir()          # a directory where a CSV belongs
+        assert prune_stub_rows.plan_file(p)["periods"] == []
+        assert prune_stub_rows.prune_file(p) == []
+
+    def test_binary_content_is_left_alone(self, csv_path):
+        csv_path.write_bytes(b"\xff\xfe\x00\x01 not text")
+        before = csv_path.read_bytes()
+        assert prune_stub_rows.prune_file(csv_path) == []
+        assert csv_path.read_bytes() == before
+
+    def test_a_header_only_file_is_left_alone(self, csv_path):
+        write(csv_path, [])
+        before = csv_path.read_text()
+        assert prune_stub_rows.prune_file(csv_path) == []
+        assert csv_path.read_text() == before
