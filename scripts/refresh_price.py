@@ -280,6 +280,14 @@ def update_dashboard(path: pathlib.Path, previous_price: float,
         return False
     if embedded.get("current_price") != previous_price:
         return False                      # already drifted from disk
+    # The embedded blob is not always a stale mirror of the file. SUM.NZ's
+    # carried a `valuation` block the on-disk DCF.json does not have, and
+    # its JS reads dcfData.valuation twice, so overwriting removed the key
+    # and broke the page; PNG.V lost `net_debt` the same way. Only replace
+    # when the file carries everything the page already had.
+    missing = set(embedded) - set(doc)
+    if missing:
+        return False
     if not apply:
         return True
     payload = json.dumps(doc, indent=2)

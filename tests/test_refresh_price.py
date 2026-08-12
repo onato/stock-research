@@ -523,3 +523,47 @@ class TestCurrencyAwareIntrinsicValue:
         assert not result.ok
         assert "denomination" in result.reason
         assert ticker.dcf.read_text() == before
+
+
+class TestDashboardKeyLoss:
+    """Re-embedding must never drop a key the dashboard's JS reads.
+
+    The price-match precondition was too weak. SUM.NZ's embedded dcfData
+    carried a `valuation` block that the on-disk DCF.json does not have, and
+    its JS reads `dcfData.valuation` twice -- so overwriting the blob with
+    the file removed the key and broke the page. PNG.V lost `net_debt` the
+    same way.
+
+    The embedded copy is not always a stale mirror of the file; sometimes it
+    is a differently-shaped view the generator built. Overwriting is only
+    safe when the replacement carries everything the old blob had.
+    """
+
+    def dash_with(self, ticker, payload):
+        path = (ticker.repo / "research" / "DCBO" / "Reports"
+                / "DCBO_Dashboard.html")
+        path.write_text(
+            "<html><script>\nconst dcfData = " + json.dumps(payload) + ";\n"
+            "render(dcfData.valuation.base);\n</script></html>")
+        return path
+
+    def test_refuses_to_drop_a_key_the_file_lacks(self, ticker):
+        embedded = dcf_doc()
+        embedded["valuation"] = {"base": {"intrinsic_value": 33.33}}
+        path = self.dash_with(ticker, embedded)
+        on_disk = dcf_doc()
+        del on_disk["valuation"]          # the SUM.NZ shape
+        ticker.write(on_disk)
+        before = path.read_text()
+
+        refresh_price.refresh(ticker.repo, "DCBO", 23.06, "USD", apply=True)
+        assert path.read_text() == before
+        assert ticker.read()["price_refresh"]["dashboard_stale"] is True
+
+    def test_still_embeds_when_the_file_is_a_superset(self, ticker):
+        embedded = {"ticker": "DCBO", "current_price": 17.52,
+                    "valuation": {"base": {"intrinsic_value": 33.33,
+                                           "upside": 90.2}}}
+        path = self.dash_with(ticker, embedded)
+        refresh_price.refresh(ticker.repo, "DCBO", 23.06, "USD", apply=True)
+        assert "23.06" in path.read_text()
