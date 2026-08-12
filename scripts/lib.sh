@@ -163,17 +163,56 @@ with_git_lock() {
   local waited=0
 
   while ! mkdir "$lockdir" 2>/dev/null; do
+    # A held lock might be an orphan. state/git.lock.d sat abandoned for two
+    # days after the rate-limit abort batch killed a worker mid-commit, and
+    # because the directory was empty nothing could tell a live holder from a
+    # corpse -- every runner since waited the full 10m and skipped its commit.
+    # git_lock.py --reclaim removes it only when the recorded owner is gone.
+    if uv run --project "$REPO_ROOT" python3 "$REPO_ROOT/scripts/git_lock.py" \
+         --reclaim "$lockdir" >/dev/null 2>&1; then
+      echo "[$ticker] reclaimed an abandoned git lock." >&2
+      continue                      # retry the mkdir straight away
+    fi
     sleep 2
     waited=$((waited + 2))
     if [ "$waited" -gt 600 ]; then
-      echo "[$ticker] Could not acquire git lock after 10m; skipping commit." >&2
+      local held
+      held="$(uv run --project "$REPO_ROOT" python3 \
+                "$REPO_ROOT/scripts/git_lock.py" --check "$lockdir" 2>/dev/null)"
+      echo "[$ticker] Could not acquire git lock after 10m (held by ${held:-?});" \
+           "skipping commit." >&2
       return 1
     fi
   done
 
-  "$@"
+  # Record the holder so a waiter can tell this lock from an orphan, and so
+  # the trap below only ever releases our own.
+  printf '%s %s\n' "$$" "$ticker" > "$lockdir/owner" 2>/dev/null || true
+
+  # Release on a signal too: without this, any kill during the critical
+  # section leaks the lock permanently, which is how the two-day orphan
+  # happened. --release is a no-op unless the recorded PID is ours, so a
+  # dying worker cannot unlock a sibling's commit.
+  local release_cmd="uv run --project '$REPO_ROOT' python3 \
+'$REPO_ROOT/scripts/git_lock.py' --release '$lockdir' --pid $$ >/dev/null 2>&1"
+  # shellcheck disable=SC2064
+  # Expanding now is deliberate: the handler must capture this lockdir and PID
+  # while they are in scope, not resolve locals that are gone by signal time.
+  trap "$release_cmd; exit 143" INT TERM
+
+  # Run the command in the BACKGROUND and wait on it. Bash defers a trap while
+  # the shell blocks on a *foreground* child, so a SIGTERM mid-commit never ran
+  # the handler and the lock leaked -- measured, and exactly how the two-day
+  # orphan was created. Waiting on a background job keeps the shell
+  # interruptible, so the trap fires and the lock is released.
+  "$@" &
+  local child=$!
+  wait "$child"
   local rc=$?
-  rmdir "$lockdir" 2>/dev/null
+
+  trap - INT TERM
+  uv run --project "$REPO_ROOT" python3 "$REPO_ROOT/scripts/git_lock.py" \
+    --release "$lockdir" --pid $$ >/dev/null 2>&1
   return "$rc"
 }
 
