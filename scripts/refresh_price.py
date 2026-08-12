@@ -124,6 +124,66 @@ def _round(value: float) -> float:
     return round(value, 1)
 
 
+_IV_SERIES_RE = re.compile(r"^intrinsic_value[_a-z]*$")
+
+
+def denomination_conflict(doc: dict, price: float) -> str | None:
+    """Reason to refuse when `intrinsic_value` is not in the price's units.
+
+    23 corpus DCFs carry parallel per-currency IV series and 15 of them leave
+    the top-level `currency` null, so a currency-code comparison cannot catch
+    them. WISE.L is the shape that matters: the London quote is 885.6 pence
+    while `intrinsic_value` is 13.5 USD, and its stored upsides track the
+    `intrinsic_value_gbp_pence` series (1001.1 -> 13.0%). Recomputing from
+    the plain field would write -98.5% over three correct numbers.
+
+    The existing stored upside is the evidence: it was computed against the
+    right series by whoever built the model, so if it matches a *sibling*
+    series better than it matches `intrinsic_value`, the plain field is not
+    the one this file's upsides are denominated in. Only a clear
+    contradiction refuses -- a file with no siblings, or whose plain field
+    already agrees, is left alone.
+    """
+    valuation = doc.get("valuation")
+    if not isinstance(valuation, dict):
+        return None
+    stored_price = doc.get("current_price")
+    if not isinstance(stored_price, (int, float)) or stored_price <= 0:
+        return None
+
+    for name in SCENARIOS:
+        block = valuation.get(name)
+        if not isinstance(block, dict):
+            continue
+        upside = block.get("upside")
+        plain = block.get("intrinsic_value")
+        if not isinstance(upside, (int, float)):
+            continue
+        siblings = {k: v for k, v in block.items()
+                    if _IV_SERIES_RE.match(k) and k != "intrinsic_value"
+                    and isinstance(v, (int, float)) and v}
+        if not siblings:
+            continue
+        # How far each candidate is from reproducing the stored upside.
+        # Bound as defaults so the closure cannot capture the loop variable
+        # and score a later scenario's numbers against this one's upside.
+        want: float = float(upside)
+        base_price: float = float(stored_price)
+
+        def gap(value: float, want: float = want,
+                base_price: float = base_price) -> float:
+            return abs((value / base_price - 1.0) * 100.0 - want)
+
+        best = min(siblings, key=lambda k: gap(siblings[k]))
+        plain_gap = gap(plain) if isinstance(plain, (int, float)) and plain \
+            else float("inf")
+        if gap(siblings[best]) < 1.0 <= plain_gap:
+            return (f"denomination mismatch: {name} upside {upside} tracks "
+                    f"{best}, not intrinsic_value -- needs a "
+                    f"currency-aware refresh")
+    return None
+
+
 def apply_price(doc: dict, price: float) -> list[str]:
     """Recompute every price-derived number in place. Returns paths changed.
 
@@ -365,6 +425,11 @@ def refresh(repo: pathlib.Path | str, ticker: str, price: float | None,
         # WISE.L quotes GBP pence against USD filings; 885.6/48.43 yields a
         # plausible P/E of 18.3 that is pure coincidence.
         res.reason = f"currency mismatch: quote {want} vs DCF {have}"
+        return res
+
+    conflict = denomination_conflict(doc, float(price))
+    if conflict:
+        res.reason = conflict
         return res
 
     res.previous_price = float(stored)

@@ -437,3 +437,89 @@ class TestFormattingPreserved:
         assert got["assumptions"]["base"]["upside"] == 999.0   # untouched
         assert got["valuation"]["base"]["upside"] == pytest.approx(44.5, 0.1)
         assert got["valuation"]["bear"]["upside"] == pytest.approx(-19.5, 0.1)
+
+
+class TestCurrencyAwareIntrinsicValue:
+    """`intrinsic_value` is not always denominated like `current_price`.
+
+    23 corpus DCFs carry parallel per-currency IV series, and 15 of those
+    leave the top-level `currency` field null, so a currency-code comparison
+    cannot catch them. WISE.L is the dangerous shape: the London quote is
+    885.6 pence while `intrinsic_value` is 13.5 USD, so recomputing upside
+    from the plain field yields -98.5% instead of the correct 13.0% that its
+    `intrinsic_value_gbp_pence` series (1001.1) implies.
+
+    The rule: pick the series that matches the quote, and when no series can
+    be shown to match, refuse rather than guess.
+    """
+
+    def wise_like(self):
+        """A dual-denomination file with the plain field in the WRONG unit."""
+        return {
+            "ticker": "WISE.L", "valuation_date": "2026-08-01",
+            "current_price": 885.6, "currency": "USD",
+            "valuation": {
+                "base": {"intrinsic_value": 13.5,
+                         "intrinsic_value_gbp_pence": 1001.1, "upside": 13.0},
+                "bear": {"intrinsic_value": 7.68,
+                         "intrinsic_value_gbp_pence": 569.4, "upside": -35.7},
+                "bull": {"intrinsic_value": 21.03,
+                         "intrinsic_value_gbp_pence": 1559.5, "upside": 76.1},
+            },
+        }
+
+    def test_refuses_when_plain_value_is_a_different_denomination(self, ticker):
+        ticker.write(self.wise_like())
+        before = ticker.dcf.read_text()
+        result = refresh_price.refresh(ticker.repo, "DCBO", 900.0, "GBp",
+                                       apply=True)
+        assert not result.ok
+        assert ticker.dcf.read_text() == before
+
+    def test_never_writes_a_98_percent_loss_from_a_unit_mismatch(self, ticker):
+        """The specific corruption this guard exists to prevent."""
+        ticker.write(self.wise_like())
+        refresh_price.refresh(ticker.repo, "DCBO", 900.0, "GBp", apply=True)
+        assert ticker.read()["valuation"]["base"]["upside"] == 13.0
+
+    def test_matching_denomination_still_writes(self, ticker):
+        """HFL.NZ shape: plain value agrees with its own _nzd series."""
+        ticker.write({
+            "ticker": "HFL.NZ", "valuation_date": "2026-08-01",
+            "current_price": 6.01, "currency": "NZD",
+            "valuation": {"base": {"intrinsic_value": 5.4107,
+                                   "intrinsic_value_nzd": 5.4107,
+                                   "intrinsic_value_gbp_pence": 235.5354,
+                                   "upside": -10.0}},
+        })
+        result = refresh_price.refresh(ticker.repo, "DCBO", 5.0, "NZD",
+                                       apply=True)
+        assert result.ok
+        assert ticker.read()["valuation"]["base"]["upside"] == pytest.approx(
+            8.2, abs=0.1)
+
+    def test_plain_only_file_is_unaffected(self, ticker):
+        """The 90 ordinary files must keep working exactly as before."""
+        result = refresh_price.refresh(ticker.repo, "DCBO", 23.06, "USD",
+                                       apply=True)
+        assert result.ok
+        assert ticker.read()["valuation"]["base"]["upside"] == pytest.approx(
+            44.5, abs=0.1)
+
+    def test_null_currency_still_refuses_a_mismatched_series(self, ticker):
+        """The real gap: 15 of the 23 dual files leave `currency` null.
+
+        The currency-code guard cannot fire on those, so the denomination
+        check must stand on the numbers alone -- the plain `intrinsic_value`
+        sits 98% away from the price while the `_gbp_pence` series sits 13%
+        away, which is only explicable as two different units.
+        """
+        doc = self.wise_like()
+        doc["currency"] = None
+        ticker.write(doc)
+        before = ticker.dcf.read_text()
+        result = refresh_price.refresh(ticker.repo, "DCBO", 900.0, None,
+                                       apply=True)
+        assert not result.ok
+        assert "denomination" in result.reason
+        assert ticker.dcf.read_text() == before
