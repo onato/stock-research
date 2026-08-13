@@ -10,12 +10,13 @@ Usage: python3 scripts/check_adyen_h1.py [--download]
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 import urllib.request
 from pathlib import Path
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 research-bot"
-PAYLOAD = "https://investors.adyen.com/financials/h1-2026/_payload.json"
+INDEX = "https://investors.adyen.com/financials/_payload.json"
 NEWS = "https://investors.adyen.com/news"
 DEST = Path("research/ADYEY/PDFs/ADYEY_Letter_H1-2026.pdf")
 
@@ -26,12 +27,35 @@ def _get(url: str, timeout: int = 30) -> bytes:
         return resp.read()
 
 
+def discover_slug() -> str | None:
+    """Find the real H1-2026 page slug from the financials index.
+
+    Adyen broke its eight-year `h1-YYYY` convention for H1-2026 by appending a
+    random suffix (`h1-2026-c2a1a`), so the slug must be discovered, never assumed.
+    """
+    try:
+        raw = _get(INDEX).decode("utf-8", "replace")
+    except Exception as exc:
+        print(f"financials index not reachable: {exc}")
+        return None
+    slugs = re.findall(r"/financials/(h1-2026[a-z0-9\-]*)", raw)
+    if not slugs:
+        return None
+    # Prefer a suffixed slug over a bare one; both may appear.
+    return max(slugs, key=len)
+
+
 def find_asset_urls() -> list[str]:
     """Return Frontify download URLs referenced by the H1-2026 payload."""
+    slug = discover_slug()
+    if not slug:
+        print("H1-2026 not yet listed on the financials index.")
+        return []
+    url = f"https://investors.adyen.com/financials/{slug}/_payload.json"
     try:
-        raw = _get(PAYLOAD).decode("utf-8", "replace")
+        raw = _get(url).decode("utf-8", "replace")
     except Exception as exc:
-        print(f"payload not reachable: {exc}")
+        print(f"payload not reachable ({slug}): {exc}")
         return []
     urls = []
     marker = "brand.adyen.com/api/asset/"
