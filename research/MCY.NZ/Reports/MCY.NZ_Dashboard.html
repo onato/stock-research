@@ -1,0 +1,1505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mercury NZ (MCY.NZ) Financial Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 20px;
+}
+.header { text-align: center; margin-bottom: 30px; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 15px; backdrop-filter: blur(10px); }
+.header h1 { font-size: 2.5rem; background: linear-gradient(90deg, #00d4aa, #00b894); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 10px; }
+.header p { color: #888; font-size: 1.1rem; margin-bottom: 8px; }
+.price-badge { display: inline-block; background: rgba(0,212,170,0.12); border: 1px solid rgba(0,212,170,0.35); border-radius: 8px; padding: 6px 16px; font-size: 0.95rem; color: #00d4aa; margin-top: 4px; }
+.dcf-badge { display: inline-block; background: rgba(253,203,110,0.12); border: 1px solid rgba(253,203,110,0.35); border-radius: 8px; padding: 6px 16px; font-size: 0.95rem; color: #fdcb6e; margin-top: 4px; margin-left: 8px; }
+
+/* Overview */
+.overview-section { max-width: 1400px; margin: 0 auto 30px; }
+.overview-toggle { width: 100%; background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.3); border-radius: 12px; padding: 16px 24px; color: #00d4aa; font-size: 1.1rem; font-weight: 600; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease; }
+.overview-toggle:hover { background: rgba(0,212,170,0.2); }
+.overview-toggle .arrow { transition: transform 0.3s ease; }
+.overview-toggle.active .arrow { transform: rotate(180deg); }
+.overview-content { display: none; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-top: none; border-radius: 0 0 12px 12px; padding: 30px; margin-top: -12px; }
+.overview-content.active { display: block; }
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+.overview-card { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; border: 1px solid rgba(255,255,255,0.08); }
+.overview-card h3 { color: #00d4aa; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.overview-card.bull h3 { color: #00d4aa; }
+.overview-card.bear h3 { color: #ff6b6b; }
+.overview-card.risks h3 { color: #fdcb6e; }
+.overview-card p { margin-bottom: 12px; line-height: 1.6; }
+.overview-card ul { list-style: none; padding: 0; margin: 0; }
+.overview-card li { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); line-height: 1.5; font-size: 0.92rem; }
+.overview-card li:last-child { border-bottom: none; }
+.risk-high { color: #ff6b6b; font-weight: 600; }
+.risk-moderate { color: #fdcb6e; font-weight: 600; }
+.risk-low { color: #00d4aa; font-weight: 600; }
+.revenue-stream { display: flex; justify-content: space-between; align-items: center; }
+.revenue-stream .percent { color: #00d4aa; font-weight: 600; }
+.trend-growing, .trend-stable, .trend-volatile, .trend-declining { font-size: 0.78rem; margin-left: 4px; }
+.trend-growing { color: #00d4aa; } .trend-stable { color: #888; } .trend-volatile { color: #fdcb6e; } .trend-declining { color: #ff6b6b; }
+
+/* KPI */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px; max-width: 1400px; margin-left: auto; margin-right: auto; }
+.kpi-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; text-align: center; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s ease, box-shadow 0.3s ease; }
+.kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0,212,170,0.2); }
+.kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+.kpi-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.kpi-change { font-size: 0.9rem; margin-top: 5px; }
+.kpi-change.positive { color: #00d4aa; }
+.kpi-change.negative { color: #ff6b6b; }
+.kpi-sub { font-size: 0.75rem; color: #666; margin-top: 4px; }
+
+/* Guidance */
+.guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+.guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
+.guidance-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.guidance-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px; }
+.guidance-meta { font-size: 0.85rem; color: #888; }
+.guidance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.guidance-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 18px; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s ease; }
+.guidance-card:hover { transform: translateY(-2px); }
+.guidance-metric { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.guidance-target { font-size: 1.4rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; }
+.guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
+.guidance-vs-prior { display: inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+.guidance-vs-prior.raised { background: rgba(0,212,170,0.15); color: #00d4aa; }
+.guidance-vs-prior.lowered { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+.guidance-vs-prior.maintained { background: rgba(255,255,255,0.1); color: #888; }
+.guidance-vs-prior.new { background: rgba(99,102,241,0.15); color: #818cf8; }
+.guidance-notes { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
+.guidance-commentary { background: rgba(255,255,255,0.03); border-radius: 10px; padding: 16px 20px; border-left: 3px solid #00d4aa; font-style: italic; color: #b0b0b0; line-height: 1.6; }
+.guidance-commentary::before { content: '"'; font-size: 1.5rem; color: #00d4aa; margin-right: 4px; }
+
+.section-title { font-size: 1.5rem; color: #fff; margin: 40px auto 20px; padding-bottom: 10px; border-bottom: 2px solid rgba(0,212,170,0.3); max-width: 1400px; }
+.section-note { max-width: 1400px; margin: 0 auto 20px; background: rgba(253,203,110,0.08); border: 1px solid rgba(253,203,110,0.3); border-radius: 10px; padding: 14px 20px; font-size: 0.88rem; color: #d8c39a; line-height: 1.5; }
+.charts-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 25px; max-width: 1400px; margin: 0 auto; }
+.chart-card { background: rgba(255,255,255,0.05); border-radius: 15px; padding: 25px; border: 1px solid rgba(255,255,255,0.1); }
+.chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.chart-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.chart-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px; }
+.chart-note { font-size: 0.78rem; color: #888; margin-top: -12px; margin-bottom: 16px; line-height: 1.4; }
+.help-btn { width: 24px; height: 24px; border-radius: 50%; background: rgba(0,212,170,0.2); border: 1px solid #00d4aa; color: #00d4aa; font-size: 14px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; }
+.help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.chart-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.log-toggle { padding: 3px 10px; border-radius: 12px; background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #888; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+.log-toggle:hover { border-color: #00d4aa; color: #00d4aa; }
+.log-toggle.active { background: rgba(0,212,170,0.2); border-color: #00d4aa; color: #00d4aa; }
+.chart-wrapper { position: relative; height: 300px; }
+
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
+.modal-overlay.active { display: flex; }
+.modal { background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%); border-radius: 16px; max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto; border: 1px solid rgba(0,212,170,0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+.modal-header { padding: 20px 25px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
+.modal-header h3 { color: #00d4aa; font-size: 1.4rem; margin: 0; }
+.modal-close { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,107,107,0.2); border: 1px solid #ff6b6b; color: #ff6b6b; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.modal-close:hover { background: #ff6b6b; color: #fff; }
+.modal-body { padding: 25px; line-height: 1.7; }
+.modal-body p { margin-bottom: 15px; }
+.modal-body strong { color: #00d4aa; }
+.modal-body ul { margin: 15px 0; padding-left: 20px; }
+.modal-body li { margin-bottom: 8px; }
+.metric-highlight { background: rgba(0,212,170,0.1); border-left: 3px solid #00d4aa; padding: 12px 15px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+
+/* DCF */
+.dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+.dcf-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px; }
+.dcf-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 24px; text-align: center; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s ease; }
+.dcf-card:hover { transform: translateY(-3px); }
+.dcf-card.highlight { background: rgba(0,212,170,0.1); border-color: rgba(0,212,170,0.3); }
+.dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.dcf-value { font-size: 2.2rem; font-weight: bold; color: #00d4aa; }
+.dcf-card:not(.highlight) .dcf-value { color: #fff; }
+.dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+.dcf-change.positive { color: #00d4aa; }
+.dcf-change.negative { color: #ff6b6b; }
+.dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
+.dcf-warning { background: rgba(253,203,110,0.15); border: 1px solid rgba(253,203,110,0.4); border-radius: 8px; padding: 12px 16px; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; color: #fdcb6e; }
+.warning-icon { font-size: 1.2rem; }
+.dcf-info-box { background: rgba(0,212,170,0.06); border: 1px solid rgba(0,212,170,0.25); border-radius: 10px; padding: 16px 20px; margin-bottom: 25px; color: #cdeee6; font-size: 0.9rem; line-height: 1.6; }
+.dcf-info-box strong { color: #00d4aa; }
+.dcf-entry-note { background: rgba(255,255,255,0.03); border-radius: 10px; padding: 14px 20px; margin-bottom: 25px; font-size: 0.85rem; color: #999; line-height: 1.6; border-left: 3px solid #fdcb6e; }
+.dcf-ddm-note { background: rgba(255,107,107,0.06); border: 1px solid rgba(255,107,107,0.25); border-radius: 10px; padding: 16px 20px; margin-bottom: 25px; color: #f0c8c8; font-size: 0.87rem; line-height: 1.6; }
+.dcf-ddm-note strong { color: #ff6b6b; }
+.dcf-inputs { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.08); }
+.dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+.dcf-inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.dcf-input-card { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
+.dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #00d4aa; }
+.dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
+.fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
+.fcf-projection-table { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 12px; overflow-x: auto; }
+.fcf-projection-item { text-align: center; }
+.fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
+.fcf-projection-item .fcf-value { font-size: 1rem; color: #e0e0e0; font-weight: 500; }
+.fcf-projection-item .growth-rate { font-size: 0.75rem; color: #00d4aa; margin-top: 2px; }
+.dcf-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; margin-bottom: 30px; padding: 25px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
+.slider-group { display: flex; flex-direction: column; gap: 10px; }
+.slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+.slider-group label span { color: #00d4aa; font-weight: 600; }
+.slider-group input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); outline: none; }
+.slider-group input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #00d4aa; cursor: pointer; transition: transform 0.2s; }
+.slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.slider-hint { font-size: 0.8rem; color: #666; }
+.scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+.scenario-tab { padding: 10px 24px; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: #888; border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s; }
+.scenario-tab:hover { border-color: rgba(0,212,170,0.5); color: #e0e0e0; }
+.scenario-tab.active { background: rgba(0,212,170,0.15); border-color: #00d4aa; color: #00d4aa; }
+.scenario-details { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.08); }
+.scenario-details h4 { color: #00d4aa; margin-bottom: 15px; }
+.scenario-narrative { font-size: 0.85rem; color: #999; margin-bottom: 15px; line-height: 1.5; }
+.assumption-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+.assumption-item { text-align: center; }
+.assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+.assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
+.sensitivity-section { margin-bottom: 30px; }
+.sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; }
+.sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.03); border-radius: 8px; overflow: hidden; }
+.sensitivity-table th, .sensitivity-table td { padding: 12px 16px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+.sensitivity-table th { background: rgba(0,212,170,0.1); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td { color: #e0e0e0; }
+.sensitivity-table td.highlight { background: rgba(0,212,170,0.15); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td.below-current { color: #ff6b6b; }
+.sensitivity-table td.above-current { color: #00d4aa; }
+.sensitivity-note { font-size: 0.78rem; color: #666; margin-top: 10px; line-height: 1.5; }
+.historical-growth { margin-bottom: 30px; }
+.historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
+.growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
+.growth-item { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 15px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+.growth-item .metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
+.growth-item .rate { font-size: 1.2rem; font-weight: 600; }
+.growth-item .rate.positive { color: #00d4aa; }
+.growth-item .rate.negative { color: #ff6b6b; }
+.growth-item.selected { border-color: #00d4aa; background: rgba(0,212,170,0.1); }
+.dcf-download { text-align: center; margin-top: 30px; }
+.download-btn { display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; background: rgba(0,212,170,0.15); border: 1px solid #00d4aa; border-radius: 8px; color: #00d4aa; text-decoration: none; font-weight: 600; transition: all 0.2s; }
+.download-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.download-icon { font-size: 1.2rem; }
+.footer-note { max-width: 1400px; margin: 30px auto 10px; text-align: center; color: #555; font-size: 0.78rem; line-height: 1.5; }
+
+@media (max-width: 768px) {
+    .charts-container { grid-template-columns: 1fr; }
+    .overview-grid { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.8rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Mercury NZ Limited (MCY.NZ)</h1>
+    <p>Renewable Electricity Gentailer &mdash; Generation &amp; Retail &mdash; NZX/ASX (foreign-exempt) &mdash; FY ends 30 June</p>
+    <span class="price-badge">Current Price: NZ$6.53</span>
+    <span class="dcf-badge">Base Case IV: NZ$6.95 (+6.4%)</span>
+</div>
+
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid" id="overviewGrid"></div>
+    </div>
+</div>
+
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf"></span> | <span id="guidanceFY"></span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<h2 class="section-title">Earnings &amp; Cash Flow &mdash; Annual (FY2017&ndash;FY2025)</h2>
+<div class="section-note">
+    <strong>EBITDAF is Mercury's headline operating metric</strong> (earnings before interest, tax, depreciation, fair-value changes and disposal gains/losses) and is what management guides to and is judged against. Statutory <strong>Net Income / EPS is dominated by non-cash fair-value swings</strong> on unhedged electricity derivatives and carbon units &mdash; e.g. FY2025 NetIncome was just NZ$1m (EPS $0.07) versus FY2024's NZ$290m, and H1&#8209;2025 was a NZ$67m statutory LOSS despite EBITDAF of $418m. Treat the Net Income chart as noise, not a performance signal.
+</div>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Revenue &amp; EBITDAF (Annual)</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('revEbitdafChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('revenue')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="revEbitdafChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>EBITDAF Margin (Annual)</h3>
+            <div class="chart-header-actions"><button class="help-btn" onclick="openModal('margin')">?</button></div>
+        </div>
+        <div class="chart-wrapper"><canvas id="marginChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Statutory Net Income (Annual) &mdash; Fair-Value Noise</h3>
+            <div class="chart-header-actions"><button class="help-btn" onclick="openModal('netincome')">?</button></div>
+        </div>
+        <div class="chart-wrapper"><canvas id="netIncomeChart"></canvas></div>
+        <div class="chart-note">Dominated by unrealised derivative &amp; carbon fair-value swings, not operating performance. FY2022 spike includes a $365m Tilt Renewables disposal gain.</div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Operating Cash Flow, CapEx &amp; Free Cash Flow (Annual)</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('cashflowChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('capex')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="cashflowChart"></canvas></div>
+        <div class="chart-note">FCF collapsed FY2024&rarr;FY2025 ($278m&rarr;$16m) as growth capex (OEC5, Kaiwera Downs II, Kaiwaikawe) ramped &mdash; this is growth investment building new earning assets, not distress. See DCF section for the stay-in-business/growth split.</div>
+    </div>
+</div>
+
+<h2 class="section-title">Half-Year Trends (H1-2018&ndash;H1-2026)</h2>
+<div class="section-note">
+    Half-year and full-year figures are <strong>never mixed on the same absolute-value line</strong> below (that would produce a misleading sawtooth, since H1 is roughly half of FY). This section is H1-only, compared H1-over-H1.
+</div>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>H1 Revenue &amp; EBITDAF</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('h1RevEbitdafChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('h1trend')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="h1RevEbitdafChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>H1 Statutory Net Income &mdash; Fair-Value Noise</h3>
+            <div class="chart-header-actions"><button class="help-btn" onclick="openModal('h1netincome')">?</button></div>
+        </div>
+        <div class="chart-wrapper"><canvas id="h1NetIncomeChart"></canvas></div>
+        <div class="chart-note">H1-2022's $427m spike is the Tilt Renewables disposal gain; H1-2025's -$67m loss reflects a negative derivative fair-value swing despite solid EBITDAF of $418m.</div>
+    </div>
+</div>
+
+<h2 class="section-title">Dividends</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Ordinary Dividend Per Share (cps)</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('dpsChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('dividend')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="dpsChart"></canvas></div>
+        <div class="chart-note">17 consecutive years of dividend growth through FY2025 (18th if FY2026's 25.0cps guidance is delivered). FY2018 and later values are annual (FY-ending) dividends; H1 interim dividends are not separately charted here.</div>
+    </div>
+</div>
+
+<h2 class="section-title">Balance Sheet &amp; Leverage</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Total Debt vs Cash (Annual)</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('debtChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('debt')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="debtChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Debt / EBITDAF (Annual)</h3>
+            <div class="chart-header-actions"><button class="help-btn" onclick="openModal('leverage')">?</button></div>
+        </div>
+        <div class="chart-wrapper"><canvas id="leverageChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shareholders' Equity (Annual)</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('equityChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('equity')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="equityChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shares Outstanding (Annual)</h3>
+            <div class="chart-header-actions"><button class="help-btn" onclick="openModal('shares')">?</button></div>
+        </div>
+        <div class="chart-wrapper"><canvas id="sharesChart"></canvas></div>
+        <div class="chart-note">Slow ~0.25%/yr drift from Dividend Reinvestment Plan (DRP) issuance, not stock-based comp (SBC is immaterial at ~$0.6-0.8m/yr) and not buybacks (Mercury has repurchased stock exactly once, ~NZ$50m in FY2018).</div>
+    </div>
+</div>
+
+<h2 class="section-title">DCF Valuation</h2>
+
+<div class="dcf-section">
+  <div class="dcf-info-box" id="framingNote"></div>
+
+  <div class="dcf-summary">
+    <div class="dcf-card highlight">
+      <div class="dcf-label">Intrinsic Value (Base)</div>
+      <div class="dcf-value" id="dcfIV">$6.95</div>
+      <div class="dcf-change positive" id="dcfUpside">+6.4% upside</div>
+      <div class="dcf-sublabel">Owner FCF, 10yr horizon &mdash; splits growth vs stay-in-business capex</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Entry Price (9.5% hurdle)</div>
+      <div class="dcf-value" id="dcfEntrySecondary">$5.64</div>
+      <div class="dcf-sublabel" id="dcfEntrySecondarySub">Buy below for a ~9.5% annual return &mdash; closer to WACC, more realistic for a BBB+ utility</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Current Price</div>
+      <div class="dcf-value" id="dcfCurrent">$6.53</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Prob-Weighted IV</div>
+      <div class="dcf-value" id="dcfWeighted">$6.59</div>
+      <div class="dcf-change" id="dcfWeightedUpside"></div>
+      <div class="dcf-sublabel">25% Bull / 50% Base / 25% Bear &mdash; all on owner FCF</div>
+    </div>
+  </div>
+
+  <div class="dcf-entry-note" id="entryHurdleCaveat"></div>
+
+  <div class="dcf-ddm-note" id="ddmCrossCheck"></div>
+
+  <div class="dcf-inputs">
+    <h4>DCF Model Inputs</h4>
+    <div class="dcf-inputs-grid">
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Base Owner FCF</div>
+        <div class="dcf-input-value" id="baseFCF">$232M</div>
+        <div class="dcf-input-note" id="sbcBreakdown">Year-1 (FY2026) projected owner FCF</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Shares Outstanding</div>
+        <div class="dcf-input-value" id="sharesOut">1.41B</div>
+        <div class="dcf-input-note" id="dilutionNote"></div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Net Debt</div>
+        <div class="dcf-input-value" id="netDebt">$2,243M</div>
+        <div class="dcf-input-note">S&amp;P-adjusted net debt/EBITDAF ~2.2x, within 2-3x target range</div>
+      </div>
+    </div>
+    <div class="fcf-projections">
+      <h5>Projected Owner FCF (Base Case, first 5 years of 10)</h5>
+      <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+    </div>
+  </div>
+
+  <div class="dcf-controls">
+    <div class="slider-group">
+      <label>EBITDAF Growth Anchor: <span id="growthValue">9.7%</span></label>
+      <input type="range" id="growthSlider" min="0" max="20" value="9.7" step="0.1" oninput="updateDCFDisplay()">
+      <div class="slider-hint" id="growthHint">5yr EBITDAF CAGR (post-Tilt/Trustpower asset base)</div>
+    </div>
+    <div class="slider-group">
+      <label>WACC: <span id="waccValue">7.4%</span></label>
+      <input type="range" id="waccSlider" min="4" max="12" value="7.41" step="0.1" oninput="updateDCFDisplay()">
+    </div>
+    <div class="slider-group">
+      <label>Terminal Growth: <span id="terminalValue">2.25%</span></label>
+      <input type="range" id="terminalSlider" min="0" max="4" value="2.25" step="0.25" oninput="updateDCFDisplay()">
+    </div>
+  </div>
+
+  <div class="scenario-tabs">
+    <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+    <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+    <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+  </div>
+
+  <div class="scenario-details" id="scenarioDetails">
+    <h4>Assumptions</h4>
+    <div class="scenario-narrative" id="scenarioNarrative"></div>
+    <div class="assumption-grid" id="assumptionGrid"></div>
+  </div>
+
+  <div class="sensitivity-section">
+    <h4>Sensitivity Analysis: Intrinsic Value by WACC &amp; Terminal Growth</h4>
+    <table class="sensitivity-table" id="sensitivityMatrix"></table>
+    <div class="sensitivity-note">Flat rows at lower WACC reflect the 13x EV/EBITDAF terminal-value cap (drawn from Mercury's own FY2023-25 trading multiple) binding instead of Gordon growth &mdash; terminal growth has no marginal effect on IV once the cap binds. This is intended, cap-limiting behaviour, not a modelling error.</div>
+  </div>
+
+  <div class="historical-growth">
+    <h4>Historical Growth Rates (CAGR)</h4>
+    <div class="growth-grid" id="growthGrid"></div>
+  </div>
+
+  <div class="dcf-download">
+    <a href="MCY.NZ_DCF_Model.xlsx" class="download-btn" download>
+      <span class="download-icon">&#8681;</span> Download Excel Model
+    </a>
+  </div>
+</div>
+
+<div class="footer-note">
+    Mercury NZ Limited (MCY.NZ) &mdash; all financial figures in NZ$ millions unless stated otherwise. Fiscal year ends 30 June. Data as of the H1 FY2026 result (24 February 2026); the FY2026 full-year result had not yet been released as of this dashboard's analysis date (13 August 2026).
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ===================== EMBEDDED DATA =====================
+const csvData = `Period,Revenue,CostOfRevenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,EBITDA,NetIncome,NetMargin,EPS,OperatingCashFlow,CapEx,FreeCashFlow,ShareholdersEquity,TotalAssets,TotalLiabilities,TotalDebt,CashAndEquivalents,SharesOutstanding,StockBasedComp,DividendPerShare,EBITDABeforeSignificant,RevenueContinuing,EBITDAContinuingBeforeSignificant,EBITContinuingBeforeSignificant,Units,Currency
+FY2017,1597.0,,,,,,523.0,184.0,11.5,13.37,372.0,116.0,256.0,3308.0,5997.0,2689.0,1107.0,30.0,1376.3,,19.6,,,,,millions,NZD
+H1-2018,958.0,,,,,,301.0,132.0,13.8,9.6,214.0,57.0,157.0,3259.0,5945.0,2686.0,1160.0,47.0,,,,,,,,millions,NZD
+FY2018,1803.0,,,,,,561.0,234.0,13.0,17.02,371.0,127.0,244.0,3286.0,6091.0,2805.0,1305.0,5.0,1374.98,0.553,15.1,,,,,millions,NZD
+H1-2019,1079.0,,,,,,302.0,104.0,9.6,7.6,171.0,53.0,118.0,3216.0,6226.0,3010.0,1406.0,78.0,,,,,,,,millions,NZD
+FY2019,2000.0,,,,,,505.0,357.0,17.8,26.23,326.0,122.0,204.0,3537.0,6484.0,2947.0,1233.0,94.0,1360.89,0.532,15.5,,,,,millions,NZD
+H1-2020,928.0,,,,,,258.0,83.0,8.9,6.1,180.0,87.0,93.0,3488.0,6385.0,2897.0,1252.0,85.0,,,,,,,,millions,NZD
+FY2020,1768.0,,,,,,494.0,207.0,11.7,15.21,356.0,223.0,133.0,3739.0,6885.0,3146.0,1291.0,79.0,1361.03,0.377,15.8,,,,,millions,NZD
+H1-2021,944.0,,,,,,294.0,130.0,13.8,9.6,163.0,194.0,-31.0,3690.0,6787.0,3097.0,1348.0,91.0,,,,,,,,millions,NZD
+FY2021,2045.0,,,,,,463.0,141.0,6.9,10.36,338.0,308.0,30.0,4186.0,7978.0,3792.0,1491.0,163.0,1361.27,0.712,17.0,,,,,millions,NZD
+H1-2022,873.0,,,,,,242.0,427.0,48.9,31.4,132.0,76.0,56.0,4605.0,8497.0,3892.0,1665.0,48.0,,,,,,,,millions,NZD
+FY2022,2188.0,,,,,,581.0,469.0,21.4,34.32,352.0,139.0,213.0,4752.0,9660.0,4908.0,1956.0,65.0,1366.52,0.561,20.0,,,,,millions,NZD
+H1-2023,1299.0,,,,,,451.0,230.0,17.7,16.9,345.0,90.0,255.0,4806.0,9634.0,4828.0,1814.0,53.0,,,,,,,,millions,NZD
+FY2023,2730.0,,,,,,841.0,103.0,3.8,7.44,578.0,297.0,281.0,4849.0,9419.0,4570.0,1898.0,75.0,1385.0,0.68,21.8,,,,,millions,NZD
+H1-2024,1605.0,,,,,,434.0,174.0,10.8,12.53,283.0,146.0,137.0,4800.0,9518.0,4718.0,2020.0,82.0,1389.0,,,,,,,millions,NZD
+FY2024,3424.0,,,,,,877.0,290.0,8.5,20.85,612.0,334.0,278.0,4849.0,9795.0,4946.0,1941.0,44.0,1391.0,0.779,23.3,,,,,millions,NZD
+H1-2025,1755.0,,,,,,418.0,-67.0,-3.8,-4.8,227.0,215.0,12.0,4690.0,9522.0,4832.0,2200.0,99.0,1397.0,,,,,,,millions,NZD
+FY2025,3498.0,,,,,,786.0,1.0,0.0,0.07,483.0,467.0,16.0,4903.0,9958.0,5055.0,2279.0,86.0,1400.0,0.638,24.0,,,,,millions,NZD
+H1-2026,1664.0,,,,,,537.0,20.0,1.2,1.42,351.0,291.0,60.0,4805.0,9888.0,5083.0,2345.0,73.0,1412.0,,,,,,,millions,NZD`;
+
+const analysis = {
+  "ticker": "MCY.NZ",
+  "name": "Mercury NZ Limited",
+  "company_name": "Mercury NZ Limited",
+  "sector": "Utilities / Renewable Electricity",
+  "analysis_date": "2026-08-13",
+  "overview": "Mercury NZ is a New Zealand-listed 'gentailer' — a vertically integrated electricity generator and retailer whose generation fleet is 100% renewable, comprising nine Waikato River hydro stations, five central North Island geothermal stations, and a wind fleet substantially enlarged by the 2021/22 Tilt Renewables acquisition. On the retail side it sells electricity, gas, broadband and mobile services to ~906,000 customer connections under the Mercury, GLOBUG and (post-2022) Trustpower-derived brands. The New Zealand Crown owns 51% of Mercury under the mixed-ownership model (MOM), with the balance free-floating on the NZX (primary) and ASX (foreign-exempt secondary listing); note that Mercury's FY2026 annual result (year ended 30 June 2026) had not yet been reported as of this analysis date (13 August 2026) — the FY2025 result (19 Aug 2025) and the H1 FY2026 result (24 Feb 2026) are the latest hard numbers used below.",
+  "business_model": {
+    "summary": "Mercury is a 'gentailer' that earns a wholesale trading margin on electricity it generates and sells into the NZ spot/futures/PPA market, plus a retail margin on electricity, gas, broadband and mobile it on-sells to end customers who it purchases wholesale power for (largely internally hedged). The generation and retail books act as a natural hedge for each other: when spot prices spike, wholesale/trading margin benefits even as retail supply costs rise, and vice versa in low-price periods. Revenue is a mix of largely non-discretionary, recurring retail consumption billing and wholesale/trading revenue that is directly exposed to hydrology and spot-price volatility.",
+    "revenue_streams": [
+      {"name": "Electricity generation/wholesale trading margin", "percent": 55, "trend": "volatile"},
+      {"name": "Electricity retail sales to customers", "percent": 30, "trend": "growing"},
+      {"name": "Gas retail", "percent": 5, "trend": "stable"},
+      {"name": "Telco (broadband & mobile)", "percent": 5, "trend": "growing"},
+      {"name": "Other (carbon units, JV income, management fees)", "percent": 5, "trend": "volatile"}
+    ],
+    "customer_type": "B2C mass-market residential and SME (majority), plus B2B Commercial & Industrial (C&I) customers (e.g. NZ Aluminium Smelters/Tiwai, Fonterra, Visy) and wholesale market counterparties",
+    "geographic_mix": "100% New Zealand — generation assets in the Waikato (hydro), central North Island/Taupō (geothermal), and Manawatū, South Taranaki, Otago and Southland (wind); retail customers nationwide"
+  },
+  "competitive_position": {
+    "main_competitors": ["Meridian Energy (MEL.NZ)", "Contact Energy (CEN.NZ)", "Genesis Energy (GNE.NZ)", "Manawa Energy (private, formerly listed)", "Independent retailers (Electric Kiwi, Flick, Frank, Octopus NZ)"],
+    "market_position": "One of the 'big four' gentailers that together generate roughly 85-90% of New Zealand's electricity and hold ~85% of retail mass-market customers. Mercury holds roughly 19% generation market share and ~16% of GWh sold, making it broadly the third or fourth largest of the four by generation volume behind Meridian and roughly comparable in scale to Contact and Genesis.",
+    "moat_factors": [
+      {"factor": "Irreplaceable consented hydro/geothermal asset base", "strength": "strong", "description": "The Waikato hydro scheme (built 1924-1970) and geothermal fields sit on resource consents and river-control/dam infrastructure that would be extremely difficult and slow to replicate; geothermal gives Mercury 24/7 renewable baseload that intermittent-only generators cannot match."},
+      {"factor": "Gentailer hedge / vertical integration", "strength": "moderate", "description": "Owning both generation and retail smooths earnings across hydrology cycles versus a pure generator or pure retailer, and gives Mercury information and pricing advantages regulators are now specifically trying to neutralise."},
+      {"factor": "Scale and balance sheet", "strength": "moderate", "description": "BBB+/Stable S&P rating and Crown-anchored ownership support access to debt markets for a multi-year, multi-billion-dollar renewables build that smaller/independent developers cannot self-fund."},
+      {"factor": "Brand and multi-product bundling", "strength": "moderate", "description": "906k connections with 38% of customers on two or more products (power, gas, broadband, mobile) raises switching costs modestly, though NZ retail electricity switching remains relatively easy and price-driven."},
+      {"factor": "Development pipeline depth", "strength": "moderate", "description": "Consented/near-consented pipeline >8TWh targeted by 2030 gives multi-year visibility competitors must match or cede share."}
+    ],
+    "weaknesses": [
+      "Hydro output is structurally weather-dependent — FY25 hydro generation was the 4th lowest for the Waikato scheme since 1980 (12th percentile inflows), directly denting both volume and margin",
+      "51% Crown ownership caps free float, constrains capital-raising flexibility and makes the company a lightning rod for political intervention on pricing/affordability",
+      "Reputational exposure as one of the 'big four' being blamed publicly for winter 2024/2025 supply tightness and high prices",
+      "Heavy multi-year capex programme is diluting free cash flow and pushing gearing up the target range just as the company also needs to fund a rising dividend"
+    ]
+  },
+  "growth_drivers": [
+    "3.5TWh of new renewable generation targeted by 2030 (vs. current total generation of ~7.9TWh in FY25), roughly a 44% volume uplift over the decade",
+    "Development pipeline to grow beyond 8TWh by 2030, spanning wind, geothermal (Ngā Tamariki OEC5, further post-2030 fields) and a major hydro refurbishment programme (~$550m to lift capacity 58MW / generation 87GWh)",
+    "OEC5 (Ngā Tamariki Unit 5) geothermal expansion commissioned/officially opened ~January-March 2026, adding 46MW and ~390GWh/yr of 24/7 renewable baseload ahead of winter 2026",
+    "FY30 EBITDAF target of $1.15-1.25 billion, up from FY26 guidance of $1.0 billion — implies ~15-25% earnings growth over four years if delivered",
+    "Electrification/decarbonisation demand growth: long-term supply contracts with NZ Aluminium Smelters (Tiwai continuation), Fonterra and Visy; management targets 400GWh of C&I electrification/new demand by 2027",
+    "Mercury/Trustpower retail integration synergies: $34m delivered by end-FY25 against an original $35m target, with a further $5m expected in FY26",
+    "Grid-scale battery and flexibility development (Whakamaru battery resource consent granted; 50MW of demand-side flexibility targeted for 2026)",
+    "AI/technology-driven optimisation of the Waikato hydro scheme ('Digital River') to extract more value from existing assets without new capex"
+  ],
+  "risks": {
+    "business": [
+      {"risk": "Hydrology variability", "severity": "high", "description": "Two consecutive years (FY24, FY25) of below-average Waikato/Taupō inflows have directly cut generation volumes and, combined with tight gas supply, driven elevated spot prices that hurt Mercury's 'short' retail position in periods when it is a net buyer. This is the single largest swing factor in reported earnings and cannot be hedged away entirely."},
+      {"risk": "Customer competition / churn", "severity": "moderate", "description": "NZ retail electricity is a mature, largely commoditised market with active independent retailers and easy switching; April 2025 price increases (~9.7% average, mostly pass-through of regulated lines/transmission costs) create headline optics risk even though margin capture is limited."},
+      {"risk": "Construction/execution risk on the build programme", "severity": "moderate", "description": "Three major projects (Ngā Tamariki OEC5, Kaiwera Downs II, Kaiwaikawe) running simultaneously exposes Mercury to cost overruns, schedule slippage, supply-chain and skilled-labour shortages."},
+      {"risk": "Ageing hydro/geothermal asset base", "severity": "moderate", "description": "Waikato hydro stations built 1924-1970 require an ongoing multi-hundred-million-dollar refurbishment programme simply to maintain output and safety compliance, competing for capital with growth projects."}
+    ],
+    "financial": [
+      {"risk": "Rising gearing through the capex cycle", "severity": "moderate", "description": "S&P-adjusted net debt/EBITDA was ~2.2x at H1 FY26 within a 2-3x target range, but management expects gearing to drift toward ~2.6x by 2030 as growth capex continues; a credit-rating downgrade from BBB+ would raise funding costs."},
+      {"risk": "Derivative/fair-value earnings volatility", "severity": "moderate", "description": "Unrealised mark-to-market moves on unhedged financial instruments create large swings between EBITDAF and statutory NPAT — FY25 NPAT collapsed to just $1m (from $290m FY24), largely due to a $290m negative fair-value swing, and H1 FY25 was a $67m statutory loss despite decent underlying trading."},
+      {"risk": "Dividend vs. free cash flow gap", "severity": "moderate", "description": "With growth capex running well ahead of operating cash flow generation during the multi-year build programme, the 70-85% of free-cash-flow payout policy could mechanically compress free cash flow available for reinvestment, requiring more debt funding or DRP issuance to bridge the gap."}
+    ],
+    "regulatory": [
+      {"risk": "Electricity Authority 'level playing field' interventions", "severity": "high", "description": "Following the Energy Competition Task Force review, the Electricity Authority has moved to require the four big gentailers to offer independent retailers the same wholesale/hedge terms they offer their own retail arms from ~mid-2026/1 July 2026, alongside mandatory minimum hedge-trading volumes. This directly targets the vertical-integration advantage that is part of Mercury's moat."},
+      {"risk": "Structural generation-retail separation calls", "severity": "moderate", "description": "Business groups, some commentators and the OECD have publicly called for full operational (or even ownership) separation of generation from retail across the big four gentailers. This remains on the table even though the Authority's initial package stopped short of forced separation."},
+      {"risk": "Political/Crown shareholder pressure on pricing", "severity": "moderate", "description": "As a 51%-Crown-owned company operating in a politically sensitive sector amid affordability concerns, Mercury faces recurring risk of government intervention (price caps, windfall taxes, mandated market rule changes)."},
+      {"risk": "Consenting and compliance risk", "severity": "moderate", "description": "Dam safety regulations (new rules implemented in 2025), resource consent renewals for hydro/geothermal, and Fast Track Approvals Act processes all carry timing and conditionality risk."}
+    ],
+    "macro": [
+      {"risk": "Interest rate sensitivity", "severity": "moderate", "description": "As a highly capital-intensive, debt-funded utility with a large multi-year capex programme, Mercury's funding costs and the relative attractiveness of its dividend yield versus term deposits/bonds are both sensitive to NZ interest rate moves."},
+      {"risk": "Gas supply and thermal-firming dependence", "severity": "moderate", "description": "NZ's declining domestic gas production increases reliance on the wider system's thermal firming during dry/low-wind periods, which indirectly drives the spot-price spikes that hurt Mercury's retail book even though Mercury itself burns no fossil fuel."},
+      {"risk": "Carbon price (ETS) exposure", "severity": "low", "description": "Mercury holds and actively trades New Zealand Units (NZUs) for trading purposes; the fair-value line on these carbon units is a real, if secondary, source of period-to-period earnings volatility tied to the NZ ETS carbon price."}
+    ]
+  },
+  "bull_case": [
+    "Long, high-visibility renewable development pipeline (>8TWh by 2030, 3.5TWh new generation targeted) in a market structurally short of generation, with three major projects already tracking to schedule/budget and OEC5 geothermal freshly commissioned",
+    "FY30 EBITDAF target of $1.15-1.25bn implies meaningful earnings growth from FY26's $1.0bn guided base as the build programme lands, without needing further M&A",
+    "100% renewable, partially baseload (geothermal) generation mix is structurally advantaged versus thermal-exposed peers as NZ and global capital continues to reward decarbonised generation and electrification demand grows",
+    "18-year (if FY26 delivered) unbroken progressive dividend track record with a BBB+/Stable credit rating gives income-oriented investors a relatively predictable, imputed yield stream, underpinned by Crown ownership stability",
+    "H1 FY26 result shows the earnings recovery case playing out in real time — EBITDAF up 28% on a swing back to above-average hydrology, illustrating the operating leverage to a normal-to-wet year after two dry years suppressed FY24/FY25"
+  ],
+  "bear_case": [
+    "Hydrology is genuinely uncontrollable and has now produced two consecutive weak years (FY24, FY25) — a third dry year, or reversion after the strong H1 FY26 wet start, would again compress both volume and margin",
+    "Regulatory risk is live and moving adverse to Mercury's economics: 'level playing field' rules taking effect around mid-2026 specifically target the wholesale-margin advantage gentailers extract from vertical integration, and calls for full structural separation have not gone away",
+    "The capex programme is large and multi-year, pushing gearing from ~2.2x toward management's own ~2.6x guided level by 2030 even before any project overrun, cost inflation, or execution slip across three simultaneous builds",
+    "Statutory NPAT is extremely volatile and low-quality ($0-1m in FY25 versus $290m the year before) due to non-cash derivative/carbon fair-value swings, making conventional P/E-based valuation unreliable",
+    "51% Crown ownership is double-edged: it lends funding stability but structurally caps free float and exposes the stock to political risk — a government facing public anger over power prices has both the incentive and the 51% control to force pricing or dividend-policy outcomes not in minority shareholders' economic interest",
+    "The share currently trades near or above most published analyst price targets, leaving a thin margin of safety for a business whose next major data point (FY2026 full-year result) is still unreleased"
+  ],
+  "recent_developments": [
+    {"date": "2025-08-19", "event": "FY2025 annual result: EBITDAF $786m (down $91m YoY, missed initial guidance) on generation volume of 7,906 GWh (down 10% YoY) driven by the 4th-lowest Waikato hydro year since 1980; statutory NPAT collapsed to just $1m (down $289m YoY) largely on a ~$290m negative fair-value swing; full-year ordinary dividend 24.0 cps, up 3% (17th consecutive year of growth); FY26 EBITDAF guidance set at $1.0 billion and FY26 dividend guidance of 25.0 cps."},
+    {"date": "2025-09", "event": "Stew Hamilton formally began as CEO (from late August 2025); Board committee restructure effective 1 January 2025; several director departures/refreshes."},
+    {"date": "2025-Q4/2026-Q1", "event": "Electricity Authority progressed its Energy Competition Task Force review, ultimately announcing 'level playing field' interventions targeted for implementation around mid-2026/1 July 2026, applying to Mercury, Contact, Genesis and Meridian."},
+    {"date": "2026-01/03", "event": "Ngā Tamariki Geothermal Station's fifth generation unit (OEC5), a $220m expansion, was powered up in January 2026 and officially opened around March 2026, lifting station capacity from 86MW to 132MW and adding ~390GWh/yr of renewable baseload ahead of winter 2026."},
+    {"date": "2026-02-24", "event": "H1 FY2026 interim result: EBITDAF $537m, up 28% on H1 FY25, on above-average hydro inflows; statutory NPAT $20m (vs. a $67m loss in H1 FY25); interim dividend 10.0 cps (up 4%); FY26 full-year guidance reiterated unchanged; net debt $2.243bn with S&P-adjusted net debt/EBITDA of ~2.2x, within the 2-3x target range."},
+    {"date": "2026-08 (pending)", "event": "FY2026 full-year result (year ended 30 June 2026) had NOT yet been released as of 13 August 2026; expected in the second half of August 2026 and will be the next major catalyst."}
+  ],
+  "guidance": {
+    "as_of": "H1 FY2026 result, 24 February 2026 (reiterating FY2025 result guidance from 19 August 2025)",
+    "fiscal_year": "FY2026 (year ended 30 June 2026) and FY2030 medium-term targets",
+    "items": [
+      {"metric": "EBITDAF", "target": "$1.0 billion", "period": "FY2026", "vs_prior": "maintained", "notes": "Reiterated unchanged at H1 FY26; H1 FY26 actual EBITDAF of $537m (up 28% YoY) tracking well against this target given above-average hydro inflows. Original FY25 EBITDAF guidance was missed ($786m actual)."},
+      {"metric": "Ordinary dividend per share", "target": "25.0 cps", "period": "FY2026", "vs_prior": "raised", "notes": "Up 4% on FY25's 24.0 cps. Would mark the 18th consecutive year of ordinary dividend increases if delivered; interim dividend of 10.0 cps (up 4%) already paid/declared at H1 FY26."},
+      {"metric": "Operating expenditure (opex)", "target": "$370 million per annum", "period": "FY2026-FY28", "vs_prior": "maintained", "notes": "Part of the 'Core optimisation' key result under the FY30 strategic framework; H1 FY26 opex tracking below this run-rate."},
+      {"metric": "Stay-in-business capex", "target": "$150 million", "period": "FY2026", "vs_prior": "raised", "notes": "Slightly above $138m actual in FY25. H1 FY26 actual was $64m; separate from growth capex which is running materially higher (~$208m in H1 FY26 alone, ~$347m for all of FY25)."},
+      {"metric": "FY30 EBITDAF", "target": "$1.15-1.25 billion", "period": "FY2030", "vs_prior": "new", "notes": "Medium-term 'Key Result' under the 'Earnings transformation' strategic objective; implies EBITDAF growth of roughly 15-25% above FY26 guidance over four years."},
+      {"metric": "New generation build", "target": "3.5 TWh of new generation by 2030", "period": "By FY2030", "vs_prior": "maintained", "notes": "Would represent roughly a 44% increase versus FY25 total generation of 7,906 GWh if fully delivered; supported by a development pipeline targeted to exceed 8TWh by 2030."},
+      {"metric": "Gearing (S&P-adjusted net debt/EBITDA)", "target": "2-3x range, drifting toward ~2.6x", "period": "Through to FY2030", "vs_prior": "maintained", "notes": "H1 FY26 actual was ~2.2x; management has flagged gearing will rise toward the upper-middle of the target range as the capex programme continues, consistent with the BBB+/Stable S&P rating being maintained rather than upgraded."}
+    ],
+    "management_commentary": "CEO Stew Hamilton (in role since 31 August 2025) has framed FY26 as delivering on three simultaneous major builds (Ngā Tamariki OEC5, Kaiwera Downs II, Kaiwaikawe) representing ~$1bn of investment and 1.1TWh of new generation, while pursuing 'rebuilding confidence' in the sector after the winter 2024 supply-tightness episode damaged public and regulatory trust in gentailers. Guidance is explicitly caveated as subject to 'any material events, significant one-off expenses or other unforeseen circumstances including changes to hydrological conditions' — hydrology remains management's own primary flagged swing factor on guidance delivery. Chair Scott St John has emphasised the dividend policy target of 70-85% of free cash flow paid out on average over time, and has been vocal in defending gentailer market structure while calling for sector-wide firming solutions rather than forced structural separation."
+  },
+  "dividend_profile": {
+    "current_annual_dividend_guidance": "25.0 cps (FY2026 guidance), following 24.0 cps actual in FY2025",
+    "track_record": "17 consecutive years of ordinary dividend growth through FY2025; would be 18 consecutive years if FY2026 guidance is delivered",
+    "policy": "Targets a payout of 70-85% of free cash flow on average over time (not a fixed percentage of NPAT, reflecting the fact that statutory NPAT is distorted by non-cash derivative/fair-value movements)",
+    "approx_yield_context": "At NZ$6.53, a 25.0 cps guided dividend implies a gross yield of roughly 3.8% before imputation credits (which are meaningful for NZ resident taxpayers given Mercury's dividends are typically fully imputed)."
+  }
+};
+
+const dcfData = {
+ "ticker": "MCY.NZ",
+ "valuation_date": "2026-08-13",
+ "current_price": 6.53,
+ "horizon_years": 10,
+ "inputs": {
+  "shares_outstanding": 1412.0,
+  "net_debt": 2243.0,
+  "total_debt": 2345.0,
+  "cash": 73.0,
+  "last_fcf": 232.3,
+  "reported_fcf": 16.0,
+  "reported_fcf_h1_2026": 60.0,
+  "sbc": 0.638,
+  "sbc_incl_equity_taxes": 0.638,
+  "sbc_pct_of_revenue": 0.000182,
+  "interest_income": 4.0,
+  "interest_income_note": "Immaterial ($1-6m/yr history); NOT stripped from FCF because Mercury is a NET-DEBT company (NZ$2,243m net debt).",
+  "sbc_source": "MCY.NZ.duckdb kpis table; FY2025 SBC $0.638m on $3,498m revenue -- immaterial for this Crown-majority utility",
+  "buyback_cash": 0.0,
+  "buyback_note": "Mercury has repurchased stock exactly once (~NZ$50m, FY2018); share count instead drifts up slowly via the Dividend Reinvestment Plan (1,376.3m FY2017 -> 1,412.0m H1-2026, ~0.25%/yr)",
+  "uncovered_dilution_pct_annual": 0.25,
+  "annual_share_growth_pct": 0.25,
+  "projected_shares": [1415.53, 1419.07, 1422.62, 1426.18, 1429.75, 1433.32, 1436.9, 1440.49, 1444.09, 1447.7],
+  "growth_capex_fy2025": 347.0,
+  "stay_in_business_capex_fy2025": 138.0,
+  "growth_capex_source": "MCY.NZ.duckdb kpis table (GrowthCapex / StayInBusinessCapex, disclosed by management each period)",
+  "mid_cycle_ebitdaf_derivation": "FY2025 EBITDAF ($786m) is a hydrological trough. Year-1 (FY2026) EBITDAF is anchored to management's own guidance of $1.0bn. Year-5 (FY2030) EBITDAF is anchored to the midpoint of management's own $1.15-1.25bn FY2030 target ($1.2bn). NOT a naive historical CAGR.",
+  "currency": "NZD",
+  "units": "millions"
+ },
+ "historical_growth": {
+  "revenue_3yr_cagr": 16.9,
+  "revenue_5yr_cagr": 14.6,
+  "eps_3yr_cagr": null,
+  "eps_5yr_cagr": null,
+  "equity_3yr_cagr": 1.0,
+  "equity_5yr_cagr": 5.6,
+  "fcf_3yr_cagr": null,
+  "fcf_5yr_cagr": null,
+  "ebitdaf_3yr_cagr": 10.6,
+  "ebitdaf_5yr_cagr": 9.7,
+  "ebitdaf_fy23_fy25_cagr": -3.3,
+  "dps_3yr_cagr": 6.3,
+  "dps_5yr_cagr": 8.7,
+  "selected_growth_rate": 9.7,
+  "growth_rate_source": "ebitdaf_5yr_cagr",
+  "growth_divergence_warning": null,
+  "notes": "SBC is immaterial for this Crown-majority utility. Reported FCF is NOT used as the DCF base or growth driver: FY2025 reported FCF was just $16m and H1-2026 was $60m, both suppressed by a growth-capex supercycle that is building earning assets, not destroying value."
+ },
+ "wacc_rationale": {
+  "risk_free_rate": 0.045,
+  "equity_risk_premium": 0.065,
+  "beta": 0.7,
+  "cost_of_equity": 0.0905,
+  "pretax_cost_of_debt": 0.055,
+  "tax_rate": 0.28,
+  "after_tax_cost_of_debt": 0.0396,
+  "weight_equity": 0.53,
+  "weight_debt": 0.47,
+  "wacc_before_premium": 0.0666,
+  "regulatory_hydrology_premium": 0.0075,
+  "wacc_base": 0.0741,
+  "commentary": "Mercury is a BBB+/Stable, Crown-majority (51%) owned NZ gentailer with a NZ$9bn+ regulated-adjacent asset base. Build-up: NZ risk-free rate ~4.5%, ERP ~6.5%, utility-appropriate beta ~0.70 gives cost of equity ~9.05%. After-tax cost of debt ~3.96% weighted at ~47% debt/53% equity gives raw WACC ~6.66%. A +0.75% premium for live regulatory intervention plus irreducible hydrology volatility lands on base-case WACC ~7.41%."
+ },
+ "assumptions": {
+  "base": {
+   "revenue_growth_pct": [4.5, 4.2, 3.8, 3.5, 3.2, 3.0, 2.8, 2.6, 2.4, 2.25],
+   "ebitdaf": [1000.0, 1060.0, 1120.0, 1160.0, 1200.0, 1245.6, 1286.7, 1324.0, 1358.4, 1389.0],
+   "ebitdaf_margin_pct": [27.4, 27.8, 28.3, 28.3, 28.4, 28.6, 28.8, 28.9, 28.9, 28.9],
+   "stay_in_business_capex": [150.0, 154.5, 159.1, 163.9, 168.8, 173.9, 179.1, 184.5, 190.0, 195.7],
+   "growth_capex": [430.0, 400.0, 350.0, 280.0, 200.0, 150.0, 120.0, 100.0, 90.0, 80.0],
+   "wc_capture_pct": 8,
+   "cash_tax_rate_path": [28.0, 28.0, 28.0, 28.0, 28.0, 28.0, 28.0, 28.0, 28.0, 28.0],
+   "wacc": 7.41,
+   "terminal_growth": 2.25,
+   "terminal_cap_ev_ebitdaf_multiple": 13.0,
+   "dilution_pct_annual": 0.25,
+   "narrative": "Mid-cycle hydrology (neither FY25 trough nor H1-26 wet-year peak), three-project build programme (OEC5, Kaiwera Downs II, Kaiwaikawe) delivered on management's own guided schedule/budget, EBITDAF path anchored to FY26 guidance ($1.0bn) ramping to FY30 target midpoint ($1.2bn), current 'level playing field' regulatory changes absorbed within the WACC premium rather than the cash flows."
+  },
+  "bull": {
+   "revenue_growth_pct": [6.0, 5.5, 5.0, 4.5, 4.0, 3.6, 3.2, 3.0, 2.8, 2.6],
+   "ebitdaf": [1050.0, 1150.0, 1225.0, 1280.0, 1300.0, 1358.5, 1412.8, 1462.2, 1506.1, 1546.8],
+   "ebitdaf_margin_pct": [28.3, 29.4, 29.8, 29.8, 29.1, 29.4, 29.6, 29.7, 29.8, 29.8],
+   "stay_in_business_capex": [148.0, 151.7, 155.5, 159.4, 163.4, 167.5, 171.7, 176.0, 180.4, 184.9],
+   "growth_capex": [420.0, 400.0, 360.0, 300.0, 220.0, 170.0, 140.0, 120.0, 105.0, 95.0],
+   "wacc": 6.66,
+   "terminal_growth": 2.5,
+   "terminal_cap_ev_ebitdaf_multiple": 14.0,
+   "narrative": "Sustained good-to-average hydrology, all three builds on/ahead of schedule, FY30 EBITDAF exceeds the top of guided range ($1.3bn vs $1.15-1.25bn target), benign regulatory outcome, continued pipeline growth beyond 2030."
+  },
+  "bear": {
+   "revenue_growth_pct": [2.5, 2.0, 1.8, 1.8, 1.7, 1.7, 1.6, 1.6, 1.5, 1.5],
+   "ebitdaf": [880.0, 850.0, 900.0, 950.0, 980.0, 1004.5, 1026.6, 1047.1, 1065.9, 1083.0],
+   "ebitdaf_margin_pct": [24.5, 23.2, 24.2, 25.1, 25.4, 25.6, 25.8, 25.9, 26.0, 26.0],
+   "stay_in_business_capex": [155.0, 160.4, 166.0, 171.8, 177.8, 184.0, 190.4, 197.1, 204.0, 211.1],
+   "growth_capex": [460.0, 440.0, 410.0, 340.0, 260.0, 200.0, 160.0, 130.0, 110.0, 95.0],
+   "wacc": 8.41,
+   "terminal_growth": 2.0,
+   "terminal_cap_ev_ebitdaf_multiple": 11.0,
+   "narrative": "Dry-year sequence (a third consecutive weak hydrology year, or reversion after the H1-26 wet start), Electricity Authority 'level playing field' + possible structural-separation escalation compresses wholesale trading margin, capex overruns/delays across the three simultaneous builds keep growth capex elevated for longer while EBITDAF falls short of FY30 target, gearing drifts toward/through the top of the 2-3x target range."
+  }
+ },
+ "projections": {
+  "base": {
+   "years": ["FY2026","FY2027","FY2028","FY2029","FY2030","FY2031","FY2032","FY2033","FY2034","FY2035"],
+   "owner_fcf": [232.3, 308.9, 405.8, 506.8, 617.8, 701.1, 761.0, 806.6, 839.9, 869.9],
+   "shares_outstanding": [1415.53, 1419.07, 1422.62, 1426.18, 1429.75, 1433.32, 1436.9, 1440.49, 1444.09, 1447.7],
+   "discount_factors": [0.931, 0.8668, 0.807, 0.7514, 0.6996, 0.6513, 0.6064, 0.5646, 0.5256, 0.4894],
+   "pv_fcf": [216.3, 267.8, 327.5, 380.8, 432.2, 456.6, 461.5, 455.4, 441.5, 425.7]
+  },
+  "bull": {
+   "years": ["FY2026","FY2027","FY2028","FY2029","FY2030","FY2031","FY2032","FY2033","FY2034","FY2035"],
+   "owner_fcf": [283.3, 380.8, 480.2, 583.6, 681.5, 775.6, 846.4, 902.6, 949.7, 989.3],
+   "shares_outstanding": [1415.53, 1419.07, 1422.62, 1426.18, 1429.75, 1433.32, 1436.9, 1440.49, 1444.09, 1447.7],
+   "discount_factors": [0.9376, 0.8791, 0.8242, 0.7727, 0.7245, 0.6793, 0.6369, 0.5971, 0.5598, 0.5249],
+   "pv_fcf": [265.6, 334.7, 395.8, 451.0, 493.7, 526.8, 539.1, 539.0, 531.7, 519.3]
+  },
+  "bear": {
+   "years": ["FY2026","FY2027","FY2028","FY2029","FY2030","FY2031","FY2032","FY2033","FY2034","FY2035"],
+   "owner_fcf": [115.5, 116.0, 183.0, 288.3, 388.4, 463.0, 515.9, 556.0, 584.8, 607.1],
+   "shares_outstanding": [1415.53, 1419.07, 1422.62, 1426.18, 1429.75, 1433.32, 1436.9, 1440.49, 1444.09, 1447.7],
+   "discount_factors": [0.9224, 0.8509, 0.7849, 0.724, 0.6679, 0.6161, 0.5683, 0.5242, 0.4836, 0.4461],
+   "pv_fcf": [106.5, 98.7, 143.6, 208.7, 259.4, 285.2, 293.2, 291.5, 282.8, 270.8]
+  }
+ },
+ "valuation": {
+  "base": { "sum_pv_fcf": 3865.2, "terminal_value_gordon": 17245.5, "terminal_value_ev_ebitdaf_cap": 18057.0, "terminal_value_used": 17245.5, "terminal_value_bound": "gordon", "pv_terminal": 8439.6, "enterprise_value": 12304.8, "net_debt": 2243.0, "equity_value": 10061.8, "intrinsic_value": 6.95, "upside": 6.4, "terminal_pct_of_value": 68.6, "implied_exit_multiple_fcf": 19.8, "implied_exit_multiple_ev_ebitdaf": 12.4 },
+  "bull": { "sum_pv_fcf": 4596.7, "terminal_value_gordon": 24389.3, "terminal_value_ev_ebitdaf_cap": 21655.2, "terminal_value_used": 21655.2, "terminal_value_bound": "ev_ebitdaf_cap", "pv_terminal": 11366.8, "enterprise_value": 15963.5, "net_debt": 2243.0, "equity_value": 13720.5, "intrinsic_value": 9.48, "upside": 45.2, "terminal_pct_of_value": 71.2, "implied_exit_multiple_fcf": 21.9, "implied_exit_multiple_ev_ebitdaf": 14.0 },
+  "bear": { "sum_pv_fcf": 2240.5, "terminal_value_gordon": 9664.0, "terminal_value_ev_ebitdaf_cap": 11913.0, "terminal_value_used": 9664.0, "terminal_value_bound": "gordon", "pv_terminal": 4310.8, "enterprise_value": 6551.3, "net_debt": 2243.0, "equity_value": 4308.3, "intrinsic_value": 2.98, "upside": -54.4, "terminal_pct_of_value": 65.8, "implied_exit_multiple_fcf": 15.9, "implied_exit_multiple_ev_ebitdaf": 8.9 }
+ },
+ "entry_price": {
+  "hurdle_rate_primary": 0.15,
+  "hurdle_rate_secondary": 0.095,
+  "primary_hurdle_caveat": "A 15% IRR hurdle is NOT a realistic entry criterion for a BBB+/Stable, regulated-adjacent utility yielding ~3.8% with a ~7.4% WACC -- no rational buyer needs 15% from an asset this defensive, so this entry price is intentionally far below both intrinsic value and the current market price. It is included only because the template requires it. The secondary entry price at approximately the company's own WACC (~9.5%, a more realistic hurdle for an income/utility holding) is the more decision-useful figure and lands much closer to both IV and the current price.",
+  "base": {
+   "years_to_terminal": 10,
+   "pv_interim_fcf_at_15pct": 2606.0,
+   "pv_terminal_at_15pct": 4262.8,
+   "net_debt": 2243.0,
+   "entry_price_15pct_irr": 3.2,
+   "entry_discount_from_current_15pct": -51.1,
+   "pv_interim_fcf_at_secondary_hurdle": 3446.1,
+   "pv_terminal_at_secondary_hurdle": 6958.8,
+   "entry_price_secondary_hurdle": 5.64,
+   "entry_discount_from_current_secondary": -13.7,
+   "secondary_hurdle_pct": 9.5
+  }
+ },
+ "sensitivity": {
+  "wacc_range": [5.41, 6.41, 7.41, 8.41, 9.41],
+  "terminal_growth_range": [1.25, 1.75, 2.25, 2.75, 3.25],
+  "matrix": [
+   [8.81, 8.81, 8.81, 8.81, 8.81],
+   [7.61, 7.98, 7.98, 7.98, 7.98],
+   [5.95, 6.41, 6.95, 7.22, 7.22],
+   [4.77, 5.07, 5.42, 5.84, 6.34],
+   [3.88, 4.09, 4.33, 4.61, 4.94]
+  ],
+  "note": "Flat rows at lower WACC values indicate the EV/EBITDAF exit-multiple cap (13x base case) is binding rather than Gordon growth -- terminal growth then has no marginal effect on intrinsic value at that WACC, which is the intended, cap-limiting behaviour."
+ },
+ "probability_weighted": {
+  "weights": { "bull": 0.25, "base": 0.5, "bear": 0.25 },
+  "weighted_iv": 6.59,
+  "weighted_upside_pct": 0.9
+ },
+ "sanity_check": {
+  "methodology_note": "P/E is explicitly NOT used as a valuation anchor here because statutory EPS is dominated by non-cash fair-value derivative/carbon swings (FY2025 EPS was $0.07). EV/EBITDAF and P/B are the primary historical anchors instead.",
+  "cap_multiple_selected_base": 13.0,
+  "cap_multiple_rationale": "13x = the FY2023-2025 average, i.e. the multiple the market has actually paid for Mercury on the current (post-Tilt/Trustpower) asset base, excluding the FY2021 acquisition-euphoria spike.",
+  "current_ev_ebitdaf_fy25": 14.58,
+  "current_ev_ebitdaf_fy26_guided": 11.46,
+  "current_pb": 1.92,
+  "implied_pb_at_base_iv": 2.04,
+  "ddm_cross_check": {
+   "description": "A 2-stage dividend-discount model (10yr DPS path off the FY2026 guided 25.0cps base, terminal growth 2.25%, discounted at the 9.05% cost of equity -- no EV/EBITDAF-style cap applied) gives ~NZ$4.08/share, well below the FCF-based DCF's base-case NZ$6.95. The ~NZ$2.87 (41%) gap is the NPV of retained cash reinvested into growth capex at returns management expects to exceed WACC -- this is the explicit bet embedded in the FCF-DCF's higher figure. It is a legitimate difference, not an error: the DDM only prices what shareholders are actually paid, while the FCF-DCF also prices the retained/reinvested share. If the build programme fails to earn its cost of capital, fair value converges toward the DDM figure, not the FCF-DCF figure.",
+   "ddm_price": 4.08,
+   "fcf_dcf_base_iv": 6.95,
+   "gap_pct_of_dcf": 41.3
+  },
+  "conclusion": "Base-case IV of NZ$6.95 is +6.4% versus the current NZ$6.53 price and sits inside the stock's own 52-week range (NZ$6.08-7.16) and its recent (FY23-25) historical EV/EBITDAF band. This is the expected, boring answer for a regulated-adjacent income utility: modestly fair-to-slightly-undervalued, not a multi-bagger and not a value trap.",
+  "ran": true,
+  "passed": true,
+  "trip_reasons": [],
+  "implied_multiples": { "pb": 2.04, "ev_ebitdaf": 12.06, "pe": null, "pe_note": "Not computed -- statutory EPS is fair-value noise (FY2025 EPS NZ$0.07); see methodology_note." },
+  "historical_averages_ex_outliers": { "pb_avg": 1.71, "pb_max": 2.15, "ev_ebitdaf_avg": 13.64, "ev_ebitdaf_median": 13.46, "ev_ebitdaf_max_ex_fy2021": 17.53, "ev_ebitdaf_max_incl_fy2021": 22.3 },
+  "diagnosis": "No trip. Implied P/B 2.04x sits below the 10yr max 2.15x, and implied EV/EBITDAF 12.06x on FY2026 guided EBITDAF of NZ$1.0bn is inside the FY2023-25 band (13.0-13.8x). Base-case upside of +6.4% is far below the 100% screen.",
+  "fix_applied": "None required -- sanity check passed on first pass."
+ },
+ "valuation_philosophy": "Mercury is modelled as a component-built, owner-FCF DCF over a 10-year explicit horizon (not 5) because the FY2025 owner-FCF margin (a hydrological trough, further depressed by peak growth capex) is nowhere near a mature steady state -- the base-case margin only matures to ~18% by Year 10 as the three-project build programme completes and growth capex tapers from ~$430-460m/yr today toward ~$80-95m/yr by Year 10. Two corrections drive the entire model: (1) EBITDAF, not statutory EPS or reported FCF, is the operating series projected -- it is anchored directly to management's own FY2026 guidance ($1.0bn) and FY2030 target (midpoint $1.2bn); (2) capex is split into stay-in-business (~$150m/yr, grown with inflation) versus growth capex (explicitly disclosed by management) and only the growth-capex component is tapered down as the pipeline completes post-2030. Net debt of NZ$2,243m is subtracted once from enterprise value. Terminal value uses the LOWER of Gordon growth and an EV/EBITDAF exit-multiple cap computed from Mercury's OWN 10-year trading history (13x base case, the FY2023-2025 average). This is framed explicitly as an INCOME stock: the 17-year unbroken dividend growth streak is the primary return driver for most holders, cross-checked against both a dividend-discount model and the stock's own 52-week trading range.",
+ "framing_note": "Mercury is fundamentally an INCOME stock, not a growth/multi-bagger opportunity: 17 consecutive years of dividend growth (24.0cps FY2025, 25.0cps FY2026 guided), a ~3.8% gross yield at NZ$6.53, and a 52-week trading range of only NZ$6.08-7.16. The realistic return profile for a holder is dividend yield plus modest real earnings/dividend growth from the generation build programme, not capital-gain-driven outsized upside. The base-case DCF result (+6.4% to intrinsic value, weighted +0.9%) is consistent with this framing: the stock is roughly fairly valued to modestly undervalued at the current price, which is the expected, unremarkable conclusion for a regulated-adjacent utility trading near its own recent historical multiple range."
+};
+
+// ===================== PARSE CSV =====================
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => obj[h.trim()] = values[i]?.trim());
+        return obj;
+    });
+}
+const data = parseCSV(csvData);
+data.sort((a, b) => {
+    const parseDate = (p) => {
+        const year = parseInt(p.match(/\d{4}/)?.[0] || '0');
+        const isQ1 = p.includes('Q1'); const isQ2 = p.includes('Q2');
+        const isQ3 = p.includes('Q3'); const isQ4 = p.includes('Q4');
+        const isH1 = p.includes('H1'); const isH2 = p.includes('H2');
+        const isFY = p.startsWith('FY');
+        const subOrder = isQ1 ? 1 : isQ2 ? 2 : isH1 ? 3 : isQ3 ? 4 : isQ4 ? 5 : isH2 ? 6 : isFY ? 7 : 0;
+        return year * 10 + subOrder;
+    };
+    return parseDate(a.Period) - parseDate(b.Period);
+});
+const fyData = data.filter(d => d.Period.startsWith('FY'));
+const h1Data = data.filter(d => d.Period.startsWith('H1'));
+const num = (v) => v === undefined || v === null || v === '' ? null : parseFloat(v);
+
+// ===================== KPI CARDS =====================
+function calcYoYChange(current, previous) {
+    if (previous === null || current === null || previous === undefined || current === undefined) return null;
+    if (parseFloat(previous) === 0) return null;
+    return ((parseFloat(current) - parseFloat(previous)) / Math.abs(parseFloat(previous)) * 100).toFixed(1);
+}
+function fmtM(v) { if (v === null) return 'N/A'; return 'NZ$' + Math.round(v).toLocaleString() + 'M'; }
+function fmtChange(pct, suffix) {
+    if (pct === null) return '';
+    const cls = parseFloat(pct) >= 0 ? 'positive' : 'negative';
+    const sign = parseFloat(pct) >= 0 ? '+' : '';
+    return `<div class="kpi-change ${cls}">${sign}${pct}% ${suffix||'YoY'}</div>`;
+}
+
+const lastFY = fyData[fyData.length - 1];        // FY2025
+const prevFY = fyData[fyData.length - 2];        // FY2024
+const lastH1 = h1Data[h1Data.length - 1];        // H1-2026
+const prevH1 = h1Data[h1Data.length - 2];        // H1-2025
+const currentPrice = 6.53;
+const netDebtH1 = num(lastH1.TotalDebt) - num(lastH1.CashAndEquivalents);
+const dpsGuideFY26 = 25.0;
+const dividendYield = (dpsGuideFY26 / 100 / currentPrice * 100).toFixed(1);
+
+const kpis = [
+    {
+        label: 'EBITDAF (FY2025)',
+        value: fmtM(num(lastFY.EBITDA)),
+        change: fmtChange(calcYoYChange(num(lastFY.EBITDA), num(prevFY.EBITDA)), 'YoY (FY)')
+    },
+    {
+        label: 'EBITDAF (H1-2026)',
+        value: fmtM(num(lastH1.EBITDA)),
+        change: fmtChange(calcYoYChange(num(lastH1.EBITDA), num(prevH1.EBITDA)), 'YoY (H1)')
+    },
+    {
+        label: 'Revenue (FY2025)',
+        value: fmtM(num(lastFY.Revenue)),
+        change: fmtChange(calcYoYChange(num(lastFY.Revenue), num(prevFY.Revenue)), 'YoY (FY)')
+    },
+    {
+        label: 'Dividend Per Share',
+        value: '24.0cps',
+        change: `<div class="kpi-change positive">25.0cps guided FY2026</div><div class="kpi-sub">17yr unbroken growth streak</div>`
+    },
+    {
+        label: 'Dividend Yield (guided)',
+        value: dividendYield + '%',
+        change: `<div class="kpi-sub">25.0cps FY26 guide / NZ$${currentPrice} price</div>`
+    },
+    {
+        label: 'Net Debt (H1-2026)',
+        value: fmtM(netDebtH1),
+        change: `<div class="kpi-sub">~2.2x S&amp;P-adj. net debt/EBITDAF</div>`
+    },
+    {
+        label: 'Free Cash Flow (FY2025)',
+        value: fmtM(num(lastFY.FreeCashFlow)),
+        change: `<div class="kpi-change negative">vs $278M FY2024</div><div class="kpi-sub">Capex supercycle, not distress</div>`
+    },
+    {
+        label: 'Statutory Net Income (FY2025)',
+        value: fmtM(num(lastFY.NetIncome)),
+        change: `<div class="kpi-sub">Fair-value noise, not a performance signal</div>`
+    }
+];
+document.getElementById('kpiGrid').innerHTML = kpis.map(k => `
+    <div class="kpi-card">
+        <div class="kpi-value">${k.value}</div>
+        <div class="kpi-label">${k.label}</div>
+        ${k.change}
+    </div>
+`).join('');
+
+// ===================== OVERVIEW =====================
+function renderOverview() {
+    const bm = analysis.business_model;
+    const cp = analysis.competitive_position;
+    const grid = document.getElementById('overviewGrid');
+    grid.innerHTML = `
+        <div class="overview-card">
+            <h3>Company Overview</h3>
+            <p>${analysis.overview}</p>
+        </div>
+        <div class="overview-card">
+            <h3>Business Model</h3>
+            <p>${bm.summary}</p>
+            <ul>
+                ${bm.revenue_streams.map(r => `<li class="revenue-stream"><span>${r.name} <span class="trend-${r.trend.split(' ')[0].replace(/[^a-z]/gi,'')}">(${r.trend})</span></span><span class="percent">${r.percent}%</span></li>`).join('')}
+            </ul>
+        </div>
+        <div class="overview-card">
+            <h3>Competitive Position</h3>
+            <p><strong>Competitors:</strong> ${cp.main_competitors.join(', ')}</p>
+            <p>${cp.market_position}</p>
+            <p><strong>Moat factors:</strong></p>
+            <ul>
+                ${cp.moat_factors.map(m => `<li><strong>${m.factor}</strong> (${m.strength}) &mdash; ${m.description}</li>`).join('')}
+            </ul>
+        </div>
+        <div class="overview-card">
+            <h3>Growth Drivers</h3>
+            <ul>${analysis.growth_drivers.map(g => `<li>${g}</li>`).join('')}</ul>
+        </div>
+        <div class="overview-card risks">
+            <h3>Key Risks</h3>
+            <ul>
+                ${[...analysis.risks.business, ...analysis.risks.financial, ...analysis.risks.regulatory, ...analysis.risks.macro]
+                  .map(r => `<li><span class="risk-${r.severity}">[${r.severity.toUpperCase()}]</span> <strong>${r.risk}</strong> &mdash; ${r.description}</li>`).join('')}
+            </ul>
+        </div>
+        <div class="overview-card bull">
+            <h3>Bull Case</h3>
+            <ul>${analysis.bull_case.map(b => `<li>${b}</li>`).join('')}</ul>
+        </div>
+        <div class="overview-card bear">
+            <h3>Bear Case</h3>
+            <ul>${analysis.bear_case.map(b => `<li>${b}</li>`).join('')}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Recent Developments</h3>
+            <ul>${analysis.recent_developments.map(d => `<li><strong>${d.date}:</strong> ${d.event}</li>`).join('')}</ul>
+        </div>
+    `;
+}
+renderOverview();
+
+function toggleOverview() {
+    const btn = document.querySelector('.overview-toggle');
+    const content = document.getElementById('overviewContent');
+    btn.classList.toggle('active');
+    content.classList.toggle('active');
+}
+
+// ===================== GUIDANCE =====================
+function renderGuidance() {
+    if (!analysis.guidance || !analysis.guidance.items || analysis.guidance.items.length === 0) {
+        document.getElementById('guidanceSection').style.display = 'none';
+        return;
+    }
+    const guidance = analysis.guidance;
+    document.getElementById('guidanceAsOf').textContent = guidance.as_of || '';
+    document.getElementById('guidanceFY').textContent = guidance.fiscal_year || '';
+    const grid = document.getElementById('guidanceGrid');
+    grid.innerHTML = guidance.items.map(item => {
+        const vsClass = item.vs_prior ? item.vs_prior.toLowerCase() : 'new';
+        const vsLabel = item.vs_prior ? item.vs_prior.charAt(0).toUpperCase() + item.vs_prior.slice(1) : 'New';
+        return `
+            <div class="guidance-card">
+                <div class="guidance-metric">${item.metric}</div>
+                <div class="guidance-target">${item.target}</div>
+                <div class="guidance-period">${item.period}</div>
+                <span class="guidance-vs-prior ${vsClass}">${vsLabel}</span>
+                ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+    const commentary = document.getElementById('guidanceCommentary');
+    if (guidance.management_commentary) {
+        commentary.textContent = guidance.management_commentary;
+        commentary.style.display = 'block';
+    } else {
+        commentary.style.display = 'none';
+    }
+}
+renderGuidance();
+
+// ===================== CHART DEFAULTS =====================
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } } },
+    scales: {
+        x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+function freshScales() {
+    return { x: { ...chartDefaults.scales.x }, y: { ...chartDefaults.scales.y } };
+}
+const chartRegistry = {};
+function toggleLogScale(canvasId, btn) {
+    const chart = chartRegistry[canvasId];
+    if (!chart) return;
+    const toLog = chart.options.scales.y.type !== 'logarithmic';
+    chart.options.scales.y.type = toLog ? 'logarithmic' : 'linear';
+    btn.classList.toggle('active', toLog);
+    chart.update();
+}
+const colors = { primary: '#00d4aa', secondary: '#00b894', tertiary: '#0984e3', quaternary: '#6c5ce7', warning: '#fdcb6e', danger: '#ff6b6b' };
+
+// ===================== ANNUAL CHARTS =====================
+const fyLabels = fyData.map(d => d.Period);
+
+chartRegistry['revEbitdafChart'] = new Chart(document.getElementById('revEbitdafChart'), {
+    type: 'bar',
+    data: {
+        labels: fyLabels,
+        datasets: [
+            { label: 'Revenue', data: fyData.map(d => num(d.Revenue)), backgroundColor: 'rgba(9,132,227,0.6)', order: 2 },
+            { label: 'EBITDAF', data: fyData.map(d => num(d.EBITDA)), backgroundColor: 'rgba(0,212,170,0.8)', order: 1 }
+        ]
+    },
+    options: { ...chartDefaults, scales: freshScales() }
+});
+
+chartRegistry['marginChart'] = new Chart(document.getElementById('marginChart'), {
+    type: 'line',
+    data: {
+        labels: fyLabels,
+        datasets: [{
+            label: 'EBITDAF Margin %',
+            data: fyData.map(d => { const r = num(d.Revenue), e = num(d.EBITDA); return (r && e !== null) ? +(e / r * 100).toFixed(1) : null; }),
+            borderColor: colors.primary, backgroundColor: 'rgba(0,212,170,0.15)', fill: true, tension: 0.3
+        }]
+    },
+    options: { ...chartDefaults, scales: freshScales() }
+});
+
+chartRegistry['netIncomeChart'] = new Chart(document.getElementById('netIncomeChart'), {
+    type: 'bar',
+    data: {
+        labels: fyLabels,
+        datasets: [{
+            label: 'Net Income',
+            data: fyData.map(d => num(d.NetIncome)),
+            backgroundColor: fyData.map(d => num(d.NetIncome) < 50 ? 'rgba(253,203,110,0.7)' : 'rgba(108,92,231,0.7)')
+        }]
+    },
+    options: { ...chartDefaults, scales: freshScales() }
+});
+
+chartRegistry['cashflowChart'] = new Chart(document.getElementById('cashflowChart'), {
+    type: 'bar',
+    data: {
+        labels: fyLabels,
+        datasets: [
+            { label: 'Operating Cash Flow', data: fyData.map(d => num(d.OperatingCashFlow)), backgroundColor: 'rgba(9,132,227,0.7)' },
+            { label: 'CapEx', data: fyData.map(d => -num(d.CapEx)), backgroundColor: 'rgba(255,107,107,0.6)' },
+            { label: 'Free Cash Flow', data: fyData.map(d => num(d.FreeCashFlow)), backgroundColor: 'rgba(0,212,170,0.8)', type: 'line', borderColor: colors.primary, tension: 0.3 }
+        ]
+    },
+    options: { ...chartDefaults, scales: freshScales() }
+});
+
+// ===================== H1 CHARTS =====================
+const h1Labels = h1Data.map(d => d.Period);
+chartRegistry['h1RevEbitdafChart'] = new Chart(document.getElementById('h1RevEbitdafChart'), {
+    type: 'bar',
+    data: {
+        labels: h1Labels,
+        datasets: [
+            { label: 'H1 Revenue', data: h1Data.map(d => num(d.Revenue)), backgroundColor: 'rgba(9,132,227,0.6)', order: 2 },
+            { label: 'H1 EBITDAF', data: h1Data.map(d => num(d.EBITDA)), backgroundColor: 'rgba(0,212,170,0.8)', order: 1 }
+        ]
+    },
+    options: { ...chartDefaults, scales: freshScales() }
+});
+
+chartRegistry['h1NetIncomeChart'] = new Chart(document.getElementById('h1NetIncomeChart'), {
+    type: 'bar',
+    data: {
+        labels: h1Labels,
+        datasets: [{
+            label: 'H1 Net Income',
+            data: h1Data.map(d => num(d.NetIncome)),
+            backgroundColor: h1Data.map(d => num(d.NetIncome) < 0 ? 'rgba(255,107,107,0.7)' : 'rgba(253,203,110,0.7)')
+        }]
+    },
+    options: { ...chartDefaults, scales: freshScales() }
+});
+
+// ===================== DIVIDEND CHART =====================
+const dpsFY = fyData.filter(d => num(d.DividendPerShare) !== null);
+chartRegistry['dpsChart'] = new Chart(document.getElementById('dpsChart'), {
+    type: 'bar',
+    data: {
+        labels: dpsFY.map(d => d.Period),
+        datasets: [{ label: 'Dividend Per Share (cps)', data: dpsFY.map(d => num(d.DividendPerShare)), backgroundColor: 'rgba(0,212,170,0.8)' }]
+    },
+    options: { ...chartDefaults, scales: freshScales() }
+});
+
+// ===================== BALANCE SHEET / LEVERAGE =====================
+chartRegistry['debtChart'] = new Chart(document.getElementById('debtChart'), {
+    type: 'bar',
+    data: {
+        labels: fyLabels,
+        datasets: [
+            { label: 'Total Debt', data: fyData.map(d => num(d.TotalDebt)), backgroundColor: 'rgba(255,107,107,0.65)' },
+            { label: 'Cash', data: fyData.map(d => num(d.CashAndEquivalents)), backgroundColor: 'rgba(0,212,170,0.8)' }
+        ]
+    },
+    options: { ...chartDefaults, scales: freshScales() }
+});
+
+chartRegistry['leverageChart'] = new Chart(document.getElementById('leverageChart'), {
+    type: 'line',
+    data: {
+        labels: fyLabels,
+        datasets: [{
+            label: 'Net Debt / EBITDAF',
+            data: fyData.map(d => { const nd = num(d.TotalDebt) - num(d.CashAndEquivalents); const e = num(d.EBITDA); return e ? +(nd / e).toFixed(2) : null; }),
+            borderColor: colors.warning, backgroundColor: 'rgba(253,203,110,0.15)', fill: true, tension: 0.3
+        }]
+    },
+    options: { ...chartDefaults, scales: freshScales() }
+});
+
+chartRegistry['equityChart'] = new Chart(document.getElementById('equityChart'), {
+    type: 'bar',
+    data: {
+        labels: fyLabels,
+        datasets: [{ label: "Shareholders' Equity", data: fyData.map(d => num(d.ShareholdersEquity)), backgroundColor: 'rgba(108,92,231,0.7)' }]
+    },
+    options: { ...chartDefaults, scales: freshScales() }
+});
+
+chartRegistry['sharesChart'] = new Chart(document.getElementById('sharesChart'), {
+    type: 'line',
+    data: {
+        labels: fyLabels,
+        datasets: [{ label: 'Shares Outstanding (M)', data: fyData.map(d => num(d.SharesOutstanding)), borderColor: colors.tertiary, backgroundColor: 'rgba(9,132,227,0.15)', fill: true, tension: 0.2 }]
+    },
+    options: { ...chartDefaults, scales: freshScales() }
+});
+
+// ===================== MODALS =====================
+const metricDescriptions = {
+    revenue: {
+        title: "Revenue &amp; EBITDAF",
+        content: `<p><strong>Revenue</strong> is total income from electricity, gas, broadband and mobile sales plus wholesale trading. <strong>EBITDAF</strong> (earnings before interest, tax, depreciation, fair-value changes and disposals) is Mercury's headline operating metric &mdash; the one management guides to and is judged against.</p>
+        <div class="metric-highlight"><strong>For Mercury:</strong> FY2026 guidance is $1.0bn EBITDAF, with an FY2030 target of $1.15-1.25bn. FY2025's $786m was a hydrological trough (4th-lowest Waikato inflow year since 1980); H1-2026's $537m (+28% YoY) shows the recovery already under way.</div>
+        <p><strong>What to watch:</strong></p><ul><li>Whether FY2026 actually lands at/near the $1.0bn guided EBITDAF</li><li>Hydrology commentary each half (Waikato/Taupō inflow percentiles)</li><li>Revenue growth vs EBITDAF growth &mdash; wholesale price pass-through can inflate revenue without margin</li></ul>`
+    },
+    margin: {
+        title: "EBITDAF Margin",
+        content: `<p>EBITDAF divided by revenue. For a gentailer this swings with hydrology and wholesale spot prices, not just cost control.</p>
+        <div class="metric-highlight"><strong>For Mercury:</strong> Margin compression in FY2024/25 reflects both a step-up in revenue (Trustpower integration, price rises) and hydrology-driven softness in trading margin.</div>
+        <p><strong>What to watch:</strong> A sustained recovery toward ~28-29% (the DCF base case's long-run assumption) versus a further slide if dry years persist.</p>`
+    },
+    netincome: {
+        title: "Statutory Net Income &mdash; Fair-Value Noise",
+        content: `<p><strong>Net Income</strong> is the GAAP/NZ IFRS bottom line, but for Mercury it is heavily distorted by <strong>non-cash mark-to-market movements</strong> on unhedged electricity derivatives and carbon (NZU) units, plus occasional disposal gains.</p>
+        <div class="metric-highlight"><strong>For Mercury:</strong> FY2025 NPAT was just $1m versus EBITDAF of $786m &mdash; a ~$290m negative fair-value swing explains almost the entire gap. FY2022's $469m includes a $365m Tilt Renewables disposal gain. H1-2025 was a $67m statutory LOSS despite solid $418m EBITDAF.</div>
+        <p><strong>What to watch:</strong> Do NOT use Net Income or EPS to judge operating performance or to compute P/E for this stock &mdash; use EBITDAF and the DCF's owner-FCF framework instead.</p>`
+    },
+    capex: {
+        title: "Operating Cash Flow, CapEx &amp; Free Cash Flow",
+        content: `<p>Operating Cash Flow less CapEx equals Free Cash Flow &mdash; the cash available to service debt, pay dividends and fund growth.</p>
+        <div class="metric-highlight"><strong>For Mercury:</strong> FCF collapsed from $278m (FY2024) to $16m (FY2025) purely because CapEx roughly tripled to fund Ngā Tamariki OEC5, Kaiwera Downs II and Kaiwaikawe &mdash; three simultaneous renewable builds targeting 3.5TWh of new generation by 2030. This is GROWTH capex creating new earning assets, not a distress signal. The DCF explicitly splits stay-in-business capex (~$150m/yr) from growth capex (~$430m/yr now, tapering to ~$80m/yr by Year 10) to model this correctly.</div>
+        <p><strong>What to watch:</strong> Growth capex tapering as the three major projects complete post-2028/29, and whether the 70-85% of-FCF dividend payout policy needs DRP issuance to bridge any gap during the peak build years.</p>`
+    },
+    h1trend: {
+        title: "H1 Revenue &amp; EBITDAF Trend",
+        content: `<p>Half-year results compared H1-over-H1 (never mixed with full-year figures, which would create a misleading sawtooth pattern since H1 is roughly half of FY).</p>
+        <div class="metric-highlight"><strong>For Mercury:</strong> H1-2026 EBITDAF of $537m was up 28% on H1-2025's $418m, driven by above-average hydro inflows &mdash; a real-time illustration of the operating leverage to a normal-to-wet year after two dry years (FY24, FY25) suppressed results.</div>
+        <p><strong>What to watch:</strong> H1 results typically capture the wetter winter months and can differ materially in seasonal mix from H2 &mdash; compare H1-to-H1, not H1-to-FY.</p>`
+    },
+    h1netincome: {
+        title: "H1 Statutory Net Income &mdash; Fair-Value Noise",
+        content: `<p>Same fair-value distortion as the annual Net Income series, but visible even more starkly half-on-half.</p>
+        <div class="metric-highlight"><strong>For Mercury:</strong> H1-2022's $427m includes the $365m Tilt Renewables disposal gain. H1-2025's -$67m loss occurred despite solid $418m EBITDAF, purely from a negative derivative fair-value swing.</div>
+        <p><strong>What to watch:</strong> Treat this chart as a reminder of earnings-quality risk, not a KPI to forecast or extrapolate.</p>`
+    },
+    dividend: {
+        title: "Dividend Per Share",
+        content: `<p>Mercury's ordinary dividend per share, in NZ cents per share (cps).</p>
+        <div class="metric-highlight"><strong>For Mercury:</strong> 17 consecutive years of dividend growth through FY2025 (24.0cps), with 25.0cps guided for FY2026 (18th consecutive year if delivered). Policy targets 70-85% of free cash flow paid out on average over time &mdash; not a fixed % of NPAT, since NPAT is fair-value-distorted.</div>
+        <p><strong>What to watch:</strong> Whether the capex supercycle forces continued DRP (Dividend Reinvestment Plan) issuance to bridge the gap between FCF and the dividend, which is mildly dilutive to per-share value over time.</p>`
+    },
+    debt: {
+        title: "Total Debt vs Cash",
+        content: `<p>Gross debt and cash balances from the balance sheet.</p>
+        <div class="metric-highlight"><strong>For Mercury:</strong> Debt has risen steadily to fund the Tilt Renewables acquisition (FY2021-22) and now the organic build programme, reaching $2,345m at H1-2026 against just $73m cash. Mercury holds a BBB+/Stable S&amp;P rating.</div>
+        <p><strong>What to watch:</strong> Debt growth outpacing EBITDAF growth would signal rising leverage risk; management's own target is to keep gearing within 2-3x, drifting toward ~2.6x by 2030.</p>`
+    },
+    leverage: {
+        title: "Net Debt / EBITDAF",
+        content: `<p>A simple leverage ratio using reported Total Debt minus Cash, divided by EBITDAF. Note this differs slightly from Mercury's own S&amp;P-adjusted net debt/EBITDA figure (~2.2x at H1-2026), which makes additional rating-agency adjustments not reflected in the raw CSV data.</p>
+        <div class="metric-highlight"><strong>For Mercury:</strong> Management's target range is 2-3x, with gearing expected to drift toward ~2.6x by FY2030 as the capex programme continues. A downgrade from BBB+ would raise funding costs.</div>
+        <p><strong>What to watch:</strong> Sustained moves above 3x would be a credit-rating red flag; the FY2025 hydrological trough pushed EBITDAF down and leverage up simultaneously &mdash; a double-hit that a wet year like H1-2026 partially reverses.</p>`
+    },
+    equity: {
+        title: "Shareholders' Equity",
+        content: `<p>Book value of equity attributable to shareholders.</p>
+        <div class="metric-highlight"><strong>For Mercury:</strong> Equity stepped up sharply in FY2021-22 from the scrip-funded Tilt Renewables/Trustpower acquisitions, not organic compounding &mdash; equity CAGR is therefore NOT used as a DCF growth driver for this company (see DCF section).</div>
+        <p><strong>What to watch:</strong> Periodic asset revaluations (common for utility/generation assets under NZ IFRS) can move this line without any change in operating performance.</p>`
+    },
+    shares: {
+        title: "Shares Outstanding",
+        content: `<p>Total ordinary shares on issue.</p>
+        <div class="metric-highlight"><strong>For Mercury:</strong> Rising slowly (~0.25%/yr) via the Dividend Reinvestment Plan (DRP), from 1,376.3m (FY2017) to 1,412.0m (H1-2026). Stock-based comp is immaterial (~$0.6-0.8m/yr) and Mercury has bought back stock only once (~NZ$50m, FY2018).</div>
+        <p><strong>What to watch:</strong> A heavier DRP take-up rate during peak capex years would accelerate dilution slightly; the DCF models this as ~0.25%/yr uncovered dilution.</p>`
+    }
+};
+function openModal(key) {
+    const m = metricDescriptions[key];
+    if (!m) return;
+    document.getElementById('modalTitle').innerHTML = m.title;
+    document.getElementById('modalBody').innerHTML = m.content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ===================== DCF SECTION =====================
+let currentScenario = 'base';
+
+function initDCF() {
+    if (!dcfData || !dcfData.valuation) return;
+
+    document.getElementById('dcfCurrent').textContent = '$' + dcfData.current_price.toFixed(2);
+
+    // Framing note
+    document.getElementById('framingNote').innerHTML = `<strong>Valuation philosophy:</strong> ${dcfData.framing_note}`;
+
+    // Entry hurdle caveat
+    document.getElementById('entryHurdleCaveat').innerHTML = `<strong>On the 15% IRR entry price:</strong> ${dcfData.entry_price.primary_hurdle_caveat} (Standard 15%-hurdle entry price would be $${dcfData.entry_price.base.entry_price_15pct_irr.toFixed(2)}, a ${Math.abs(dcfData.entry_price.base.entry_discount_from_current_15pct).toFixed(0)}% discount to spot &mdash; shown here for completeness only, not as a recommended entry point.)`;
+
+    // DDM cross-check
+    const ddm = dcfData.sanity_check.ddm_cross_check;
+    document.getElementById('ddmCrossCheck').innerHTML = `<strong>Dividend-Discount Model cross-check:</strong> ${ddm.description}`;
+
+    const base = dcfData.assumptions.base;
+    document.getElementById('growthSlider').value = dcfData.historical_growth.selected_growth_rate;
+    document.getElementById('waccSlider').value = base.wacc;
+    document.getElementById('terminalSlider').value = base.terminal_growth;
+    document.getElementById('growthValue').textContent = dcfData.historical_growth.selected_growth_rate + '%';
+    document.getElementById('waccValue').textContent = base.wacc + '%';
+    document.getElementById('terminalValue').textContent = base.terminal_growth + '%';
+    document.getElementById('growthHint').textContent = '5yr EBITDAF CAGR (post-Tilt/Trustpower asset base) — anchored to FY26/FY30 guidance, not extrapolated blindly';
+
+    // Secondary entry price card (static — reflects base case)
+    document.getElementById('dcfEntrySecondary').textContent = '$' + dcfData.entry_price.base.entry_price_secondary_hurdle.toFixed(2);
+
+    renderDCFInputs();
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    updateDCFDisplay();
+    switchScenario('base');
+}
+
+function renderDCFInputs() {
+    const inputs = dcfData.inputs;
+    const currency = 'NZ$';
+    const formatNum = (n) => {
+        if (Math.abs(n) >= 1000) return currency + (n/1000).toFixed(2) + 'B';
+        return currency + n.toFixed(0) + 'M';
+    };
+
+    document.getElementById('baseFCF').textContent = formatNum(inputs.last_fcf);
+    document.getElementById('sbcBreakdown').innerHTML = `Reported FCF only $${inputs.reported_fcf}M (FY25) / $${inputs.reported_fcf_h1_2026}M (H1-26) — DCF uses Year-1 projected owner FCF, not the capex-supercycle-suppressed reported figure`;
+
+    const shares = inputs.shares_outstanding;
+    document.getElementById('sharesOut').textContent = (shares/1000).toFixed(2) + 'B';
+    const g = inputs.annual_share_growth_pct;
+    document.getElementById('dilutionNote').textContent = `+${g.toFixed(2)}%/yr from DRP issuance (no buybacks since FY2018)`;
+
+    const netDebt = inputs.net_debt;
+    const netDebtEl = document.getElementById('netDebt');
+    netDebtEl.textContent = formatNum(netDebt);
+
+    renderFCFProjections();
+}
+
+function renderFCFProjections() {
+    const proj = dcfData.projections[currentScenario] || dcfData.projections.base;
+    const currency = 'NZ$';
+    const formatFCF = (n) => {
+        if (Math.abs(n) >= 1000) return currency + (n/1000).toFixed(2) + 'B';
+        return currency + n.toFixed(0) + 'M';
+    };
+
+    let html = `
+        <div class="fcf-projection-item header">FY2026</div>
+        <div class="fcf-projection-item header">FY2027</div>
+        <div class="fcf-projection-item header">FY2028</div>
+        <div class="fcf-projection-item header">FY2029</div>
+        <div class="fcf-projection-item header">FY2030</div>
+        <div class="fcf-projection-item header">FY2035 (Yr10)</div>
+    `;
+    const idxs = [0, 1, 2, 3, 4, 9];
+    idxs.forEach((idx, i) => {
+        const fcf = proj.owner_fcf[idx];
+        const prevFcf = idx === 0 ? dcfData.inputs.last_fcf : proj.owner_fcf[idx - 1];
+        const growth = prevFcf ? ((fcf - prevFcf) / Math.abs(prevFcf) * 100) : 0;
+        html += `<div class="fcf-projection-item">
+            <div class="fcf-value">${formatFCF(fcf)}</div>
+            <div class="growth-rate">${idx === 0 ? '' : (growth >= 0 ? '+' : '') + growth.toFixed(0) + '%'}</div>
+        </div>`;
+    });
+    document.getElementById('fcfProjectionTable').innerHTML = html;
+}
+
+// Reproduce the DCF JSON's own methodology: sum of PV(owner FCF) from the
+// projections array for the active scenario, PLUS a re-derived terminal value
+// using slider WACC/terminal-growth (bounded by the scenario's own EV/EBITDAF
+// exit-multiple cap), discounted back at the SAME slider WACC. This lets the
+// sliders explore sensitivity while the underlying FCF path stays anchored to
+// the scenario's guidance-based projections (matching valuation.base exactly
+// when sliders are at their default/base values).
+function calculateDCF(scenario, wacc, terminalGrowth) {
+    const proj = dcfData.projections[scenario];
+    const assump = dcfData.assumptions[scenario];
+    const years = proj.owner_fcf.length; // 10
+    const waccDec = wacc / 100;
+
+    // PV of interim FCF at the slider WACC
+    let sumPvFcf = 0;
+    for (let i = 0; i < years; i++) {
+        const df = 1 / Math.pow(1 + waccDec, i + 1);
+        sumPvFcf += proj.owner_fcf[i] * df;
+    }
+
+    // Terminal value: Gordon growth vs EV/EBITDAF cap, take the lower (same rule as the JSON)
+    const finalFcf = proj.owner_fcf[years - 1];
+    const terminalFcfGrowth = finalFcf * (1 + terminalGrowth / 100);
+    const terminalValueGordon = terminalFcfGrowth / (waccDec - terminalGrowth / 100);
+
+    // EV/EBITDAF cap uses the scenario's own final-year EBITDAF (base: 1389.0) and cap multiple
+    const finalEbitdaf = assump.ebitdaf[assump.ebitdaf.length - 1];
+    const terminalValueCap = finalEbitdaf * assump.terminal_cap_ev_ebitdaf_multiple;
+
+    const terminalValueUsed = Math.min(terminalValueGordon, terminalValueCap);
+    const dfTerminal = 1 / Math.pow(1 + waccDec, years);
+    const pvTerminal = terminalValueUsed * dfTerminal;
+
+    const enterpriseValue = sumPvFcf + pvTerminal;
+    const equityValue = enterpriseValue - dcfData.inputs.net_debt;
+    const exitShares = dcfData.inputs.projected_shares[dcfData.inputs.projected_shares.length - 1];
+    const iv = equityValue / exitShares;
+
+    // Entry price at 15% IRR hurdle: PV(interim FCF @15%) + PV(terminal @15%, using the
+    // SAME terminal value logic at 15%) minus net debt, per share.
+    const hurdle = 0.15;
+    let sumPvFcfHurdle = 0;
+    for (let i = 0; i < years; i++) {
+        sumPvFcfHurdle += proj.owner_fcf[i] / Math.pow(1 + hurdle, i + 1);
+    }
+    const terminalValueGordonHurdle = terminalFcfGrowth / (hurdle - terminalGrowth / 100);
+    const terminalValueUsedHurdle = Math.min(terminalValueGordonHurdle, terminalValueCap);
+    const pvTerminalHurdle = terminalValueUsedHurdle / Math.pow(1 + hurdle, years);
+    const entryPrice = (sumPvFcfHurdle + pvTerminalHurdle - dcfData.inputs.net_debt) / exitShares;
+
+    return { iv: iv, entryPrice: entryPrice, sumPvFcf: sumPvFcf, pvTerminal: pvTerminal, enterpriseValue: enterpriseValue };
+}
+
+window.updateDCFDisplay = function() {
+    const growth = parseFloat(document.getElementById('growthSlider').value);
+    const wacc = parseFloat(document.getElementById('waccSlider').value);
+    const terminal = parseFloat(document.getElementById('terminalSlider').value);
+
+    document.getElementById('growthValue').textContent = growth + '%';
+    document.getElementById('waccValue').textContent = wacc + '%';
+    document.getElementById('terminalValue').textContent = terminal + '%';
+
+    renderFCFProjections();
+
+    const result = calculateDCF(currentScenario, wacc, terminal);
+
+    document.getElementById('dcfIV').textContent = '$' + result.iv.toFixed(2);
+
+    const upside = ((result.iv - dcfData.current_price) / dcfData.current_price * 100);
+    const upsideEl = document.getElementById('dcfUpside');
+    upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(1) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+    upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+    const wiv = dcfData.probability_weighted.weighted_iv;
+    document.getElementById('dcfWeighted').textContent = '$' + wiv.toFixed(2);
+    const wUpEl = document.getElementById('dcfWeightedUpside');
+    const wUp = (wiv - dcfData.current_price) / dcfData.current_price * 100;
+    wUpEl.textContent = (wUp >= 0 ? '+' : '') + wUp.toFixed(1) + '% ' + (wUp >= 0 ? 'upside' : 'downside');
+    wUpEl.className = 'dcf-change ' + (wUp >= 0 ? 'positive' : 'negative');
+
+    const grid = document.getElementById('assumptionGrid');
+    if (grid) {
+        const assump = dcfData.assumptions[currentScenario];
+        grid.innerHTML = `
+            <div class="assumption-item"><div class="label">EBITDAF Growth Anchor</div><div class="value">${growth}%</div></div>
+            <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc}%</div></div>
+            <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${terminal}%</div></div>
+            <div class="assumption-item"><div class="label">Terminal Cap (EV/EBITDAF)</div><div class="value">${assump.terminal_cap_ev_ebitdaf_multiple}x</div></div>
+            <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa;">$${result.iv.toFixed(2)}</div></div>
+        `;
+    }
+};
+
+window.switchScenario = function(scenario) {
+    currentScenario = scenario;
+    document.querySelectorAll('.scenario-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.scenario === scenario);
+    });
+
+    const assumptions = dcfData.assumptions[scenario];
+    const valuation = dcfData.valuation[scenario];
+
+    document.getElementById('scenarioNarrative').textContent = assumptions.narrative;
+
+    document.getElementById('growthSlider').value = dcfData.historical_growth.selected_growth_rate;
+    document.getElementById('waccSlider').value = assumptions.wacc;
+    document.getElementById('terminalSlider').value = assumptions.terminal_growth;
+
+    renderFCFProjections();
+
+    const grid = document.getElementById('assumptionGrid');
+    grid.innerHTML = `
+        <div class="assumption-item"><div class="label">Year-1 EBITDAF</div><div class="value">$${assumptions.ebitdaf[0].toFixed(0)}M</div></div>
+        <div class="assumption-item"><div class="label">Year-10 EBITDAF</div><div class="value">$${assumptions.ebitdaf[9].toFixed(0)}M</div></div>
+        <div class="assumption-item"><div class="label">WACC</div><div class="value">${assumptions.wacc}%</div></div>
+        <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${assumptions.terminal_growth}%</div></div>
+        <div class="assumption-item"><div class="label">Terminal Cap (EV/EBITDAF)</div><div class="value">${assumptions.terminal_cap_ev_ebitdaf_multiple}x</div></div>
+        <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa;">$${valuation.intrinsic_value.toFixed(2)}</div></div>
+    `;
+
+    updateDCFDisplay();
+};
+
+function renderHistoricalGrowth() {
+    const growth = dcfData.historical_growth;
+    const selectedSource = growth.growth_rate_source;
+    const grid = document.getElementById('growthGrid');
+    const metrics = [
+        { key: 'revenue_3yr_cagr', label: 'Revenue 3Y' },
+        { key: 'revenue_5yr_cagr', label: 'Revenue 5Y' },
+        { key: 'ebitdaf_3yr_cagr', label: 'EBITDAF 3Y' },
+        { key: 'ebitdaf_5yr_cagr', label: 'EBITDAF 5Y' },
+        { key: 'equity_3yr_cagr', label: 'Equity 3Y' },
+        { key: 'equity_5yr_cagr', label: 'Equity 5Y' },
+        { key: 'dps_3yr_cagr', label: 'DPS 3Y' },
+        { key: 'dps_5yr_cagr', label: 'DPS 5Y' }
+    ];
+    grid.innerHTML = metrics.map(m => {
+        const rate = growth[m.key];
+        if (rate === null || rate === undefined) return '';
+        const isSelected = m.key === selectedSource;
+        const colorClass = rate >= 0 ? 'positive' : 'negative';
+        return `
+            <div class="growth-item ${isSelected ? 'selected' : ''}">
+                <div class="metric">${m.label}</div>
+                <div class="rate ${colorClass}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const table = document.getElementById('sensitivityMatrix');
+    const currentPrice = dcfData.current_price;
+    let html = '<tr><th>WACC \\ Term G</th>';
+    sens.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+    html += '</tr>';
+    sens.wacc_range.forEach((wacc, i) => {
+        html += `<tr><th>${wacc}%</th>`;
+        sens.matrix[i].forEach((val, j) => {
+            const isHighlight = Math.abs(wacc - dcfData.assumptions.base.wacc) < 0.01 &&
+                               Math.abs(sens.terminal_growth_range[j] - dcfData.assumptions.base.terminal_growth) < 0.01;
+            const colorClass = val >= currentPrice ? 'above-current' : 'below-current';
+            html += `<td class="${isHighlight ? 'highlight' : colorClass}">$${val.toFixed(2)}</td>`;
+        });
+        html += '</tr>';
+    });
+    table.innerHTML = html;
+}
+
+initDCF();
+
+(function() {
+    var growthSlider = document.getElementById('growthSlider');
+    var waccSlider = document.getElementById('waccSlider');
+    var terminalSlider = document.getElementById('terminalSlider');
+    if (growthSlider) { growthSlider.oninput = window.updateDCFDisplay; growthSlider.onchange = window.updateDCFDisplay; }
+    if (waccSlider) { waccSlider.oninput = window.updateDCFDisplay; waccSlider.onchange = window.updateDCFDisplay; }
+    if (terminalSlider) { terminalSlider.oninput = window.updateDCFDisplay; terminalSlider.onchange = window.updateDCFDisplay; }
+})();
+</script>
+</body>
+</html>
