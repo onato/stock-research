@@ -22,7 +22,7 @@ LEADERBOARD ?= 15   # rows shown by `make screen`
 .DEFAULT_GOAL := help
 .PHONY: help run digest status screen integrity missing prune-stubs standardize-scale research facts evals evals-all \
         cost gaps exchange-eval facts-xbrl screen-metrics check-currency ledger ledger-backfill queue-prune \
-        screen-fundamentals backfill-units \
+        screen-fundamentals backfill-units canonical-iv \
         test test-country lint coverage typecheck
 
 help: ## Show this help
@@ -173,6 +173,14 @@ screen-metrics: ## Compare core metrics across tickers, normalized (PERIOD=FY202
 screen-fundamentals: ## Screen on TTM/growth/ROE/D-E/PEG (EXCHANGE=NZX ARGS="--min-roe 0.15")
 	$(PY) $(SCRIPTS)/screen_fundamentals.py $(if $(EXCHANGE),--exchange $(EXCHANGE),) \
 	  $(if $(SUFFIX),--suffix $(SUFFIX),) $(ARGS)
+
+# A dual-listed DCF writes weighted_iv_hkd/_usd rather than the canonical
+# weighted_iv, so screen.py flags NO_IV and drops the row. Selection is by
+# quote currency only -- never FX conversion, since an RMB IV over an HKD
+# price read as +200% upside.
+canonical-iv: ## Name the canonical weighted_iv on dual-currency DCFs (APPLY=1 to write)
+	$(PY) $(SCRIPTS)/canonical_iv.py $(if $(TICKER),--ticker $(TICKER),--all) \
+	  $(if $(APPLY),--apply,)
 
 backfill-units: ## Infer missing core_metrics.units from DCF anchors (APPLY=1 to write)
 	$(PY) $(SCRIPTS)/backfill_units.py $(if $(APPLY),--apply,) $(if $(TICKER),--ticker $(TICKER),)
