@@ -109,6 +109,14 @@ def eligible(repo: pathlib.Path | str, tickers: list[str], *,
     valuation_date, 19 had no new filing at all, so re-running the parser
     would re-derive identical financials at ~$6 each. It never affects
     never-researched tickers, which have nothing to compare against.
+
+    Note that this flag predates `refresh_route`, and its "~$6 each" premise
+    no longer holds for the tickers it excludes: a tier-2 ticker now routes
+    to `/refresh-stock`, which skips the parser entirely. The flag is still
+    the right default for `make run` -- fresh financial data is the higher
+    priority when the budget only covers a few tickers -- but dropping it
+    (`make run REQUIRE_NEW=0`) is now a cheap way to age out the tier-2
+    backlog rather than the expensive one it used to be.
     """
     repo = pathlib.Path(repo)
 

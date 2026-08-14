@@ -17,6 +17,12 @@ SCREEN  := .claude/skills/screen-investments/screen.py
 #
 TICKERS  ?= 4
 PARALLEL ?= 2
+
+# `make run` prioritises tickers with unparsed filings. Tier-2 tickers (stale
+# by date, financials already current) are excluded by that, which is why 23
+# of them had aged past 45 days. They now route to the cheap /refresh-stock
+# path, so REQUIRE_NEW=0 is an inexpensive way to work that backlog down.
+REQUIRE_NEW ?= 1
 LEADERBOARD ?= 15   # rows shown by `make screen`
 
 .DEFAULT_GOAL := help
@@ -54,7 +60,8 @@ ifdef TICKER
 	@$(SCRIPTS)/run_loop.sh -j 1 $(TICKER)
 else
 	@echo "==> researching $(TICKERS) ticker(s), $(PARALLEL) at a time"
-	@$(SCRIPTS)/run_loop.sh -n $(TICKERS) -j $(PARALLEL) --require-new-filings
+	@$(SCRIPTS)/run_loop.sh -n $(TICKERS) -j $(PARALLEL) \
+	  $(if $(filter 1,$(REQUIRE_NEW)),--require-new-filings,)
 endif
 	@echo
 	@echo "==> scoring"

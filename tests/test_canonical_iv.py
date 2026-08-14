@@ -228,3 +228,154 @@ class TestApply:
         first = path.read_text()
         assert canonical_iv.apply(repo, "9999.HK", quote_currency="HKD") is False
         assert path.read_text() == first
+
+    def test_apply_refuses_an_unknown_quote_currency(self, repo):
+        dcf_at(repo, "CSU", {"weighted_intrinsic_value_cad": 2936.08})
+        assert canonical_iv.apply(repo, "CSU", quote_currency=None) is False
+
+    def test_apply_on_a_missing_file_is_false_not_a_crash(self, repo):
+        assert canonical_iv.apply(repo, "NOPE", quote_currency="USD") is False
+
+    def test_an_integer_value_is_not_rendered_as_a_float(self, repo):
+        path = dcf_at(repo, "T", {"weighted_iv_usd": 40.0})
+        canonical_iv.apply(repo, "T", quote_currency="USD")
+        assert '"weighted_iv": 40' in path.read_text()
+
+    def test_a_mid_object_variant_keeps_the_json_valid(self, repo):
+        """The anchor line is followed by a sibling, so it ends with a comma.
+
+        The insert must keep exactly one comma between each pair of keys --
+        the real corpus files (9999.HK, BABA) all take this branch.
+        """
+        base = repo / "research" / "T" / "Reports"
+        base.mkdir(parents=True)
+        path = base / "T_DCF.json"
+        path.write_text(
+            '{\n  "probability_weighted": {\n'
+            '    "weighted_iv_usd": 12.5,\n'
+            '    "note": "x"\n'
+            '  }\n}\n')
+        assert canonical_iv.apply(repo, "T", quote_currency="USD") is True
+        pw = json.loads(path.read_text())["probability_weighted"]
+        assert pw["weighted_iv"] == 12.5
+        assert pw["note"] == "x"
+
+    def test_a_trailing_variant_keeps_the_json_valid(self, repo):
+        """The anchor line may be the last key in its object (no comma)."""
+        base = repo / "research" / "T" / "Reports"
+        base.mkdir(parents=True)
+        path = base / "T_DCF.json"
+        path.write_text(
+            '{\n  "probability_weighted": {\n'
+            '    "note": "x",\n'
+            '    "weighted_iv_usd": 12.5\n'
+            '  }\n}\n')
+        assert canonical_iv.apply(repo, "T", quote_currency="USD") is True
+        pw = json.loads(path.read_text())["probability_weighted"]
+        assert pw["weighted_iv"] == 12.5
+        assert pw["note"] == "x"
+
+
+class TestCli:
+    """The corpus sweep. Network access is stubbed -- these must stay offline."""
+
+    @pytest.fixture(autouse=True)
+    def _repo_and_quotes(self, repo, monkeypatch):
+        monkeypatch.setattr(canonical_iv, "REPO", repo)
+        monkeypatch.setattr(canonical_iv, "DEFAULT_DELAY", 0)
+        self.quotes = {}
+        monkeypatch.setattr(canonical_iv, "_quote_currency",
+                            lambda root, t: self.quotes.get(t))
+        monkeypatch.setattr("time.sleep", lambda *_: None)
+        self.repo = repo
+
+    def run(self, *argv):
+        import sys as _s
+        old = _s.argv
+        _s.argv = ["canonical_iv.py", *argv]
+        try:
+            return canonical_iv.main()
+        finally:
+            _s.argv = old
+
+    def test_report_mode_writes_nothing(self, capsys):
+        path = dcf_at(self.repo, "T", {"weighted_iv_usd": 12.5})
+        self.quotes["T"] = "USD"
+        before = path.read_text()
+        assert self.run("--all") == 0
+        assert path.read_text() == before
+        out = capsys.readouterr().out
+        assert "would" in out
+        assert "report only" in out
+
+    def test_apply_mode_writes(self, capsys):
+        dcf_at(self.repo, "T", {"weighted_iv_usd": 12.5})
+        self.quotes["T"] = "USD"
+        assert self.run("--all", "--apply") == 0
+        assert "fixed" in capsys.readouterr().out
+
+    def test_a_refusal_is_reported_and_counted(self, capsys):
+        dcf_at(self.repo, "T", {"weighted_iv_rmb": 416.0})
+        self.quotes["T"] = "HKD"
+        self.run("--all")
+        out = capsys.readouterr().out
+        assert "REFUSED" in out
+        assert "refused: 1" in out
+
+    def test_already_canonical_tickers_are_skipped_without_a_quote(self,
+                                                                  capsys):
+        """No quote is fetched for a file that needs nothing -- 110 of 121."""
+        dcf_at(self.repo, "T", {"weighted_iv": 33.0})
+        fetched = []
+        canonical_iv._quote_currency = lambda root, t: fetched.append(t)
+        self.run("--all")
+        assert fetched == []
+        assert "already canonical: 1" in capsys.readouterr().out
+
+    def test_a_single_ticker_can_be_targeted(self, capsys):
+        dcf_at(self.repo, "A", {"weighted_iv_usd": 1.0})
+        dcf_at(self.repo, "B", {"weighted_iv_usd": 2.0})
+        self.quotes.update({"A": "USD", "B": "USD"})
+        self.run("--ticker", "A", "--apply")
+        out = capsys.readouterr().out
+        assert "A" in out
+        assert "  B  " not in out
+
+    def test_an_empty_corpus_is_not_an_error(self, capsys):
+        assert self.run("--all") == 0
+        assert "nothing to do" in capsys.readouterr().out
+
+    def test_report_mode_does_not_claim_to_have_fixed_anything(self, capsys):
+        """`fixed: N` in a dry run would misreport what happened on disk."""
+        dcf_at(self.repo, "T", {"weighted_iv_usd": 12.5})
+        self.quotes["T"] = "USD"
+        self.run("--all")
+        assert "resolvable: 1" in capsys.readouterr().out
+
+
+class TestBadInput:
+    def test_a_non_dict_probability_weighted_is_refused(self, repo):
+        dcf_at(repo, "T", ["not", "a", "dict"])
+        r = canonical_iv.resolve(repo, "T", quote_currency="USD")
+        assert r.value is None
+        assert "no probability_weighted" in r.reason
+
+    def test_a_boolean_is_not_a_number(self, repo):
+        """`True` is an int subclass; a truthy check would read it as 1.0."""
+        dcf_at(repo, "T", {"weighted_iv_usd": True})
+        assert canonical_iv.resolve(
+            repo, "T", quote_currency="USD").value is None
+
+    def test_a_bare_prefix_is_not_a_currency_variant(self, repo):
+        dcf_at(repo, "T", {"weighted_iv_": 5.0})
+        r = canonical_iv.resolve(repo, "T", quote_currency="USD")
+        assert r.value is None
+        assert "no currency-suffixed variant" in r.reason
+
+    def test_unparseable_json_is_not_an_error(self, repo):
+        base = repo / "research" / "T" / "Reports"
+        base.mkdir(parents=True)
+        (base / "T_DCF.json").write_text("{not json")
+        r = canonical_iv.resolve(repo, "T", quote_currency="USD")
+        assert r.value is None
+        assert "no readable DCF" in r.reason

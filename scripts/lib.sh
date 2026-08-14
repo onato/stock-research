@@ -14,7 +14,10 @@
 # ---------------------------------------------------------------------------
 # research_ticker <ticker> [--quiet]
 #
-# Runs the research-stock skill for one ticker. The full JSON event stream is
+# Runs the skill this ticker needs -- /research-stock for a tier-3 ticker
+# (new filings, or never researched), the cheaper /refresh-stock for a tier-2
+# one (stale by date only), and nothing at all for tiers 0-1. See
+# refresh_route.py. The full JSON event stream is
 # always written to $LOG_DIR/<ticker>.log; by default a readable summary is
 # also printed live via progress.py.
 #
@@ -25,9 +28,34 @@ research_ticker() {
   local ticker="$1" quiet="${2:-}"
   local log="$LOG_DIR/$ticker.log"
   local stream="$LOG_DIR/$ticker.stream"
-  local start rc elapsed
+  local start rc elapsed skill_prompt
 
   mkdir -p "$LOG_DIR"
+
+  # Which skill this ticker actually needs. A ticker that is stale only by
+  # date -- its filings already parsed into the CSV -- does not need the
+  # download/extract/parse half of the pipeline, and re-running it re-derives
+  # numbers that cannot have moved. refresh_route returns the empty string
+  # when no model should run at all (tier 0/1).
+  #
+  # FORCE=1 pins this to the full re-research regardless of tier.
+  #
+  # A routing *failure* and a legitimate "no work" both produce no usable
+  # prompt, and they must not be confused: skipping a ticker because the
+  # router crashed would silently drop it from the run. So the exit status
+  # decides, and only a clean exit is allowed to mean "skip".
+  if skill_prompt=$(uv run --project "$REPO_ROOT" python3 \
+       "$REPO_ROOT/scripts/refresh_route.py" --ticker "$ticker" --prompt \
+       ${FORCE:+--force} 2>/dev/null); then
+    if [ -z "$skill_prompt" ]; then
+      echo "[$ticker] nothing to do (tier 0/1) -- skipping the model."
+      return 0
+    fi
+  else
+    echo "[$ticker] refresh_route failed -- falling back to full research." >&2
+    skill_prompt="/research-stock $ticker"
+  fi
+  echo "[$ticker] $skill_prompt"
   # Truncated per run so a pane tailing it shows this attempt, not the last
   # one's output followed by this one's.
   : > "$stream"
@@ -68,7 +96,7 @@ do not summarize their contents."
     claude --permission-mode bypassPermissions \
            --disallowed-tools "Bash(open *)" \
            --output-format stream-json --verbose \
-           -p "/research-stock $ticker
+           -p "$skill_prompt
 
 $batch_note" 2>&1 \
       | tee "$log" \
@@ -83,7 +111,7 @@ $batch_note" 2>&1 \
     claude --permission-mode bypassPermissions \
            --disallowed-tools "Bash(open *)" \
            --output-format stream-json --verbose \
-           -p "/research-stock $ticker
+           -p "$skill_prompt
 
 $batch_note" \
       | tee "$log" \
