@@ -171,6 +171,45 @@ The CSV should contain:
 - All annual periods from the 10-K/20-F reports (up to 10 years)
 - Sorted in chronological order (oldest first)
 
+### Step 5c: Extraction gate — check the data before spending on agents
+
+```bash
+python3 scripts/run_evals.py "$ARGUMENTS"
+```
+
+This is a **gate, not a report**. Steps 6-8 cost real money (a full run is
+$3.50–$4.91), and every one of them is built on this CSV — a DCF computed
+from a broken extraction is expensive and worthless. Read the output before
+continuing.
+
+**Stop and fix the extraction if you see any of these:**
+
+| Check | What it means |
+|---|---|
+| `csv_parse` | the CSV is missing or empty — the parser wrote nothing |
+| `periods_unique` | the same period twice; one is a duplicate or mislabelled row |
+| `essential_coverage` | a field the DCF consumes has no values at all |
+| `units_consistent` | DB and CSV disagree by ~1000x — a units bug |
+
+`essential_coverage` is the one that catches a *thin* extraction rather than a
+malformed one. It grades `net_income`, `shareholders_equity` and
+`shares_outstanding` per-field, because a column can be present in the header
+and empty in every single row — that is how AAPL ended up with no share count
+and PNG.V with none either, both scoring a clean 1.0 beforehand. `revenue` is
+graded as a warn only, since NAV vehicles (BIF.NZ, FIH.U, BGI.NZ) have no
+revenue line by design.
+
+When it fails, the fix is upstream — go back to Step 5a/5b and find why the
+field is empty (missing filings, a label the parser does not recognise, an
+adjudication that dropped the row). If the gap is genuinely unavailable from
+the filings, `/backfill-msn` can fill it from MSN Money after validation.
+
+**Warns are a review queue, not a blocker.** `identity_fcf`, `eps_share_scale`
+and the `continuity_*` checks all have documented legitimate causes
+(owner-FCF adjustments, EPS-in-cents tickers, share consolidations). Read
+them, satisfy yourself each one is explained, and continue — do not "fix" a
+warn that is describing correct data.
+
 ## Step 6: Qualitative Analysis
 
 **Always regenerate** - includes recent developments and current market context that should be refreshed each run.
@@ -221,52 +260,17 @@ Output: ./research/$ARGUMENTS/Reports/{TICKER}_Dashboard.html
 
 Create a DCF valuation model based on the financial data and qualitative analysis.
 
-Use the dcf-analyst agent instructions in `.claude/agents/dcf-analyst.md` to:
+Spawn the `dcf-analyst` agent (`.claude/agents/dcf-analyst.md`).
 
-1. **Calculate Historical Growth Rates**
-   - 3-year and 5-year CAGRs for Revenue, EPS, FCF, and Equity
-   - Select equity growth as primary driver (most conservative)
-   - Flag if equity CAGR diverges >30% from revenue/EPS
+**Do not restate the valuation method here.** The agent routes the ticker to the right
+model via `.claude/skills/dcf-methods/SKILL.md` and reads that model's reference file —
+an owner-FCF DCF for operating companies, and something else entirely for banks, REITs,
+LICs, holdcos and distressed shells. Duplicating the method in this file is how the two
+drift apart: this step previously carried a share-count rule the agent no longer uses.
 
-2. **Create Scenario Projections**
-   - **Base Case**: Historical equity CAGR, decelerating toward terminal growth
-   - **Bull Case**: +5-10pp above base, aligned with bull thesis
-   - **Bear Case**: -5-10pp below base, risk factors materialize
-
-3. **Owner-FCF Adjustment** (always — build the DCF on owner FCF, not reported FCF)
-   - `last_fcf = reported_fcf − SBC_incl_equity_taxes − interest_income`, applied across the whole history so growth rates use the adjusted series
-   - **SBC must include cash taxes on equity awards** (financing-activity withholding), not just the cash-flow add-back
-   - **Strip interest income whenever net cash > 1× the FCF base** — leaving it in while also adding net cash to EV counts the cash pile twice
-   - **Project forward SBC as a % of revenue**, declining gradually (e.g. 15% → 10%). Never hold SBC flat in dollars while revenue compounds — that silently assumes the comp problem solves itself
-   - Share count grows only by dilution buybacks fail to absorb: `uncovered = max(0, SBC − buyback_cash)`
-   - Charges the cost exactly once: buyback-heavy names keep a flat share count, non-repurchasers dilute
-   - If any input is missing from the metrics CSV, extract it from `Extracted/` and backfill — never skip the adjustment silently
-
-4. **Build the FCF margin from components** — never carry the latest year's margin forward flat
-   - `adj_EBITDA − SBC − D&A → EBIT → ×(1−cash_tax) → +D&A − capex + working capital = owner FCF`
-   - **Working capital scales with the CHANGE in revenue** (capture ~15-20% of the YoY increase), not with revenue. Deferred-revenue tailwinds shrink hard when growth decelerates — DUOL's was 34% of FY2025 reported FCF
-   - **Ramp the cash tax rate to normal** if the latest year had a valuation-allowance release or one-off credit (DUOL: −6% guided 2026 → ~21%)
-   - Sanity-check the projected year-1 owner-FCF margin against the component build; if it is far above the latest actual, an unrepeatable one-off is being carried forward
-
-5. **DCF Calculations**
-   - Project owner FCF for 5 years from the component build
-   - Terminal Value = **lower of** Gordon Growth and a 20× terminal-FCF cap (12-15× for cyclicals); record which bound
-   - Discount to present value using WACC
-   - Subtract net debt, divide by the **year-5 projected share count** for intrinsic value
-   - Emit a memo line for value-per-share *if SBC were non-cash* — the spread shows how much the answer hangs on SBC treatment
-
-6. **Entry Price Calculation**
-   - Entry price = the price at which buying today, collecting 5 years of projected FCF, and exiting at fair value in year 5 earns a 15% IRR
-   - `Entry Price = ( Σ FCF_t / 1.15^t  +  TV_5 / 1.15^5  −  net_debt ) / projected_shares[5]` (t = 1..5, using the scenario's projected SBC-adjusted FCF path; TV_5 is the Gordon terminal value computed with WACC)
-   - Do NOT discount only the terminal value — that ignores the interim FCF the investor receives and the net cash on the balance sheet, and produces an entry price far too low
-   - Sanity property: when projected growth ≈ 15%, entry price lands modestly below intrinsic value (because the 15% hurdle exceeds WACC) — never at ~half of it
-
-7. **Sensitivity Analysis**
-   - Matrix of IV across WACC (+/-2%) and Terminal Growth (+/-1%)
-
-8. **Generate Outputs**
-   - `./research/$ARGUMENTS/Reports/{TICKER}_DCF.json` - Embedded in dashboard
-   - `./research/$ARGUMENTS/Reports/{TICKER}_DCF_Model.xlsx` - Downloadable Excel model
+Outputs:
+- `./research/$ARGUMENTS/Reports/{TICKER}_DCF.json` — embedded in the dashboard
+- `./research/$ARGUMENTS/Reports/{TICKER}_DCF_Model.xlsx` — downloadable Excel model
 
 The dashboard generator will embed the DCF JSON and add an interactive valuation section with:
 - Intrinsic Value and Entry Price cards
@@ -475,6 +479,28 @@ ls research/$ARGUMENTS/Reports/${ARGUMENTS}_Metrics.csv \
    research/$ARGUMENTS/Reports/${ARGUMENTS}_Dashboard.html
 ```
 
+## Exit Gate: the run is not done until the eval passes
+
+```bash
+python3 scripts/run_evals.py --strict "$ARGUMENTS"
+```
+
+`--strict` exits non-zero if any check failed. **A non-zero exit means the run
+is not finished** — fix what it names and re-run it, or say plainly that the
+ticker is left in a broken state. Do not report success over a failing gate.
+
+This exists because the failure mode above is not hypothetical: runs have
+exited cleanly, reported success and cost $3.50–$4.91 with no metrics at all.
+A self-assessed checklist did not catch those; an exit code does. It also
+covers the checklist items that are mechanically checkable — the dashboard
+existing (AIR.NZ once scored 1.0 while missing one, which is why that check
+is a `fail` and not a `warn`), the DCF's `sanity_check` block being populated,
+the scenario weights summing to 1, and the weighted IV actually recomputing
+from the scenario IVs.
+
+The scorecard is written to `state/scores/{TICKER}_{date}.json` with the agent
+prompt hash, so a score change is attributable to a prompt version.
+
 ## Final Checklist
 
 **Data Collection (cached - only download new reports):**
@@ -486,6 +512,7 @@ ls research/$ARGUMENTS/Reports/${ARGUMENTS}_Metrics.csv \
 **Analysis (regenerate each run for fresh data):**
 - [ ] Metrics CSV rebuilt from all extracted text (includes any new data)
 - [ ] Metrics CSV includes DCF fields: ShareholdersEquity, TotalDebt, CashAndEquivalents, SharesOutstanding
+- [ ] Extraction gate (Step 5c) ran and passed **before** the paid agents were spawned
 - [ ] Qualitative analysis JSON refreshed with current market context and recent developments
 - [ ] DCF valuation JSON refreshed with current stock price and updated projections
 - [ ] DCF Excel model regenerated
@@ -506,6 +533,9 @@ ls research/$ARGUMENTS/Reports/${ARGUMENTS}_Metrics.csv \
 **Index Page:**
 - [ ] index.html updated with new/updated ticker entry
 - [ ] Entry is in correct alphabetical position in the stocks array
+
+**Exit gate (deterministic — this one is not self-assessed):**
+- [ ] `run_evals.py --strict $ARGUMENTS` exits zero, or the failure is stated plainly
 
 **Note:** To force re-download of ALL reports (not just new ones), delete the PDFs folder:
 ```bash

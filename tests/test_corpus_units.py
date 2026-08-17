@@ -37,7 +37,6 @@ UNRESOLVED = {
     "AFI.NZ",    # DCF says "AUD (fundamentals) / NZD (reported valuation
                  # outputs)" -- not a code, and picking one is a guess
     "AGL.NZ",    # no units stated
-    "DCBO",      # no units stated
     "PNG.V",     # no units stated
     "SDL.NZ",    # no units stated
     "SPK.NZ",    # DCF says "NZ$", a symbol rather than a code

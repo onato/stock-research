@@ -108,6 +108,65 @@ def load_metrics(ticker: str) -> tuple[list[dict[str, Any]] | None, Any]:
     return out, header
 
 
+def check_essential_coverage(rows: list[dict[str, Any]], header: list[str],
+                             card: Card) -> None:
+    """Grade the columns a valuation cannot be built without.
+
+    The `coverage` check above deliberately never fails, because raw fill
+    rate over the union schema tracks business model rather than extraction
+    quality -- META and V sit at 33-42% purely for want of REIT and bank
+    columns. Measured over the 126 committed tickers, a 50%/75% threshold on
+    that number would flag 37 and 97 tickers respectively, nearly all of them
+    correct.
+
+    So the graded question is per-field and much narrower: does each field a
+    DCF actually consumes have values? That separates cleanly -- it catches
+    AAPL and PNG.V (SharesOutstanding declared in the header, empty in every
+    row), AGL.NZ/SUM.NZ/FRFHF (NetIncome 0/N) and ADYEY/ADYEN.AS (Revenue
+    0/N, and net-revenue CAGR is precisely ADYEY's DCF driver).
+
+    Revenue is excluded from the fail set because NAV vehicles (BIF.NZ,
+    FIH.U, BGI.NZ) have no revenue line by design; it is reported as a warn
+    so the gap stays visible without mis-grading the model type.
+    """
+    fail_fields = ("net_income", "shareholders_equity", "shares_outstanding")
+    warn_fields = ("revenue",)
+
+    present = {normalize(h) for h in header}
+    n = len(rows)
+
+    def gap(field: str) -> str | None:
+        """None if the field is adequately covered, else a short reason."""
+        if field not in present:
+            return "column absent"
+        filled = sum(1 for r in rows if r.get(field) is not None)
+        if filled == 0:
+            return f"0/{n} filled"
+        # Balance-sheet fields are legitimately blank on interim rows, so
+        # partial coverage is a review queue rather than a broken artifact.
+        if filled / n < 0.5:
+            return f"{filled}/{n} filled"
+        return None
+
+    empty = {f: g for f in fail_fields if (g := gap(f)) is not None}
+    thin = {f: g for f in warn_fields if (g := gap(f)) is not None}
+
+    hard = {f: g for f, g in empty.items()
+            if g == "column absent" or g.startswith("0/")}
+    if hard:
+        card.add("essential_coverage", "fail",
+                 "no usable values: "
+                 + ", ".join(f"{f} ({g})" for f, g in sorted(hard.items())))
+    elif empty or thin:
+        sparse = {**empty, **thin}
+        card.add("essential_coverage", "warn",
+                 "sparse: "
+                 + ", ".join(f"{f} ({g})" for f, g in sorted(sparse.items())))
+    else:
+        card.add("essential_coverage", "pass",
+                 f"{len(fail_fields) + len(warn_fields)} valuation fields covered")
+
+
 def check_metrics(ticker: str, card: Card) -> None:
     rows, header = load_metrics(ticker)
     if rows is None:
@@ -190,6 +249,8 @@ def check_metrics(ticker: str, card: Card) -> None:
                  f"({cells / (len(rows) * len(core)):.0%}), {len(core)} core columns mapped")
     else:
         card.add("coverage", "warn", "no headers map to core schema")
+
+    check_essential_coverage(rows, header, card)
 
 
 # ---------------------------------------------------------------------------

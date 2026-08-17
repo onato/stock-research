@@ -245,6 +245,84 @@ class TestCheckMetricsEdges:
         assert checks["coverage"]["detail"] == "no headers map to core schema"
 
 
+class TestEssentialCoverage:
+    """Raw fill rate over the union schema measures business model, not
+    extraction quality: META and V sit at 33-42% because they have no
+    REIT/bank columns, while the real failures hide at high fill rates.
+
+    So the graded check is per-field over the handful of columns a DCF
+    cannot be built without. Measured against the committed corpus, the
+    fails this catches are AAPL and PNG.V (SharesOutstanding 0/N),
+    AGL.NZ/SUM.NZ/FRFHF (NetIncome 0/N) and ADYEY/ADYEN.AS (Revenue 0/N)
+    — every one a column that exists in the header and is empty in every
+    row.
+    """
+
+    HEADER: ClassVar = ["Period", "Revenue", "NetIncome",
+                        "ShareholdersEquity", "SharesOutstanding"]
+
+    def test_full_essential_coverage_passes(self, make_ticker):
+        checks = csv_checks(make_ticker, self.HEADER, [
+            ["FY2023", 100, 10, 50, 20],
+            ["FY2024", 110, 11, 55, 20],
+        ], ticker="ESSOK")
+        assert checks["essential_coverage"]["status"] == "pass"
+
+    def test_empty_essential_column_fails(self, make_ticker):
+        """The AAPL case: SharesOutstanding is a header with no values."""
+        checks = csv_checks(make_ticker, self.HEADER, [
+            ["FY2023", 100, 10, 50, ""],
+            ["FY2024", 110, 11, 55, ""],
+        ], ticker="ESSAAPL")
+        c = checks["essential_coverage"]
+        assert c["status"] == "fail"
+        assert "shares_outstanding" in c["detail"]
+
+    def test_missing_essential_column_fails(self, make_ticker):
+        """A column absent from the header is the same gap as an empty one."""
+        checks = csv_checks(make_ticker, ["Period", "Revenue", "NetIncome"], [
+            ["FY2023", 100, 10],
+        ], ticker="ESSGONE")
+        c = checks["essential_coverage"]
+        assert c["status"] == "fail"
+        assert "shareholders_equity" in c["detail"]
+        assert "shares_outstanding" in c["detail"]
+
+    def test_annual_only_balance_sheet_passes(self, make_ticker):
+        """Balance-sheet fields are legitimately blank on interim rows, so
+        a half-filled column is normal reporting, not a gap."""
+        checks = csv_checks(make_ticker, self.HEADER, [
+            ["FY2023", 100, 10, 50, 20],
+            ["Q1 2024", 30, 3, "", ""],
+            ["Q2 2024", 32, 3, "", ""],
+            ["FY2024", 110, 11, 55, 20],
+        ], ticker="ESSHALF")
+        assert checks["essential_coverage"]["status"] == "pass"
+
+    def test_sparse_essential_column_warns(self, make_ticker):
+        """Below half-filled is past what interim reporting explains."""
+        checks = csv_checks(make_ticker, self.HEADER, [
+            ["FY2021", 90, 9, 45, 20],
+            ["FY2022", 95, 9, "", ""],
+            ["FY2023", 100, 10, "", ""],
+            ["FY2024", 110, 11, "", ""],
+        ], ticker="ESSPART")
+        c = checks["essential_coverage"]
+        assert c["status"] == "warn"
+        assert "1/4" in c["detail"]
+
+    def test_revenueless_vehicle_does_not_fail_on_revenue(self, make_ticker):
+        """BIF.NZ/FIH.U/BGI.NZ are NAV vehicles with no revenue line by
+        design (CLAUDE.md documents them). Equity + shares carry the model,
+        so an absent revenue column must not be graded a failure."""
+        checks = csv_checks(
+            make_ticker,
+            ["Period", "NetIncome", "ShareholdersEquity", "SharesOutstanding"],
+            [["FY2023", 10, 50, 20], ["FY2024", 11, 55, 20]],
+            ticker="ESSNAV")
+        assert checks["essential_coverage"]["status"] != "fail"
+
+
 class TestCheckDcfEdges:
     def test_unparseable_valuation_date_warns(self, make_ticker):
         checks = dcf_checks(make_ticker,
