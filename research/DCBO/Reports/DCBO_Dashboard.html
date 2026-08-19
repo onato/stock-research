@@ -228,6 +228,14 @@
             background: linear-gradient(180deg,#00d4aa,#00b894);
             border-radius: 2px;
         }
+        .chart-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .log-toggle {
+            padding: 3px 10px; border-radius: 12px; background: transparent;
+            border: 1px solid rgba(255,255,255,0.2); color: #888;
+            font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;
+        }
+        .log-toggle:hover { border-color: #00d4aa; color: #00d4aa; }
+        .log-toggle.active { background: rgba(0,212,170,0.2); border-color: #00d4aa; color: #00d4aa; }
         .help-btn {
             width: 24px; height: 24px;
             border-radius: 50%;
@@ -500,28 +508,40 @@
     <div class="chart-card">
         <div class="chart-header">
             <h3>Annual Revenue &amp; Growth Rate</h3>
-            <button class="help-btn" onclick="openModal('revenue')">?</button>
+                <div class="chart-header-actions">
+                    <button class="log-toggle" onclick="toggleLogScale('revenueChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                    <button class="help-btn" onclick="openModal('revenue')">?</button>
+                </div>
         </div>
         <div class="chart-wrapper"><canvas id="revenueChart"></canvas></div>
     </div>
     <div class="chart-card">
         <div class="chart-header">
             <h3>Subscription vs Professional Services Revenue (Annual)</h3>
-            <button class="help-btn" onclick="openModal('revMix')">?</button>
+                <div class="chart-header-actions">
+                    <button class="log-toggle" onclick="toggleLogScale('revMixChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                    <button class="help-btn" onclick="openModal('revMix')">?</button>
+                </div>
         </div>
         <div class="chart-wrapper"><canvas id="revMixChart"></canvas></div>
     </div>
     <div class="chart-card">
         <div class="chart-header">
             <h3>Quarterly Revenue Trend</h3>
-            <button class="help-btn" onclick="openModal('qRevenue')">?</button>
+                <div class="chart-header-actions">
+                    <button class="log-toggle" onclick="toggleLogScale('qRevenueChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                    <button class="help-btn" onclick="openModal('qRevenue')">?</button>
+                </div>
         </div>
         <div class="chart-wrapper"><canvas id="qRevenueChart"></canvas></div>
     </div>
     <div class="chart-card">
         <div class="chart-header">
             <h3>ARR &amp; ACV Trend</h3>
-            <button class="help-btn" onclick="openModal('arr')">?</button>
+                <div class="chart-header-actions">
+                    <button class="log-toggle" onclick="toggleLogScale('arrChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                    <button class="help-btn" onclick="openModal('arr')">?</button>
+                </div>
         </div>
         <div class="chart-wrapper"><canvas id="arrChart"></canvas></div>
     </div>
@@ -540,7 +560,10 @@
     <div class="chart-card">
         <div class="chart-header">
             <h3>Adjusted EBITDA &amp; Margin (Annual)</h3>
-            <button class="help-btn" onclick="openModal('ebitda')">?</button>
+                <div class="chart-header-actions">
+                    <button class="log-toggle" onclick="toggleLogScale('ebitdaChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                    <button class="help-btn" onclick="openModal('ebitda')">?</button>
+                </div>
         </div>
         <div class="chart-wrapper"><canvas id="ebitdaChart"></canvas></div>
     </div>
@@ -566,7 +589,10 @@
     <div class="chart-card">
         <div class="chart-header">
             <h3>Customer Count Trend</h3>
-            <button class="help-btn" onclick="openModal('customers')">?</button>
+                <div class="chart-header-actions">
+                    <button class="log-toggle" onclick="toggleLogScale('customersChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                    <button class="help-btn" onclick="openModal('customers')">?</button>
+                </div>
         </div>
         <div class="chart-wrapper"><canvas id="customersChart"></canvas></div>
     </div>
@@ -1106,6 +1132,25 @@ function renderGuidance() {
     document.getElementById('guidanceCommentary').textContent = g.management_commentary;
 }
 
+// ===================== LOG SCALE TOGGLE =====================
+// Charts register themselves so the Log button can flip the y-axis after
+// construction. Logarithmic axes reject <= 0, so a series containing zero or
+// negative values keeps its linear axis and the button is not offered.
+const chartRegistry = {};
+function toggleLogScale(canvasId, btn) {
+    const chart = chartRegistry[canvasId];
+    if (!chart) return;
+    const toLog = chart.options.scales.y.type !== 'logarithmic';
+    chart.options.scales.y.type = toLog ? 'logarithmic' : 'linear';
+    // Dual-axis charts (ARR/ACV) must switch both, or the second series stays
+    // linear and the comparison the toggle exists to make is lost.
+    if (chart.options.scales.y1) {
+        chart.options.scales.y1.type = toLog ? 'logarithmic' : 'linear';
+    }
+    btn.classList.toggle('active', toLog);
+    chart.update();
+}
+
 // ===================== CHARTS =====================
 function renderCharts() {
     // 1. Annual Revenue + Growth Rate
@@ -1115,7 +1160,7 @@ function renderCharts() {
         if(i===0) return null;
         return +((n(d.Revenue)-n(fyData[i-1].Revenue))/n(fyData[i-1].Revenue)*100).toFixed(1);
     });
-    new Chart(document.getElementById('revenueChart'), {
+    chartRegistry['revenueChart'] = new Chart(document.getElementById('revenueChart'), {
         type: 'bar',
         data: {
             labels: fyLabels,
@@ -1135,7 +1180,7 @@ function renderCharts() {
     // 2. Revenue Mix (Annual)
     const fySubRev = fyData.map(d => n(d.SubscriptionRevenue));
     const fyPSRev = fyData.map(d => n(d.ProfessionalServicesRevenue));
-    new Chart(document.getElementById('revMixChart'), {
+    chartRegistry['revMixChart'] = new Chart(document.getElementById('revMixChart'), {
         type: 'bar',
         data: {
             labels: fyLabels,
@@ -1151,7 +1196,7 @@ function renderCharts() {
     });
 
     // 3. Quarterly Revenue Trend
-    new Chart(document.getElementById('qRevenueChart'), {
+    chartRegistry['qRevenueChart'] = new Chart(document.getElementById('qRevenueChart'), {
         type: 'line',
         data: {
             labels: qData.map(d => qLabel(d.Period)),
@@ -1170,7 +1215,7 @@ function renderCharts() {
     // filtering them independently silently plots ACV against the wrong
     // periods whenever the two series have different coverage.
     const kpiData = arrData.filter(d => qKey(d.Period));
-    new Chart(document.getElementById('arrChart'), {
+    chartRegistry['arrChart'] = new Chart(document.getElementById('arrChart'), {
         type: 'line',
         data: {
             labels: kpiData.map(d => qLabel(d.Period)),
@@ -1189,7 +1234,7 @@ function renderCharts() {
 
     // 5. Gross Margin (Quarterly)
     const gmData = qData.filter(d => d.GrossMargin && n(d.GrossMargin) > 0);
-    new Chart(document.getElementById('grossMarginChart'), {
+    chartRegistry['grossMarginChart'] = new Chart(document.getElementById('grossMarginChart'), {
         type: 'line',
         data: {
             labels: gmData.map(d => qLabel(d.Period)),
@@ -1210,7 +1255,7 @@ function renderCharts() {
     // 6. Adj EBITDA Annual
     const fyEBITDA = fyData.filter(d => d.AdjustedEBITDA && n(d.AdjustedEBITDA) !== 0);
     const fyEBITDAMargin = fyEBITDA.map(d => (n(d.AdjustedEBITDA)/n(d.Revenue)*100).toFixed(1));
-    new Chart(document.getElementById('ebitdaChart'), {
+    chartRegistry['ebitdaChart'] = new Chart(document.getElementById('ebitdaChart'), {
         type: 'bar',
         data: {
             labels: fyEBITDA.map(d => d.Period),
@@ -1227,7 +1272,7 @@ function renderCharts() {
     });
 
     // 7. Operating Income vs Net Income
-    new Chart(document.getElementById('opIncomeChart'), {
+    chartRegistry['opIncomeChart'] = new Chart(document.getElementById('opIncomeChart'), {
         type: 'bar',
         data: {
             labels: fyLabels,
@@ -1241,7 +1286,7 @@ function renderCharts() {
 
     // 8. FCF & Operating Cash Flow Annual
     const fyFCF = fyData.filter(d => d.FreeCashFlow && n(d.FreeCashFlow) !== 0);
-    new Chart(document.getElementById('fcfChart'), {
+    chartRegistry['fcfChart'] = new Chart(document.getElementById('fcfChart'), {
         type: 'bar',
         data: {
             labels: fyFCF.map(d => d.Period),
@@ -1255,7 +1300,7 @@ function renderCharts() {
 
     // 9. Customers
     const custData = allData.filter(d => d.Customers && n(d.Customers) > 0 && !d.Period.startsWith('H') && !d.Period.startsWith('9M'));
-    new Chart(document.getElementById('customersChart'), {
+    chartRegistry['customersChart'] = new Chart(document.getElementById('customersChart'), {
         type: 'line',
         data: {
             labels: custData.map(d => d.Period),
@@ -1275,7 +1320,7 @@ function renderCharts() {
 
     // 10. Quarterly Adj EBITDA Margin
     const qEBITDA = qData.filter(d => d.AdjustedEBITDA && n(d.AdjustedEBITDA) !== 0 && n(d.Revenue) > 0);
-    new Chart(document.getElementById('qEbitdaChart'), {
+    chartRegistry['qEbitdaChart'] = new Chart(document.getElementById('qEbitdaChart'), {
         type: 'line',
         data: {
             labels: qEBITDA.map(d => qLabel(d.Period)),
@@ -1292,7 +1337,7 @@ function renderCharts() {
     });
 
     // 11. EPS Diluted Annual
-    new Chart(document.getElementById('epsChart'), {
+    chartRegistry['epsChart'] = new Chart(document.getElementById('epsChart'), {
         type: 'bar',
         data: {
             labels: fyLabels,
@@ -1308,7 +1353,7 @@ function renderCharts() {
 
     // 12. Shares Outstanding
     const sharesHistorical = allData.filter(d => d.SharesOutstanding && n(d.SharesOutstanding) > 0 && !d.Period.startsWith('H') && !d.Period.startsWith('9M'));
-    new Chart(document.getElementById('sharesChart'), {
+    chartRegistry['sharesChart'] = new Chart(document.getElementById('sharesChart'), {
         type: 'line',
         data: {
             labels: sharesHistorical.map(d => d.Period),
