@@ -23,14 +23,22 @@ def repo(tmp_path):
     return tmp_path
 
 
-def ticker_at(repo, ticker, *, filings=(), csv_periods=(), days_old=0,
-              price=100.0):
-    """A researched ticker with given extracted filings and CSV rows."""
+def ticker_at(repo, ticker, *, filings=(), downloaded=(), csv_periods=(),
+              days_old=0, price=100.0):
+    """A researched ticker with given extracted filings and CSV rows.
+
+    `downloaded` names filings that exist in PDFs/ but were never extracted --
+    the state a mid-pipeline interruption leaves behind.
+    """
     base = repo / "research" / ticker
     (base / "Extracted").mkdir(parents=True, exist_ok=True)
     (base / "Reports").mkdir(parents=True, exist_ok=True)
     for name in filings:
         (base / "Extracted" / name).write_text("x")
+    if downloaded:
+        (base / "PDFs").mkdir(parents=True, exist_ok=True)
+    for name in downloaded:
+        (base / "PDFs" / name).write_text("x")
     if csv_periods:
         rows = "\n".join(f"{p},1" for p in csv_periods)
         (base / "Reports" / f"{ticker}_Metrics.csv").write_text(
@@ -263,3 +271,60 @@ class TestCli:
     def test_no_research_dir(self, tmp_path, monkeypatch, capsys):
         out = self._run(monkeypatch, capsys, tmp_path, "--all")
         assert "0 tickers" in out
+
+
+class TestUnextractedFilings:
+    """A downloaded-but-unextracted filing is still new data.
+
+    `has_new_filings` scanned only Extracted/*.txt, so a filing sitting in
+    PDFs/ -- downloaded but never run through pdftotext -- was invisible to
+    the gate. The ticker was reported tier 2 ("no new filings, narrative
+    only"), which routes to /refresh-stock and explicitly skips the parser.
+    The new period would then never be extracted, and the refresh would
+    rebuild a valuation on a balance sheet a quarter out of date.
+
+    Measured on DCBO: the Q2-2026 6-K sat in PDFs/ unextracted while the
+    router reported tier 2. Net debt had moved from $15.9M to $52M.
+    """
+
+    def test_unextracted_filing_counts_as_new(self, repo):
+        ticker_at(repo, "DCBO",
+                  filings=["DCBO_6K_Q1-2026.txt"],
+                  downloaded=["DCBO_6K_Q2-2026.htm"],
+                  csv_periods=["Q1-2026"])
+        assert refresh_plan.has_new_filings(repo, "DCBO") is True
+
+    def test_unextracted_filing_routes_to_tier_3(self, repo):
+        ticker_at(repo, "DCBO",
+                  filings=["DCBO_6K_Q1-2026.txt"],
+                  downloaded=["DCBO_6K_Q2-2026.htm"],
+                  csv_periods=["Q1-2026"], days_old=53)
+        assert refresh_plan.plan_tier(repo, "DCBO").tier == 3
+
+    def test_already_extracted_filing_is_not_double_counted(self, repo):
+        # The same period in both folders is not new -- the parser has run.
+        ticker_at(repo, "DCBO",
+                  filings=["DCBO_6K_Q2-2026.txt"],
+                  downloaded=["DCBO_6K_Q2-2026.htm"],
+                  csv_periods=["Q2-2026"], days_old=53)
+        assert refresh_plan.has_new_filings(repo, "DCBO") is False
+
+    def test_stale_download_older_than_csv_is_not_new(self, repo):
+        # A leftover old PDF must not re-trigger the parser forever.
+        ticker_at(repo, "DCBO",
+                  filings=["DCBO_6K_Q2-2026.txt"],
+                  downloaded=["DCBO_6K_Q1-2026.htm"],
+                  csv_periods=["Q2-2026"], days_old=53)
+        assert refresh_plan.has_new_filings(repo, "DCBO") is False
+
+    def test_reason_names_the_unextracted_filing(self, repo):
+        # The message must name the filing that actually triggered tier 3,
+        # not the older extracted one -- otherwise the operator is told to
+        # re-parse a period that is already in the CSV.
+        ticker_at(repo, "DCBO",
+                  filings=["DCBO_6K_Q1-2026.txt"],
+                  downloaded=["DCBO_6K_Q2-2026.htm"],
+                  csv_periods=["Q1-2026"], days_old=53)
+        got = refresh_plan.plan_tier(repo, "DCBO")
+        assert "Q2-2026" in got.reason
+        assert got.newest_filing == "Q2-2026"

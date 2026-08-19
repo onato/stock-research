@@ -57,6 +57,14 @@ _FILING_RE = re.compile(
     r"(?:_Part\d+|_d\d+)?\.txt$"
 )
 
+# Downloaded filings keep their source extension (.htm for EDGAR/iXBRL, .pdf
+# for IR-site reports) and are only renamed to .txt once extracted.
+_DOWNLOAD_RE = re.compile(
+    r"^(?P<ticker>.+?)_(?P<kind>[A-Za-z0-9]+)_(?P<period>.+?)"
+    r"(?:_Part\d+|_d\d+)?\.(?:htm|html|pdf)$",
+    re.IGNORECASE,
+)
+
 
 @dataclass(frozen=True, slots=True)
 class RefreshPlan:
@@ -112,6 +120,23 @@ def newest_extracted_period(repo: pathlib.Path,
     return _newest([m.group("period") for m in matches if m])
 
 
+def newest_downloaded_period(repo: pathlib.Path,
+                             ticker: str) -> periods.Period | None:
+    """The latest period among this ticker's downloaded (unextracted) filings.
+
+    A filing lands in PDFs/ before it is extracted to Extracted/*.txt. Scanning
+    only the latter made a downloaded-but-unextracted filing invisible to the
+    gate, so a ticker with genuinely new data was reported tier 2 and routed to
+    a narrative-only refresh that skips the parser by design.
+    """
+    folder = repo / "research" / ticker / "PDFs"
+    if not folder.is_dir():
+        return None
+    names = (p.name for p in folder.iterdir() if p.is_file())
+    matches = (_DOWNLOAD_RE.match(n) for n in names)
+    return _newest([m.group("period") for m in matches if m])
+
+
 def newest_csv_period(repo: pathlib.Path,
                       ticker: str) -> periods.Period | None:
     """The latest period present in this ticker's Metrics CSV."""
@@ -130,7 +155,13 @@ def has_new_filings(repo: pathlib.Path, ticker: str) -> bool:
     A missing CSV counts as new data: there is nothing to compare against, so
     the parser has demonstrably not run.
     """
-    filing = period_identity(newest_extracted_period(repo, ticker))
+    filing = max(
+        (ident for ident in (
+            period_identity(newest_extracted_period(repo, ticker)),
+            period_identity(newest_downloaded_period(repo, ticker)),
+        ) if ident is not None),
+        default=None,
+    )
     if filing is None:
         return False
     parsed = period_identity(newest_csv_period(repo, ticker))
@@ -179,7 +210,14 @@ def plan_tier(repo: pathlib.Path | str, ticker: str, *,
     repo = pathlib.Path(repo)
     dcf = repo / "research" / ticker / "Reports" / f"{ticker}_DCF.json"
 
-    filing = newest_extracted_period(repo, ticker)
+    # Report whichever filing is newest on disk -- extracted or merely
+    # downloaded -- so the reason names the period that triggered the tier.
+    filing = max(
+        (p for p in (newest_extracted_period(repo, ticker),
+                     newest_downloaded_period(repo, ticker)) if p is not None),
+        key=lambda p: period_identity(p) or (0, 0),
+        default=None,
+    )
     parsed = newest_csv_period(repo, ticker)
     labels = (filing.raw if filing else None, parsed.raw if parsed else None)
 
