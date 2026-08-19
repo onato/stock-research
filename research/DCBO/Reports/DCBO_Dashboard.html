@@ -229,6 +229,13 @@
             border-radius: 2px;
         }
         .chart-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .view-toggle {
+            padding: 3px 10px; border-radius: 12px; background: transparent;
+            border: 1px solid rgba(255,255,255,0.2); color: #888;
+            font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;
+        }
+        .view-toggle:hover { border-color: #0984e3; color: #0984e3; }
+        .view-toggle.active { background: rgba(9,132,227,0.2); border-color: #0984e3; color: #0984e3; }
         .log-toggle {
             padding: 3px 10px; border-radius: 12px; background: transparent;
             border: 1px solid rgba(255,255,255,0.2); color: #888;
@@ -507,8 +514,10 @@
 <div class="charts-container">
     <div class="chart-card">
         <div class="chart-header">
-            <h3>Annual Revenue &amp; Growth Rate</h3>
+            <h3>Revenue &amp; Growth Rate</h3>
                 <div class="chart-header-actions">
+                    <button class="view-toggle active" onclick="setPeriodView('revenueChart', 'annual', this)">FY</button>
+                    <button class="view-toggle" onclick="setPeriodView('revenueChart', 'quarterly', this)">Q</button>
                     <button class="log-toggle" onclick="toggleLogScale('revenueChart', this)" title="Toggle logarithmic y-axis">Log</button>
                     <button class="help-btn" onclick="openModal('revenue')">?</button>
                 </div>
@@ -519,6 +528,8 @@
         <div class="chart-header">
             <h3>Subscription vs Professional Services Revenue (Annual)</h3>
                 <div class="chart-header-actions">
+                    <button class="view-toggle active" onclick="setPeriodView('revMixChart', 'annual', this)">FY</button>
+                    <button class="view-toggle" onclick="setPeriodView('revMixChart', 'quarterly', this)">Q</button>
                     <button class="log-toggle" onclick="toggleLogScale('revMixChart', this)" title="Toggle logarithmic y-axis">Log</button>
                     <button class="help-btn" onclick="openModal('revMix')">?</button>
                 </div>
@@ -561,6 +572,8 @@
         <div class="chart-header">
             <h3>Adjusted EBITDA &amp; Margin (Annual)</h3>
                 <div class="chart-header-actions">
+                    <button class="view-toggle active" onclick="setPeriodView('ebitdaChart', 'annual', this)">FY</button>
+                    <button class="view-toggle" onclick="setPeriodView('ebitdaChart', 'quarterly', this)">Q</button>
                     <button class="log-toggle" onclick="toggleLogScale('ebitdaChart', this)" title="Toggle logarithmic y-axis">Log</button>
                     <button class="help-btn" onclick="openModal('ebitda')">?</button>
                 </div>
@@ -576,8 +589,12 @@
     </div>
     <div class="chart-card">
         <div class="chart-header">
-            <h3>Free Cash Flow &amp; Operating Cash Flow (Annual)</h3>
-            <button class="help-btn" onclick="openModal('fcf')">?</button>
+            <h3>Free Cash Flow &amp; Operating Cash Flow</h3>
+                <div class="chart-header-actions">
+                    <button class="view-toggle active" onclick="setPeriodView('fcfChart', 'annual', this)">FY</button>
+                    <button class="view-toggle" onclick="setPeriodView('fcfChart', 'quarterly', this)">Q</button>
+                    <button class="help-btn" onclick="openModal('fcf')">?</button>
+                </div>
         </div>
         <div class="chart-wrapper"><canvas id="fcfChart"></canvas></div>
     </div>
@@ -1151,15 +1168,41 @@ function toggleLogScale(canvasId, btn) {
     chart.update();
 }
 
+// ===================== PERIOD VIEW TOGGLE =====================
+// canvasId -> { annual: {labels, data[], scaleX}, quarterly: {...} }
+// Annual-only charts hide the current year: this dashboard is built after
+// Q2-2026, so an FY-only revenue chart shows nothing from 2026 at all.
+const chartSeries = {};
+function setPeriodView(canvasId, view, btn) {
+    const chart = chartRegistry[canvasId], s = chartSeries[canvasId];
+    if (!chart || !s || !s[view]) return;
+    chart.data.labels = s[view].labels;
+    s[view].data.forEach((d, i) => { if (chart.data.datasets[i]) chart.data.datasets[i].data = d; });
+    if (s[view].scaleX) chart.options.scales.x = s[view].scaleX;
+    btn.parentNode.querySelectorAll('.view-toggle').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    chart.update();
+}
+
 // ===================== CHARTS =====================
 function renderCharts() {
-    // 1. Annual Revenue + Growth Rate
+    // 1. Revenue + Growth Rate (annual / quarterly)
     const fyLabels = fyData.map(d => d.Period);
     const fyRev = fyData.map(d => n(d.Revenue));
     const fyRevGrowth = fyData.map((d,i) => {
         if(i===0) return null;
         return +((n(d.Revenue)-n(fyData[i-1].Revenue))/n(fyData[i-1].Revenue)*100).toFixed(1);
     });
+    const qRev = qData.map(d => n(d.Revenue));
+    // Quarterly growth is YoY (vs the same quarter last year), not QoQ --
+    // sequential growth in a seasonal business is not comparable to the
+    // annual series this toggle sits beside.
+    const qRevGrowth = qData.map((d,i) =>
+        i < 4 ? null : +((n(d.Revenue)-n(qData[i-4].Revenue))/n(qData[i-4].Revenue)*100).toFixed(1));
+    chartSeries['revenueChart'] = {
+        annual: { labels: fyLabels, data: [fyRev, fyRevGrowth], scaleX: chartDefaults.scales.x },
+        quarterly: { labels: qData.map(d => qLabel(d.Period)), data: [qRev, qRevGrowth], scaleX: qScale(qData) }
+    };
     chartRegistry['revenueChart'] = new Chart(document.getElementById('revenueChart'), {
         type: 'bar',
         data: {
@@ -1180,6 +1223,13 @@ function renderCharts() {
     // 2. Revenue Mix (Annual)
     const fySubRev = fyData.map(d => n(d.SubscriptionRevenue));
     const fyPSRev = fyData.map(d => n(d.ProfessionalServicesRevenue));
+    chartSeries['revMixChart'] = {
+        annual: { labels: fyLabels, data: [fySubRev, fyPSRev], scaleX: { ...chartDefaults.scales.x, stacked: true } },
+        quarterly: { labels: qData.map(d => qLabel(d.Period)),
+                     data: [qData.map(d => n(d.SubscriptionRevenue)),
+                            qData.map(d => d.ProfessionalServicesRevenue ? n(d.ProfessionalServicesRevenue) : null)],
+                     scaleX: { ...qScale(qData), stacked: true } }
+    };
     chartRegistry['revMixChart'] = new Chart(document.getElementById('revMixChart'), {
         type: 'bar',
         data: {
@@ -1255,6 +1305,16 @@ function renderCharts() {
     // 6. Adj EBITDA Annual
     const fyEBITDA = fyData.filter(d => d.AdjustedEBITDA && n(d.AdjustedEBITDA) !== 0);
     const fyEBITDAMargin = fyEBITDA.map(d => (n(d.AdjustedEBITDA)/n(d.Revenue)*100).toFixed(1));
+    const qEB = qData.filter(d => d.AdjustedEBITDA && n(d.AdjustedEBITDA) !== 0 && n(d.Revenue) > 0);
+    chartSeries['ebitdaChart'] = {
+        annual: { labels: fyEBITDA.map(d => d.Period),
+                  data: [fyEBITDA.map(d => n(d.AdjustedEBITDA)), fyEBITDAMargin],
+                  scaleX: chartDefaults.scales.x },
+        quarterly: { labels: qEB.map(d => qLabel(d.Period)),
+                     data: [qEB.map(d => n(d.AdjustedEBITDA)),
+                            qEB.map(d => +(n(d.AdjustedEBITDA)/n(d.Revenue)*100).toFixed(1))],
+                     scaleX: qScale(qEB) }
+    };
     chartRegistry['ebitdaChart'] = new Chart(document.getElementById('ebitdaChart'), {
         type: 'bar',
         data: {
@@ -1284,8 +1344,17 @@ function renderCharts() {
         options: chartDefaults
     });
 
-    // 8. FCF & Operating Cash Flow Annual
+    // 8. FCF & Operating Cash Flow (annual / quarterly)
     const fyFCF = fyData.filter(d => d.FreeCashFlow && n(d.FreeCashFlow) !== 0);
+    const qFCF = qData.filter(d => d.FreeCashFlow && n(d.FreeCashFlow) !== 0);
+    chartSeries['fcfChart'] = {
+        annual: { labels: fyFCF.map(d => d.Period),
+                  data: [fyFCF.map(d => n(d.FreeCashFlow)), fyFCF.map(d => n(d.OperatingCashFlow))],
+                  scaleX: chartDefaults.scales.x },
+        quarterly: { labels: qFCF.map(d => qLabel(d.Period)),
+                     data: [qFCF.map(d => n(d.FreeCashFlow)), qFCF.map(d => n(d.OperatingCashFlow))],
+                     scaleX: qScale(qFCF) }
+    };
     chartRegistry['fcfChart'] = new Chart(document.getElementById('fcfChart'), {
         type: 'bar',
         data: {

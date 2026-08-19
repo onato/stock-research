@@ -47,6 +47,37 @@ Based on your analysis, select 6-8 KPI cards and 8-12 charts that best tell the 
 </div>
 ```
 
+**Annual/Quarterly toggle**: Any chart whose metric is reported at both frequencies must carry a period switch in its header, defaulting to **Annual**. Annual-only charts hide the most recent quarters — a dashboard built after Q2 shows nothing from the current year, which is usually the part the reader cares about most. Use the `.view-toggle` CSS with a `chartSeries` registry mapping each canvas id to its two row sets:
+
+```html
+<div class="chart-header-actions">
+    <button class="view-toggle active" onclick="setPeriodView('revenueChart', 'annual', this)">FY</button>
+    <button class="view-toggle" onclick="setPeriodView('revenueChart', 'quarterly', this)">Q</button>
+    <button class="log-toggle" onclick="toggleLogScale('revenueChart', this)" title="Toggle logarithmic y-axis">Log</button>
+    <button class="help-btn" onclick="openModal('revenue')">?</button>
+</div>
+```
+
+```javascript
+// canvasId -> { annual: {labels, data[]}, quarterly: {labels, data[]} }
+const chartSeries = {};
+function setPeriodView(canvasId, view, btn) {
+    const chart = chartRegistry[canvasId], s = chartSeries[canvasId];
+    if (!chart || !s || !s[view]) return;
+    chart.data.labels = s[view].labels;
+    s[view].data.forEach((d, i) => { if (chart.data.datasets[i]) chart.data.datasets[i].data = d; });
+    // Year boundaries only mean something on a quarterly axis.
+    if (chart.options.scales.x) chart.options.scales.x = s[view].scaleX;
+    btn.parentNode.querySelectorAll('.view-toggle').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    chart.update();
+}
+```
+
+Skip the switch only where one frequency is genuinely unavailable (a balance-sheet item disclosed annually, an FY-only KPI) — say so in the chart's help modal rather than silently offering a dead button.
+
+**Quarterly axis conventions**: normalise labels to one short form (`Q1'24`) even when the CSV mixes `Q1 2024` and `Q1-2024` spellings, sort chronologically, and draw a brighter 2px grid line before each Q1 so a fiscal year reads as one group. Without that break the eye pairs the last quarter of one year with the first of the next. Never plot two series that were filtered independently against one shared label axis — derive both from the same row set and use `null` + `spanGaps: true` for genuinely missing points, so a gap reads as a gap rather than as zero.
+
 **Examples by business type** (use as guidance, not rules):
 
 - **Payments/Fintech**: Volume, take rate, active customers, transaction count, revenue per customer
@@ -507,6 +538,26 @@ body {
     align-items: center;
     gap: 8px;
     flex-shrink: 0;
+}
+.view-toggle {
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #888;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.view-toggle:hover {
+    border-color: #0984e3;
+    color: #0984e3;
+}
+.view-toggle.active {
+    background: rgba(9, 132, 227, 0.2);
+    border-color: #0984e3;
+    color: #0984e3;
 }
 .log-toggle {
     padding: 3px 10px;
@@ -1423,13 +1474,14 @@ function renderDCFInputs() {
     const shares = inputs.shares_outstanding;
     document.getElementById('sharesOut').textContent = shares >= 1000 ? (shares/1000).toFixed(2) + 'B' : shares.toFixed(1) + 'M';
 
-    // Dilution note: shares only grow by the SBC buybacks fail to absorb
+    // Dilution note: the count is flat when SBC is expensed (charging both would
+    // double-count). A positive rate means genuine non-SBC issuance.
     const dilEl = document.getElementById('dilutionNote');
     if (dilEl) {
         const g = inputs.annual_share_growth_pct;
         dilEl.textContent = (g > 0)
-            ? `+${g.toFixed(1)}%/yr from uncovered dilution`
-            : 'Flat — buybacks absorb SBC';
+            ? `+${g.toFixed(1)}%/yr from non-SBC issuance`
+            : 'Flat — SBC expensed in cash flows';
     }
 
     // Net debt (negative = net cash)
