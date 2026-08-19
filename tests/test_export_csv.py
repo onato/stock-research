@@ -63,6 +63,107 @@ def run_main(monkeypatch, *argv):
     return export_csv.main()
 
 
+class TestNonSchemaColumnsArePreserved:
+    """The CSV is the committed system of record; the DB is a gitignored,
+    rebuildable cache (CLAUDE.md). So a derived artifact must never subtract
+    from its source: columns the canonical schema has no opinion about are
+    carried through rather than dropped.
+
+    58 of 126 committed CSVs carry such columns. For UBER, XYZ and PYPL they
+    exist ONLY in the CSV -- XYZ's kpis table is empty outright -- and they
+    are the figures the dashboards are built around (GrossBookings, MAPCs,
+    Trips, SquareGPV, CashAppInflows, TPV, ActiveAccounts). Reading the kpis
+    table instead of the CSV would silently destroy exactly those.
+    """
+
+    def test_unknown_column_survives_the_export(self, make_ticker, monkeypatch):
+        d = make_ticker("SYN")
+        make_db(d.parent.parent, "SYN", ["FY2023", "FY2024"])
+        out = d / "Reports" / "SYN_Metrics.csv"
+        out.write_text("Period,Revenue,GrossBookings\n"
+                       "FY2023,100,31500\n"
+                       "FY2024,100,37600\n")
+
+        assert run_main(monkeypatch, "SYN") == 0
+        with open(out, newline="") as fh:
+            rows = list(csv.DictReader(fh))
+        assert [r["GrossBookings"] for r in rows] == ["31500", "37600"]
+
+    def test_carried_column_is_appended_after_the_schema_headers(
+            self, make_ticker, monkeypatch):
+        """Core columns keep their canonical order and spelling; carried
+        ones follow, so dashboards reading by header still work."""
+        d = make_ticker("SYN")
+        make_db(d.parent.parent, "SYN", ["FY2024"])
+        out = d / "Reports" / "SYN_Metrics.csv"
+        out.write_text("Period,Revenue,MAPCs\nFY2024,100,156\n")
+
+        assert run_main(monkeypatch, "SYN") == 0
+        with open(out, newline="") as fh:
+            header = next(csv.reader(fh))
+        assert header[:len(schema.CSV_HEADERS)] == schema.CSV_HEADERS
+        assert header[len(schema.CSV_HEADERS):] == ["MAPCs"]
+
+    def test_carried_values_follow_their_period_not_row_order(
+            self, make_ticker, monkeypatch):
+        """The export re-sorts oldest-first; a carried value must travel
+        with its own period, not stay at its old row index."""
+        d = make_ticker("SYN")
+        make_db(d.parent.parent, "SYN", ["FY2023", "FY2024"])
+        out = d / "Reports" / "SYN_Metrics.csv"
+        # deliberately newest-first on disk
+        out.write_text("Period,Revenue,Trips\nFY2024,100,twenty\n"
+                       "FY2023,100,ten\n")
+
+        assert run_main(monkeypatch, "SYN") == 0
+        with open(out, newline="") as fh:
+            rows = list(csv.DictReader(fh))
+        assert [(r["Period"], r["Trips"]) for r in rows] == [
+            ("FY2023", "ten"), ("FY2024", "twenty")]
+
+    def test_new_period_gets_a_blank_not_a_borrowed_value(
+            self, make_ticker, monkeypatch):
+        d = make_ticker("SYN")
+        make_db(d.parent.parent, "SYN", ["FY2023", "FY2024"])
+        out = d / "Reports" / "SYN_Metrics.csv"
+        out.write_text("Period,Revenue,Trips\nFY2023,100,ten\n")
+
+        assert run_main(monkeypatch, "SYN") == 0
+        with open(out, newline="") as fh:
+            rows = list(csv.DictReader(fh))
+        assert [(r["Period"], r["Trips"]) for r in rows] == [
+            ("FY2023", "ten"), ("FY2024", "")]
+
+    def test_carrying_does_not_excuse_an_unpopulated_core_column(
+            self, make_ticker, monkeypatch):
+        """CostOfRevenue IS in the schema, so an empty table column is still
+        real data loss and must still be refused -- carrying through is only
+        for columns the schema does not model."""
+        d = make_ticker("SYN")
+        make_db(d.parent.parent, "SYN", ["FY2023"])
+        out = d / "Reports" / "SYN_Metrics.csv"
+        out.write_text("Period,Revenue,CostOfRevenue,Trips\n"
+                       "FY2023,100,42,ten\n")
+
+        assert run_main(monkeypatch, "SYN") == 1
+        assert "42" in out.read_text()
+
+    def test_force_still_discards_carried_columns(self, make_ticker,
+                                                  monkeypatch):
+        """--force means "regenerate from the table alone"; it keeps its
+        documented meaning rather than quietly becoming a merge."""
+        d = make_ticker("SYN")
+        make_db(d.parent.parent, "SYN", ["FY2023"])
+        out = d / "Reports" / "SYN_Metrics.csv"
+        out.write_text("Period,Revenue,Trips\nFY2023,100,ten\n")
+
+        assert run_main(monkeypatch, "SYN", "--force") == 0
+        with open(out, newline="") as fh:
+            header = next(csv.reader(fh))
+        assert header == schema.CSV_HEADERS
+        assert "ten" not in out.read_text()
+
+
 class TestAntiShrinkGuard:
     def test_refuses_to_shrink_existing_csv(self, make_ticker, monkeypatch):
         # WISE.L regression: 18 CSV periods silently replaced by 5 annual

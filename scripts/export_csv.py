@@ -7,7 +7,13 @@ both spellings -- this applies the mapping so the agent does not have to
 hand-write 24 column aliases in a COPY statement (it got that wrong, which
 is what this script exists to prevent).
 
-Usage: export_csv.py TICKER
+The core columns are rebuilt from the table, but any column the schema does
+not model (a business KPI like GrossBookings or TPV) is carried through from
+the existing CSV. The CSV is the committed system of record and the DB a
+gitignored, rebuildable cache, so this export refines its source rather than
+replacing it. `--force` opts out and regenerates from the table alone.
+
+Usage: export_csv.py TICKER [--force]
 """
 
 import csv
@@ -67,12 +73,51 @@ def _would_lose(out: pathlib.Path,
                 continue
             col = header_to_col.get(header)
             if col is None:
-                # A column the canonical schema does not carry at all; the
-                # export drops it wholesale.
-                lost_cells.append((period, header))
-            elif target[schema.CORE_NAMES.index(col)] is None:
+                # A column the canonical schema does not model. It is no
+                # longer lost -- carry_columns() copies it through -- so it
+                # is not counted here. Only --force drops it, which is what
+                # --force means.
+                continue
+            if target[schema.CORE_NAMES.index(col)] is None:
                 lost_cells.append((period, header))
     return lost_periods, lost_cells
+
+
+def carry_columns(out: pathlib.Path, periods: list[str]
+                  ) -> tuple[list[str], dict[str, dict[str, str]]]:
+    """Non-schema columns from the existing CSV, keyed by period.
+
+    The CSV is the committed system of record and the DB a gitignored,
+    rebuildable cache (CLAUDE.md), so the derived artifact must not subtract
+    from its source. core_metrics has no column for a business KPI like
+    GrossBookings or TPV, and the kpis table is not a reliable substitute:
+    of the 58 committed CSVs carrying such columns, UBER and PYPL hold none
+    of them in kpis and XYZ's kpis table is empty, so reading from there
+    would destroy precisely the figures the dashboards plot.
+
+    Values travel with their period, because the export re-sorts rows
+    oldest-first. A period the old CSV did not have gets a blank rather
+    than a neighbour's value.
+    """
+    try:
+        with open(out, newline="", errors="replace") as fh:
+            existing = list(csv.DictReader(fh))
+    except OSError:
+        return [], {}
+    if not existing:
+        return [], {}
+
+    extra = [h for h in existing[0] if h and h not in schema.CSV_HEADERS]
+    if not extra:
+        return [], {}
+
+    wanted = set(periods)
+    by_period = {}
+    for row in existing:
+        period = str(row.get("Period") or "")
+        if period in wanted:
+            by_period[period] = {h: (row.get(h) or "") for h in extra}
+    return extra, by_period
 
 
 def main() -> int:
@@ -132,14 +177,24 @@ def main() -> int:
                   "to discard them.", file=sys.stderr)
             return 1
 
+    extra: list[str] = []
+    carried: dict[str, dict[str, str]] = {}
+    if out.exists() and not force:
+        extra, carried = carry_columns(out, [str(r[idx]) for r in rows])
+
     with open(out, "w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(schema.CSV_HEADERS)
+        w.writerow(schema.CSV_HEADERS + extra)
         for r in rows:
-            w.writerow(["" if v is None else v for v in r])
+            values = ["" if v is None else v for v in r]
+            if extra:
+                held = carried.get(str(r[idx]), {})
+                values += [held.get(h, "") for h in extra]
+            w.writerow(values)
 
+    note = f", {len(extra)} carried" if extra else ""
     print(f"{ticker}: {len(rows)} periods -> {out.name} "
-          f"({len(schema.CSV_HEADERS)} columns)")
+          f"({len(schema.CSV_HEADERS)} columns{note})")
     return 0
 
 
