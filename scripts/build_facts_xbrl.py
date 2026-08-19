@@ -217,6 +217,35 @@ def collect(facts: dict[str, Any],
             unit_seen or "USD")
 
 
+def derive(rec: dict[str, Any]) -> None:
+    """Fill the columns SEC never tags: FCF and the margins.
+
+    XBRL carries only what a filer marked up, and nobody marks up
+    "free cash flow" or "net margin" -- they are conventions, not line
+    items. The agent-adjudicated text path has always computed them, so
+    without this the two paths produce different schemas for the same
+    company: a ticker rebuilt from XBRL came back with free_cash_flow
+    5/109 against a CSV that had it everywhere, and export_csv.py
+    correctly refused to blank 488 populated cells.
+
+    Every input is already scaled to millions by the caller. A missing
+    input leaves the output NULL -- never a zero, which would read as a
+    real measurement of no cash flow.
+    """
+    ocf, capex = rec.get("operating_cash_flow"), rec.get("capex")
+    if rec.get("free_cash_flow") is None and ocf is not None and capex is not None:
+        # SEC tags PaymentsToAcquire... as a positive outflow.
+        rec["free_cash_flow"] = ocf - abs(capex)
+
+    revenue = rec.get("revenue")
+    if revenue:
+        for margin, part in (("gross_margin", "gross_profit"),
+                             ("operating_margin", "operating_income"),
+                             ("net_margin", "net_income")):
+            if rec.get(margin) is None and rec.get(part) is not None:
+                rec[margin] = rec[part] / revenue * 100
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("ticker")
@@ -295,6 +324,7 @@ def main() -> int:
             if k not in rec:
                 continue
             rec[k] = v / 1e6 if (k not in scale_free and v is not None) else v
+        derive(rec)
         payload.append([rec[c] for c in cols])
     if payload:
         con.executemany(

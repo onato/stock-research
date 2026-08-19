@@ -274,10 +274,63 @@ def db_row(repo, period):
         read_only=True)
     row = con.execute(
         "SELECT revenue, net_income, eps, dividend_per_share, total_assets,"
-        "       gross_profit, units, currency"
+        "       cost_of_revenue, units, currency"
         " FROM core_metrics WHERE period = ?", [period]).fetchone()
     con.close()
     return row
+
+
+class TestDerivedColumns:
+    """FCF and the margin columns are computed, never tagged.
+
+    The XBRL path only ever took directly-tagged concepts, so a rebuilt
+    ticker landed with free_cash_flow 5/109 while the CSV it replaced had
+    it everywhere -- export_csv.py then refused the export rather than
+    blank 488 populated cells. The agent-adjudicated path has always
+    derived these; XBRL has to as well or the two paths disagree.
+    """
+
+    def test_fcf_derived_from_ocf_minus_capex(self, xbrl_repo, monkeypatch):
+        assert run_main(monkeypatch, "TRIM") == 0
+        con = duckdb.connect(
+            str(xbrl_repo / "research" / "TRIM" / "Reports" / "TRIM.duckdb"),
+            read_only=True)
+        ocf, capex, fcf = con.execute(
+            "SELECT operating_cash_flow, capex, free_cash_flow"
+            " FROM core_metrics WHERE period = 'FY2024'").fetchone()
+        con.close()
+        assert (ocf, capex) == (9000.0, 2000.0)
+        assert fcf == 7000.0
+
+    def test_margins_derived_as_percentages(self, xbrl_repo, monkeypatch):
+        # Revenue 40bn, gross profit 24bn, net income 6bn.
+        assert run_main(monkeypatch, "TRIM") == 0
+        con = duckdb.connect(
+            str(xbrl_repo / "research" / "TRIM" / "Reports" / "TRIM.duckdb"),
+            read_only=True)
+        gm, nm = con.execute(
+            "SELECT gross_margin, net_margin"
+            " FROM core_metrics WHERE period = 'FY2024'").fetchone()
+        con.close()
+        assert gm == pytest.approx(60.0)
+        assert nm == pytest.approx(15.0)
+
+    def test_derived_columns_absent_when_inputs_missing(self, xbrl_repo,
+                                                       monkeypatch):
+        """FY2023 has revenue and net income but no OCF/capex/gross profit:
+        the margin it can compute is filled, the rest stay NULL rather than
+        becoming a guessed zero."""
+        assert run_main(monkeypatch, "TRIM") == 0
+        con = duckdb.connect(
+            str(xbrl_repo / "research" / "TRIM" / "Reports" / "TRIM.duckdb"),
+            read_only=True)
+        fcf, gm, nm = con.execute(
+            "SELECT free_cash_flow, gross_margin, net_margin"
+            " FROM core_metrics WHERE period = 'FY2023'").fetchone()
+        con.close()
+        assert fcf is None
+        assert gm is None
+        assert nm is not None
 
 
 class TestMainWritesDb:
@@ -311,7 +364,9 @@ class TestMainWritesDb:
 
     def test_untagged_concept_stays_null(self, xbrl_repo, monkeypatch):
         # Deliberately NO model fallback: absent from XBRL means genuinely
-        # untagged. Missing stays NULL.
+        # untagged. Missing stays NULL. (cost_of_revenue is the untagged
+        # example here -- gross_profit IS tagged in the fixture, because
+        # TestDerivedColumns needs it to compute a gross margin.)
         assert run_main(monkeypatch, "TRIM") == 0
         assert db_row(xbrl_repo, "FY2024")[5] is None
 
@@ -348,7 +403,7 @@ class TestMainWritesDb:
         assert not (xbrl_repo / "research" / "TRIM").exists()
         out = capsys.readouterr().out
         assert "Trimmed Example Co" in out
-        assert "gross_profit" in out  # missing concepts are reported
+        assert "cost_of_revenue" in out  # missing concepts are reported
 
     def test_show_reports_concept_provenance(self, xbrl_repo, monkeypatch,
                                              capsys):
