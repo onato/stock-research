@@ -283,6 +283,48 @@ class TestStaleRuns:
         assert run_status._fmt_secs(600) == "10m00"
 
 
+class TestActiveTickers:
+    """The machine-readable list watch_run.sh's pane reconciler polls.
+
+    A pane is only ever retargeted to satisfy a ticker on this list, so it
+    must be running-state-only (a result event means done), bounded to the
+    current run, and newest-first (watch_run truncates to MAX_PANES).
+    """
+
+    def test_running_tickers_are_active(self, tmp_path):
+        write_log(tmp_path, "CO2.NZ", tool("Bash"))
+        assert run_status.active_tickers(tmp_path) == ["CO2.NZ"]
+
+    def test_done_tickers_are_not_active(self, tmp_path):
+        write_log(tmp_path, "CO2.NZ", tool("Bash"), result(cost=1.0))
+        assert run_status.active_tickers(tmp_path) == []
+
+    def test_stale_transcripts_are_not_active(self, tmp_path):
+        # A running-shaped log from a previous batch (mtime beyond `since`)
+        # must not claim a pane in this run's viewer.
+        write_log(tmp_path, "OLD.NZ", tool("Bash"),
+                  mtime=time.time() - 7 * 3600)
+        assert run_status.active_tickers(tmp_path) == []
+        assert run_status.active_tickers(tmp_path, since=0) == ["OLD.NZ"]
+
+    def test_newest_activity_first(self, tmp_path):
+        # watch_run keeps only the first MAX_PANES, so the freshest ticker
+        # must sort ahead of one idling longer.
+        write_log(tmp_path, "SLOW.NZ", tool("Bash"),
+                  mtime=time.time() - 600)
+        write_log(tmp_path, "FRESH.NZ", tool("Bash"))
+        assert run_status.active_tickers(tmp_path) == ["FRESH.NZ", "SLOW.NZ"]
+
+    def test_a_rerun_ignores_the_stale_joblog(self, tmp_path):
+        # During a live batch state/joblog.tsv is the PREVIOUS run's record.
+        # A ticker being re-run (fresh log, no result event yet) must stay
+        # active even though the stale joblog says it finished -- otherwise
+        # the reconciler would evict a running ticker's pane.
+        write_log(tmp_path, "CO2.NZ", tool("Bash"))
+        write_joblog(tmp_path, (1, 2563, 0, "CO2.NZ"))
+        assert run_status.active_tickers(tmp_path) == ["CO2.NZ"]
+
+
 class TestRender:
     def test_the_table_has_a_row_per_ticker(self, tmp_path):
         write_log(tmp_path, "A.NZ", tool("Bash", description="one"))
@@ -357,3 +399,18 @@ class TestCli:
                   mtime=time.time() - 10 * 86400)
         assert "OLD.NZ" in self._run(monkeypatch, capsys, tmp_path,
                                      "--since", "0")
+
+    def test_active_prints_one_ticker_per_line(self, tmp_path, monkeypatch,
+                                               capsys):
+        write_log(tmp_path, "A.NZ", tool("Bash"), mtime=time.time() - 60)
+        write_log(tmp_path, "B.NZ", tool("Bash"))
+        write_log(tmp_path, "C.NZ", tool("Bash"), result(cost=1.0))
+        out = self._run(monkeypatch, capsys, tmp_path, "--active")
+        assert out == "B.NZ\nA.NZ\n"
+
+    def test_active_with_nothing_running_prints_nothing(self, tmp_path,
+                                                        monkeypatch, capsys):
+        # The reconciler splits this output on newlines; a "no run found"
+        # banner would become a phantom ticker.
+        write_log(tmp_path, "A.NZ", tool("Bash"), result(cost=1.0))
+        assert self._run(monkeypatch, capsys, tmp_path, "--active") == ""

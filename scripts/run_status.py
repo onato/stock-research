@@ -172,6 +172,34 @@ def ticker_row(root: pathlib.Path, ticker: str,
     return row
 
 
+def active_tickers(root: pathlib.Path, now: float | None = None,
+                   since: float = DEFAULT_SINCE) -> list[str]:
+    """Tickers running right now, freshest first.
+
+    This is what watch_run.sh's pane reconciler polls, so two properties are
+    load-bearing:
+
+    * The joblog is deliberately NOT consulted. During a live batch the
+      stable state/joblog.tsv is the *previous* run's record (each run writes
+      a timestamped joblog, copied over only when it ends), so a ticker being
+      re-run would read as "done" and get its pane evicted mid-flight. A log
+      with no result event is running; nothing else gets a say.
+    * Freshest first: watch_run.sh truncates to MAX_PANES, and the freshest
+      tickers are the ones worth a pane.
+
+    `since` fences off previous batches the same way render() does; 0 shows
+    everything.
+    """
+    root = pathlib.Path(root)
+    rows = [ticker_row(root, t, joblog=None, now=now)
+            for t in discover(root)]
+    running = [r for r in rows
+               if r["state"] == "running"
+               and (not since or r["idle"] <= since)]
+    running.sort(key=lambda r: (r["idle"], r["ticker"]))
+    return [r["ticker"] for r in running]
+
+
 def _fmt_secs(value: int | None) -> str:
     """m/s under an hour, h/m above it.
 
@@ -249,9 +277,18 @@ def main() -> int:
     p.add_argument("--since", type=float, default=DEFAULT_SINCE,
                    help="ignore transcripts idle longer than this many "
                         "seconds; 0 shows every run ever recorded")
+    p.add_argument("--active", action="store_true",
+                   help="print running tickers one per line, freshest "
+                        "first, and exit (for watch_run.sh's reconciler)")
     args = p.parse_args()
 
     root = pathlib.Path(args.root)
+    if args.active:
+        # Bare output only -- the consumer splits on newlines, so a "no run
+        # found" banner would read as a phantom ticker.
+        for t in active_tickers(root, since=args.since):
+            print(t)
+        return 0
     if not args.watch:
         print(render(root, args.joblog, since=args.since))
         return 0
