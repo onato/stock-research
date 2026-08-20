@@ -1,0 +1,1401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manuka Resources Ltd (MKR.NZ) Financial Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 20px;
+}
+.header { text-align: center; margin-bottom: 20px; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 15px; backdrop-filter: blur(10px); }
+.header h1 { font-size: 2.5rem; background: linear-gradient(90deg, #00d4aa, #00b894); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 10px; }
+.header p { color: #888; font-size: 1.1rem; }
+
+.going-concern-banner {
+    max-width: 1400px; margin: 0 auto 20px; background: rgba(255,107,107,0.12);
+    border: 1px solid rgba(255,107,107,0.45); border-radius: 12px; padding: 16px 22px;
+    display: flex; align-items: center; gap: 14px; color: #ffb3b3;
+}
+.going-concern-banner .icon { font-size: 1.6rem; flex-shrink: 0; }
+.going-concern-banner strong { color: #ff6b6b; }
+
+.model-approach-banner {
+    max-width: 1400px; margin: 0 auto 20px; background: rgba(253,203,110,0.12);
+    border: 1px solid rgba(253,203,110,0.4); border-radius: 12px; padding: 16px 22px;
+    color: #fdcb6e; line-height: 1.6; font-size: 0.92rem;
+}
+.model-approach-banner .title { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px; max-width: 1400px; margin-left: auto; margin-right: auto; }
+.kpi-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; text-align: center; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s ease, box-shadow 0.3s ease; }
+.kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0,212,170,0.2); }
+.kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+.kpi-card.warn .kpi-value { color: #ff6b6b; }
+.kpi-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.kpi-change { font-size: 0.9rem; margin-top: 5px; }
+.kpi-change.positive { color: #00d4aa; }
+.kpi-change.negative { color: #ff6b6b; }
+.kpi-change.neutral { color: #888; }
+
+.guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+.guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 8px; }
+.guidance-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.guidance-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px; }
+.guidance-meta { font-size: 0.85rem; color: #888; }
+.guidance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.guidance-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 18px; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s ease; }
+.guidance-card:hover { transform: translateY(-2px); }
+.guidance-metric { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.guidance-target { font-size: 1.3rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; }
+.guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
+.guidance-vs-prior { display: inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+.guidance-vs-prior.raised { background: rgba(0,212,170,0.15); color: #00d4aa; }
+.guidance-vs-prior.lowered { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+.guidance-vs-prior.maintained { background: rgba(255,255,255,0.1); color: #888; }
+.guidance-vs-prior.new, .guidance-vs-prior.maintained\/on, .guidance-vs-prior.raised\/on { background: rgba(99,102,241,0.15); color: #818cf8; }
+.guidance-notes { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
+.guidance-commentary { background: rgba(255,255,255,0.03); border-radius: 10px; padding: 16px 20px; border-left: 3px solid #00d4aa; font-style: italic; color: #b0b0b0; line-height: 1.6; }
+.guidance-commentary::before { content: '"'; font-size: 1.5rem; color: #00d4aa; margin-right: 4px; }
+
+.section-title { font-size: 1.5rem; color: #fff; margin: 40px auto 20px; padding-bottom: 10px; border-bottom: 2px solid rgba(0,212,170,0.3); max-width: 1400px; }
+.charts-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 25px; max-width: 1400px; margin: 0 auto; }
+.chart-card { background: rgba(255,255,255,0.05); border-radius: 15px; padding: 25px; border: 1px solid rgba(255,255,255,0.1); }
+.chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 8px; }
+.chart-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.chart-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px; }
+.help-btn { width: 24px; height: 24px; border-radius: 50%; background: rgba(0,212,170,0.2); border: 1px solid #00d4aa; color: #00d4aa; font-size: 14px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; }
+.help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.chart-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.view-toggle { padding: 3px 10px; border-radius: 12px; background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #888; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+.view-toggle:hover { border-color: #0984e3; color: #0984e3; }
+.view-toggle.active { background: rgba(9,132,227,0.2); border-color: #0984e3; color: #0984e3; }
+.log-toggle { padding: 3px 10px; border-radius: 12px; background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #888; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+.log-toggle:hover { border-color: #00d4aa; color: #00d4aa; }
+.log-toggle.active { background: rgba(0,212,170,0.2); border-color: #00d4aa; color: #00d4aa; }
+.chart-wrapper { position: relative; height: 300px; }
+.chart-note { font-size: 0.75rem; color: #666; margin-top: 10px; line-height: 1.4; }
+
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
+.modal-overlay.active { display: flex; }
+.modal { background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%); border-radius: 16px; max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto; border: 1px solid rgba(0,212,170,0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+.modal-header { padding: 20px 25px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
+.modal-header h3 { color: #00d4aa; font-size: 1.4rem; margin: 0; }
+.modal-close { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,107,107,0.2); border: 1px solid #ff6b6b; color: #ff6b6b; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.modal-close:hover { background: #ff6b6b; color: #fff; }
+.modal-body { padding: 25px; line-height: 1.7; }
+.modal-body p { margin-bottom: 15px; }
+.modal-body strong { color: #00d4aa; }
+.modal-body ul { margin: 15px 0; padding-left: 20px; }
+.modal-body li { margin-bottom: 8px; }
+.metric-highlight { background: rgba(0,212,170,0.1); border-left: 3px solid #00d4aa; padding: 12px 15px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+
+.overview-section { max-width: 1400px; margin: 0 auto 30px; }
+.overview-toggle { width: 100%; background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.3); border-radius: 12px; padding: 16px 24px; color: #00d4aa; font-size: 1.1rem; font-weight: 600; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease; }
+.overview-toggle:hover { background: rgba(0,212,170,0.2); }
+.overview-toggle .arrow { transition: transform 0.3s ease; }
+.overview-toggle.active .arrow { transform: rotate(180deg); }
+.overview-content { display: none; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-top: none; border-radius: 0 0 12px 12px; padding: 30px; margin-top: -12px; }
+.overview-content.active { display: block; }
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+.overview-card { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; border: 1px solid rgba(255,255,255,0.08); }
+.overview-card h3 { color: #00d4aa; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.overview-card p { margin-bottom: 12px; line-height: 1.6; }
+.overview-card ul { list-style: none; padding: 0; margin: 0; }
+.overview-card li { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); line-height: 1.5; }
+.overview-card li:last-child { border-bottom: none; }
+.overview-card.bull h3 { color: #00d4aa; }
+.overview-card.bear h3 { color: #ff6b6b; }
+.overview-card.risks h3 { color: #fdcb6e; }
+.risk-high { color: #ff6b6b; }
+.risk-moderate { color: #fdcb6e; }
+.risk-low { color: #00d4aa; }
+.revenue-stream { display: flex; justify-content: space-between; align-items: center; }
+.revenue-stream .percent { color: #00d4aa; font-weight: 600; }
+.trend-growing { color: #00d4aa; }
+.trend-stable { color: #888; }
+.trend-declining { color: #ff6b6b; }
+.trend-stalled { color: #ff6b6b; }
+
+/* DCF Valuation Section */
+.dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+.dcf-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+.dcf-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 24px; text-align: center; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s ease; }
+.dcf-card:hover { transform: translateY(-3px); }
+.dcf-card.highlight { background: rgba(0,212,170,0.1); border-color: rgba(0,212,170,0.3); }
+.dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.dcf-value { font-size: 2.2rem; font-weight: bold; color: #00d4aa; }
+.dcf-card:not(.highlight) .dcf-value { color: #fff; }
+.dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+.dcf-change.positive { color: #00d4aa; }
+.dcf-change.negative { color: #ff6b6b; }
+.dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
+.dcf-warning { background: rgba(253,203,110,0.15); border: 1px solid rgba(253,203,110,0.4); border-radius: 8px; padding: 12px 16px; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; color: #fdcb6e; }
+.warning-icon { font-size: 1.2rem; }
+.dcf-inputs { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.08); }
+.dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+.dcf-inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.dcf-input-card { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
+.dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #00d4aa; }
+.dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
+.fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
+.fcf-projection-table { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 12px; overflow-x: auto; }
+.fcf-projection-item { text-align: center; }
+.fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
+.fcf-projection-item .year { font-size: 0.75rem; color: #888; margin-bottom: 2px; }
+.fcf-projection-item .fcf-value { font-size: 1rem; color: #e0e0e0; font-weight: 500; }
+.fcf-projection-item .growth-rate { font-size: 0.75rem; color: #00d4aa; margin-top: 2px; }
+.dcf-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; margin-bottom: 30px; padding: 25px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
+.slider-group { display: flex; flex-direction: column; gap: 10px; }
+.slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+.slider-group label span { color: #00d4aa; font-weight: 600; }
+.slider-group input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); outline: none; }
+.slider-group input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #00d4aa; cursor: pointer; transition: transform 0.2s; }
+.slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.slider-hint { font-size: 0.8rem; color: #666; }
+.scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+.scenario-tab { padding: 10px 24px; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: #888; border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s; }
+.scenario-tab:hover { border-color: rgba(0,212,170,0.5); color: #e0e0e0; }
+.scenario-tab.active { background: rgba(0,212,170,0.15); border-color: #00d4aa; color: #00d4aa; }
+.scenario-details { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.08); }
+.scenario-details h4 { color: #00d4aa; margin-bottom: 15px; }
+.assumption-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+.assumption-item { text-align: center; }
+.assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+.assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
+.sensitivity-section { margin-bottom: 30px; }
+.sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; }
+.sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.03); border-radius: 8px; overflow: hidden; }
+.sensitivity-table th, .sensitivity-table td { padding: 12px 16px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+.sensitivity-table th { background: rgba(0,212,170,0.1); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td { color: #e0e0e0; }
+.sensitivity-table td.highlight { background: rgba(0,212,170,0.15); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td.below-current { color: #ff6b6b; }
+.sensitivity-table td.above-current { color: #00d4aa; }
+.historical-growth { margin-bottom: 30px; }
+.historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
+.growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
+.growth-item { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 15px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+.growth-item .metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
+.growth-item .rate { font-size: 1.2rem; font-weight: 600; }
+.growth-item .rate.positive { color: #00d4aa; }
+.growth-item .rate.negative { color: #ff6b6b; }
+.growth-item .rate.na { color: #666; }
+.growth-item.selected { border-color: #00d4aa; background: rgba(0,212,170,0.1); }
+.dcf-download { text-align: center; margin-top: 30px; }
+.download-btn { display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; background: rgba(0,212,170,0.15); border: 1px solid #00d4aa; border-radius: 8px; color: #00d4aa; text-decoration: none; font-weight: 600; transition: all 0.2s; }
+.download-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.download-icon { font-size: 1.2rem; }
+
+@media (max-width: 768px) {
+    .charts-container { grid-template-columns: 1fr; }
+    .overview-grid { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.8rem; }
+    .fcf-projection-table { grid-template-columns: repeat(3, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Manuka Resources Ltd (MKR.NZ)</h1>
+    <p>ASX/NZX Precious Metals Restart &mdash; Mt Boppy Gold &amp; Wonawinta Silver, Cobar Basin NSW | FY ends 30 June | Reports in AUD, quoted in NZD</p>
+</div>
+
+<div class="going-concern-banner">
+    <span class="icon">&#9888;&#65039;</span>
+    <div><strong>Going-Concern Material Uncertainty:</strong> H1FY2026 interim financial statements (31 Dec 2025) disclose a A$12.9m half-year loss, A$7.7m operating cash outflow and A$21.7m net current liabilities, and state these factors "indicate a material uncertainty which may cast significant doubt as to whether the Group will continue as a going concern." Revenue was zero in both FY2025 and H1FY2026 (care &amp; maintenance); first gold revenue is targeted mid-July 2026.</div>
+</div>
+
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid">
+            <div class="overview-card">
+                <h3>Company Overview</h3>
+                <p>${analysis.overview}</p>
+            </div>
+            <div class="overview-card">
+                <h3>Business Model</h3>
+                <p>${analysis.business_model.summary}</p>
+                <ul id="revenueStreamsList"></ul>
+            </div>
+            <div class="overview-card">
+                <h3>Competitive Position</h3>
+                <p><strong>Competitors:</strong> <span id="competitorsList"></span></p>
+                <p><strong>Market Position:</strong> ${analysis.competitive_position.market_position}</p>
+                <p><strong>Moat Factors:</strong></p>
+                <ul id="moatList"></ul>
+            </div>
+            <div class="overview-card">
+                <h3>Growth Drivers</h3>
+                <ul id="growthDriversList"></ul>
+            </div>
+            <div class="overview-card risks">
+                <h3>Key Risks</h3>
+                <ul id="risksList"></ul>
+            </div>
+            <div class="overview-card bull">
+                <h3>Bull Case</h3>
+                <ul id="bullCaseList"></ul>
+            </div>
+            <div class="overview-card bear">
+                <h3>Bear Case</h3>
+                <ul id="bearCaseList"></ul>
+            </div>
+            <div class="overview-card">
+                <h3>Recent Developments</h3>
+                <ul id="recentDevList"></ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf">-</span> | <span id="guidanceFY">-</span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<h2 class="section-title">Financial Performance</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Revenue</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('revenueChart','annual',this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('revenueChart','half',this)">H1/FY</button>
+                <button class="help-btn" onclick="openModal('revenue')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="revenueChart"></canvas></div>
+        <div class="chart-note">Log scale omitted &mdash; FY2025 and H1-2026 revenue is zero (care &amp; maintenance) and Chart.js cannot plot zero on a log axis.</div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Income (Loss)</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('netIncomeChart','annual',this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('netIncomeChart','half',this)">H1/FY</button>
+                <button class="help-btn" onclick="openModal('netIncome')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="netIncomeChart"></canvas></div>
+        <div class="chart-note">Log scale omitted &mdash; every period is a net loss (negative values).</div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Operating Cash Flow vs Capital Expenditure</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('ocfCapexChart','annual',this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('ocfCapexChart','half',this)">H1/FY</button>
+                <button class="help-btn" onclick="openModal('ocfCapex')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="ocfCapexChart"></canvas></div>
+        <div class="chart-note">Log scale omitted &mdash; both series cross zero.</div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Free Cash Flow</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('fcfChart','annual',this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('fcfChart','half',this)">H1/FY</button>
+                <button class="help-btn" onclick="openModal('fcf')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="fcfChart"></canvas></div>
+        <div class="chart-note">Log scale omitted &mdash; FCF is negative in every reported period.</div>
+    </div>
+</div>
+
+<h2 class="section-title">Balance Sheet &amp; Solvency</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Cash Balance</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('cashChart','annual',this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('cashChart','half',this)">H1/FY</button>
+                <button class="log-toggle" onclick="toggleLogScale('cashChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('cash')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="cashChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Total Debt vs Shareholders' Equity</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('debtEquityChart','annual',this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('debtEquityChart','half',this)">H1/FY</button>
+                <button class="help-btn" onclick="openModal('debtEquity')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="debtEquityChart"></canvas></div>
+        <div class="chart-note">Log scale omitted &mdash; equity approached near-zero in FY2025.</div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Total Assets vs Total Liabilities</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('assetsLiabChart','annual',this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('assetsLiabChart','half',this)">H1/FY</button>
+                <button class="log-toggle" onclick="toggleLogScale('assetsLiabChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('assetsLiab')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="assetsLiabChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shares Outstanding (Dilution)</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('sharesChart','annual',this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('sharesChart','half',this)">H1/FY</button>
+                <button class="log-toggle" onclick="toggleLogScale('sharesChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('shares')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="sharesChart"></canvas></div>
+        <div class="chart-note">CSV SharesOutstanding is a period-end snapshot and is stale relative to the DCF's reconciled 1,477.96m count (see DCF section) &mdash; it predates the Aug-Dec 2025 raises and subsequent option exercises.</div>
+    </div>
+</div>
+
+<h2 class="section-title">DCF Valuation</h2>
+
+<div class="model-approach-banner">
+    <div class="title">&#9888;&#65039; Model Approach: Physical Production Ramp, Not Historical Extrapolation</div>
+    <div id="modelApproachText"></div>
+</div>
+
+<div class="dcf-section">
+  <div class="dcf-summary">
+    <div class="dcf-card highlight">
+      <div class="dcf-label">Intrinsic Value (Base)</div>
+      <div class="dcf-value" id="dcfIV">$0.05</div>
+      <div class="dcf-change negative" id="dcfUpside">-48% downside</div>
+      <div class="dcf-sublabel">Owner FCF &mdash; physical production ramp, NZD/share</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Entry Price (15% CAGR)</div>
+      <div class="dcf-value" id="dcfEntry">$0.07</div>
+      <div class="dcf-sublabel">WACC (19%) &gt; 15% hurdle &rarr; entry price sits ABOVE base IV (see note below)</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Current Price (NZD)</div>
+      <div class="dcf-value" id="dcfCurrent">$0.095</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Prob-Weighted IV</div>
+      <div class="dcf-value" id="dcfWeighted">$0.05</div>
+      <div class="dcf-change" id="dcfWeightedUpside"></div>
+      <div class="dcf-sublabel">35% Bear / 45% Base / 20% Bull &mdash; bear up-weighted for going-concern risk</div>
+    </div>
+  </div>
+
+  <div class="dcf-warning" id="growthWarning" style="display:flex;">
+    <span class="warning-icon">&#9888;</span>
+    <span id="warningText"></span>
+  </div>
+
+  <div class="dcf-warning" id="entryPriceNote" style="display:flex; background: rgba(9,132,227,0.12); border-color: rgba(9,132,227,0.4); color:#74b9ff;">
+    <span class="warning-icon">&#8505;&#65039;</span>
+    <span>WACC (19%) exceeds the 15% hurdle rate used for entry-price. That makes the model's own risk-adjusted fair value HARSHER than what a 15%-hurdle investor requires, so the entry price (discounted at 15%) comes out ABOVE intrinsic value here &mdash; the reverse of the usual relationship. This is mechanically correct, not an error.</span>
+  </div>
+
+  <div class="dcf-inputs">
+    <h4>DCF Model Inputs</h4>
+    <div class="dcf-inputs-grid">
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Base FCF (Year 1, restart capex)</div>
+        <div class="dcf-input-value" id="baseFCF">-$9M</div>
+        <div class="dcf-input-note" id="sbcBreakdown">Owner FCF before ramp begins (FY2027)</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Shares Outstanding</div>
+        <div class="dcf-input-value" id="sharesOut">1.48B</div>
+        <div class="dcf-input-note" id="dilutionNote">Reconciled H1-2026 + subsequent option exercises; held flat (SBC nil)</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Net Debt</div>
+        <div class="dcf-input-value" id="netDebt">$31M</div>
+        <div class="dcf-input-note">Fully-drawn US$30m Nebari facility less latest disclosed cash</div>
+      </div>
+    </div>
+    <div class="fcf-projections">
+      <h5>Projected Owner FCF (Base Case, 5-Year)</h5>
+      <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+    </div>
+  </div>
+
+  <div class="dcf-controls">
+    <div class="slider-group">
+      <label>Mature EBITDA (% of mgmt 10yr avg): <span id="growthValue">40%</span></label>
+      <input type="range" id="growthSlider" min="10" max="70" value="40" step="1" oninput="updateDCFDisplay()">
+      <div class="slider-hint" id="growthHint">Management's 10-year mine plan averages A$127m p.a. EBITDA; this model haircuts it heavily for execution/going-concern risk</div>
+    </div>
+    <div class="slider-group">
+      <label>WACC: <span id="waccValue">19%</span></label>
+      <input type="range" id="waccSlider" min="9" max="25" value="19" step="0.5" oninput="updateDCFDisplay()">
+    </div>
+    <div class="slider-group">
+      <label>Terminal Growth: <span id="terminalValue">1.5%</span></label>
+      <input type="range" id="terminalSlider" min="0" max="3" value="1.5" step="0.5" oninput="updateDCFDisplay()">
+    </div>
+  </div>
+
+  <div class="scenario-tabs">
+    <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+    <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+    <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case (Going-Concern Failure)</button>
+  </div>
+
+  <div class="scenario-details" id="scenarioDetails">
+    <h4>Assumptions</h4>
+    <div class="assumption-grid" id="assumptionGrid"></div>
+  </div>
+
+  <div class="sensitivity-section">
+    <h4>Sensitivity Analysis: Intrinsic Value (NZD) by WACC &amp; Terminal Growth &mdash; Base Case</h4>
+    <table class="sensitivity-table" id="sensitivityMatrix"></table>
+    <div class="chart-note" style="margin-top:10px;">At WACC 15-17% the terminal-growth columns are flat because a conservative 6x terminal-FCF cap (appropriate for a reserve-depleting single-asset miner), not the Gordon growth formula, binds at those lower discount rates.</div>
+  </div>
+
+  <div class="historical-growth">
+    <h4>Historical Growth Rates (CAGR)</h4>
+    <div class="growth-grid" id="growthGrid"></div>
+    <div class="chart-note" style="margin-top:10px;">Revenue and FCF CAGRs are undefined (N/A) because FY2025/H1-2026 revenue was zero. Equity CAGR is shown for reference only and is NOT used as a valuation driver &mdash; it describes a balance sheet collapsing toward the FY2025 low, before the Aug-Dec 2025 capital raises. This DCF instead builds forward FCF as a haircut physical production ramp off management's mine plan.</div>
+  </div>
+
+  <div class="dcf-download">
+    <a href="MKR.NZ_DCF_Model.xlsx" class="download-btn" download>
+      <span class="download-icon">&#8681;</span> Download Excel Model
+    </a>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ============ EMBEDDED DATA ============
+const csvData = `Period,Revenue,CostOfRevenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,EBITDA,NetIncome,NetMargin,EPS,OperatingCashFlow,CapEx,FreeCashFlow,ShareholdersEquity,TotalAssets,TotalLiabilities,TotalDebt,CashAndEquivalents,SharesOutstanding,StockBasedComp,DividendPerShare,EBITDABeforeSignificant,RevenueContinuing,EBITDAContinuingBeforeSignificant,EBITContinuingBeforeSignificant,Units,Currency
+FY2020,9.261798,7.264503,1.997295,21.6,1.997295,21.6,,-4.552843,-49.2,-0.032799999999999996,1.768268,-14.743737,-12.975469,-2.446727,36.427215,38.873942,25.704579,1.50904,249.353712,-0.435611,,,,,,millions,AUD
+FY2021,43.752567,43.312892,0.439675,1.0,0.439675,1.0,,-2.895244,-6.6,-0.011200000000000002,0.207793,-7.8703,-7.662507,2.184639,35.245377,33.060738,16.621347,1.018035,269.353712,0.0,,,,,,millions,AUD
+FY2022,53.271499,41.244405,12.027094,22.6,12.027094,22.6,,5.28142,9.9,0.0192,8.351246,-8.878674,-0.527428,13.573765,41.596517,28.022752,13.111178,1.160615,286.020381,-0.069718,,,,,,millions,AUD
+H1-2023,8.926069,16.456776,-7.530707,-84.4,-7.530707,-84.4,,-13.246268,-148.4,-0.0461,-5.525152,-0.97468,-6.499832,30.276476,63.82147,33.544994,16.397602,0.952538,287.601208,0.0,,,,,,millions,AUD
+FY2023,9.899903,24.324548,-14.424645,-145.7,-14.424645,-145.7,,-26.342019,-266.1,-0.061500000000000006,-14.5199,-1.265731,-15.785631,19.941974,61.505655,41.563681,24.779748,0.265833,562.520062,-0.021584,,,,,,millions,AUD
+H1-2024,14.458032,17.992997,-3.534965,-24.4,-3.534965,-24.4,,-8.565882,-59.2,-0.0154,-0.82897,-0.564595,-1.393565,13.361817,60.336464,46.974647,27.728258,0.551195,556.606947,0.0,,,,,,millions,AUD
+FY2024,15.195323,21.938371,-6.743048,-44.4,-6.743048,-44.4,,-18.234635,-120.0,-0.0269,-7.229481,-1.422717,-8.652198,17.010151,61.137606,44.127455,28.389352,2.12535,779.767669,-0.39921,,,,,,millions,AUD
+H1-2025,0.0,0.0,0.0,,0.0,,,-8.369652,,-0.010700000000000001,-3.271736,-0.204743,-3.476479,8.635068,61.238423,52.603355,36.839428,2.038521,784.450423,0.0,,,,,,millions,AUD
+FY2025,0.0,0.0,0.0,,0.0,,,-16.876465,,-0.021099999999999997,-5.203385,-0.259672,-5.463057,2.295736,59.39783,57.102094,40.376654,0.968645,1065.384851,0.0,,,,,,millions,AUD
+H1-2026,0.0,0.0,0.0,,0.0,,,-12.875283,,-0.012,-7.712918,-0.820186,-8.533104,22.990165,61.049705,38.05954,23.933377,2.439885,1075.991298,0.0,,,,,,millions,AUD
+`;
+
+const analysis = {
+  "ticker": "MKR.NZ",
+  "company_name": "Manuka Resources Ltd",
+  "analysis_date": "2026-08-20",
+  "overview": "Manuka Resources is an Australian precious-metals junior developing two 100%-owned, fully permitted mine assets in the Cobar Basin, NSW - the Mt Boppy gold mine and the Wonawinta silver project - which it is restarting in 2026 after a period on care and maintenance. It also owns Trans-Tasman Resources (TTR), whose Taranaki VTM project is a large-scale offshore vanadium-titanium-magnetite iron sands resource in New Zealand's South Taranaki Bight that requires marine consents it does not currently have. Manuka is dual-listed - primary on the ASX (MKR) and a foreign-exempt secondary listing on the NZX (MKR.NZ, quoted in NZD) since 29 September 2025 - and reports in AUD with a 30 June fiscal year end.",
+  "business_model": {
+    "summary": "Pre-revenue restart-stage miner: FY2025 and H1FY2026 both recorded zero sales revenue as Mt Boppy and Wonawinta were on care and maintenance. The company is recommissioning the Wonawinta CIL processing plant to generate cash flow from gold ore (from mid-2026) and then silver ore (targeted September 2026 quarter) sold to a single off-taker. The Taranaki VTM project is a separate, much larger, longer-dated optionality asset with no revenue until final consents, financing and construction are achieved - a multi-year process even in the best case.",
+    "revenue_streams": [
+      {"name": "Mt Boppy gold ore/dump/tailings retreatment (restarting)", "percent": 0, "trend": "growing"},
+      {"name": "Wonawinta silver ore (restarting)", "percent": 0, "trend": "growing"},
+      {"name": "Taranaki VTM iron/vanadium concentrate (pre-development, no consent)", "percent": 0, "trend": "stalled"}
+    ],
+    "customer_type": "B2B - single off-taker for gold/silver concentrate/doré; no customers yet for Taranaki VTM",
+    "geographic_mix": "Operations 100% in NSW, Australia (Mt Boppy, Wonawinta); Taranaki VTM project 100% in New Zealand's Exclusive Economic Zone; dual ASX/NZX listing"
+  },
+  "competitive_position": {
+    "main_competitors": ["Cobar Basin peers (Peel Mining, Aurelia Metals, Metals Acquisition/CSA)", "Silver restart/junior producers (Investigator Resources, Adriatic Metals)", "Global VTM/iron-sands and vanadium developers (Trimetals/QMines analogues, South African/Chinese vanadium producers)", "Junior gold restart operators in NSW (Alkane Resources, Aurelia Metals)"],
+    "market_position": "Micro-cap (~A$120m market cap) restart-stage precious metals producer with no current market share; Taranaki VTM would be a globally significant vanadium/iron-sands resource (one of the largest drilled vanadium deposits worldwide) if ever permitted and built, but has zero regulatory approval to operate",
+    "moat_factors": [
+      {"factor": "Existing permitted infrastructure", "strength": "moderate", "description": "Wonawinta already has a granted mining lease, an existing ~1Mtpa CIL plant, approved tailings dams and accommodation - materially lower capex/time to restart (~A$26.6m) than a greenfield project"},
+      {"factor": "100% ownership of all three assets", "strength": "moderate", "description": "No JV partners or royalty overhangs diluting economics, full optionality retained"},
+      {"factor": "Resource scale at Taranaki VTM", "strength": "moderate", "description": "3.2Bt VTM resource containing 1.6Mt V2O5, ranked among the largest drilled vanadium projects globally, with a granted mining permit - but this scale advantage is neutralized by lack of environmental consent"},
+      {"factor": "Critical minerals policy alignment", "strength": "weak", "description": "Vanadium/titanium are on NZ's Critical Minerals List and Fast-track Approvals Act Schedule 2, giving government-level support, though this has not translated into consent approval"}
+    ],
+    "weaknesses": [
+      "No revenue for over two years (FY2025 was the first year in 5 with zero gold or silver output)",
+      "Single off-taker concentration for concentrate/doré sales",
+      "Taranaki VTM consent was DECLINED in draft form by the Fast-track expert panel (4 Feb 2026) and the application was withdrawn (19 Feb 2026) rather than face a final refusal - the seabed mining path is now materially uncertain with no clear alternative approval route",
+      "History of heavy shareholder dilution and debt-for-equity/warrant issuance to fund operations",
+      "Small, thinly analyst-covered micro-cap with limited institutional following"
+    ]
+  },
+  "growth_drivers": [
+    "Restart of Wonawinta silver and Mt Boppy gold production in 2026, monetizing existing infrastructure at near-record precious metals prices (silver up ~160% and gold up ~65% in CY2025, with further gains into 2026)",
+    "10-year Cobar Basin mine plan (Jan 2026 update) targeting average EBITDA of ~A$127m p.a. at C1 cost of ~A$34.4/oz silver, NPV8 of ~A$805m and IRR of ~1,092% at then-prevailing metal price assumptions",
+    "Mt Boppy Open Pit gold cutback and Pipeline Ridge exploration target providing high-grade incremental ounces and multi-year mine life extension",
+    "Full drawdown of the US$30m Nebari Natural Resources Credit Fund facility plus recent equity raises intended to fully fund the restart through to first silver production",
+    "Unhedged exposure to spot gold and silver prices, both near multi-decade highs, providing operating leverage if the restart executes on time and on budget",
+    "Long-dated optionality in the Taranaki VTM project (post-tax NPV10 of US$1.26bn, IRR 39%, average annual EBITDA of US$312m per the PFS) if a viable consenting pathway is eventually found, though this is not embedded in near-term value"
+  ],
+  "risks": {
+    "business": [
+      {"risk": "Single-asset/single-region execution risk", "severity": "high", "description": "Nearly all near-term value depends on successfully recommissioning one processing plant (Wonawinta) and restarting two mines that have been on care and maintenance for 2+ years; plant modifications (desliming circuit) are unproven at full scale"},
+      {"risk": "Customer concentration", "severity": "moderate", "description": "Company currently delivers all product to a single off-taker"},
+      {"risk": "Small, unproven reserve base with high Inferred content", "severity": "moderate", "description": "The 10.9Mt Cobar mine plan is underpinned by only 6.9Mt of Reserves and comprises 39% Inferred Resources, with no certainty conversion will occur at forecast grade/tonnage"}
+    ],
+    "financial": [
+      {"risk": "Going-concern material uncertainty", "severity": "high", "description": "H1FY2026 interim financial statements (31 Dec 2025) explicitly disclose a loss of A$12.9m, operating cash outflow of A$7.7m and net current liabilities of A$21.7m, and state these factors 'indicate a material uncertainty which may cast significant doubt as to whether the Group will continue as a going concern'"},
+      {"risk": "High leverage and refinancing risk", "severity": "high", "description": "New US$30m senior secured Nebari facility (drawn in tranches through June 2026) replaced prior TransAsia debt; substantial finance costs (A$5.5m in H1FY2026 alone, including share-based payments to lenders) and warrants issued to the lender (36.4m warrants at A$0.2004, expiring 2030) add dilution and cash cost"},
+      {"risk": "Continued shareholder dilution", "severity": "high", "description": "Share capital roughly tripled from A$72.9m to A$105.4m between June and December 2025 via equity raises; ~1.6bn shares now on issue; options/warrants exercises (e.g., 73.4m shares from option exercise post period-end) add further dilution"},
+      {"risk": "FX exposure", "severity": "moderate", "description": "AUD reporting entity with USD-denominated Nebari facility and NZD-denominated NZX listing/TTR project exposes the company to AUD/USD and AUD/NZD movements"}
+    ],
+    "regulatory": [
+      {"risk": "Taranaki VTM consenting failure", "severity": "high", "description": "The Fast-track expert panel's draft decision (4 Feb 2026) proposed declining the marine and discharge consents on environmental/cultural grounds (risk to Māui dolphin, kororā/little penguin, fairy prion, and unproven economic benefit case), and TTR withdrew its application (19 Feb 2026) rather than pursue a likely final refusal. This is the second failed attempt at NZ marine consent for this project (following a 2021 Supreme Court-driven refusal under the EEZ Act), and no clear alternative approval pathway currently exists"},
+      {"risk": "NSW mining/environmental compliance", "severity": "moderate", "description": "Ongoing rehabilitation, tailings and environmental bond obligations at Mt Boppy/Wonawinta"}
+    ],
+    "macro": [
+      {"risk": "Commodity price reversal", "severity": "high", "description": "Restart economics are highly sensitive to gold/silver prices, which are near record/multi-decade highs; a material pullback would compress the projected EBITDA/IRR materially given the newly built cost base"},
+      {"risk": "Interest rate / credit market sensitivity", "severity": "moderate", "description": "Reliance on a specialist resource-credit lender (Nebari) at a relatively high effective cost reflects the company's risk profile and limits refinancing optionality"}
+    ]
+  },
+  "macro_factors": {
+    "industry_outlook": "Gold and silver prices have both risen sharply through CY2025-26 (silver +~160% in CY2025, gold +~65%, with further gains into 2026) on safe-haven demand, central bank buying and industrial/AI-related silver demand, providing a strong tailwind for restart economics of small-cap precious metals producers. Vanadium/titanium demand is supported by steel alloy and grid-scale battery storage growth, and NZ policy (Critical Minerals List, Fast-track Act, Minerals Strategy 2040) explicitly targets doubling mineral export earnings by 2035 - but seabed/offshore mining faces acute environmental and Māori/iwi cultural opposition in New Zealand.",
+    "cyclicality": "High - a junior mining restart story fully exposed to commodity price cycles, with fixed near-term production costs against a variable revenue base once operating",
+    "interest_rate_sensitivity": "Moderate-high indirectly via the cost and availability of specialist project debt (Nebari facility) and via gold/silver's inverse relationship to real interest rates",
+    "key_input_costs": ["Diesel/energy for mining and processing", "Reagents (cyanide, flotation chemicals) for CIL/flotation processing", "Labour (regional NSW hiring for restart)", "Debt servicing costs on the Nebari facility"]
+  },
+  "recent_developments": [
+    {"date": "2025-09", "event": "Completed refinance of prior senior secured debt facility (TransAsia); two-tranche capital raising completed with second tranche subject to AGM shareholder approval (granted late Nov 2025)"},
+    {"date": "2025-09-26", "event": "Commenced trading on the NZX (foreign-exempt secondary listing, code MKR.NZ, quoted in NZD) and released the 10-year Cobar Basin production plan for Wonawinta silver and Mt Boppy gold"},
+    {"date": "2025-12-01 / 2026-03-02", "event": "Executed and then finalized definitive documentation for a US$30 million senior secured term facility with Nebari Natural Resources Credit Fund II; Tranche 1 (US$26m) drawn 27 Feb 2026, Tranche 2 completed 26 June 2026, fully funding the restart"},
+    {"date": "2026-01-30", "event": "Released updated 10-year Mine Plan for Wonawinta/Mt Boppy: 10.9Mt production target, average EBITDA ~A$127m p.a. at C1 cost A$34.4/oz silver, NPV8 A$805m, IRR ~1,092%; capex to restart plant raised to A$26.6m (including A$11.4m desliming circuit)"},
+    {"date": "2026-02-04", "event": "Fast-track expert panel issued a draft decision proposing to DECLINE marine and discharge consents for the Taranaki VTM Project, citing unproven environmental mitigation (risk to Māui dolphin, kororā, fairy prion) and an unconvincing economic benefits case"},
+    {"date": "2026-02-19", "event": "TTR withdrew its Fast-track application for Taranaki VTM rather than face a near-certain final refusal; company now reviewing options to progress environmental approvals via an alternative pathway"},
+    {"date": "2026-03-09", "event": "Announced the end of the Care and Maintenance program - officially transitioning to operational mode ahead of restart"},
+    {"date": "2026-03-16", "event": "H1FY2026 interim results released: A$12.9m half-year loss, A$21.7m net current liabilities, and explicit going-concern material uncertainty disclosure by directors and auditor"},
+    {"date": "2026-07", "event": "First gold processing revenue targeted mid-July 2026 from Wonawinta/Mt Boppy stockpiles; silver production targeted for the September 2026 quarter"}
+  ],
+  "guidance": {
+    "as_of": "H1FY2026 interim report (16 March 2026) and 30 January 2026 Mine Plan release",
+    "fiscal_year": "FY2026",
+    "items": [
+      {"metric": "First gold production/revenue", "target": "Mid-July 2026", "period": "Q4 FY2026 / Q1 FY2027 (calendar)", "vs_prior": "maintained/on track", "notes": "From Wonawinta and Mt Boppy stockpile processing"},
+      {"metric": "First silver production", "target": "September 2026 quarter", "period": "Q1 FY2027 (calendar Q3 2026)", "vs_prior": "maintained", "notes": "Wonawinta open pit mining scheduled to commence Q3 CY2026 per the 30 Jan 2026 mine plan"},
+      {"metric": "Restart capital expenditure", "target": "A$26.6 million", "period": "FY2026", "vs_prior": "raised", "notes": "Up from the earlier A$18.9m estimate cited in the FY2025 annual report; includes A$11.4m for a new desliming circuit"},
+      {"metric": "10-year average EBITDA (Cobar Basin)", "target": "~A$127 million p.a.", "period": "10-year mine plan (from restart)", "vs_prior": "raised", "notes": "Up materially from the FY2025 estimate of ~A$22m p.a. at A$50/oz silver, reflecting both an expanded mine plan and higher assumed silver price; C1 cost guided at A$34.4/oz silver including gold credits"},
+      {"metric": "Project funding", "target": "Fully funded through to silver production", "period": "FY2026", "vs_prior": "maintained", "notes": "Combination of A$15m equity raise and fully-drawn US$30m Nebari facility; management states this covers restart through to Wonawinta silver production"}
+    ],
+    "management_commentary": "Executive Chairman Dennis Karp has repeatedly emphasized that elevated gold and silver prices provide 'fantastic momentum' to the restart plans and that the directors are confident in continuing as a going concern based on the company's history of successfully raising capital since its 2020 IPO, creditor support, and high metal prices. On Taranaki VTM, management states it is 'working through a number of options to progress the final environmental approvals' following the Fast-track withdrawal, but has not disclosed a specific alternative pathway or timeline."
+  },
+  "bull_case": [
+    "Precious metals prices (gold and silver) are near record/multi-decade highs, and Manuka is restarting two previously producing, fully permitted assets with existing infrastructure at a fraction of greenfield capex and lead time",
+    "Fully funded restart (equity raise + drawn US$30m Nebari facility) removes near-term financing risk specifically for the Cobar Basin gold/silver restart, with first gold revenue targeted mid-2026 and silver following in Q3 CY2026",
+    "10-year mine plan economics are compelling on paper (average EBITDA ~A$127m p.a., NPV8 ~A$805m) if executed at guided costs and current metal prices, which would be transformative relative to the current ~A$120m market cap",
+    "100% ownership across all three projects retains full upside optionality without JV dilution, and unhedged production offers maximum leverage to further silver/gold price appreciation",
+    "Taranaki VTM remains a large, government-recognized (Critical Minerals List) strategic resource that could still create option value if a revised consenting pathway or legislative change emerges, at essentially zero cost to current shareholders since it is not in the base valuation"
+  ],
+  "bear_case": [
+    "Explicit going-concern material uncertainty disclosed in the most recent (H1FY2026) financial statements - net current liabilities of A$21.7m and continued operating cash burn mean execution failure or a metals price pullback could quickly threaten solvency",
+    "Taranaki VTM's Fast-track application was effectively refused (draft decline, then withdrawal) - a second failed NZ marine consent attempt for the same project after the 2021 refusal - leaving no clear near-term regulatory path and stranding a large book value of exploration/evaluation assets tied to the project",
+    "Heavy and ongoing shareholder dilution (share capital roughly tripled in six months to Dec 2025; ~1.6bn shares outstanding; lender warrants and option exercises add further overhang) erodes per-share value even if the restart succeeds",
+    "High-cost, high-leverage capital structure (US$30m Nebari facility plus warrants, substantial finance costs) means a large share of restart cash flow will service debt before benefiting equity holders",
+    "Zero analyst/broker coverage, thin trading liquidity, and a two-year track record of no revenue create high execution and valuation uncertainty; restart timelines have already slipped multiple times historically (2022 silver trial ended early, Mt Boppy operations halted Q1 2024) and mine plan capex estimates have already been revised up (A$18.9m to A$26.6m)"
+  ]
+};
+
+const dcfData = {
+  "ticker": "MKR.NZ",
+  "valuation_date": "2026-08-20",
+  "current_price": 0.095,
+  "inputs": {
+    "shares_outstanding": 1477.96,
+    "net_debt": 31.064,
+    "net_debt_currency": "AUD",
+    "last_fcf": -9.114,
+    "reported_fcf": -5.463057,
+    "sbc": 0.0,
+    "sbc_incl_equity_taxes": 0.0,
+    "sbc_pct_of_revenue": 0.0,
+    "interest_income": 0.0,
+    "sbc_source": "SBC verified structurally immaterial: FY2025/H1-2026 StockBasedComp column is 0/blank in the CSV and the H1-2026 note 17 share-based-payment reserve (A$4.65m outstanding options) is overwhelmingly lender/advisor warrants and legacy option grants tied to financing, not an ongoing employee-comp program at this pre-revenue scale. Kept explicit at 0% per section 7(e) (SBC-zero convention), not deleted.",
+    "buyback_cash": 0.0,
+    "annual_share_growth_pct": 0.0,
+    "projected_shares": [1477.96,1477.96,1477.96,1477.96,1477.96,1477.96,1477.96,1477.96,1477.96,1477.96],
+    "share_count_basis": "Fully diluted issued count reconstructed as: 1,404,559,716 ordinary shares on issue at 31-Dec-2025 (H1-2026 interim, note 15 share capital reconciliation) PLUS 73,400,000 shares issued on exercise of unlisted options between 31-Dec-2025 and the interim report date (note 20(b), subsequent events) = 1,477,959,716. Held FLAT for the projection per house convention. CSV SharesOutstanding column (1,065m-1,076m) is STALE.",
+    "price_as_of": "2026-08-19T23:41:14Z (Yahoo Finance regularMarketTime, MKR.NZ)",
+    "balance_sheet_date": "2025-12-31 (H1-2026 interim, ASX/NZX), with debt anchor rolled forward for the fully-drawn Nebari facility",
+    "currency": "AUD",
+    "quote_currency": "NZD",
+    "fx_rate_aud_nzd": 1.1958,
+    "fx_rate_aud_usd": 0.7115,
+    "fx_as_of": "2026-08-20 (Yahoo Finance AUDNZD=X, AUDUSD=X spot)",
+    "units": "millions",
+    "net_debt_methodology": "Net debt is NOT taken directly off the 31-Dec-2025 balance sheet (A$21.49m) because the Nebari facility (only US$26m of US$30m drawn at H1-2026 report date) completed its second tranche 26-Jun-2026 and refinances/absorbs prior debt. Anchor: Nebari US$30m fully drawn @ AUDUSD 0.7115 = A$42.16m total debt, LESS A$11.1m latest disclosed cash = A$31.06m net debt.",
+    "notes": "MODEL CHOSEN: Owner-FCF DCF (component build), scenario-weighted. Manuka is NOT distressed/receivership (funded restart, imminent revenue) and NOT a pure asset play (Taranaki VTM assigned zero value) so neither the historical-CAGR nor asset-waterfall model fits. Forward build is a PHYSICAL PRODUCTION RAMP anchored to management's 30-Jan-2026 10-year mine plan (avg EBITDA A$127m p.a., NPV8 A$805m), heavily haircut for slipped-restart history, 39% Inferred-Resource content, near-record metal prices, and going-concern uncertainty. Base mature EBITDA = 40% of management's average (A$50.8m); bull 65% (A$82.6m); bear 15% (A$19.1m). SBC nil. No NCI (100% owned). Risk charged BOTH in flows (heavy haircuts) AND in a going-concern-loaded 19% WACC -- documented departure from charge-risk-once convention because solvency risk is qualitatively distinct from execution/commodity risk. Taranaki VTM assigned ZERO value in all scenarios (Fast-track withdrawn Feb-2026, second failed NZ marine-consent attempt, no disclosed alternative pathway).",
+    "wacc_rationale": "WACC 19% = AUD risk-free ~4.0% + equity risk premium ~5.5% (small-cap ASX) + size/illiquidity premium ~3.0% + single-asset concentration premium ~2.5% + going-concern/distress premium ~4.0%. Deliberate departure from charge-risk-once: risk charged in BOTH flows (haircuts) and discount rate because solvency risk and execution/commodity risk are treated as distinct."
+  },
+  "historical_growth": {
+    "revenue_3yr_cagr": null,
+    "revenue_5yr_cagr": null,
+    "eps_3yr_cagr": null,
+    "eps_5yr_cagr": null,
+    "equity_3yr_cagr": -44.7,
+    "equity_5yr_cagr": -42.5,
+    "fcf_3yr_cagr": null,
+    "fcf_5yr_cagr": null,
+    "selected_growth_rate": null,
+    "growth_rate_source": "NONE -- historical CAGRs are not used as a valuation driver",
+    "growth_divergence_warning": "Historical growth rates are NOT meaningful and are NOT used to drive this valuation. Revenue and FCF CAGRs are undefined because FY2025/H1-2026 revenue is zero (care & maintenance). The equity CAGR (-42.5% 5yr, -44.7% 3yr) describes a balance sheet collapsing toward the FY2025 low of A$2.30m book equity BEFORE the Aug-Dec 2025 capital raises -- a real historical fact but describes run-down/refinancing mode, not restart economics. This DCF instead builds forward FCF as a physical production ramp against management's mine plan (heavily haircut)."
+  },
+  "assumptions": {
+    "base": {"description": "Mature run-rate EBITDA = 40% of management's own 10yr average (A$50.8m of A$127m); 3-year production ramp FY27-29; EBITDA margin 42%; modest reserve-life taper from year 8; cash tax rate ramps 0% to 28%.", "mature_ebitda_aud_m": 50.8, "ebitda_margin_mature": 0.42, "ramp_years": 3, "wacc": 0.19, "terminal_growth": 0.015, "terminal_cap_multiple": 6.0},
+    "bull": {"description": "Mature run-rate EBITDA = 65% of management's average (A$82.6m); faster 2-year ramp; EBITDA margin 48%; taper only from year 9; sustained elevated gold/silver prices.", "mature_ebitda_aud_m": 82.55, "ebitda_margin_mature": 0.48, "ramp_years": 2, "wacc": 0.19, "terminal_growth": 0.02, "terminal_cap_multiple": 6.0},
+    "bear": {"description": "Mature run-rate EBITDA = 15% of management's average (A$19.1m) -- restart struggles, cost overruns, gold/silver mean-revert; slower 4-year ramp; equity value floored at zero once net debt applied -- models going-concern failure, not just a smaller base case.", "mature_ebitda_aud_m": 19.05, "ebitda_margin_mature": 0.3, "ramp_years": 4, "wacc": 0.19, "terminal_growth": 0.01, "terminal_cap_multiple": 6.0}
+  },
+  "projections": {
+    "base": {"years": ["FY2027","FY2028","FY2029","FY2030","FY2031","FY2032","FY2033","FY2034","FY2035","FY2036"],
+      "owner_fcf": [-9.114,19.819,28.303,30.48,26.61,25.448,25.448,21.631,17.814,13.997],
+      "discount_factors": [0.8403,0.7062,0.5934,0.4987,0.419,0.3521,0.2959,0.2487,0.209,0.1756],
+      "pv_fcf": [-7.659,13.996,16.795,15.199,11.151,8.961,7.531,5.379,3.723,2.458]},
+    "bull": {"years": ["FY2027","FY2028","FY2029","FY2030","FY2031","FY2032","FY2033","FY2034","FY2035","FY2036"],
+      "owner_fcf": [12.956,63.631,58.645,50.596,46.572,46.572,46.572,46.572,39.586,32.6],
+      "discount_factors": [0.8403,0.7062,0.5934,0.4987,0.419,0.3521,0.2959,0.2487,0.209,0.1756],
+      "pv_fcf": [10.888,44.934,34.801,25.231,19.516,16.4,13.781,11.581,8.272,5.725]},
+    "bear": {"years": ["FY2027","FY2028","FY2029","FY2030","FY2031","FY2032","FY2033","FY2034","FY2035","FY2036"],
+      "owner_fcf": [-20.095,-5.332,3.81,6.032,8.89,8.89,7.445,6.001,4.556,3.111],
+      "discount_factors": [0.8403,0.7062,0.5934,0.4987,0.419,0.3521,0.2959,0.2487,0.209,0.1756],
+      "pv_fcf": [-16.887,-3.766,2.261,3.008,3.725,3.131,2.203,1.492,0.952,0.546]}
+  },
+  "valuation": {
+    "base": {"sum_pv_fcf": 77.533, "terminal_value": 81.18, "terminal_value_bound": "gordon", "pv_terminal": 14.255, "enterprise_value": 91.789, "net_debt": 31.064, "equity_value": 60.724, "intrinsic_value_aud": 0.0411, "intrinsic_value": 0.0491, "street_intrinsic_value": 0.0491, "upside": -48.3, "terminal_pct_of_value": 15.5, "implied_exit_multiple": 5.8},
+    "bull": {"sum_pv_fcf": 191.129, "terminal_value": 195.602, "terminal_value_bound": "gordon", "pv_terminal": 34.348, "enterprise_value": 225.477, "net_debt": 31.064, "equity_value": 194.412, "intrinsic_value_aud": 0.1315, "intrinsic_value": 0.1573, "street_intrinsic_value": 0.1573, "upside": 65.6, "terminal_pct_of_value": 15.2, "implied_exit_multiple": 6.0},
+    "bear": {"sum_pv_fcf": -3.333, "terminal_value": 17.459, "terminal_value_bound": "gordon", "pv_terminal": 3.066, "enterprise_value": -0.267, "net_debt": 31.064, "equity_value": -31.332, "intrinsic_value_aud": 0.0, "intrinsic_value": 0.0, "street_intrinsic_value": 0.0, "upside": -100.0, "terminal_pct_of_value": null, "implied_exit_multiple": 5.61, "note": "Equity value floored at zero (limited liability). Unfloored DCF equity value is A$-31.33m -- models going-concern failure."}
+  },
+  "entry_price": {
+    "hurdle_rate": 0.15,
+    "methodology_note": "WACC (19%) EXCEEDS the 15% hurdle rate. When WACC > hurdle, the model's own risk-adjusted fair value is HARSHER (lower) than what a 15%-hurdle investor requires, so entry price (discounted at the lower 15% hurdle) comes out ABOVE intrinsic value -- mechanically correct, not an error.",
+    "base": {"years_to_terminal": 10, "pv_interim_fcf_at_hurdle": 92.491, "pv_terminal_at_hurdle": 20.067, "net_debt": 31.064, "entry_price_aud": 0.0551, "entry_price": 0.0659, "entry_discount_from_current": -30.6},
+    "bull": {"entry_price_aud": 0.162, "entry_price": 0.1938},
+    "bear": {"entry_price_aud": 0.0, "entry_price": 0.0, "note": "floored at zero, same going-concern-failure logic as the bear intrinsic value"},
+    "weighted_entry_price": 0.0684
+  },
+  "required_return_table": {
+    "scenario": "base",
+    "returns": [9,10,11,12,15,19],
+    "value_per_share": [0.1032,0.0959,0.0891,0.0828,0.0665,0.0491],
+    "note": "19% (the model's own WACC) added alongside the standard 9-15% band because it is the house discount rate for this ticker and sits above the standard range."
+  },
+  "sensitivity": {
+    "wacc_range": [15,17,19,21,23],
+    "terminal_growth_range": [0.5,1.0,1.5,2.0,2.5],
+    "matrix": [
+      [0.0665,0.0665,0.0665,0.0665,0.0665],
+      [0.0574,0.0574,0.0574,0.0574,0.0574],
+      [0.0484,0.0488,0.0491,0.0495,0.0495],
+      [0.0408,0.041,0.0413,0.0416,0.0418],
+      [0.0344,0.0345,0.0347,0.0349,0.0351]
+    ],
+    "note": "Values in NZD, base scenario. At WACC 15-17% the terminal-growth columns are flat because the 6x terminal-FCF cap (not the Gordon growth formula) binds at those lower discount rates."
+  },
+  "probability_weighted": {
+    "weights": {"bear": 0.35, "base": 0.45, "bull": 0.2},
+    "weights_rationale": "Bear weight raised well above the 15% house default to 35% because of explicit going-concern material uncertainty, single-asset/single-plant execution risk on an unproven desliming circuit retrofit, and a demonstrated history of slipped restarts/upward capex revisions. Bull weight cut to 20% because it requires several independent things to go right simultaneously. Base gets the residual 45%.",
+    "weighted_iv_aud": 0.0448,
+    "weighted_iv": 0.0536,
+    "street_weighted_iv": 0.0536,
+    "band_position": null,
+    "band_position_note": "SBC is verified structurally nil at this pre-revenue restart scale so the house/street band collapses to a single point; band_position is null rather than a degenerate 0%."
+  },
+  "sanity_check": {
+    "current_market_cap_aud": 121.2,
+    "current_market_cap_nzd": 140.4,
+    "implied_ev_at_current_price_aud": 152.3,
+    "base_case_enterprise_value_aud": 91.8,
+    "base_case_ev_vs_market_implied_ev": "Base-case DCF enterprise value of A$92m compares to a current-price-implied EV of A$152m -- the market is pricing in roughly 166% of the haircut-adjusted base case, consistent with a market that is discounting a pre-revenue restart with going-concern disclosure heavily, and/or partially pricing bear-case/dilution risk.",
+    "management_npv8_aud_805m_vs_house_base_ev": "Management's own 30-Jan-2026 mine plan states NPV8 of A$805m for the Cobar Basin assets alone. This DCF's base-case enterprise value of A$92m is roughly 11% of that figure -- the gap is the haircut applied for execution risk, Inferred-resource conversion risk, price-assumption fade, and going-concern discount.",
+    "checks": {"scenario_weights_sum_to_1": true, "weighted_iv_recomputes": true, "bear_equity_floored_at_zero": true, "current_price_between_bear_and_bull": true}
+  },
+  "valuation_philosophy": "Manuka is a pre-revenue restart-stage junior miner with two mines fully permitted and funded to restart but with zero revenue in the trailing two years, explicit going-concern material uncertainty, and a management-published 10-year mine plan (NPV8 A$805m) that is materially unverified given the company's own history of slipped timelines and upward capex revisions. This DCF treats the situation as a PHYSICAL PRODUCTION RAMP scenario problem: three explicit, heavily haircut paths from management's own mine-plan economics to a mature run-rate EBITDA (40% of guidance in base, 65% in bull, 15% in bear), discounted at a going-concern-loaded 19% WACC, terminal-valued at the LOWER of Gordon growth or a conservative 6x terminal-FCF cap, and probability-weighted 35/45/20 bear/base/bull. Taranaki VTM is assigned zero value in every scenario. The resulting weighted intrinsic value of NZ$0.0536 (upside -43.6% to the NZ$0.095 quote) and base-case value of NZ$0.0491 both sit below the current market price, indicating the market is ascribing more optimism to a successful, on-time, on-budget restart than this model's haircuts allow."
+};
+
+// ============ CSV PARSING ============
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => obj[h.trim()] = values[i]?.trim());
+        return obj;
+    });
+}
+
+const data = parseCSV(csvData);
+
+data.sort((a, b) => {
+    const parseDate = (p) => {
+        const year = parseInt(p.match(/\d{4}/)?.[0] || '0');
+        const isQ1 = p.includes('Q1');
+        const isQ2 = p.includes('Q2');
+        const isQ3 = p.includes('Q3');
+        const isQ4 = p.includes('Q4');
+        const isH1 = p.includes('H1');
+        const isH2 = p.includes('H2');
+        const isFY = p.startsWith('FY');
+        const subOrder = isQ1 ? 1 : isQ2 ? 2 : isH1 ? 3 : isQ3 ? 4 : isQ4 ? 5 : isH2 ? 6 : isFY ? 7 : 0;
+        return year * 10 + subOrder;
+    };
+    return parseDate(a.Period) - parseDate(b.Period);
+});
+
+const fyData = data.filter(d => d.Period.startsWith('FY'));
+// "Half" view = every reported period in chronological order (FY + H1), giving visibility into the most recent H1-2026
+const allData = data;
+
+const num = (v) => (v === undefined || v === null || v === '' ? null : parseFloat(v));
+
+// ============ KPI CARDS ============
+function fmtM(v, digits) {
+    if (v === null || v === undefined || isNaN(v)) return 'N/A';
+    digits = digits === undefined ? 1 : digits;
+    return 'A$' + v.toFixed(digits) + 'M';
+}
+function fmtShares(v) {
+    if (v === null) return 'N/A';
+    return (v / 1000).toFixed(2) + 'B';
+}
+
+const latest = allData[allData.length - 1]; // H1-2026
+const priorFY = fyData[fyData.length - 2]; // FY2024 (last revenue-earning FY)
+const latestFY = fyData[fyData.length - 1]; // FY2025
+
+const kpis = [
+    { label: 'Revenue (H1-2026)', value: fmtM(num(latest.Revenue), 2), change: 'Zero &mdash; care & maintenance', cls: 'warn' },
+    { label: 'Net Loss (H1-2026)', value: fmtM(num(latest.NetIncome), 2), change: 'Loss every period since FY2023', cls: 'warn' },
+    { label: 'Cash Balance (H1-2026)', value: fmtM(num(latest.CashAndEquivalents), 2), change: 'vs A$0.97M at FY2025', cls: '' },
+    { label: 'Total Debt (H1-2026)', value: fmtM(num(latest.TotalDebt), 1), change: 'Nebari facility drawing to US$30M', cls: 'warn' },
+    { label: "Shareholders' Equity (H1-2026)", value: fmtM(num(latest.ShareholdersEquity), 1), change: '10x jump vs FY2025 (A$34M raise)', cls: '' },
+    { label: 'Shares Outstanding (H1-2026)', value: fmtShares(num(latest.SharesOutstanding)), change: '~4.3x vs FY2020 (249M)', cls: 'warn' },
+    { label: 'Operating Cash Flow (H1-2026)', value: fmtM(num(latest.OperatingCashFlow), 2), change: 'A$21.7M net current liabilities disclosed', cls: 'warn' },
+    { label: 'DCF Weighted IV (NZD)', value: '$' + dcfData.probability_weighted.weighted_iv.toFixed(4), change: ((dcfData.probability_weighted.weighted_iv - dcfData.current_price) / dcfData.current_price * 100).toFixed(0) + '% vs $' + dcfData.current_price.toFixed(3) + ' price', cls: 'warn' }
+];
+
+document.getElementById('kpiGrid').innerHTML = kpis.map(k => `
+    <div class="kpi-card ${k.cls}">
+        <div class="kpi-value">${k.value}</div>
+        <div class="kpi-label">${k.label}</div>
+        <div class="kpi-change neutral">${k.change}</div>
+    </div>
+`).join('');
+
+// ============ OVERVIEW SECTION ============
+function toggleOverview() {
+    const btn = document.querySelector('.overview-toggle');
+    const content = document.getElementById('overviewContent');
+    btn.classList.toggle('active');
+    content.classList.toggle('active');
+}
+
+document.getElementById('revenueStreamsList').innerHTML = analysis.business_model.revenue_streams.map(r => `
+    <li class="revenue-stream"><span>${r.name}</span> <span class="percent trend-${r.trend}">${r.trend}</span></li>
+`).join('');
+
+document.getElementById('competitorsList').textContent = analysis.competitive_position.main_competitors.join(', ');
+
+document.getElementById('moatList').innerHTML = analysis.competitive_position.moat_factors.map(m => `
+    <li><strong>${m.factor}</strong> (${m.strength}): ${m.description}</li>
+`).join('');
+
+document.getElementById('growthDriversList').innerHTML = analysis.growth_drivers.map(g => `<li>${g}</li>`).join('');
+
+const allRisks = [
+    ...analysis.risks.business.map(r => ({...r, cat: 'Business'})),
+    ...analysis.risks.financial.map(r => ({...r, cat: 'Financial'})),
+    ...analysis.risks.regulatory.map(r => ({...r, cat: 'Regulatory'})),
+    ...analysis.risks.macro.map(r => ({...r, cat: 'Macro'}))
+];
+document.getElementById('risksList').innerHTML = allRisks.map(r => `
+    <li><span class="risk-${r.severity}">&#9679;</span> <strong>[${r.cat}] ${r.risk}</strong> (${r.severity}): ${r.description}</li>
+`).join('');
+
+document.getElementById('bullCaseList').innerHTML = analysis.bull_case.map(b => `<li>${b}</li>`).join('');
+document.getElementById('bearCaseList').innerHTML = analysis.bear_case.map(b => `<li>${b}</li>`).join('');
+document.getElementById('recentDevList').innerHTML = analysis.recent_developments.map(d => `<li><strong>${d.date}:</strong> ${d.event}</li>`).join('');
+
+// ============ GUIDANCE ============
+function renderGuidance() {
+    if (!analysis.guidance || !analysis.guidance.items || analysis.guidance.items.length === 0) {
+        document.getElementById('guidanceSection').style.display = 'none';
+        return;
+    }
+    const guidance = analysis.guidance;
+    document.getElementById('guidanceAsOf').textContent = guidance.as_of || '';
+    document.getElementById('guidanceFY').textContent = guidance.fiscal_year || '';
+
+    const grid = document.getElementById('guidanceGrid');
+    grid.innerHTML = guidance.items.map(item => {
+        const vsClass = item.vs_prior ? item.vs_prior.toLowerCase().replace(/[^a-z]/g, '') : 'new';
+        const vsLabel = item.vs_prior ? item.vs_prior.charAt(0).toUpperCase() + item.vs_prior.slice(1) : 'New';
+        return `
+            <div class="guidance-card">
+                <div class="guidance-metric">${item.metric}</div>
+                <div class="guidance-target">${item.target}</div>
+                <div class="guidance-period">${item.period}</div>
+                <span class="guidance-vs-prior ${vsClass}">${vsLabel}</span>
+                ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+
+    const commentary = document.getElementById('guidanceCommentary');
+    if (guidance.management_commentary) {
+        commentary.textContent = guidance.management_commentary;
+        commentary.style.display = 'block';
+    } else {
+        commentary.style.display = 'none';
+    }
+}
+renderGuidance();
+
+document.getElementById('modelApproachText').innerHTML =
+    "Manuka's DCF does not extrapolate historical revenue/FCF CAGRs (meaningless: revenue was zero in FY2025 and H1-2026) and is not a distressed asset/creditor-waterfall model (the company is a funded, going, restarting operation, not a receivership). Instead it is built as a <strong>physical production ramp</strong> off management's own 30-Jan-2026 10-year Cobar Basin mine plan (avg EBITDA ~A$127m p.a., NPV8 ~A$805m), with mature run-rate EBITDA heavily haircut to 40% of guidance in the base case (65% bull / 15% bear) for execution risk, 39% Inferred-Resource content, near-record metal-price assumptions, and explicit going-concern uncertainty. Risk is deliberately charged in <strong>both</strong> the cash-flow haircuts <strong>and</strong> a going-concern-loaded 19% WACC &mdash; a documented departure from the usual charge-risk-once convention. Taranaki VTM is assigned <strong>zero value</strong> in every scenario following the Feb-2026 Fast-track withdrawal.";
+
+// ============ CHART HELPERS ============
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } } },
+    scales: {
+        x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+function freshScales() {
+    return { x: { ...chartDefaults.scales.x }, y: { ...chartDefaults.scales.y } };
+}
+
+const chartRegistry = {};
+const chartSeries = {};
+
+function toggleLogScale(canvasId, btn) {
+    const chart = chartRegistry[canvasId];
+    if (!chart) return;
+    const toLog = chart.options.scales.y.type !== 'logarithmic';
+    chart.options.scales.y.type = toLog ? 'logarithmic' : 'linear';
+    btn.classList.toggle('active', toLog);
+    chart.update();
+}
+
+function setPeriodView(canvasId, view, btn) {
+    const chart = chartRegistry[canvasId], s = chartSeries[canvasId];
+    if (!chart || !s || !s[view]) return;
+    chart.data.labels = s[view].labels;
+    s[view].data.forEach((d, i) => { if (chart.data.datasets[i]) chart.data.datasets[i].data = d; });
+    btn.parentNode.querySelectorAll('.view-toggle').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    chart.update();
+}
+
+const colors = { primary: '#00d4aa', secondary: '#00b894', tertiary: '#0984e3', quaternary: '#6c5ce7', warning: '#fdcb6e', danger: '#ff6b6b' };
+
+function labelFor(p) { return p; }
+
+// ============ FINANCIAL PERFORMANCE CHARTS ============
+// Revenue
+(function() {
+    const fyLabels = fyData.map(labelFor);
+    const fyVals = fyData.map(d => num(d.Revenue));
+    const halfLabels = allData.map(labelFor);
+    const halfVals = allData.map(d => num(d.Revenue));
+    chartSeries.revenueChart = {
+        annual: { labels: fyLabels, data: [fyVals] },
+        half: { labels: halfLabels, data: [halfVals] }
+    };
+    const ctx = document.getElementById('revenueChart');
+    chartRegistry.revenueChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: fyLabels, datasets: [{ label: 'Revenue (A$M)', data: fyVals, backgroundColor: colors.primary, borderRadius: 4 }] },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+})();
+
+// Net Income
+(function() {
+    const fyLabels = fyData.map(labelFor);
+    const fyVals = fyData.map(d => num(d.NetIncome));
+    const halfLabels = allData.map(labelFor);
+    const halfVals = allData.map(d => num(d.NetIncome));
+    chartSeries.netIncomeChart = {
+        annual: { labels: fyLabels, data: [fyVals] },
+        half: { labels: halfLabels, data: [halfVals] }
+    };
+    const ctx = document.getElementById('netIncomeChart');
+    chartRegistry.netIncomeChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: fyLabels, datasets: [{ label: 'Net Income (A$M)', data: fyVals, backgroundColor: fyVals.map(v => v >= 0 ? colors.primary : colors.danger), borderRadius: 4 }] },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+})();
+
+// OCF vs Capex
+(function() {
+    const fyLabels = fyData.map(labelFor);
+    const fyOcf = fyData.map(d => num(d.OperatingCashFlow));
+    const fyCapex = fyData.map(d => num(d.CapEx));
+    const halfLabels = allData.map(labelFor);
+    const halfOcf = allData.map(d => num(d.OperatingCashFlow));
+    const halfCapex = allData.map(d => num(d.CapEx));
+    chartSeries.ocfCapexChart = {
+        annual: { labels: fyLabels, data: [fyOcf, fyCapex] },
+        half: { labels: halfLabels, data: [halfOcf, halfCapex] }
+    };
+    const ctx = document.getElementById('ocfCapexChart');
+    chartRegistry.ocfCapexChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: fyLabels, datasets: [
+            { label: 'Operating Cash Flow (A$M)', data: fyOcf, backgroundColor: colors.tertiary, borderRadius: 4 },
+            { label: 'CapEx (A$M)', data: fyCapex, backgroundColor: colors.warning, borderRadius: 4 }
+        ]},
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+})();
+
+// FCF
+(function() {
+    const fyLabels = fyData.map(labelFor);
+    const fyVals = fyData.map(d => num(d.FreeCashFlow));
+    const halfLabels = allData.map(labelFor);
+    const halfVals = allData.map(d => num(d.FreeCashFlow));
+    chartSeries.fcfChart = {
+        annual: { labels: fyLabels, data: [fyVals] },
+        half: { labels: halfLabels, data: [halfVals] }
+    };
+    const ctx = document.getElementById('fcfChart');
+    chartRegistry.fcfChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: fyLabels, datasets: [{ label: 'Free Cash Flow (A$M)', data: fyVals, backgroundColor: colors.danger, borderRadius: 4 }] },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+})();
+
+// ============ BALANCE SHEET CHARTS ============
+// Cash
+(function() {
+    const fyLabels = fyData.map(labelFor);
+    const fyVals = fyData.map(d => num(d.CashAndEquivalents));
+    const halfLabels = allData.map(labelFor);
+    const halfVals = allData.map(d => num(d.CashAndEquivalents));
+    chartSeries.cashChart = {
+        annual: { labels: fyLabels, data: [fyVals] },
+        half: { labels: halfLabels, data: [halfVals] }
+    };
+    const ctx = document.getElementById('cashChart');
+    chartRegistry.cashChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: fyLabels, datasets: [{ label: 'Cash & Equivalents (A$M)', data: fyVals, borderColor: colors.primary, backgroundColor: 'rgba(0,212,170,0.1)', fill: true, tension: 0.3 }] },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+})();
+
+// Debt vs Equity
+(function() {
+    const fyLabels = fyData.map(labelFor);
+    const fyDebt = fyData.map(d => num(d.TotalDebt));
+    const fyEquity = fyData.map(d => num(d.ShareholdersEquity));
+    const halfLabels = allData.map(labelFor);
+    const halfDebt = allData.map(d => num(d.TotalDebt));
+    const halfEquity = allData.map(d => num(d.ShareholdersEquity));
+    chartSeries.debtEquityChart = {
+        annual: { labels: fyLabels, data: [fyDebt, fyEquity] },
+        half: { labels: halfLabels, data: [halfDebt, halfEquity] }
+    };
+    const ctx = document.getElementById('debtEquityChart');
+    chartRegistry.debtEquityChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: fyLabels, datasets: [
+            { label: 'Total Debt (A$M)', data: fyDebt, backgroundColor: colors.danger, borderRadius: 4 },
+            { label: "Shareholders' Equity (A$M)", data: fyEquity, backgroundColor: colors.primary, borderRadius: 4 }
+        ]},
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+})();
+
+// Assets vs Liabilities
+(function() {
+    const fyLabels = fyData.map(labelFor);
+    const fyAssets = fyData.map(d => num(d.TotalAssets));
+    const fyLiab = fyData.map(d => num(d.TotalLiabilities));
+    const halfLabels = allData.map(labelFor);
+    const halfAssets = allData.map(d => num(d.TotalAssets));
+    const halfLiab = allData.map(d => num(d.TotalLiabilities));
+    chartSeries.assetsLiabChart = {
+        annual: { labels: fyLabels, data: [fyAssets, fyLiab] },
+        half: { labels: halfLabels, data: [halfAssets, halfLiab] }
+    };
+    const ctx = document.getElementById('assetsLiabChart');
+    chartRegistry.assetsLiabChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: fyLabels, datasets: [
+            { label: 'Total Assets (A$M)', data: fyAssets, borderColor: colors.tertiary, backgroundColor: 'rgba(9,132,227,0.1)', fill: true, tension: 0.3 },
+            { label: 'Total Liabilities (A$M)', data: fyLiab, borderColor: colors.danger, backgroundColor: 'rgba(255,107,107,0.1)', fill: true, tension: 0.3 }
+        ]},
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+})();
+
+// Shares Outstanding
+(function() {
+    const fyLabels = fyData.map(labelFor);
+    const fyVals = fyData.map(d => num(d.SharesOutstanding));
+    const halfLabels = allData.map(labelFor);
+    const halfVals = allData.map(d => num(d.SharesOutstanding));
+    chartSeries.sharesChart = {
+        annual: { labels: fyLabels, data: [fyVals] },
+        half: { labels: halfLabels, data: [halfVals] }
+    };
+    const ctx = document.getElementById('sharesChart');
+    chartRegistry.sharesChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: fyLabels, datasets: [{ label: 'Shares Outstanding (M)', data: fyVals, borderColor: colors.quaternary, backgroundColor: 'rgba(108,92,231,0.1)', fill: true, tension: 0.3 }] },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+})();
+
+// ============ MODAL DESCRIPTIONS ============
+const metricDescriptions = {
+    revenue: { title: 'Revenue', content: `
+        <p><strong>Revenue</strong> is Manuka's sales income from gold/silver ore, dump material and tailings sold to its off-taker.</p>
+        <div class="metric-highlight"><strong>For Manuka:</strong> Revenue was ZERO in FY2025 and H1FY2026 because Mt Boppy and Wonawinta were on care and maintenance &mdash; this is not a business decline, it is a deliberate operational pause ahead of the funded restart. First gold revenue is targeted mid-July 2026, with silver following in the September 2026 quarter.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Whether first gold revenue actually lands in the targeted window (management has slipped restart timelines before &mdash; 2022 silver trial, Mt Boppy Q1 2024 halt)</li>
+            <li>Ramp speed from first gold to full silver production once resumed</li>
+            <li>Whether realized prices track the near-record spot gold/silver assumptions baked into management's mine plan</li>
+        </ul>` },
+    netIncome: { title: 'Net Income (Loss)', content: `
+        <p><strong>Net Income</strong> is bottom-line profit or loss after all costs, financing charges and tax.</p>
+        <div class="metric-highlight"><strong>For Manuka:</strong> Every period since H1FY2023 has been a net loss, funded by capital raises and debt. H1FY2026 alone lost A$12.9m against zero revenue, driven substantially by finance costs on the new Nebari facility (A$5.5m in the half, including share-based payments to the lender).</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Losses narrowing (or not) once restart revenue begins in H2 FY2026/FY2027</li>
+            <li>Finance costs as a share of the loss &mdash; the Nebari facility is expensive, specialist project debt</li>
+        </ul>` },
+    ocfCapex: { title: 'Operating Cash Flow vs Capital Expenditure', content: `
+        <p><strong>Operating Cash Flow (OCF)</strong> is cash generated (or consumed) by day-to-day operations; <strong>CapEx</strong> is cash spent on plant, mine development and the desliming circuit retrofit.</p>
+        <div class="metric-highlight"><strong>For Manuka:</strong> OCF has been negative in every period since H1FY2023 (A$7.7m outflow in H1FY2026 alone) &mdash; this is the operating cash burn cited directly in the going-concern disclosure. CapEx is ramping as the A$26.6m restart budget (including A$11.4m for the new desliming circuit) is spent.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>OCF turning positive once gold/silver sales begin</li>
+            <li>Whether restart capex stays within the A$26.6m budget (already revised up once from A$18.9m)</li>
+        </ul>` },
+    fcf: { title: 'Free Cash Flow', content: `
+        <p><strong>Free Cash Flow</strong> = Operating Cash Flow &minus; Capital Expenditure. This is the cash actually available to fund the business after investment.</p>
+        <div class="metric-highlight"><strong>For Manuka:</strong> FCF has been negative in every reported period, reflecting both a company on care and maintenance (no revenue) and one investing in a plant restart. This is the reason the Nebari facility and repeated equity raises exist &mdash; the company cannot self-fund the restart from operations.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>The trajectory implied by the DCF's owner-FCF projection: FY2027 still negative (A$-9.1m, restart capex year) before turning strongly positive from FY2028</li>
+        </ul>` },
+    cash: { title: 'Cash Balance', content: `
+        <p><strong>Cash and Equivalents</strong> is the company's liquid cash on the balance sheet at period end.</p>
+        <div class="metric-highlight"><strong>For Manuka:</strong> Cash fell to just A$0.27m at FY2023 and A$0.97m at FY2025 &mdash; genuinely thin buffers for a company burning several million a half-year. The H1FY2026 balance of A$2.44m still sits against A$21.7m of net current liabilities, which is the specific basis for the going-concern qualification.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Cash runway relative to disclosed operating burn</li>
+            <li>Whether the fully-drawn Nebari facility (completed June 2026, after this chart's last data point) materially improves the cash position</li>
+        </ul>` },
+    debtEquity: { title: "Total Debt vs Shareholders' Equity", content: `
+        <p><strong>Total Debt</strong> is borrowings (bank/specialist project debt); <strong>Shareholders' Equity</strong> is book net assets attributable to owners.</p>
+        <div class="metric-highlight"><strong>For Manuka:</strong> Equity collapsed to just A$2.30m at FY2025 (near wipeout) before jumping roughly 10x to A$22.99m at H1FY2026 &mdash; not from profits, but from a ~A$34m capital raise between June and December 2025 that roughly tripled share capital. Debt has grown steadily as the Nebari facility (US$30m, fully drawn by June 2026) replaced and expanded on prior TransAsia debt.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Debt continuing to rise through FY2026 as the second Nebari tranche draws (not fully reflected in H1FY2026 data)</li>
+            <li>Equity trend once restart cash flow (or further dilution) starts flowing through</li>
+        </ul>` },
+    assetsLiab: { title: 'Total Assets vs Total Liabilities', content: `
+        <p><strong>Total Assets</strong> and <strong>Total Liabilities</strong> from the balance sheet, whose gap is shareholders' equity.</p>
+        <div class="metric-highlight"><strong>For Manuka:</strong> The two lines have converged sharply since FY2021 as liabilities (debt, payables) grew faster than assets, squeezing the equity cushion to near zero by FY2025 before the late-2025 capital raise widened the gap again.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Liabilities growth as the full Nebari facility draws through FY2026</li>
+            <li>Whether Taranaki VTM exploration/evaluation assets (a meaningful chunk of Total Assets) face any impairment given the Feb-2026 Fast-track withdrawal</li>
+        </ul>` },
+    shares: { title: 'Shares Outstanding (Dilution)', content: `
+        <p><strong>Shares Outstanding</strong> is the total ordinary share count, the denominator for all per-share value.</p>
+        <div class="metric-highlight"><strong>For Manuka:</strong> The single biggest per-share risk in this story. Shares roughly doubled from FY2022 (286m) to FY2023 (563m), nearly doubled again to FY2025 (1,065m), and the DCF's reconciled H1FY2026-plus-subsequent-events count is 1,478m &mdash; a ~5x increase since FY2022. Further dilution risk remains from 209.6m outstanding unlisted options (~roughly at-the-money) and 36.4m Nebari lender warrants at A$0.2004.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Whether restart cash flow lets the company stop raising equity, or whether further raises/warrant exercises continue diluting existing holders</li>
+            <li>The CSV's SharesOutstanding column is a stale period-end snapshot; the DCF section below uses the fully reconciled count</li>
+        </ul>` }
+};
+
+function openModal(key) {
+    document.getElementById('modalTitle').textContent = metricDescriptions[key].title;
+    document.getElementById('modalBody').innerHTML = metricDescriptions[key].content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ============ DCF SECTION ============
+let currentScenario = 'base';
+
+function initDCF() {
+    if (!dcfData || !dcfData.valuation) return;
+
+    document.getElementById('dcfCurrent').textContent = '$' + dcfData.current_price.toFixed(3);
+
+    if (dcfData.historical_growth.growth_divergence_warning) {
+        document.getElementById('growthWarning').style.display = 'flex';
+        document.getElementById('warningText').textContent = dcfData.historical_growth.growth_divergence_warning;
+    }
+
+    const base = dcfData.assumptions.base;
+    document.getElementById('growthSlider').value = 40;
+    document.getElementById('waccSlider').value = base.wacc * 100;
+    document.getElementById('terminalSlider').value = base.terminal_growth * 100;
+
+    document.getElementById('growthValue').textContent = '40%';
+    document.getElementById('waccValue').textContent = (base.wacc * 100) + '%';
+    document.getElementById('terminalValue').textContent = (base.terminal_growth * 100) + '%';
+
+    renderDCFInputs();
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    updateDCFDisplay();
+    switchScenario('base');
+}
+
+function renderDCFInputs() {
+    const inputs = dcfData.inputs;
+    document.getElementById('baseFCF').textContent = 'A$' + inputs.last_fcf.toFixed(1) + 'M';
+    document.getElementById('sbcBreakdown').textContent = 'Owner FCF, restart-capex year (FY2027) before ramp; SBC verified nil';
+
+    const shares = inputs.shares_outstanding;
+    document.getElementById('sharesOut').textContent = (shares / 1000).toFixed(2) + 'B';
+    document.getElementById('dilutionNote').textContent = 'Reconciled H1-2026 + post-period option exercises; held flat (SBC nil)';
+
+    const netDebt = inputs.net_debt;
+    const netDebtEl = document.getElementById('netDebt');
+    netDebtEl.textContent = 'A$' + netDebt.toFixed(1) + 'M';
+
+    renderFCFProjections();
+}
+
+// Uses the ACTUAL base-case projection years from the DCF JSON (physical production
+// ramp), not a generic declining-growth-rate model, since that better reflects the
+// documented ramp structure.
+function renderFCFProjections() {
+    const scen = dcfData.projections[currentScenario] || dcfData.projections.base;
+    const fcf = scen.owner_fcf;
+    const years = scen.years;
+
+    let html = `<div class="fcf-projection-item header">Base</div>`;
+    for (let i = 1; i < 6; i++) html += `<div class="fcf-projection-item header">${years[i-1]}</div>`;
+
+    html += `<div class="fcf-projection-item"><div class="fcf-value">A$${dcfData.inputs.last_fcf.toFixed(1)}M</div><div class="growth-rate">-</div></div>`;
+    for (let i = 0; i < 5; i++) {
+        const prevVal = i === 0 ? dcfData.inputs.last_fcf : fcf[i-1];
+        const growth = prevVal !== 0 ? (((fcf[i] - prevVal) / Math.abs(prevVal)) * 100).toFixed(0) : 'n/m';
+        html += `<div class="fcf-projection-item"><div class="fcf-value">A$${fcf[i].toFixed(1)}M</div><div class="growth-rate">${growth === 'n/m' ? 'n/m' : (growth >= 0 ? '+' : '') + growth + '%'}</div></div>`;
+    }
+    document.getElementById('fcfProjectionTable').innerHTML = html;
+}
+
+// Recompute DCF from the component projection given slider overrides: scale the
+// base-case owner_fcf path by the mature-EBITDA-% slider (relative to the 40% base),
+// then re-discount at the chosen WACC and re-cap the terminal value.
+function calculateDCF(matureEbitdaPct, wacc, terminalGrowth) {
+    const scen = dcfData.projections.base;
+    const scaleFactor = matureEbitdaPct / 40; // base case anchors at 40% of mgmt guidance
+    const years = scen.owner_fcf.length;
+    const hurdle = 0.15;
+
+    let pvFCF = 0, pvFCFHurdle = 0;
+    const scaledFCF = scen.owner_fcf.map((v, i) => {
+        // Year 1 (restart capex) doesn't scale with mature EBITDA; years 2+ scale
+        return i === 0 ? v : v * scaleFactor;
+    });
+
+    for (let i = 0; i < years; i++) {
+        pvFCF += scaledFCF[i] / Math.pow(1 + wacc / 100, i + 1);
+        pvFCFHurdle += scaledFCF[i] / Math.pow(1 + hurdle, i + 1);
+    }
+
+    const lastFCF = scaledFCF[years - 1];
+    const terminalFCFGordon = lastFCF * (1 + terminalGrowth / 100);
+    const terminalValueGordon = terminalFCFGordon / (wacc / 100 - terminalGrowth / 100);
+    const terminalCapMultiple = 6.0;
+    const terminalValueCap = lastFCF * terminalCapMultiple;
+    // House convention: terminal value is the LOWER of Gordon growth or the 6x cap
+    const terminalValue = Math.min(terminalValueGordon > 0 ? terminalValueGordon : Infinity, terminalValueCap);
+    const pvTerminal = terminalValue / Math.pow(1 + wacc / 100, years);
+
+    const enterpriseValue = pvFCF + pvTerminal;
+    const netDebt = dcfData.inputs.net_debt;
+    const equityValue = Math.max(enterpriseValue - netDebt, -netDebt); // floor logic applied below
+    const exitShares = dcfData.inputs.shares_outstanding;
+
+    const ivAud = Math.max(enterpriseValue - netDebt, 0) / exitShares;
+    const iv = ivAud * dcfData.inputs.fx_rate_aud_nzd;
+
+    const pvTerminalHurdle = terminalValue / Math.pow(1 + hurdle, years);
+    const entryPriceAud = (pvFCFHurdle + pvTerminalHurdle - netDebt) / exitShares;
+    const entryPrice = Math.max(entryPriceAud, 0) * dcfData.inputs.fx_rate_aud_nzd;
+
+    return { iv, entryPrice, pvFCF, pvTerminal, enterpriseValue };
+}
+
+window.updateDCFDisplay = function() {
+    const growth = parseFloat(document.getElementById('growthSlider').value);
+    const wacc = parseFloat(document.getElementById('waccSlider').value);
+    const terminal = parseFloat(document.getElementById('terminalSlider').value);
+
+    document.getElementById('growthValue').textContent = growth + '%';
+    document.getElementById('waccValue').textContent = wacc + '%';
+    document.getElementById('terminalValue').textContent = terminal + '%';
+
+    renderFCFProjections();
+
+    const result = calculateDCF(growth, wacc, terminal);
+
+    document.getElementById('dcfIV').textContent = '$' + result.iv.toFixed(4);
+    document.getElementById('dcfEntry').textContent = '$' + result.entryPrice.toFixed(4);
+
+    const upside = ((result.iv - dcfData.current_price) / dcfData.current_price * 100);
+    const upsideEl = document.getElementById('dcfUpside');
+    upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(0) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+    upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+    const wiv = dcfData.probability_weighted.weighted_iv;
+    document.getElementById('dcfWeighted').textContent = '$' + wiv.toFixed(4);
+    const wUpEl = document.getElementById('dcfWeightedUpside');
+    const wUp = (wiv - dcfData.current_price) / dcfData.current_price * 100;
+    wUpEl.textContent = (wUp >= 0 ? '+' : '') + wUp.toFixed(0) + '% ' + (wUp >= 0 ? 'upside' : 'downside');
+    wUpEl.className = 'dcf-change ' + (wUp >= 0 ? 'positive' : 'negative');
+
+    const grid = document.getElementById('assumptionGrid');
+    if (grid) {
+        grid.innerHTML = `
+            <div class="assumption-item"><div class="label">Mature EBITDA (% of mgmt avg)</div><div class="value">${growth}%</div></div>
+            <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc}%</div></div>
+            <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${terminal}%</div></div>
+            <div class="assumption-item"><div class="label">Intrinsic Value (NZD)</div><div class="value" style="color:#00d4aa;">$${result.iv.toFixed(4)}</div></div>
+            <div class="assumption-item"><div class="label">Entry Price (NZD)</div><div class="value" style="color:#00d4aa;">$${result.entryPrice.toFixed(4)}</div></div>
+        `;
+    }
+};
+
+window.switchScenario = function(scenario) {
+    currentScenario = scenario;
+
+    document.querySelectorAll('.scenario-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.scenario === scenario);
+    });
+
+    const assumptions = dcfData.assumptions[scenario];
+    const valuation = dcfData.valuation[scenario];
+    const scenPctMap = { base: 40, bull: 65, bear: 15 };
+
+    renderFCFProjections();
+
+    document.getElementById('growthSlider').value = scenPctMap[scenario];
+    document.getElementById('waccSlider').value = assumptions.wacc * 100;
+    document.getElementById('terminalSlider').value = assumptions.terminal_growth * 100;
+
+    const grid = document.getElementById('assumptionGrid');
+    grid.innerHTML = `
+        <div class="assumption-item"><div class="label">Mature EBITDA</div><div class="value">A$${assumptions.mature_ebitda_aud_m.toFixed(1)}M</div></div>
+        <div class="assumption-item"><div class="label">EBITDA Margin</div><div class="value">${(assumptions.ebitda_margin_mature * 100).toFixed(0)}%</div></div>
+        <div class="assumption-item"><div class="label">Ramp Years</div><div class="value">${assumptions.ramp_years}</div></div>
+        <div class="assumption-item"><div class="label">WACC</div><div class="value">${(assumptions.wacc * 100).toFixed(0)}%</div></div>
+        <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${(assumptions.terminal_growth * 100).toFixed(1)}%</div></div>
+        <div class="assumption-item"><div class="label">Intrinsic Value (NZD)</div><div class="value" style="color:#00d4aa;">$${valuation.intrinsic_value.toFixed(4)}</div></div>
+    `;
+
+    updateDCFDisplay();
+};
+
+function renderHistoricalGrowth() {
+    const growth = dcfData.historical_growth;
+    const grid = document.getElementById('growthGrid');
+
+    const metrics = [
+        { key: 'revenue_3yr_cagr', label: 'Revenue 3Y' },
+        { key: 'revenue_5yr_cagr', label: 'Revenue 5Y' },
+        { key: 'equity_3yr_cagr', label: 'Equity 3Y' },
+        { key: 'equity_5yr_cagr', label: 'Equity 5Y' },
+        { key: 'fcf_3yr_cagr', label: 'FCF 3Y' },
+        { key: 'fcf_5yr_cagr', label: 'FCF 5Y' }
+    ];
+
+    grid.innerHTML = metrics.map(m => {
+        const rate = growth[m.key];
+        if (rate === null || rate === undefined) {
+            return `<div class="growth-item"><div class="metric">${m.label}</div><div class="rate na">N/A</div></div>`;
+        }
+        const colorClass = rate >= 0 ? 'positive' : 'negative';
+        return `<div class="growth-item"><div class="metric">${m.label}</div><div class="rate ${colorClass}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div></div>`;
+    }).join('');
+}
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const table = document.getElementById('sensitivityMatrix');
+    const currentPrice = dcfData.current_price;
+
+    let html = '<tr><th>WACC \\ Term G</th>';
+    sens.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+    html += '</tr>';
+
+    sens.wacc_range.forEach((wacc, i) => {
+        html += `<tr><th>${wacc}%</th>`;
+        sens.matrix[i].forEach((val, j) => {
+            const isHighlight = wacc === (dcfData.assumptions.base.wacc * 100) &&
+                                 sens.terminal_growth_range[j] === (dcfData.assumptions.base.terminal_growth * 100);
+            const colorClass = val >= currentPrice ? 'above-current' : 'below-current';
+            html += `<td class="${isHighlight ? 'highlight' : colorClass}">$${val.toFixed(4)}</td>`;
+        });
+        html += '</tr>';
+    });
+
+    table.innerHTML = html;
+}
+
+initDCF();
+
+(function() {
+    var growthSlider = document.getElementById('growthSlider');
+    var waccSlider = document.getElementById('waccSlider');
+    var terminalSlider = document.getElementById('terminalSlider');
+
+    if (growthSlider) { growthSlider.oninput = window.updateDCFDisplay; growthSlider.onchange = window.updateDCFDisplay; }
+    if (waccSlider) { waccSlider.oninput = window.updateDCFDisplay; waccSlider.onchange = window.updateDCFDisplay; }
+    if (terminalSlider) { terminalSlider.oninput = window.updateDCFDisplay; terminalSlider.onchange = window.updateDCFDisplay; }
+})();
+</script>
+</body>
+</html>
