@@ -23,6 +23,13 @@
 #
 # --quiet suppresses the live summary (for parallel runs, where several
 # interleaved streams are unreadable). Returns the CLI's exit status.
+#
+# Models are tiered by task difficulty. The orchestrator runs on
+# BATCH_MODEL (default claude-opus-5) rather than inheriting the user's
+# interactive default (Fable, at 2x Opus pricing); the per-stage agents set
+# their own tier in .claude/agents/*.md frontmatter -- fable for the
+# valuation (dcf-analyst), opus for adjudication (financial-parser),
+# sonnet/haiku below that.
 # ---------------------------------------------------------------------------
 research_ticker() {
   local ticker="$1" quiet="${2:-}"
@@ -94,6 +101,7 @@ do not summarize their contents."
     # share one terminal and the tag is the only thing telling them apart.
     set -o pipefail
     claude --permission-mode bypassPermissions \
+           --model "${BATCH_MODEL:-claude-opus-5}" \
            --disallowed-tools "Bash(open *)" \
            --output-format stream-json --verbose \
            -p "$skill_prompt
@@ -109,6 +117,7 @@ $batch_note" 2>&1 \
   else
     set -o pipefail
     claude --permission-mode bypassPermissions \
+           --model "${BATCH_MODEL:-claude-opus-5}" \
            --disallowed-tools "Bash(open *)" \
            --output-format stream-json --verbose \
            -p "$skill_prompt
