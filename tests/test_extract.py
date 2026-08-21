@@ -163,19 +163,35 @@ class TestMainRouting:
     def test_suffixed_symbol_goes_straight_to_text(self, monkeypatch, capsys):
         rc, calls, gaps = drive(
             monkeypatch, ["AGL.NZ"],
-            {"build_facts.py": (0, "scanned")}, [(42, 0)])
+            {"build_facts.py": (0, "scanned"),
+             "adjudicate.py": (0, "AGL.NZ: 9 core cells -- 5 resolved")},
+            [(42, 0)])
         assert rc == 0
-        assert [c[0] for c in calls] == ["build_facts.py"]
+        # candidates are pre-adjudicated into the worksheet before any agent runs
+        assert calls == [("build_facts.py", ["AGL.NZ"]), ("adjudicate.py", ["AGL.NZ"])]
         assert gaps == []
-        assert "42 candidate facts" in capsys.readouterr().out
+        out = capsys.readouterr().out
+        assert "42 candidate facts" in out
+        assert "5 resolved" in out
+
+    def test_adjudicate_failure_is_reported_not_fatal(self, monkeypatch, capsys):
+        rc, calls, _gaps = drive(
+            monkeypatch, ["AGL.NZ"],
+            {"build_facts.py": (0, "scanned"), "adjudicate.py": (2, "boom")},
+            [(42, 0)])
+        assert rc == 0
+        assert [c[0] for c in calls] == ["build_facts.py", "adjudicate.py"]
+        assert "WARNING: adjudicate.py exited 2" in capsys.readouterr().out
 
     def test_empty_xbrl_falls_back_to_text_and_logs_gap(self, monkeypatch, capsys):
         rc, calls, gaps = drive(
             monkeypatch, ["NFLX"],
-            {"build_facts_xbrl.py": (0, "nothing"), "build_facts.py": (0, "ok")},
+            {"build_facts_xbrl.py": (0, "nothing"), "build_facts.py": (0, "ok"),
+             "adjudicate.py": (0, "ok")},
             [(0, 0), (7, 0)])
         assert rc == 0
-        assert [c[0] for c in calls] == ["build_facts_xbrl.py", "build_facts.py"]
+        assert [c[0] for c in calls] == ["build_facts_xbrl.py", "build_facts.py",
+                                         "adjudicate.py"]
         assert [g[1] for g in gaps] == ["other"]
         assert "falling back to text" in capsys.readouterr().out
 
@@ -208,9 +224,9 @@ class TestMainRouting:
     def test_forced_text_path_skips_xbrl_for_us_symbol(self, monkeypatch, capsys):
         rc, calls, _ = drive(
             monkeypatch, ["NFLX", "--path", "text"],
-            {"build_facts.py": (0, "ok")}, [(5, 0)])
+            {"build_facts.py": (0, "ok"), "adjudicate.py": (0, "ok")}, [(5, 0)])
         assert rc == 0
-        assert [c[0] for c in calls] == ["build_facts.py"]
+        assert [c[0] for c in calls] == ["build_facts.py", "adjudicate.py"]
 
     def test_show_flag_forwarded_to_child_script(self, monkeypatch, capsys):
         _, calls, _ = drive(

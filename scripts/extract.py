@@ -5,7 +5,8 @@ Exchanges differ in what they publish, so one extractor cannot serve all
 of them:
 
   US (bare symbol)  SEC XBRL companyfacts -- typed facts, exact periods
-  everything else   text extraction from pdftotext output
+  everything else   text extraction from pdftotext output, then
+                    adjudicate.py pre-resolves the candidates into a worksheet
 
 This is the single entry point the skill calls; it picks the path, falls
 back when the preferred one yields nothing, and logs a gap either way so
@@ -107,6 +108,12 @@ def main() -> int:
     facts, _ = facts_count(t)
     if facts:
         print(f"  path: text extraction  ({facts} candidate facts)")
+        # Decide what the candidates already settle and hand the agent a
+        # worksheet, so it reviews instead of re-reading the filings.
+        rc, out = run("adjudicate.py", t)
+        print(out.rstrip())
+        if rc != 0:
+            print(f"  WARNING: adjudicate.py exited {rc}; agent works from facts alone")
         return 0
 
     # Neither path produced anything. The agent will read the filings

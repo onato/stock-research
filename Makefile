@@ -27,7 +27,7 @@ LEADERBOARD ?= 15   # rows shown by `make screen`
 
 .DEFAULT_GOAL := help
 .PHONY: help run digest status screen integrity missing prune-stubs standardize-scale research facts evals evals-all \
-        cost gaps exchange-eval facts-xbrl screen-metrics check-currency ledger ledger-backfill queue-prune \
+        cost gaps exchange-eval facts-xbrl adjudicate screen-metrics check-currency ledger ledger-backfill queue-prune \
         screen-fundamentals backfill-units canonical-iv sync-portfolio \
         test test-country lint coverage typecheck
 
@@ -138,6 +138,10 @@ research: ## Research one ticker with live progress (TICKER=AGL.NZ)
 facts: ## Rebuild the DuckDB facts table for one ticker (fast, no model)
 	@test -n "$(TICKER)" || { echo "usage: make facts TICKER=AGL.NZ" >&2; exit 2; }
 	$(PY) $(SCRIPTS)/build_facts.py $(TICKER) --show
+
+adjudicate: ## Pre-resolve facts into Reports/{T}_Worksheet.md (no model; CHECK=1 grades vs core_metrics)
+	@test -n "$(TICKER)" || { echo "usage: make adjudicate TICKER=AGL.NZ [CHECK=1]" >&2; exit 2; }
+	$(PY) $(SCRIPTS)/adjudicate.py $(TICKER) $(if $(CHECK),--check,)
 
 facts-xbrl: ## Structured extraction for a US filer via SEC XBRL (TICKER=PYPL)
 	@test -n "$(TICKER)" || { echo "usage: make facts-xbrl TICKER=PYPL" >&2; exit 2; }
