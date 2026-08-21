@@ -83,10 +83,11 @@ as a forward proxy — it is not an analyst estimate, and the output says so.
 
 Period labels come in 13 format families across 2,274 labels; `scripts/periods.py` is
 the single parser. `H1 2026`, `H1-2026`, `H1 FY2026` and `H1-FY2026` all name the same
-six months of **fiscal** 2026. Do not hand-roll period parsing — note that the older
-`export_csv.sort_key` mis-sorts `Q# FY####` labels (it lets the trailing `FY` overwrite
-the quarter's rank), which is why 21 committed CSVs are currently ordered with the full
-year ahead of its own quarters.
+six months of **fiscal** 2026. Do not hand-roll period parsing — not even
+`startswith("FY")`: `FY2017-15mo` and `FY2018-6moStub` (ARB.NZ) are FY-shaped but not
+years, which is what `periods.is_annual` exists to say. `export_csv.sort_key` delegates
+to `periods.sort_key` (an older token-loop version mis-sorted `Q# FY####`; fixed in
+1ff31759).
 
 ## Parser Architecture (open/closed)
 
