@@ -173,6 +173,20 @@ class TestCompleteness:
         assert rec["fy_years"] == 1
         assert rec["complete_years"] == 1
 
+    def test_irregular_fy_shaped_rows_are_not_extra_years(self, repo):
+        # ARB.NZ files `FY2017-15mo` and `FY2018-6moStub` around a balance-date
+        # change; OCA.NZ has `FY2021 (10mo)`. They start with "FY" but are not
+        # twelve-month years, and a six-month stub scored as a complete year
+        # overstates depth against the goal.
+        write_csv(repo, "ARB.NZ", [
+            full_year("FY2017-15mo"), full_year("FY2018-6moStub"),
+            full_year("FY2019"), full_year("FY2020"),
+        ])
+        rec = scan_one(repo, "ARB.NZ")
+        assert rec["fy_years"] == 2
+        assert rec["complete_years"] == 2
+        assert rec["first_year"] == 2019
+
     def test_duplicate_fy_rows_count_once(self, repo):
         write_csv(repo, "DUP", [full_year("FY2024"), full_year("FY2024")])
         assert scan_one(repo, "DUP")["fy_years"] == 1

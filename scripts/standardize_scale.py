@@ -48,6 +48,7 @@ from typing import Any
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import backfill_units as bu
+import periods
 import schema
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
@@ -131,7 +132,9 @@ def _dcf_inputs(reports: pathlib.Path, ticker: str) -> dict[str, Any]:
 def _latest(rows: list[dict[str, str]], header: str) -> float | None:
     """Newest populated value for a column, matching how the DCF was built."""
     for row in reversed(rows):
-        if not (row.get("Period") or "").strip().upper().startswith("FY"):
+        # A 15-month transition year is FY-shaped but not comparable with
+        # the DCF's twelve-month inputs.
+        if not periods.is_annual(periods.parse(row.get("Period"))):
             continue
         value = _num(row.get(header))
         if value:            # zero cannot anchor a ratio

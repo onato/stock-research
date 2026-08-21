@@ -43,6 +43,7 @@ import sys
 from typing import Any
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import periods
 import schema
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
@@ -63,9 +64,6 @@ TARGET_YEARS = 10
 
 # CSV header spelling for each core column, for display.
 DISPLAY = {name: hdr for name, _, hdr in schema.CORE_COLUMNS}
-
-YEAR_RE = re.compile(r"(19|20)\d{2}")
-
 
 # Scale/currency markers some tickers bake into their headers:
 # BABA and 9988.HK file `Revenue_RMB_Mn` and `EPS_Diluted_RMB`, AGL.NZ uses
@@ -116,13 +114,17 @@ def strip_units(header: str) -> str | None:
 
 
 def year_of(period: str) -> int | None:
-    m = YEAR_RE.search(period or "")
-    return int(m.group(0)) if m else None
+    return periods.parse(period).fiscal_year
 
 
 def is_fy(period: str) -> bool:
-    """True for a full-year row. H1/Q rows are real data but not extra years."""
-    return (period or "").strip().upper().startswith("FY")
+    """True for a genuine twelve-month year.
+
+    H1/Q rows are real data but not extra years, and neither are FY-shaped
+    irregular periods: ARB.NZ's `FY2017-15mo` and `FY2018-6moStub` counted as
+    two complete years, a six-month stub scored the same as a full one.
+    """
+    return periods.is_annual(periods.parse(period))
 
 
 def read_csv_rows(path: pathlib.Path) -> list[dict[str, str]]:

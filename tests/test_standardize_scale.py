@@ -242,6 +242,21 @@ class TestDefensivePaths:
         write_dcf(ticker_dir)
         assert standardize_scale.resolve_scale(ticker_dir, "T") is None
 
+    def test_an_irregular_newest_fy_row_is_not_an_anchor(self, ticker_dir):
+        # A 15-month transition year is FY-shaped but its figures are not
+        # comparable with the DCF's twelve-month inputs; the anchor must be
+        # the newest genuine year beneath it.
+        write_csv(ticker_dir / "T_Metrics.csv",
+                  [{"Period": "FY2024", "Revenue": "500",
+                    "SharesOutstanding": "100000000",
+                    "TotalDebt": "200000000"},
+                   {"Period": "FY2025-15mo", "Revenue": "700",
+                    "SharesOutstanding": "5", "TotalDebt": "7"}],
+                  headers=["Period", "Revenue", "SharesOutstanding",
+                           "TotalDebt", "Units", "Currency"])
+        write_dcf(ticker_dir, shares_outstanding=100.0, total_debt=200.0)
+        assert standardize_scale.resolve_scale(ticker_dir, "T") == "absolute"
+
 
 class TestConversion:
     def test_thousands_convert_to_millions(self, ticker_dir):
