@@ -283,14 +283,51 @@ class TestJudgmentMetrics:
         assert [c.value_raw for c in p.shortlist] == [6119.0]
 
     def test_check_reports_precision_without_judgment_metrics(self, db):
-        con = db([fact("Revenue", "FY2024", 263527.0),
+        con = db([fact("TotalAssets", "FY2024", 263527.0),
                   fact("CapEx", "FY2024", -12917.0)])
-        con.execute("INSERT INTO core_metrics (period, revenue, capex, units)"
+        con.execute("INSERT INTO core_metrics (period, total_assets, capex, units)"
                     " VALUES ('FY2024', 263.527, 18.296, 'millions')")
         rep = adjudicate.check(con, adjudicate.propose(con))
         assert (rep["compared"], rep["agree"]) == (2, 1)
         assert rep["firm"] == (1, 1)          # (agree, compared) excluding ~ cells
         assert rep["firm_value"] == (1, 1)
+
+
+class TestSummaryOnlyPeriods:
+    def secs(self):
+        return {"X.NZ_Annual_FY2018.txt": [
+            sections.Section("summary", "FIVE-YEAR SUMMARY", 1, 50),
+            sections.Section("statement", "INCOME STATEMENT", 51, 200)]}
+
+    def test_period_without_its_own_filing_resolves_from_the_summary(self, db):
+        # 0016.HK FY2016/FY2017 exist only as five-year-summary columns in the
+        # FY2018 report; with no filing of their own, the summary IS the source.
+        con = db([fact("Revenue", "FY2018", 85.0, line=100, file="X.NZ_Annual_FY2018.txt"),
+                  fact("Revenue", "FY2016", 70.0, line=10, file="X.NZ_Annual_FY2018.txt")])
+        p = cell(adjudicate.propose(con, self.secs()), "revenue", "FY2016")
+        assert (p.status, p.rung, p.value_raw) == ("resolved", "summary-only", 70.0)
+        assert "no filing of its own" in p.rationale
+
+    def test_period_with_its_own_filing_still_ignores_the_summary(self, db):
+        con = db([fact("Revenue", "FY2018", 85.0, line=100, file="X.NZ_Annual_FY2018.txt"),
+                  fact("Revenue", "FY2018", 80.0, line=10, file="X.NZ_Annual_FY2018.txt")])
+        p = cell(adjudicate.propose(con, self.secs()), "revenue", "FY2018")
+        assert (p.status, p.value_raw) == ("resolved", 85.0)
+
+
+class TestMissingPointers:
+    def test_missing_cells_point_at_the_metrics_home_statement(self, db):
+        con = db([fact("Revenue", "FY2024", 1.0), fact("Revenue", "FY2023", 1.0,
+                                                        file="X.NZ_Annual_FY2023.txt"),
+                  fact("CapEx", "FY2023", -2.0, file="X.NZ_Annual_FY2023.txt")])
+        ps = adjudicate.propose(con)
+        pointers = {"X.NZ_Annual_FY2024.txt": [("Consolidated Income Statement", 100, 160),
+                                               ("Consolidated Statement of Cash Flows", 300, 360)]}
+        text = adjudicate.worksheet("X.NZ", ps, pointers)
+        missing = text.split("## Missing")[1].split("## KPIs")[0]
+        assert "capex" in missing
+        assert "X.NZ_Annual_FY2024.txt:300-360" in missing
+        assert "100-160" not in missing
 
 
 class TestVocabulary:
@@ -382,6 +419,7 @@ class TestWorksheet:
                 for j in range(6)]
         text = adjudicate.worksheet("X.NZ", adjudicate.propose(db(rows)), {})
         assert len(text.encode()) <= adjudicate.SIZE_BUDGET
+        assert adjudicate.SIZE_BUDGET <= 24_000   # one `cat` inside the tool's output cap
 
 
 class TestTable:

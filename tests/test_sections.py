@@ -161,3 +161,25 @@ class TestStatementFamily:
         secs = sections.index_text(text)
         assert sections.find(secs, 18).caption == "CONSOLIDATED STATEMENT OF FINANCIAL POSITION"
         assert sections.find(secs, 1) is None
+
+
+class TestLongSummaryBlocks:
+    def test_second_subcaption_after_a_fifteen_line_block_is_still_summary(self):
+        # 0027.HK five-year summary: the income block runs 15 lines and the
+        # year row is nine lines above "CONSOLIDATED BALANCE SHEET".
+        body = ["FIVE-YEAR SUMMARY", "   2020   2021   2022   2023   2024",
+                "   HK$'000  HK$'000  HK$'000  HK$'000  HK$'000",
+                "CONSOLIDATED INCOME STATEMENT"]
+        body += [f"Line {i}   1   2   3   4   5" for i in range(11)]
+        body += ["CONSOLIDATED BALANCE SHEET", "Total assets   1  2  3  4  5"]
+        kinds = [s.kind for s in sections.index_text("\n".join(body) + "\n")]
+        assert kinds == ["summary", "summary", "summary"]
+
+    def test_real_statements_after_a_long_summary_block_stay_statements(self):
+        body = ["FIVE-YEAR SUMMARY", "   2020   2021   2022   2023   2024",
+                "CONSOLIDATED BALANCE SHEET"]
+        body += [f"Line {i}   1   2   3   4   5" for i in range(60)]
+        body += ["CONSOLIDATED INCOME STATEMENT", "For the year ended 31 December 2024",
+                 "Revenue   43,432,373   35,684,253"]
+        kinds = [s.kind for s in sections.index_text("\n".join(body) + "\n")]
+        assert kinds == ["summary", "summary", "statement"]

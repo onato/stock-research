@@ -48,7 +48,7 @@ from parsers import common
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
 SHORTLIST = 4
-SIZE_BUDGET = 40_000          # bytes; ARB.NZ's agent ingested 489 KB of filings
+SIZE_BUDGET = 24_000          # bytes: one `cat` under the tool output cap (0016.HK's 33 KB took 3 reads)
 CONTEXT_CHARS = (100, 40, 0)  # progressive trim to stay inside the budget
 
 SCALES: dict[str, float] = {"units": 1.0, "thousands": 1e3, "millions": 1e6,
@@ -74,7 +74,9 @@ OUTLIER_MIN_PERIODS = 3
 # diluted EPS, which borrowings lines make "total debt". A candidate here
 # can be the right line and the wrong answer, so it is proposed, never green.
 JUDGMENT = {"capex", "total_debt", "ebitda", "stock_based_comp", "eps", "net_income",
-            "shareholders_equity"}   # total equity incl. NCI vs attributable
+            "shareholders_equity",   # total equity incl. NCI vs attributable
+            "operating_income",      # before/after fair-value changes (0016.HK)
+            "revenue"}               # company vs group incl. JVs; with/without other income
 # The primary statement each metric is read from; a candidate in another
 # statement (cash-flow closing cash vs the balance-sheet line) ranks below.
 HOME = {"revenue": "income", "cost_of_revenue": "income", "gross_profit": "income",
@@ -176,7 +178,7 @@ def _guard(metric: str, c: Candidate, static: set[float]) -> str | None:
 
 
 def _resolve(metric: str, kind: str, period: str, cands: list[Candidate],
-             static: set[float]) -> Proposal:
+             static: set[float], own_filing: bool = True) -> Proposal:
     guarded: Counter[str] = Counter()
     stmt: list[Candidate] = []
     for c in cands:
@@ -187,6 +189,19 @@ def _resolve(metric: str, kind: str, period: str, cands: list[Candidate],
             guarded[why_not] += 1
         else:
             stmt.append(c)
+    if not stmt and not own_filing:
+        # No filing of its own: the five-year summary in a later report is
+        # the only source there is (0016.HK FY2016-17). Use it, say so.
+        summ = [c for c in cands if c.confidence == "statement_line" and c.section == "summary"
+                and not _year_like(c) and c.value_raw != 0]
+        if len({c.value_raw for c in summ}) == 1:
+            best = min(summ, key=Candidate.rank)
+            return Proposal(metric, kind, period, "resolved", "summary-only", best.value_raw,
+                            best.units_hint, best.currency, best.source_file, best.line_no,
+                            len(cands), "no filing of its own; taken from a later report's "
+                            "multi-year summary", [], [],
+                            "confirm-definition" if metric in JUDGMENT else None,
+                            best.section)
     values = {c.value_raw for c in stmt}
     pick: Candidate | None = None
     rung = ""
@@ -259,7 +274,8 @@ def propose(con: duckdb.DuckDBPyConnection,
                                        ctx or "", conf, own[src], section, fam,
                                        HOME.get(key[0])))
 
-    universe = {p for p in own.values() if p}
+    filed = {p for p in own.values() if p}
+    universe = set(filed)
     universe |= {p for by in cells.values() for p, cs in by.items()
                  if any(c.confidence == "statement_line" for c in cs)}
     out: list[Proposal] = []
@@ -277,7 +293,8 @@ def propose(con: duckdb.DuckDBPyConnection,
         for period in universe | set(by_period):
             cands = by_period.get(period, [])
             if cands:
-                cells_out.append(_resolve(metric, kind, period, cands, static))
+                cells_out.append(_resolve(metric, kind, period, cands, static,
+                                          own_filing=period in filed))
             else:
                 files = sorted(f for f, p in own.items() if p == period)
                 cells_out.append(Proposal(metric, kind, period, "missing", files=files,
@@ -344,7 +361,7 @@ def _short(file: str, ticker: str) -> str:
 
 def _render(ticker: str, props: list[Proposal],
             pointers: dict[str, list[tuple[str, int, int]]], ctx_width: int,
-            cap: int) -> str:
+            cap: int, kpi_lists: bool = True, terse: bool = False) -> str:
     core = [p for p in props if p.kind == "core"]
     kpi = [p for p in props if p.kind == "kpi"]
     plist = sorted({p.period for p in props}, key=periods.sort_key)
@@ -387,7 +404,8 @@ def _render(ticker: str, props: list[Proposal],
                          f"/{c.section}{'' if c.units_hint else ', ?units'}] "
                          f"{_short(c.source_file, ticker)}:{c.line_no}"
                          + (f" — {ctx}" if ctx else ""))
-        return f"- {p.metric} {p.period} ({p.n_candidates}; {p.rationale}): " + " | ".join(items)
+        why = "" if terse else f"; {p.rationale}"
+        return f"- {p.metric} {p.period} ({p.n_candidates}{why}): " + " | ".join(items)
 
     lines += ["", "## Resolved", ""]
     for per in plist:
@@ -417,9 +435,12 @@ def _render(ticker: str, props: list[Proposal],
         lines.append(f"- {per}: {', '.join(p.metric for p in miss)}"
                      + (f" — files: {', '.join(_short(f, ticker) for f in files)}"
                         if files else " — no filing for this period"))
+        homes = {HOME.get(p.metric) for p in miss}
         for f in files:
             for caption, a, b in pointers.get(f, []):
-                lines.append(f"  - {f}:{a}-{b} {caption}")
+                fam = sections.family(caption)
+                if fam in homes or None in homes:
+                    lines.append(f"  - {f}:{a}-{b} {caption}")
 
     lines += ["", "## KPIs", "",
               "Metrics outside core_metrics (write to `kpis`, not new columns):", ""]
@@ -428,7 +449,12 @@ def _render(ticker: str, props: list[Proposal],
         if got:
             lines.append(resolved_line(per, got))
     lines.append("")
-    lines.extend(shortlist_line(p) for p in kpi if p.status == "contested")
+    if kpi_lists:
+        lines.extend(shortlist_line(p) for p in kpi if p.status == "contested")
+    else:
+        n_kpi = sum(1 for p in kpi if p.status == "contested")
+        lines.append(f"({n_kpi} contested KPI cells omitted for size -- "
+                     "query proposed_metrics WHERE kind = 'kpi' AND status = 'contested')")
 
     lines += ["", "## Filings", "",
               "| file | own period | units hint | currency | candidates |",
@@ -456,13 +482,17 @@ def _render(ticker: str, props: list[Proposal],
 
 def worksheet(ticker: str, props: list[Proposal],
               pointers: dict[str, list[tuple[str, int, int]]]) -> str:
-    """Render the worksheet, trimming context and shortlists to the budget."""
+    """Render the worksheet, trimming to the budget: shorter contexts, then
+    shorter shortlists, then KPI shortlists dropped (the agent can query
+    proposed_metrics for those), then rationales dropped."""
     text = ""
-    for cap in (SHORTLIST, 2):
-        for width in CONTEXT_CHARS:
-            text = _render(ticker, props, pointers, width, cap)
-            if len(text.encode()) <= SIZE_BUDGET:
-                return text
+    for terse in (False, True):
+        for kpi_lists in (True, False):
+            for cap in (SHORTLIST, 2, 1):
+                for width in CONTEXT_CHARS:
+                    text = _render(ticker, props, pointers, width, cap, kpi_lists, terse)
+                    if len(text.encode()) <= SIZE_BUDGET:
+                        return text
     return text
 
 

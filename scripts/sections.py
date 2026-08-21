@@ -49,6 +49,8 @@ TITLE_RE = re.compile(
     r"(?:[A-Z][\w'’-]*|and|of|the|for|&)(?:\s+(?:[A-Z][\w'’-]*|and|of|the|for|&)){0,7}")
 MIN_POINTER_LINES = 5   # a contents entry is one line; a statement is many
 SUBCAPTION_WINDOW = 12  # a statement caption this soon after a summary one may be its sub-heading
+CHAIN_WINDOW = 40       # once one sub-heading is found, later ones may follow a page-long block
+YEAR_WINDOW = 10        # lines either side of a caption searched for its year row
 YEAR_RE = re.compile(r"\b(?:19|20)\d{2}\b")
 MULTI_YEAR_TABLE = 4    # a statement shows two years (three if restated); a summary shows five+
 
@@ -99,11 +101,12 @@ def index_text(text: str) -> list[Section]:
         # (0001.HK "Ten Year Summary" repeats "CONSOLIDATED INCOME STATEMENT";
         # its first column is 2015). Once one sub-heading is found, the
         # block's later ones follow without needing their own year row.
-        near = lines[max(0, start - 5):start + 5]
-        after_summary = bool(out) and out[-1].kind == "summary" \
-            and out[-1].end - out[-1].start + 1 <= SUBCAPTION_WINDOW
+        near = lines[max(0, start - YEAR_WINDOW):start + YEAR_WINDOW]
+        prev_len = out[-1].end - out[-1].start + 1 if out else 0
+        after_summary = bool(out) and out[-1].kind == "summary"
         if kind == "statement" and (
-                (after_summary and (chained or _many_years(near)))
+                (after_summary and prev_len <= SUBCAPTION_WINDOW and _many_years(near))
+                or (after_summary and chained and prev_len <= CHAIN_WINDOW)
                 or _many_years(near, MULTI_YEAR_TABLE)):
             kind, chained = "summary", True
         elif kind != "statement" or not out or out[-1].kind != "summary":

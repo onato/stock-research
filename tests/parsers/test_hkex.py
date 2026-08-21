@@ -167,3 +167,17 @@ class TestUnitsHintByMajority:
         p = parser()
         assert p.units_hint(text.split("\n")) == "millions"
         assert p.currency(text.split("\n")) == "HKD"
+
+
+class TestBareDollarMillionsHeader:
+    def test_dollar_m_header_is_millions(self):
+        # 0388.HK (HKEX itself) heads every statement column "$m".
+        text = ("Consolidated Income Statement\n"
+                "                                   2025      2024\n"
+                "                     Note            $m        $m\n"
+                "Trading fees        5(a)         10,333     7,189\n")
+        assert parser().units_hint(text.split("\n")) == "millions"
+
+    def test_dollar_thousands_header(self):
+        text = "                     Note         $'000      $'000\nRevenue   1,234  1,100\n"
+        assert parser().units_hint(text.split("\n")) == "thousands"

@@ -36,7 +36,7 @@ class HKEXParser(BaseParser):
     CJK_RE = re.compile(r"[一-鿿　-〿＀-￯].*$")
 
     UNITS_TOKEN_RE = re.compile(
-        r"(?:RMB|HK\$|US\$)\s?(?:['’]\s?)?(000\b|million|billion)", re.IGNORECASE)
+        r"(?:RMB|HK\$|US\$|\$)\s?(?:['’]\s?)?(000\b|million|billion|m\b|bn\b)", re.IGNORECASE)
 
     # Table-header declarations: "(in thousands)", "(RMB, in thousands)",
     # "(All amounts in thousands, ...)", "(in millions)" — how the US-style
@@ -75,7 +75,7 @@ class HKEXParser(BaseParser):
     def _scale(token: str) -> str:
         u = token.lower()
         return ("thousands" if u.startswith(("000", "thousand"))
-                else "millions" if u.startswith("million") else "billions")
+                else "millions" if u.startswith(("million", "m")) else "billions")
 
     def currency(self, lines: list[str]) -> str | None:
         return self._search_currency("\n".join(lines))

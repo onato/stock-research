@@ -177,3 +177,21 @@ class TestOperatingProfitBeforeDandA:
 
     def find(self, label):
         return [m for m, pats in bf.COMPILED.items() if any(p.search(label) for p in pats)]
+
+
+class TestSharesPattern:
+    def test_treasury_lines_are_not_share_counts(self):
+        # 0388.HK: "Shares held for Share Award Scheme" (-1,228) became the share count.
+        for label in ("Shares held for Share Award Scheme", "Shares repurchased",
+                      "Shares purchased for Share Award Scheme", "Shares to be issued"):
+            assert "SharesOutstanding" not in self.find(label), label
+        for label in ("Number of ordinary shares", "Weighted average number of shares",
+                      "Ordinary shares in issue", "Shares outstanding", "Issued and fully paid shares"):
+            assert "SharesOutstanding" in self.find(label), label
+
+    def test_cash_and_other_cash_equivalents_and_bank_deposits(self):
+        assert "CashAndEquivalents" in self.find("Cash and other cash equivalents and bank deposits")
+        assert "CashAndEquivalents" in self.find("Cash and bank balances")
+
+    def find(self, label):
+        return [m for m, pats in bf.COMPILED.items() if any(p.search(label) for p in pats)]

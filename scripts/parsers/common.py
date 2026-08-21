@@ -45,15 +45,21 @@ PATTERNS: dict[str, list[str]] = {
     "TotalAssets": [r"^total assets(?! less)"],
     "TotalLiabilities": [r"^total liabilities"],
     # Opening balances ("at 1 January", "brought forward") are last year's close.
-    "CashAndEquivalents": [(r"^cash and (cash )?equivalents"
+    "CashAndEquivalents": [(r"^cash(,| and)( other)? (cash )?equivalents"
                             r"(?!.*(at 1 |at the beginning|at beginning|brought forward|at start))"),
-                           r"^cash at bank", r"^bank (deposits|balances) and cash"],
+                           r"^cash at bank", r"^bank (deposits|balances) and cash",
+                           r"^cash and bank (balances|deposits)"],
     # Pre-tax, pre-interest subtotal -- a different quantity from OCF (0006.HK
     # FY2025: 547 vs 884). Its own metric so it can never outrank OCF.
     "CashGeneratedFromOperations": [r"^cash generated (from|by) operation"],
     "TotalDebt": [r"^(total )?borrowings", r"^(total )?(interest.bearing )?debt",
                   r"^loans and borrowings"],
-    "SharesOutstanding": [r"^(weighted average )?(number of )?(ordinary )?shares",
+    "SharesOutstanding": [# A count, not a transaction: "Shares purchased for Share Award Scheme" (0027.HK)
+                          # and "Shares held for Share Award Scheme" (0388.HK) are cash flows.
+                          r"^(weighted average )?number of (ordinary |issued )?shares",
+                          r"^weighted average (number of )?(ordinary )?shares",
+                          r"^(ordinary )?shares (in issue|outstanding)",
+                          r"^issued (and fully paid )?(ordinary )?shares",
                           r"shares on issue"],
     "StockBasedComp": [r"^(stock|share).based (compensation|payment)",
                        r"^share.based payment"],
