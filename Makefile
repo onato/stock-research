@@ -215,5 +215,5 @@ ledger: ## Append TICKER's current DCF to the prediction ledger
 ledger-backfill: ## Log every existing DCF.json to the ledger (idempotent)
 	$(PY) $(SCRIPTS)/ledger.py backfill
 
-queue-prune: ## Drop delisted tickers from the queue (no model, costs nothing)
-	$(PY) $(SCRIPTS)/prune_queue.py
+queue-prune: ## Comment out delisted tickers in the queue (APPLY=1 to write)
+	$(PY) $(SCRIPTS)/prune_queue.py $(if $(APPLY),--apply,)

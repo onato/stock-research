@@ -128,7 +128,7 @@ class TestMain:
     def test_delisted_ticker_commented_with_reason(self, queue_dir, monkeypatch, capsys):
         f = queue_dir / "nzx.txt"
         f.write_text("ACE.NZ\nAIR.NZ\n")
-        assert run(monkeypatch, {"ACE.NZ": DEAD, "AIR.NZ": LIVE}) == 0
+        assert run(monkeypatch, {"ACE.NZ": DEAD, "AIR.NZ": LIVE}, "--apply") == 0
         assert f.read_text().splitlines() == [
             "# ACE.NZ  # delisted? no such symbol (404)",
             "AIR.NZ",
@@ -158,23 +158,32 @@ class TestMain:
     def test_inline_comment_stripped_before_lookup(self, queue_dir, monkeypatch):
         f = queue_dir / "nzx.txt"
         f.write_text("ACE.NZ  # renamed to BAI.NZ\n")
-        run(monkeypatch, {"ACE.NZ": DEAD})
+        run(monkeypatch, {"ACE.NZ": DEAD}, "--apply")
         assert f.read_text() == (
             "# ACE.NZ  # renamed to BAI.NZ  # delisted? no such symbol (404)\n")
 
-    def test_dry_run_reports_but_writes_nothing(self, queue_dir, monkeypatch, capsys):
+    def test_default_is_a_dry_run_that_writes_nothing(self, queue_dir, monkeypatch, capsys):
+        # Every other mutating script here is check-by-default; the queue
+        # must not be rewritten by a bare `make queue-prune`.
         f = queue_dir / "nzx.txt"
         f.write_text("ACE.NZ\n")
-        assert run(monkeypatch, {"ACE.NZ": DEAD}, "--dry-run") == 0
+        assert run(monkeypatch, {"ACE.NZ": DEAD}) == 0
         assert f.read_text() == "ACE.NZ\n"
         out = capsys.readouterr().out
         assert "delisted: 1" in out
-        assert "--dry-run: nothing written" in out
+        assert "--apply" in out
+
+    def test_apply_writes_and_does_not_claim_a_dry_run(self, queue_dir, monkeypatch, capsys):
+        f = queue_dir / "nzx.txt"
+        f.write_text("ACE.NZ\n")
+        assert run(monkeypatch, {"ACE.NZ": DEAD}, "--apply") == 0
+        assert f.read_text() == "# ACE.NZ  # delisted? no such symbol (404)\n"
+        assert "nothing written" not in capsys.readouterr().out
 
     def test_every_queue_file_is_checked(self, queue_dir, monkeypatch):
         (queue_dir / "asx.txt").write_text("BHP.AX\n")
         (queue_dir / "nzx.txt").write_text("AIR.NZ\n")
-        assert run(monkeypatch, {"BHP.AX": LIVE, "AIR.NZ": DEAD}) == 0
+        assert run(monkeypatch, {"BHP.AX": LIVE, "AIR.NZ": DEAD}, "--apply") == 0
         assert (queue_dir / "asx.txt").read_text() == "BHP.AX\n"
         assert "# AIR.NZ" in (queue_dir / "nzx.txt").read_text()
 
@@ -184,7 +193,7 @@ class TestMain:
         (queue_dir / "nzx.txt").write_text("AIR.NZ\n")
         target = tmp_path / "custom.txt"
         target.write_text("ACE.NZ\n")
-        assert run(monkeypatch, {"ACE.NZ": DEAD}, "--file", str(target)) == 0
+        assert run(monkeypatch, {"ACE.NZ": DEAD}, "--apply", "--file", str(target)) == 0
         assert "# ACE.NZ" in target.read_text()
 
     def test_missing_file_is_skipped(self, queue_dir, monkeypatch, capsys):

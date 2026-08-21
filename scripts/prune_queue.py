@@ -14,8 +14,8 @@ Nothing is deleted -- entries are commented with the reason, so the file
 still records what was considered.
 
 Usage:
-  prune_queue.py              # check every queued ticker
-  prune_queue.py --dry-run    # report only
+  prune_queue.py              # report what would be commented out
+  prune_queue.py --apply      # write the queue files
   prune_queue.py --file queue/nzx.txt
 """
 
@@ -65,7 +65,8 @@ def quote(ticker: str) -> tuple[float | None, str]:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--apply", action="store_true",
+                    help="rewrite the queue files (default: report only)")
     ap.add_argument("--file", default="")
     ap.add_argument("--delay", type=float, default=0.4,
                     help="seconds between requests (Yahoo rate-limits)")
@@ -100,7 +101,7 @@ def main() -> int:
             out.append(f"# {line}  # delisted? {info}")
             changed = True
 
-        if changed and not args.dry_run:
+        if changed and args.apply:
             f.write_text("\n".join(out) + "\n")
 
     print(f"  live: {live}   delisted: {len(dead)}   unresolved: {len(unknown)}")
@@ -112,8 +113,8 @@ def main() -> int:
         print("\n  could not check (left in the queue):")
         for t, why in unknown[:8]:
             print(f"    {t:12s} {why}")
-    if args.dry_run:
-        print("\n  (--dry-run: nothing written)")
+    if not args.apply:
+        print("\n  (nothing written; pass --apply to comment them out)")
     return 0
 
 
