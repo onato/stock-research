@@ -221,6 +221,39 @@ function renderGuidance() {
 renderGuidance();
 ```
 
+### Page Header
+
+The header carries the company name, a one-line descriptor, and a **headline valuation
+chip**. Include the empty `#headerValuation` container; `initDCF()` fills it from the DCF
+JSON and reveals it, so it stays hidden on dashboards with no DCF.
+
+```html
+<div class="header">
+    <h1>{Company Name} ({TICKER})</h1>
+    <p>{one-line business descriptor &middot; FY end &middot; reporting currency}</p>
+    <div class="header-valuation" id="headerValuation" style="display:none"></div>
+</div>
+```
+
+### Which valuation number leads
+
+**The probability-weighted IV is the headline.** It is the expected value across
+bull/base/bear at the analyst's own weights, and it is the figure the screener ranks on
+(`screen-investments/screen.py` reads exactly `probability_weighted.weighted_iv`) and the
+one `dcf-analyst.md` requires. The base-case IV is a single scenario — useful supporting
+detail, not the number to act on. They diverge materially: across the corpus 31 tickers
+weight *below* base, with outliers past +100%.
+
+So: `Prob-Weighted IV` takes the first card and the `highlight` class; `Intrinsic Value
+(Base)` follows as a plain card. Never restore base IV to the lead slot.
+
+Two rules that follow:
+- **Always render `#dcfWeightedUpside`.** A headline with no upside % is worse than the
+  card it replaced.
+- **Never hardcode the weights sublabel.** Render it from
+  `probability_weighted.weights` via `#dcfWeightedSublabel`; hardcoded text has already
+  drifted from the JSON on four dashboards.
+
 ### Investment Overview Section
 
 The dashboard must include an **Investment Overview** section at the top (below the header, above KPI cards) that displays the qualitative analysis. This section should be collapsible.
@@ -325,6 +358,35 @@ body {
     color: #888;
     font-size: 1.1rem;
 }
+/* Headline valuation chip — fills the wide, otherwise-empty header strip so the
+   number the reader should act on is visible without scrolling to the DCF. */
+.header-valuation {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 14px 32px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.hv-item {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+.hv-label {
+    font-size: 0.75rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.hv-value {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #e0e0e0;
+}
+.hv-value.positive { color: #00d4aa; }
+.hv-value.negative { color: #ff6b6b; }
 .kpi-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -928,6 +990,12 @@ If a DCF JSON file exists at `./research/{ticker}/Reports/{TICKER}_DCF.json`, ad
   <!-- Valuation Summary Cards -->
   <div class="dcf-summary">
     <div class="dcf-card highlight">
+      <div class="dcf-label">Prob-Weighted IV</div>
+      <div class="dcf-value" id="dcfWeighted">$131</div>
+      <div class="dcf-change" id="dcfWeightedUpside"></div>
+      <div class="dcf-sublabel" id="dcfWeightedSublabel">25% Bull / 50% Base / 25% Bear</div>
+    </div>
+    <div class="dcf-card">
       <div class="dcf-label">Intrinsic Value (Base)</div>
       <div class="dcf-value" id="dcfIV">$162</div>
       <div class="dcf-change positive" id="dcfUpside">+7% upside</div>
@@ -941,12 +1009,6 @@ If a DCF JSON file exists at `./research/{ticker}/Reports/{TICKER}_DCF.json`, ad
     <div class="dcf-card">
       <div class="dcf-label">Current Price</div>
       <div class="dcf-value" id="dcfCurrent">$151</div>
-    </div>
-    <div class="dcf-card">
-      <div class="dcf-label">Prob-Weighted IV</div>
-      <div class="dcf-value" id="dcfWeighted">$131</div>
-      <div class="dcf-change" id="dcfWeightedUpside"></div>
-      <div class="dcf-sublabel">25% Bull / 50% Base / 25% Bear &mdash; all on owner FCF</div>
     </div>
   </div>
 
@@ -984,20 +1046,27 @@ If a DCF JSON file exists at `./research/{ticker}/Reports/{TICKER}_DCF.json`, ad
     </div>
   </div>
 
-  <!-- Interactive Sliders -->
+  <!-- Interactive Sliders.
+       step MUST be fine enough to hold the scenario's exact defaults: a
+       range input snaps its value to the nearest step, so step="1" turned a
+       7.5% base growth rate into 8% on NPH.NZ and every "at defaults" number
+       on the page silently drifted from the DCF JSON (IV $2.97 vs $2.87)
+       while node --check and the render both passed. Use step="0.1" for
+       growth and terminal, "0.05" for WACC, and after init assert
+       slider.value == assumptions.base.<field> before trusting the page. -->
   <div class="dcf-controls">
     <div class="slider-group">
       <label>Growth Rate: <span id="growthValue">15%</span></label>
-      <input type="range" id="growthSlider" min="0" max="30" value="15" step="1" oninput="updateDCFDisplay()">
+      <input type="range" id="growthSlider" min="0" max="30" value="15" step="0.1" oninput="updateDCFDisplay()">
       <div class="slider-hint" id="growthHint">Based on equity CAGR</div>
     </div>
     <div class="slider-group">
       <label>WACC: <span id="waccValue">10%</span></label>
-      <input type="range" id="waccSlider" min="6" max="18" value="10" step="0.5" oninput="updateDCFDisplay()">
+      <input type="range" id="waccSlider" min="6" max="18" value="10" step="0.05" oninput="updateDCFDisplay()">
     </div>
     <div class="slider-group">
       <label>Terminal Growth: <span id="terminalValue">3%</span></label>
-      <input type="range" id="terminalSlider" min="0" max="5" value="3" step="0.5" oninput="updateDCFDisplay()">
+      <input type="range" id="terminalSlider" min="0" max="5" value="3" step="0.1" oninput="updateDCFDisplay()">
     </div>
   </div>
 
@@ -1432,12 +1501,61 @@ function initDCF() {
     document.getElementById('growthHint').textContent =
         'Based on ' + dcfData.historical_growth.growth_rate_source.replace(/_/g, ' ');
 
+    // Weights sublabel is rendered FROM the JSON, never hardcoded — four
+    // dashboards previously showed weights that contradicted their own DCF.
+    const wsub = document.getElementById('dcfWeightedSublabel');
+    const wts = (dcfData.probability_weighted || {}).weights;
+    if (wsub && wts) {
+        const pct = (x) => Math.round(x * 100);
+        let txt = `${pct(wts.bull)}% Bull / ${pct(wts.base)}% Base / ${pct(wts.bear)}% Bear`;
+        if (!isWeightedLive()) txt += ' \u2014 fixed from model';
+        wsub.textContent = txt;
+    }
+
+    renderHeaderValuation();
+
     // Render components
     renderDCFInputs();
     renderHistoricalGrowth();
     renderSensitivityMatrix();
     updateDCFDisplay();
     switchScenario('base');
+}
+
+// Headline valuation chip in the page header. The header strip is wide and
+// mostly empty, so the number the reader should actually act on goes there —
+// visible without scrolling to the DCF section. Static from JSON by design:
+// it is a headline, not a second live model.
+function renderHeaderValuation() {
+    const el = document.getElementById('headerValuation');
+    if (!el) return;
+    const pw = dcfData.probability_weighted || {};
+    const wiv = pw.weighted_iv;
+    const price = dcfData.current_price;
+    if (wiv == null || price == null) return;
+
+    // A price must be denominated like the IV that divides it. WISE.L quotes
+    // 885.6 GBP pence against a USD model: rendering that as -98% upside is the
+    // documented price-currency-mismatch. Suppress the chip rather than lie.
+    const ratio = wiv / price;
+    if (ratio > 20 || ratio < 0.05) return;
+    const up = (wiv - price) / price * 100;
+    const cls = up >= 0 ? 'positive' : 'negative';
+    const sign = up >= 0 ? '+' : '';
+    el.innerHTML =
+        `<div class="hv-item">
+            <span class="hv-label">Prob-Weighted IV</span>
+            <span class="hv-value">${fmtIV(wiv)}</span>
+        </div>
+        <div class="hv-item">
+            <span class="hv-label">Current Price</span>
+            <span class="hv-value">${fmtIV(price)}</span>
+        </div>
+        <div class="hv-item">
+            <span class="hv-label">Upside</span>
+            <span class="hv-value ${cls}">${sign}${up.toFixed(0)}%</span>
+        </div>`;
+    el.style.display = 'flex';
 }
 
 // Render DCF inputs and FCF projections
@@ -1607,6 +1725,78 @@ function calculateDCF(startGrowth, wacc, terminalGrowth) {
     };
 }
 
+// Format an IV for a card. Sub-$10 quotes (NZX/ASX micro-caps) need decimals;
+// .toFixed(0) would render $0.54 as "$0".
+function fmtIV(v) {
+    const c = (dcfData.inputs && dcfData.inputs.currency) || '$';
+    const a = Math.abs(v);
+    const dp = a >= 100 ? 0 : a >= 10 ? 1 : a >= 1 ? 2 : 4;
+    return c + v.toFixed(dp);
+}
+
+// Probability-weighted IV shown on the headline card.
+//
+// ANCHORED to the DCF JSON, not recomputed from scratch. calculateDCF() below is
+// a generic 5-year Gordon model and does NOT reproduce the analyst's
+// component-built DCF: measured across the corpus it lands within +/-5% of
+// valuation.base.intrinsic_value on only 13 of 41 dashboards and is off by >30%
+// on 12 (worst: +2035%). The base card has always carried that drift. The
+// headline must not inherit it, or it would contradict both the DCF JSON and the
+// screener, which ranks on probability_weighted.weighted_iv.
+//
+// At default slider positions this returns the stored weighted_iv EXACTLY. Move a
+// slider and it scales that anchor by the RATIO calculateDCF() implies between the
+// new settings and the defaults -- direction and rough magnitude, without
+// pretending the toy model reproduces the real one.
+function weightedIV(growth, wacc, terminal) {
+    const pw = dcfData.probability_weighted || {};
+    const stored = pw.weighted_iv;
+    if (stored == null || !isWeightedLive()) return stored;
+
+    const a = dcfData.assumptions;
+    const bg = dcfData.historical_growth.selected_growth_rate;
+    const bw = a.base.wacc, bt = a.base.terminal_growth;
+    if (growth === bg && wacc === bw && terminal === bt) return stored;
+
+    // Re-weight all three scenarios, applying the user's deltas from the base
+    // defaults to bull and bear as well.
+    const at = (g, k, t) => {
+        const w = pw.weights;
+        const startOf = (sc) => (a[sc] && Array.isArray(a[sc].growth_rates) && a[sc].growth_rates.length)
+            ? a[sc].growth_rates[0] : bg;
+        let sum = 0;
+        for (const sc of ['bull', 'base', 'bear']) {
+            const sg = (sc === 'base' ? bg : startOf(sc)) + (g - bg);
+            const sk = (a[sc].wacc != null ? a[sc].wacc : bw) + (k - bw);
+            const st = (a[sc].terminal_growth != null ? a[sc].terminal_growth : bt) + (t - bt);
+            // Gordon blows up as WACC approaches terminal growth; keep a floor.
+            sum += w[sc] * calculateDCF(sg, Math.max(sk, st + 0.5), st).iv;
+        }
+        return sum;
+    };
+
+    const ref = at(bg, bw, bt);
+    if (!ref || !isFinite(ref)) return stored;
+    const now = at(growth, wacc, terminal);
+    if (!now || !isFinite(now)) return stored;
+    return stored * (now / ref);
+}
+
+// Can the weighted IV be rebuilt from the growth/WACC/terminal sliders?
+// Requires a scenario-based FCF model: per-scenario assumptions, weights summing
+// to 1, and the FCF inputs calculateDCF() depends on.
+function isWeightedLive() {
+    const pw = dcfData.probability_weighted || {};
+    const w = pw.weights;
+    const a = dcfData.assumptions;
+    if (!w || !a || !a.base || !a.bull || !a.bear) return false;
+    if (!dcfData.inputs || dcfData.inputs.last_fcf == null) return false;
+    if (!dcfData.historical_growth || dcfData.historical_growth.selected_growth_rate == null) return false;
+    const total = (w.bull || 0) + (w.base || 0) + (w.bear || 0);
+    if (Math.abs(total - 1) > 0.001) return false;
+    return true;
+}
+
 // Update display when sliders change
 window.updateDCFDisplay = function() {
     const growth = parseFloat(document.getElementById('growthSlider').value);
@@ -1634,10 +1824,10 @@ window.updateDCFDisplay = function() {
     upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(0) + '% ' + (upside >= 0 ? 'upside' : 'downside');
     upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
 
-    // Update weighted IV
-    // Probability-weighted IV, on the same owner-FCF basis as every scenario
-    const wiv = dcfData.probability_weighted.weighted_iv;
-    document.getElementById('dcfWeighted').textContent = '$' + wiv.toFixed(0);
+    // Update weighted IV — the headline card, so it must track the sliders too.
+    // A frozen number in the lead slot reads as broken. See weightedIV().
+    const wiv = weightedIV(growth, wacc, terminal);
+    document.getElementById('dcfWeighted').textContent = fmtIV(wiv);
     const wUpEl = document.getElementById('dcfWeightedUpside');
     if (wUpEl) {
         const wUp = (wiv - dcfData.current_price) / dcfData.current_price * 100;
