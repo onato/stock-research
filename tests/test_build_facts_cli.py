@@ -35,7 +35,7 @@ class TestCli:
         con.close()
         assert ("Revenue", "FY2024", 263527.0, "thousands", "NZD",
                 "statement_line") in rows
-        assert ("Revenue", None, 267805.0, "thousands", "NZD",
+        assert ("Revenue", "FY2023", 267805.0, "thousands", "NZD",
                 "prior_year_column") in rows
         assert {r[0] for r in rows} == {"Revenue", "TotalAssets"}
 

@@ -8,7 +8,10 @@ itself is the generic fallback for exchanges without a dedicated subclass.
 The candidate-emitter contract (see build_facts.py DELIBERATE NON-GOALS)
 binds every subclass: emit raw candidates with hints — never scale units,
 never pick between competing candidates, never infer a period the filename
-does not state. A subclass may make the HINTS more accurate for its
+does not state. (A comparative column is labelled one fiscal year before
+the filename's period: that is arithmetic on the stated period, not an
+inference, and it lets next year's comparative corroborate this year's
+figure.) A subclass may make the HINTS more accurate for its
 exchange; adjudication stays the financial-parser agent's job.
 
 Open/closed rule: an exchange's quirk goes in its subclass, never here.
@@ -19,6 +22,8 @@ directory + a test module. No shared-code edits.
 import re
 from collections.abc import Iterator
 from typing import Any, ClassVar
+
+import periods
 
 from . import common
 
@@ -75,6 +80,7 @@ class BaseParser:
         """Yield candidate facts from one extracted filing."""
         lines = text.splitlines()
         period = common.period_from_filename(filename)
+        column_periods = self.column_periods(period)
         units_hint = self.units_hint(lines)
         currency = self.currency(lines)
 
@@ -95,7 +101,7 @@ class BaseParser:
                     for col, val in enumerate(nums[:self.MAX_VALUE_COLUMNS]):
                         yield {
                             "metric": metric,
-                            "period": period if col == 0 else None,
+                            "period": column_periods[col],
                             "value_raw": val,
                             "units_hint": self.units_for_line(i, units_hint),
                             "source_file": filename,
@@ -106,6 +112,17 @@ class BaseParser:
                             "currency": currency,
                         }
                     break
+
+    def column_periods(self, period: str | None) -> list[str | None]:
+        """Period label for each value column: the filing's own, then one
+        fiscal year earlier per comparative column. Unknown stays unknown --
+        a comparative of an undated file is still undated."""
+        labels: list[str | None] = [period]
+        for _ in range(1, self.MAX_VALUE_COLUMNS):
+            prev = labels[-1]
+            labels.append(None if prev is None
+                          else periods.prior_year(periods.parse(prev)))
+        return labels
 
     # ------------------------------------------------------------------
     # Strategy hooks. Defaults = the original scanner, bit-for-bit.

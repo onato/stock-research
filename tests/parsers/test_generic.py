@@ -27,8 +27,29 @@ class TestCleanStatement:
         rev = [f for f in facts if f["metric"] == "Revenue"]
         assert [(f["value_raw"], f["confidence"]) for f in rev] == [
             (263527.0, "statement_line"), (267805.0, "prior_year_column")]
-        # prior-year column never carries the filing's period
-        assert rev[1]["period"] is None
+        # the fixture's own name states no period, so neither column has one
+        assert [f["period"] for f in rev] == [None, None]
+
+    def test_comparative_is_labelled_prior_year(self, fixture_path):
+        # The comparative column is the same period one fiscal year earlier,
+        # spelled canonically so it can corroborate that year's own filing.
+        text = fixture_path("generic", "clean_statement.txt").read_text()
+        facts = list(bf.BaseParser().scan(text, "X.NZ_Annual_FY2024.txt"))
+        rev = [f for f in facts if f["metric"] == "Revenue"]
+        assert [(f["period"], f["confidence"]) for f in rev] == [
+            ("FY2024", "statement_line"), ("FY2023", "prior_year_column")]
+
+    def test_half_year_comparative_is_prior_half(self, fixture_path):
+        text = fixture_path("generic", "clean_statement.txt").read_text()
+        facts = list(bf.BaseParser().scan(text, "X.NZ_HalfYear_H1-2025.txt"))
+        rev = [f for f in facts if f["metric"] == "Revenue"]
+        assert [f["period"] for f in rev] == ["H1-2025", "H1 FY2024"]
+
+    def test_unknown_period_stays_unknown_on_every_column(self, fixture_path):
+        text = fixture_path("generic", "clean_statement.txt").read_text()
+        facts = list(bf.BaseParser().scan(text, "X.NZ_Presentation.txt"))
+        rev = [f for f in facts if f["metric"] == "Revenue"]
+        assert [f["period"] for f in rev] == [None, None]
 
     def test_units_hint_from_sentence_declaration(self, fixture_path):
         facts = scan(fixture_path("generic", "clean_statement.txt"))

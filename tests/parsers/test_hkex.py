@@ -129,5 +129,6 @@ class TestThirdComparativeColumn:
         # the extra column reuses the vocabulary the agent already knows
         assert [f["confidence"] for f in rev] == [
             "statement_line", "prior_year_column", "prior_year_column"]
-        assert rev[1]["period"] is None
-        assert rev[2]["period"] is None
+        # each comparative steps one more fiscal year back
+        assert rev[1]["period"] == "FY2023"
+        assert rev[2]["period"] == "FY2022"
