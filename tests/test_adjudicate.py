@@ -162,6 +162,22 @@ class TestSectionAndStaticGuards:
         p = cell(adjudicate.propose(con, secs), "cash_and_equivalents", "FY2024")
         assert [c.value_raw for c in p.shortlist] == [121303.0, 127323.0]
 
+    def test_home_statement_outranks_another_statement(self, db):
+        # 0004.HK cash: the cash-flow statement's closing balance and the
+        # balance sheet's "Bank deposits and cash" are both statement lines;
+        # a balance-sheet metric belongs to the balance sheet.
+        secs = {"X.NZ_Annual_FY2024.txt": [
+            sections.Section("statement", "Consolidated Statement of Cash Flows", 1, 100),
+            sections.Section("statement", "Consolidated Statement of Financial Position", 101, 200)]}
+        con = db([fact("CashAndEquivalents", "FY2024", 8964.0, line=90),
+                  fact("CashAndEquivalents", "FY2024", 9718.0, line=150)])
+        p = cell(adjudicate.propose(con, secs), "cash_and_equivalents", "FY2024")
+        assert [c.value_raw for c in p.shortlist] == [9718.0, 8964.0]
+
+    def test_shareholders_equity_is_definition_sensitive(self, db):
+        con = db([fact("ShareholdersEquity", "FY2024", 152418.0)])
+        assert cell(adjudicate.propose(con), "shareholders_equity", "FY2024").flag == "confirm-definition"
+
     def test_value_repeating_across_periods_is_static_text(self, db):
         # ARG.NZ: capex "33,220" in five different periods -- a facility limit
         # or commitment line that matched the pattern, not a cash flow.
@@ -174,12 +190,30 @@ class TestSectionAndStaticGuards:
         assert q.status == "contested"
         assert "repeat" in q.rationale
 
+    def test_share_count_from_a_note_cannot_resolve_alone(self, db):
+        # 0001.HK: "8,000,000,000 shares" is the AUTHORISED capital in the
+        # share-capital note; it repeated every year so the static guard's
+        # share-count exemption let it resolve as shares outstanding.
+        secs = {"X.NZ_Annual_FY2024.txt": [
+            sections.Section("statement", "FINANCIAL POSITION", 1, 100),
+            sections.Section("notes", "NOTES", 101, 999)]}
+        con = db([fact("SharesOutstanding", "FY2024", 8e9, line=500)])
+        p = cell(adjudicate.propose(con, secs), "shares_outstanding", "FY2024")
+        assert p.status == "contested"
+        assert "note" in p.rationale
+        con2 = db([fact("SharesOutstanding", "FY2024", 3830.0, line=50)])
+        assert cell(adjudicate.propose(con2, secs), "shares_outstanding", "FY2024").status == "resolved"
+
     def test_negative_count_or_total_is_a_stray_match(self, db):
         # 0001.HK: shares_outstanding = -41 resolved as the lone candidate.
         con = db([fact("SharesOutstanding", "FY2024", -41.0, line=10)])
         p = cell(adjudicate.propose(con), "shares_outstanding", "FY2024")
         assert p.status == "contested"
         assert "negative" in p.rationale
+
+    def test_zero_eps_is_a_dash_row(self, db):
+        con = db([fact("EPS", "FY2024", 0.0, line=10), fact("EPS", "FY2024", 4.46, line=60)])
+        assert cell(adjudicate.propose(con), "eps", "FY2024").value_raw == 4.46
 
     def test_zero_net_income_is_a_dash_row(self, db):
         con = db([fact("NetIncome", "FY2024", 0.0, line=10),
@@ -237,6 +271,16 @@ class TestJudgmentMetrics:
         assert "✓" not in grid
         assert "## Confirm definition" in text
         assert "capex FY2024" in text.split("## Confirm definition")[1]
+
+    def test_definition_list_omits_guarded_candidates(self, db):
+        # 0006.HK net_income: the dash row (0) was excluded from the pick but
+        # still led the "other distinct values" list.
+        con = db([fact("NetIncome", "FY2024", 0.0, line=10),
+                  fact("NetIncome", "FY2024", 6119.0, line=60),
+                  fact("NetIncome", "FY2024", 6119.0, line=900, context="Note 9")])
+        p = cell(adjudicate.propose(con), "net_income", "FY2024")
+        assert (p.status, p.value_raw) == ("resolved", 6119.0)
+        assert [c.value_raw for c in p.shortlist] == [6119.0]
 
     def test_check_reports_precision_without_judgment_metrics(self, db):
         con = db([fact("Revenue", "FY2024", 263527.0),

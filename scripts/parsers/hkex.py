@@ -17,6 +17,8 @@ filings yielded ~100 each.
 """
 
 import re
+from collections import Counter
+from collections.abc import Iterator
 
 from .base import BaseParser
 
@@ -44,18 +46,36 @@ class HKEXParser(BaseParser):
         r"\(\s*(?:RMB\s*,?\s*|All amounts\s+)?in (thousands|millions|billions)",
         re.IGNORECASE)
 
+    # `HK$ 4.46` / `US$ 0.57`: a currency token glued to a per-share figure.
+    # Dropping it makes the cell numeric, so the note reference before it is
+    # recognised as one (0001.HK EPS read as 10, the note number, not 4.46).
+    CCY_PREFIX = re.compile(r"(?:HK|US|S|A|NZ|RMB)?\$\s*(?=[\d(])")
+
+    def segments(self, line: str) -> Iterator[tuple[str, list[float]]]:
+        return super().segments(self.CCY_PREFIX.sub("", line))
+
     def clean_label(self, cell: str) -> str:
         return self.CJK_RE.sub("", cell).strip()
 
     def units_hint(self, lines: list[str]) -> str | None:
+        """Majority of the units tokens in the file. Taking the first match
+        let narrative ("HK$136.8 billion") outvote thirty statement headers
+        reading "HK$ Million" (0004.HK half-years hinted billions)."""
+        votes: Counter[str] = Counter()
         for line in lines:
-            m = self.PAREN_DECL_RE.search(line) or self.UNITS_TOKEN_RE.search(line)
-            if m:
-                u = m.group(1).lower()
-                return ("thousands" if u.startswith(("000", "thousand"))
-                        else "millions" if u.startswith("million")
-                        else "billions")
+            for m in self.PAREN_DECL_RE.finditer(line):
+                votes[self._scale(m.group(1))] += 3   # an explicit declaration
+            for m in self.UNITS_TOKEN_RE.finditer(line):
+                votes[self._scale(m.group(1))] += 1
+        if votes:
+            return votes.most_common(1)[0][0]
         return super().units_hint(lines)
+
+    @staticmethod
+    def _scale(token: str) -> str:
+        u = token.lower()
+        return ("thousands" if u.startswith(("000", "thousand"))
+                else "millions" if u.startswith("million") else "billions")
 
     def currency(self, lines: list[str]) -> str | None:
         return self._search_currency("\n".join(lines))

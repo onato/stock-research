@@ -39,7 +39,9 @@ from parsers import get_parser
 from parsers.base import BaseParser
 from parsers.common import (  # noqa: F401  (re-exported API)
     COMPILED,
+    LABEL_RE,
     PATTERNS,
+    normalize_label,
     parse_num,
     period_from_filename,
 )

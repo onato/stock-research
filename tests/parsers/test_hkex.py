@@ -132,3 +132,38 @@ class TestThirdComparativeColumn:
         # each comparative steps one more fiscal year back
         assert rev[1]["period"] == "FY2023"
         assert rev[2]["period"] == "FY2022"
+
+
+class TestCurrencyPrefixedCells:
+    """0001.HK prints per-share figures as `HK$ 4.46` with a US$ convenience
+    column on the left. The currency token made the cell non-numeric, so the
+    note reference `10` was the only number left and became the EPS."""
+
+    def test_eps_reads_the_hkd_value_not_the_note_ref(self, fixture_text):
+        facts = scan(fixture_text, "0001_income_statement.txt",
+                     "0001.HK_Annual_FY2024.txt")
+        eps = [(f["value_raw"], f["period"]) for f in facts if f["metric"] == "EPS"]
+        assert eps == [(4.46, "FY2024"), (6.14, "FY2023")]
+
+    def test_leading_convenience_column_is_still_ignored(self, fixture_text):
+        facts = scan(fixture_text, "0001_income_statement.txt",
+                     "0001.HK_Annual_FY2024.txt")
+        rev = [f["value_raw"] for f in facts if f["metric"] == "Revenue"]
+        assert rev == [281351.0, 275575.0]
+
+    def test_total_assets_less_current_liabilities_is_not_total_assets(self, fixture_text):
+        facts = scan(fixture_text, "0001_income_statement.txt",
+                     "0001.HK_Annual_FY2024.txt")
+        assert not [f for f in facts if f["metric"] == "TotalAssets"]
+
+
+class TestUnitsHintByMajority:
+    def test_prose_billion_does_not_outvote_statement_headers(self):
+        text = ("Net asset value was HK$136.8 billion at year end.\n"
+                "RMB assets provide a natural hedge.\n"
+                "                  HK$ Million     HK$ Million\n"
+                "Revenue                12,115          18,950\n"
+                "                  HK$ Million     HK$ Million\n")
+        p = parser()
+        assert p.units_hint(text.split("\n")) == "millions"
+        assert p.currency(text.split("\n")) == "HKD"

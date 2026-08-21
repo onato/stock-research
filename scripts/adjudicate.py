@@ -59,7 +59,7 @@ TIER = {"statement_line": 3, "prior_year_column": 2, "prose": 1}
 SECTION_SCORE = {"statement": 2, "other": 1, "notes": 0, "summary": -1}
 # Metrics for which a printed 0 is a dash row, not a value.
 NONZERO = {"revenue", "total_assets", "total_liabilities", "shareholders_equity",
-           "shares_outstanding", "net_income"}
+           "shares_outstanding", "net_income", "eps"}
 # Metrics that cannot be negative; a negative match is a stray line.
 NONNEG = {"revenue", "total_assets", "total_liabilities", "shares_outstanding",
           "cash_and_equivalents"}
@@ -73,7 +73,17 @@ OUTLIER_MIN_PERIODS = 3
 # with or without intangibles, total vs attributable profit, basic vs
 # diluted EPS, which borrowings lines make "total debt". A candidate here
 # can be the right line and the wrong answer, so it is proposed, never green.
-JUDGMENT = {"capex", "total_debt", "ebitda", "stock_based_comp", "eps", "net_income"}
+JUDGMENT = {"capex", "total_debt", "ebitda", "stock_based_comp", "eps", "net_income",
+            "shareholders_equity"}   # total equity incl. NCI vs attributable
+# The primary statement each metric is read from; a candidate in another
+# statement (cash-flow closing cash vs the balance-sheet line) ranks below.
+HOME = {"revenue": "income", "cost_of_revenue": "income", "gross_profit": "income",
+        "operating_income": "income", "ebitda": "income", "net_income": "income",
+        "eps": "income", "operating_cash_flow": "cashflow", "capex": "cashflow",
+        "free_cash_flow": "cashflow", "shareholders_equity": "position",
+        "total_assets": "position", "total_liabilities": "position",
+        "total_debt": "position", "cash_and_equivalents": "position",
+        "shares_outstanding": "position"}
 STATEMENT_RE = re.compile(
     r"consolidated|statement of|balance sheet|income statement|cash flow", re.IGNORECASE)
 NOTE_RE = re.compile(r"\bnotes?\b|segment|reconcil", re.IGNORECASE)
@@ -90,15 +100,18 @@ class Candidate:
     confidence: str
     own_period: str | None   # the filing's own period, canonically spelled
     section: str = "other"   # from sections.py; "other" when unindexed
+    family: str | None = None  # which primary statement, when section == "statement"
+    home: str | None = None    # the metric's own statement (adjudicate.HOME)
 
-    def rank(self) -> tuple[int, int, int, int, str]:
+    def rank(self) -> tuple[int, int, int, int, int, str]:
         # Context keywords stand in for the section only when the file was
         # not indexed; inside a known section they would double-count.
         ctx = self.context if self.section == "other" else ""
         score = (1 if STATEMENT_RE.search(ctx) else 0) - (1 if NOTE_RE.search(ctx) else 0)
+        at_home = 1 if (self.home and self.family == self.home) else 0
         # Primary statements precede the notes, so an earlier line wins ties.
         return (-TIER.get(self.confidence, 0), -SECTION_SCORE.get(self.section, 1),
-                -score, self.line_no, self.source_file)
+                -at_home, -score, self.line_no, self.source_file)
 
     def first_line(self, width: int) -> str:
         if width <= 0:
@@ -157,6 +170,8 @@ def _guard(metric: str, c: Candidate, static: set[float]) -> str | None:
         return "zero/dash rows"
     if c.value_raw < 0 and metric in NONNEG:
         return "negative values for a metric that cannot be negative"
+    if metric == "shares_outstanding" and c.section == "notes":
+        return "share counts from a note (authorised capital, option pools)"
     return None
 
 
@@ -198,6 +213,7 @@ def _resolve(metric: str, kind: str, period: str, cands: list[Candidate],
         distinct: list[Candidate] = []
         for c in ranked:
             if flag and c.confidence == "statement_line" \
+                    and _guard(metric, c, static) is None \
                     and c.value_raw not in {d.value_raw for d in distinct}:
                 distinct.append(c)
         return Proposal(metric, kind, period, "resolved", rung, pick.value_raw,
@@ -236,9 +252,12 @@ def propose(con: duckdb.DuckDBPyConnection,
             continue
         core = schema.normalize(metric)
         key = (core, "core") if core else (metric, "kpi")
-        section = sections.section_of(secs[src], int(line or 0)) if src in secs else "other"
+        sec = sections.find(secs[src], int(line or 0)) if src in secs else None
+        section = sec.kind if sec else "other"
+        fam = sections.family(sec.caption) if sec and sec.kind == "statement" else None
         cells[key][p].append(Candidate(float(value), units, ccy, src, int(line or 0),
-                                       ctx or "", conf, own[src], section))
+                                       ctx or "", conf, own[src], section, fam,
+                                       HOME.get(key[0])))
 
     universe = {p for p in own.values() if p}
     universe |= {p for by in cells.values() for p, cs in by.items()

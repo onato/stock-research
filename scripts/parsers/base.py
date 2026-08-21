@@ -84,14 +84,31 @@ class BaseParser:
         units_hint = self.units_hint(lines)
         currency = self.currency(lines)
 
+        carry = ""   # a label-only line whose numbers are on the next line
         for i, line in enumerate(lines):
-            for label, raw_nums in self.segments(line):
+            segs = list(self.segments(line))
+            # "(Loss)/earnings per share   7": a note reference alone on the
+            # label line is not a value; the figures follow on the next line.
+            if len(segs) == 1 and self.is_lone_note_ref(segs[0][1]):
+                carry = common.normalize_label(segs[0][0])
+                continue
+            if not segs:
+                carry = self.label_only(line)
+                continue
+            for label, raw_nums in segs:
                 nums = self.strip_leading_note_ref(raw_nums)
                 if not nums:
                     continue
+                # "Net cash generated from" / "  operating activities  115":
+                # a wrapped label continues in lowercase on the numbers line;
+                # "Earnings per share" / "Basic and diluted  (1.05)" is the
+                # one upper-case continuation every IFRS filer prints.
+                name = common.normalize_label(label)
+                joined = bool(carry) and (name[:1].islower() or common.BASIC_DILUTED_RE.match(name))
+                full = f"{carry} {name}" if joined else name
 
                 for metric, regexes in common.COMPILED.items():
-                    if not any(r.search(label) for r in regexes):
+                    if not any(r.search(full) for r in regexes):
                         continue
                     ctx = "\n".join(lines[max(0, i - 2):i + 3])
                     # First column is the reporting period; the rest are
@@ -112,6 +129,18 @@ class BaseParser:
                             "currency": currency,
                         }
                     break
+
+    @staticmethod
+    def is_lone_note_ref(nums: list[float]) -> bool:
+        return len(nums) == 1 and nums[0] == int(nums[0]) and 0 < nums[0] < 100
+
+    def label_only(self, line: str) -> str:
+        """The line's label if it is a bare label (no numbers), else ""."""
+        cells = common.CELL_SPLIT.split(line.strip())
+        if len(cells) != 1 or not cells[0] or any(ch.isdigit() for ch in cells[0]):
+            return ""
+        label = self.clean_label(cells[0])
+        return common.normalize_label(label) if common.LABEL_RE.match(label) else ""
 
     def column_periods(self, period: str | None) -> list[str | None]:
         """Period label for each value column: the filing's own, then one

@@ -102,3 +102,58 @@ class TestLineNumbersMatchTheFile:
         facts = list(bf.BaseParser().scan(text, "X.NZ_Annual_FY2024.txt"))
         lines = {f["metric"]: f["line_no"] for f in facts}
         assert lines == {"Revenue": 1, "CostOfRevenue": 2, "TotalAssets": 3}
+
+
+class TestWrappedLabels:
+    TEXT = ("Cash flows from operating activities\n"
+            "Net cash generated from\n"
+            "  operating activities                              115          179\n"
+            "Purchase of property, plant\n"
+            "  and equipment                                      (2)          (1)\n"
+            "Cash and cash equivalents at 1 January             2,733        2,456\n"
+            "Cash and cash equivalents at 31 December           2,141        2,733\n"
+            "Cash generated from operations                       547          884\n")
+
+    def facts(self):
+        return list(bf.BaseParser().scan(self.TEXT, "X.HK_HalfYear_H1-2025.txt"))
+
+    def test_label_wrapped_onto_the_numbers_line_is_joined(self):
+        got = {(f["metric"], f["confidence"]): (f["value_raw"], f["line_no"])
+               for f in self.facts()}
+        assert got[("OperatingCashFlow", "statement_line")] == (115.0, 3)
+        assert got[("CapEx", "statement_line")] == (-2.0, 5)
+
+    def test_opening_cash_balance_is_not_cash(self):
+        cash = [(f["value_raw"], f["line_no"]) for f in self.facts()
+                if f["metric"] == "CashAndEquivalents" and f["confidence"] == "statement_line"]
+        assert cash == [(2141.0, 7)]
+
+    def test_cash_generated_from_operations_is_its_own_metric(self):
+        cgo = [f["value_raw"] for f in self.facts()
+               if f["metric"] == "CashGeneratedFromOperations" and f["confidence"] == "statement_line"]
+        assert cgo == [547.0]
+        ocf = [f["line_no"] for f in self.facts() if f["metric"] == "OperatingCashFlow"]
+        assert 8 not in ocf
+
+
+class TestTwoLineEps:
+    TEXT = ("(Loss)/profit for the year                         (2,611)      1,105\n"
+            "(Loss)/earnings per share\n"
+            "Basic and diluted                          7       (1.05)       0.31\n")
+
+    def test_basic_and_diluted_line_inherits_the_eps_label(self):
+        facts = list(bf.BaseParser().scan(self.TEXT, "X.HK_Annual_FY2024.txt"))
+        got = {(f["metric"], f["confidence"]): f["value_raw"] for f in facts}
+        assert got[("EPS", "statement_line")] == -1.05
+        assert got[("EPS", "prior_year_column")] == 0.31
+        assert got[("NetIncome", "statement_line")] == -2611.0
+
+
+class TestLoneNoteRefLine:
+    TEXT = ("(Loss)/earnings per share                              7\n"
+            "Basic and diluted                                              (0.86)       0.23\n")
+
+    def test_note_ref_alone_on_the_label_line_is_not_a_value(self):
+        facts = list(bf.BaseParser().scan(self.TEXT, "X.HK_Annual_FY2020.txt"))
+        eps = [(f["value_raw"], f["line_no"], f["confidence"]) for f in facts if f["metric"] == "EPS"]
+        assert eps == [(-0.86, 2, "statement_line"), (0.23, 2, "prior_year_column")]

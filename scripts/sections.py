@@ -42,9 +42,15 @@ NOTES_RE = re.compile(
 # "(continued)" marker, or layout punctuation. Prose may not.
 TRAILER_RE = re.compile(r"(?:\s*\((?:continued|cont\.?)\))?[\s\d:|\-–—.]*$", re.IGNORECASE)
 
+CELL_SPLIT = re.compile(r"\s{2,}")
+# A heading, not a sentence: every word capitalised bar small connectors, no
+# trailing "is"/comma, at most eight words.
+TITLE_RE = re.compile(
+    r"(?:[A-Z][\w'’-]*|and|of|the|for|&)(?:\s+(?:[A-Z][\w'’-]*|and|of|the|for|&)){0,7}")
 MIN_POINTER_LINES = 5   # a contents entry is one line; a statement is many
 SUBCAPTION_WINDOW = 12  # a statement caption this soon after a summary one may be its sub-heading
 YEAR_RE = re.compile(r"\b(?:19|20)\d{2}\b")
+MULTI_YEAR_TABLE = 4    # a statement shows two years (three if restated); a summary shows five+
 
 
 @dataclass(frozen=True)
@@ -56,14 +62,23 @@ class Section:
 
 
 def classify(line: str) -> tuple[str, str] | None:
-    """(kind, caption) if the line is a section caption, else None."""
-    text = line.strip()
+    """(kind, caption) if the line is a section caption, else None.
+
+    Only the first cell counts: reports print a page-navigation column on
+    the right ("... Profit or Loss        Financial Statements").
+    """
+    text = CELL_SPLIT.split(line.strip(), maxsplit=1)[0].strip()
     if not text or len(text) > 90:
         return None
     for kind, rx in (("statement", STATEMENT_RE), ("summary", SUMMARY_RE),
                      ("notes", NOTES_RE)):
         m = rx.match(text)
-        if m and TRAILER_RE.fullmatch(text[m.end():]):
+        if not m:
+            continue
+        rest = text[m.end():]
+        # A summary caption may carry more words ("Five-Year Group Profit
+        # Summary and"); a statement caption may not, or prose would match.
+        if TRAILER_RE.fullmatch(rest) or (kind == "summary" and TITLE_RE.fullmatch(text)):
             return kind, text
     return None
 
@@ -84,9 +99,12 @@ def index_text(text: str) -> list[Section]:
         # (0001.HK "Ten Year Summary" repeats "CONSOLIDATED INCOME STATEMENT";
         # its first column is 2015). Once one sub-heading is found, the
         # block's later ones follow without needing their own year row.
-        if kind == "statement" and out and out[-1].kind == "summary" \
-                and out[-1].end - out[-1].start + 1 <= SUBCAPTION_WINDOW \
-                and (chained or _many_years(lines[max(0, start - 5):start + 5])):
+        near = lines[max(0, start - 5):start + 5]
+        after_summary = bool(out) and out[-1].kind == "summary" \
+            and out[-1].end - out[-1].start + 1 <= SUBCAPTION_WINDOW
+        if kind == "statement" and (
+                (after_summary and (chained or _many_years(near)))
+                or _many_years(near, MULTI_YEAR_TABLE)):
             kind, chained = "summary", True
         elif kind != "statement" or not out or out[-1].kind != "summary":
             chained = False
@@ -94,9 +112,33 @@ def index_text(text: str) -> list[Section]:
     return out
 
 
-def _many_years(block: list[str]) -> bool:
+def _many_years(block: list[str], n: int = 3) -> bool:
     years = set(YEAR_RE.findall(" ".join(block)))
-    return len(years) >= 3
+    return len(years) >= n
+
+
+FAMILY_RE = (
+    ("income", re.compile(r"income statement|profit or loss|profit and loss|comprehensive income|"
+                          r"financial performance", re.IGNORECASE)),
+    ("position", re.compile(r"financial position|balance sheet", re.IGNORECASE)),
+    ("cashflow", re.compile(r"cash ?flow", re.IGNORECASE)),
+    ("equity", re.compile(r"changes in equity|movements in equity", re.IGNORECASE)),
+)
+
+
+def family(caption: str) -> str | None:
+    """Which primary statement a caption names, or None for anything else."""
+    for name, rx in FAMILY_RE:
+        if rx.search(caption):
+            return name
+    return None
+
+
+def find(secs: list[Section], line_no: int) -> Section | None:
+    for s in secs:
+        if s.start <= line_no <= s.end:
+            return s
+    return None
 
 
 def section_of(secs: list[Section], line_no: int) -> str:

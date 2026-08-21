@@ -111,9 +111,14 @@ class TestPatternVocabulary:
 
     def test_ocf_phrasings(self):
         for label in ("Net cash flows from operating activities",
-                      "Cash generated from operations",
                       "Net cash (used in)/provided by operating activities"):
             assert "OperatingCashFlow" in self.find(label), label
+
+    def test_cash_generated_from_operations_is_not_ocf(self):
+        # The pre-tax, pre-interest subtotal (0006.HK FY2025: 547 vs OCF 884).
+        found = self.find("Cash generated from operations")
+        assert "CashGeneratedFromOperations" in found
+        assert "OperatingCashFlow" not in found
 
     def test_us_equity_award_tax_phrasing(self):
         assert "EquityAwardTaxes" in self.find(
@@ -133,3 +138,42 @@ class TestHalfYearNamedByFiscalYear:
 
     def test_annual_fy_unchanged(self):
         assert bf.period_from_filename("X.NZ_Annual_FY2025.txt") == "FY2025"
+
+
+class TestTotalAssetsPattern:
+    def test_less_current_liabilities_is_excluded(self):
+        rx = bf.COMPILED["TotalAssets"]
+        assert any(r.search("total assets") for r in rx)
+        assert not any(r.search("total assets less current liabilities") for r in rx)
+
+
+class TestParenthesisedLabels:
+    # IFRS filers write "(Loss)/profit for the year" and "(Loss)/earnings per
+    # share" when the sign flipped; 0004.HK FY2024 lost EPS and net income
+    # to a label grammar that required a leading letter.
+    def test_leading_parenthesis_is_a_label(self):
+        assert bf.LABEL_RE.match("(Loss)/profit for the year")
+
+    def test_sign_flip_prefixes_are_normalised_away(self):
+        assert bf.normalize_label("(Loss)/earnings per share") == "earnings per share"
+        assert bf.normalize_label("Earnings/(loss) per share") == "Earnings per share"
+        assert bf.normalize_label("(Loss)/profit attributable to") == "profit attributable to"
+        assert bf.normalize_label("Revenue") == "Revenue"
+
+
+class TestOperatingProfitBeforeDandA:
+    # 0004.HK prints "Operating profit before depreciation, amortisation,
+    # interest and tax" one line above "Operating profit"; the first is EBITDA.
+    def test_before_clause_routes_to_ebitda(self):
+        found = self.find("Operating profit before depreciation, amortisation, interest and tax")
+        assert "EBITDA" in found
+        assert "OperatingIncome" not in found
+
+    def test_plain_operating_profit_unchanged(self):
+        assert "OperatingIncome" in self.find("Operating profit")
+
+    def test_bank_deposits_and_cash_is_cash(self):
+        assert "CashAndEquivalents" in self.find("Bank deposits and cash")
+
+    def find(self, label):
+        return [m for m, pats in bf.COMPILED.items() if any(p.search(label) for p in pats)]

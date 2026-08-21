@@ -17,9 +17,11 @@ PATTERNS: dict[str, list[str]] = {
                 r"^total income(?!\s*tax)"],
     "CostOfRevenue": [r"^cost of (sales|revenue|goods sold)"],
     "GrossProfit": [r"^gross (profit|margin|loss)"],
-    "OperatingIncome": [r"^operating (profit|loss|income)", r"^ebit\b",
+    "OperatingIncome": [r"^operating (profit|loss|income)(?! before)", r"^ebit\b",
                         r"^(profit|loss) from operations"],
-    "EBITDA": [r"\bebitda\b"],   # adjusted/underlying/normalised all qualify
+    "EBITDA": [r"\bebitda\b",
+               # "Operating profit before depreciation, amortisation, interest and tax"
+               r"^operating (profit|loss) before (depreciation|interest|amortisation)"],   # adjusted/underlying/normalised all qualify
     "NetIncome": [r"^(net )?(profit|loss)( after tax| for the (year|period))",
                   r"^net (income|earnings)", r"^(profit|loss) attributable to"],
     "ProfitBeforeTax": [r"^(profit|loss) before (income )?tax"],
@@ -33,7 +35,6 @@ PATTERNS: dict[str, list[str]] = {
     # inflow/(outflow) from". Match on the operating-activities anchor and
     # allow any connector, rather than enumerating phrasings.
     "OperatingCashFlow": [r"^(net )?cash.{0,40}operating activities",
-                          r"^cash generated (from|by) operation",
                           r"^cash flows? from operating"],
     "CapEx": [r"^(purchase|acquisition|additions?) of (property|plant|equipment|fixed)",
               r"^capital expenditure"],
@@ -41,9 +42,15 @@ PATTERNS: dict[str, list[str]] = {
                      r"^amortisation( and impairment)?"],
     "ShareholdersEquity": [r"^total (shareholders.? )?equity", r"^net assets",
                            r"^equity attributable to"],
-    "TotalAssets": [r"^total assets"],
+    "TotalAssets": [r"^total assets(?! less)"],
     "TotalLiabilities": [r"^total liabilities"],
-    "CashAndEquivalents": [r"^cash and (cash )?equivalents", r"^cash at bank"],
+    # Opening balances ("at 1 January", "brought forward") are last year's close.
+    "CashAndEquivalents": [(r"^cash and (cash )?equivalents"
+                            r"(?!.*(at 1 |at the beginning|at beginning|brought forward|at start))"),
+                           r"^cash at bank", r"^bank (deposits|balances) and cash"],
+    # Pre-tax, pre-interest subtotal -- a different quantity from OCF (0006.HK
+    # FY2025: 547 vs 884). Its own metric so it can never outrank OCF.
+    "CashGeneratedFromOperations": [r"^cash generated (from|by) operation"],
     "TotalDebt": [r"^(total )?borrowings", r"^(total )?(interest.bearing )?debt",
                   r"^loans and borrowings"],
     "SharesOutstanding": [r"^(weighted average )?(number of )?(ordinary )?shares",
@@ -90,7 +97,19 @@ NUM_CELL = re.compile(r"^(?:" + NUM + r")(?:\s+(?:" + NUM + r"))*$")
 # Label cap raised 60 -> 80: real statement lines get long. "Payments
 # for taxes related to net share settlement of equity awards" is 67
 # characters. 80 still excludes prose, which runs well past it.
-LABEL_RE = re.compile(r"^[A-Za-z][A-Za-z0-9 ,.&/()'’\-]{2,80}$")
+LABEL_RE = re.compile(r"^[A-Za-z(][A-Za-z0-9 ,.&/()'’\-]{2,80}$")
+# "(Loss)/profit for the year", "Earnings/(loss) per share": the sign-flip
+# alternative is noise for vocabulary matching.
+SIGN_FLIP_RE = re.compile(r"^\((?:loss|profit|deficit|surplus)\)/|/\((?:loss|profit|deficit|surplus)\)",
+                          re.IGNORECASE)
+
+
+BASIC_DILUTED_RE = re.compile(r"^(basic|diluted)( and diluted)?\b", re.IGNORECASE)
+
+
+def normalize_label(label: str) -> str:
+    """Drop "(Loss)/" style sign-flip alternatives so the vocabulary matches."""
+    return SIGN_FLIP_RE.sub("", label).strip()
 
 
 def parse_num(tok: str) -> float | None:

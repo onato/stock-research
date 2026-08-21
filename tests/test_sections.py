@@ -101,3 +101,63 @@ class TestTicker:
         monkeypatch.setattr(sys, "argv", ["sections.py", "NOPE.NZ"])
         assert sections.main() == 2
         assert "no Extracted" in capsys.readouterr().err
+
+
+class TestPageNavColumn:
+    # 0006.HK prints the report's section nav in a right-hand column on
+    # every page, so a caption line reads "Consolidated Statement of Profit
+    # or Loss        Financial Statements". Classify on the first cell.
+    def test_caption_with_nav_column_is_a_statement(self):
+        text = ("Consolidated Statement of Profit or Loss"
+                "                                        Financial Statements\n"
+                "For the year ended 31 December 2020\nRevenue   1,270   1,348\n")
+        assert sections.index_text(text)[0].kind == "statement"
+
+    def test_statement_caption_amid_a_year_row_is_a_summary_table(self):
+        # 0004.HK ten-year table: the page header is invisible to the index,
+        # so nothing marks the block as a summary except its five-year row.
+        text = ("186   THE WHARF (HOLDINGS) LIMITED Annual Report 2024\n"
+                "          2019      2018      2017      2016      2015\n"
+                "  Year ended 31 December   HK$ Million  HK$ Million\n"
+                "  Consolidated Income Statement\n"
+                "  Revenue      16,874    21,055    43,273    46,627    40,875\n")
+        assert sections.index_text(text)[0].kind == "summary"
+
+    def test_two_year_statement_header_stays_a_statement(self):
+        text = ("Consolidated Income Statement\n"
+                "For The Year Ended 31 December 2024\n"
+                "                    2024        2023\n"
+                "Revenue           12,115      18,950\n")
+        assert sections.index_text(text)[0].kind == "statement"
+
+    def test_prose_about_five_years_is_not_a_summary_caption(self):
+        for line in ("five years of the current regulatory period, and achieved",
+                     "The summary of five-year financial results of the Group is"):
+            assert sections.classify(line) is None, line
+
+    def test_wrapped_five_year_caption_is_a_summary(self):
+        text = ("Five-Year Group Profit Summary and            Financial Statements\n"
+                "Group Statement of Financial Position\n"
+                "Five-Year Group Profit Summary\n"
+                "HK$ million        2020   2019   2018   2017   2016\n"
+                "Revenue            1,270  1,348  1,555  1,420  1,288\n")
+        kinds = [s.kind for s in sections.index_text(text)]
+        assert kinds[0] == "summary"
+        assert kinds[1] == "summary"      # sub-caption inside the summary block
+
+
+class TestStatementFamily:
+    def test_families_from_captions(self):
+        f = sections.family
+        assert f("Consolidated Income Statement") == "income"
+        assert f("Consolidated Statement of Profit or Loss and Other Comprehensive Income") == "income"
+        assert f("CONSOLIDATED STATEMENT OF FINANCIAL POSITION") == "position"
+        assert f("Consolidated Balance Sheet") == "position"
+        assert f("Consolidated Statement of Cash Flows") == "cashflow"
+        assert f("Consolidated Statement of Changes in Equity") == "equity"
+        assert f("Notes to the Financial Statements") is None
+
+    def test_find_returns_the_section(self, text):
+        secs = sections.index_text(text)
+        assert sections.find(secs, 18).caption == "CONSOLIDATED STATEMENT OF FINANCIAL POSITION"
+        assert sections.find(secs, 1) is None
