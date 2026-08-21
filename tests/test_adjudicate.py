@@ -99,6 +99,21 @@ class TestLadder:
         assert p.status == "missing"
         assert p.files == ["X.NZ_Annual_FY2024.txt"]
 
+    def test_year_header_captured_as_value_cannot_resolve(self, db):
+        # "EBITDA   2024   2023" -- the scanner read the column headers as
+        # values, and every copy agrees, so unanimity alone would bless it.
+        con = db([fact("EBITDA", "FY2024", 2024.0, line=50),
+                  fact("EBITDA", "FY2024", 2024.0, line=90)])
+        p = cell(adjudicate.propose(con), "ebitda", "FY2024")
+        assert p.status == "contested"
+        assert "year" in p.rationale
+
+    def test_year_like_value_with_other_evidence_is_ignored(self, db):
+        con = db([fact("Revenue", "FY2024", 2024.0, line=50),
+                  fact("Revenue", "FY2024", 263527.0, line=100)])
+        p = cell(adjudicate.propose(con), "revenue", "FY2024")
+        assert (p.status, p.rung, p.value_raw) == ("resolved", "single", 263527.0)
+
     def test_only_comparative_evidence_is_contested(self, db):
         # No filing of FY2023's own, but FY2024's comparative column has it.
         # Worth showing the agent; not strong enough to resolve alone.
@@ -107,6 +122,105 @@ class TestLadder:
         p = cell(adjudicate.propose(con), "revenue", "FY2023")
         assert p.status == "contested"
         assert p.shortlist[0].confidence == "prior_year_column"
+
+
+class TestSectionAndStaticGuards:
+    def secs(self):
+        import sections
+        return {"X.NZ_Annual_FY2024.txt": [
+            sections.Section("summary", "FINANCIAL SUMMARY", 1, 50),
+            sections.Section("statement", "STATEMENT OF FINANCIAL POSITION", 51, 120),
+            sections.Section("notes", "NOTES", 121, 999)]}
+
+    def test_summary_table_value_cannot_resolve_alone(self, db):
+        # A lone candidate inside the five-year summary is usually another
+        # year's figure (ARG.NZ FY2020 equity 810.4 was FY2016's).
+        con = db([fact("ShareholdersEquity", "FY2024", 810.4, line=20)])
+        p = cell(adjudicate.propose(con, self.secs()), "shareholders_equity", "FY2024")
+        assert p.status == "contested"
+        assert "summary" in p.rationale
+        assert p.shortlist[0].section == "summary"
+
+    def test_statement_section_outranks_summary_and_notes(self, db):
+        con = db([fact("Revenue", "FY2024", 1.0, line=20),
+                  fact("Revenue", "FY2024", 3.0, line=300),
+                  fact("Revenue", "FY2024", 2.0, line=60)])
+        p = cell(adjudicate.propose(con, self.secs()), "revenue", "FY2024")
+        assert [c.value_raw for c in p.shortlist] == [2.0, 3.0, 1.0]
+
+    def test_value_repeating_across_periods_is_static_text(self, db):
+        # ARG.NZ: capex "33,220" in five different periods -- a facility limit
+        # or commitment line that matched the pattern, not a cash flow.
+        rows = [fact("CapEx", f"FY{y}", 33220.0, line=500, file=f"X.NZ_Annual_FY{y}.txt")
+                for y in (2022, 2023, 2024)]
+        rows.append(fact("CapEx", "FY2024", -812.0, line=200))
+        p = cell(adjudicate.propose(con := db(rows)), "capex", "FY2024")
+        assert (p.status, p.rung, p.value_raw) == ("resolved", "single", -812.0)
+        q = cell(adjudicate.propose(con), "capex", "FY2023")
+        assert q.status == "contested"
+        assert "repeat" in q.rationale
+
+    def test_zero_total_is_a_dash_row(self, db):
+        con = db([fact("TotalAssets", "FY2024", 0.0, line=10),
+                  fact("TotalAssets", "FY2024", 206.3, line=60)])
+        p = cell(adjudicate.propose(con), "total_assets", "FY2024")
+        assert (p.status, p.value_raw) == ("resolved", 206.3)
+        con2 = db([fact("TotalAssets", "FY2023", 0.0, line=10, file="X.NZ_Annual_FY2023.txt")])
+        assert cell(adjudicate.propose(con2), "total_assets", "FY2023").status == "contested"
+
+    def test_lone_outlier_against_other_periods_is_contested(self, db):
+        # SEK.NZ H1 FY2020 shares_outstanding: a single match of 358 when every
+        # other period reads ~40,000. One candidate, 100x out of line.
+        rows = [fact("SharesOutstanding", f"FY{y}", 40000.0 + y,
+                     file=f"X.NZ_Annual_FY{y}.txt") for y in (2021, 2022, 2023)]
+        rows.append(fact("SharesOutstanding", "H1-2020", 358.0,
+                         file="X.NZ_HalfYear_H1-2020.txt"))
+        ps = adjudicate.propose(db(rows))
+        p = cell(ps, "shares_outstanding", "H1 FY2020")
+        assert p.status == "contested"
+        assert "out of line" in p.rationale
+        assert cell(ps, "shares_outstanding", "FY2022").status == "resolved"
+
+    def test_outlier_guard_needs_enough_history(self, db):
+        rows = [fact("Revenue", "FY2023", 40000.0, file="X.NZ_Annual_FY2023.txt"),
+                fact("Revenue", "FY2024", 358.0)]
+        assert cell(adjudicate.propose(db(rows)), "revenue", "FY2024").status == "resolved"
+
+    def test_worksheet_tags_section(self, db):
+        con = db([fact("Revenue", "FY2024", 1.0, line=20),
+                  fact("Revenue", "FY2024", 2.0, line=60),
+                  fact("Revenue", "FY2024", 3.0, line=70)])
+        text = adjudicate.worksheet("X.NZ", adjudicate.propose(con, self.secs()), {})
+        assert "[stmt/statement]" in text
+        assert "[stmt/summary]" in text
+
+
+class TestJudgmentMetrics:
+    def test_definition_sensitive_metric_is_flagged_not_green(self, db):
+        # SEK.NZ capex: the scanner's "purchase of PP&E" line is right as a
+        # line and wrong as capex (the agent adds intangibles). Resolved, but
+        # shown as ~ with every distinct statement value, never as ✓.
+        con = db([fact("CapEx", "FY2024", -12917.0, line=1364),
+                  fact("CapEx", "FY2024", -12917.0, line=1400, context="Note 12")])
+        ps = adjudicate.propose(con)
+        p = cell(ps, "capex", "FY2024")
+        assert (p.status, p.flag) == ("resolved", "confirm-definition")
+        text = adjudicate.worksheet("X.NZ", ps, {})
+        grid = text.split("## Grid")[1].split("## Resolved")[0]
+        assert "~" in grid
+        assert "✓" not in grid
+        assert "## Confirm definition" in text
+        assert "capex FY2024" in text.split("## Confirm definition")[1]
+
+    def test_check_reports_precision_without_judgment_metrics(self, db):
+        con = db([fact("Revenue", "FY2024", 263527.0),
+                  fact("CapEx", "FY2024", -12917.0)])
+        con.execute("INSERT INTO core_metrics (period, revenue, capex, units)"
+                    " VALUES ('FY2024', 263.527, 18.296, 'millions')")
+        rep = adjudicate.check(con, adjudicate.propose(con))
+        assert (rep["compared"], rep["agree"]) == (2, 1)
+        assert rep["firm"] == (1, 1)          # (agree, compared) excluding ~ cells
+        assert rep["firm_value"] == (1, 1)
 
 
 class TestVocabulary:
@@ -125,7 +239,7 @@ class TestVocabulary:
                   fact("InterestIncome", "FY2024", 0.9, line=700, context="Note 6")])
         ps = adjudicate.propose(con)
         text = adjudicate.worksheet("X.NZ", ps, {})
-        assert "### InterestIncome FY2024" in text.split("## KPIs")[1]
+        assert "- InterestIncome FY2024" in text.split("## KPIs")[1]
 
     def test_period_spellings_merge(self, db):
         con = db([fact("Revenue", "H1-2024", 5.0, file="X.NZ_HalfYear_H1-2024.txt"),
@@ -191,7 +305,10 @@ class TestWorksheet:
                      file=f"X.NZ_Annual_FY{2006 + i}.txt",
                      context="Consolidated statement x " * 10)
                 for i in range(20) for m in ("Revenue", "NetIncome", "TotalAssets",
-                                             "CapEx", "OperatingCashFlow")
+                                             "CapEx", "OperatingCashFlow", "EBITDA",
+                                             "TotalDebt", "CashAndEquivalents",
+                                             "SharesOutstanding", "GrossProfit",
+                                             "InterestIncome", "DividendsPaid")
                 for j in range(6)]
         text = adjudicate.worksheet("X.NZ", adjudicate.propose(db(rows)), {})
         assert len(text.encode()) <= adjudicate.SIZE_BUDGET
@@ -225,6 +342,39 @@ class TestCheck:
         assert rep["agree"] == 2
         assert rep["by_rung"]["single"] == (2, 3)
         assert ("total_debt", "FY2024") in rep["disagreements"]
+
+    def test_agreement_tolerates_rounding_sign_and_per_share_scale(self, db):
+        con = db([fact("CapEx", "FY2024", -4752.0),        # agent wrote +4.8
+                  fact("EPS", "FY2024", -3.9),             # cents vs dollars
+                  fact("Revenue", "FY2024", 263527.0),
+                  fact("NetIncome", "FY2024", 9100.0)])    # agent wrote 9.5: wrong
+        con.execute("INSERT INTO core_metrics (period, capex, eps, revenue, net_income,"
+                    " units) VALUES ('FY2024', 4.8, -0.039, 263.5, 9.5, 'millions')")
+        rep = adjudicate.check(con, adjudicate.propose(con))
+        assert (rep["compared"], rep["agree"]) == (4, 3)
+        assert list(rep["disagreements"]) == [("net_income", "FY2024")]
+
+    def test_disagreements_are_classified(self, db):
+        con = db([fact("Revenue", "H1-2020", 9.0, file="X.NZ_HalfYear_H1-2020.txt"),
+                  fact("Revenue", "H1-2019", 7.0, file="X.NZ_HalfYear_H1-2019.txt"),
+                  fact("NetIncome", "FY2024", 5.0)])
+        # the agent labelled half-years one fiscal year later than the filenames
+        con.execute("INSERT INTO core_metrics (period, revenue) VALUES"
+                    " ('H1 FY2021', 9.0), ('H1 FY2020', 7.0)")
+        con.execute("INSERT INTO core_metrics (period, net_income) VALUES ('FY2024', 50.0)")
+        rep = adjudicate.check(con, adjudicate.propose(con))
+        assert rep["why"][("revenue", "H1 FY2020")] == "period-shift"
+        assert rep["why"][("net_income", "FY2024")] == "other"
+
+    def test_legacy_core_metrics_without_newer_columns(self, db):
+        # Tickers researched before the schema grew have a narrower table;
+        # grading must use the columns that exist, not the current DDL.
+        con = db([fact("Revenue", "FY2024", 263527.0)])
+        con.execute("DROP TABLE core_metrics")
+        con.execute("CREATE TABLE core_metrics (period TEXT, revenue DOUBLE, units TEXT)")
+        con.execute("INSERT INTO core_metrics VALUES ('FY2024', 263.527, 'millions')")
+        rep = adjudicate.check(con, adjudicate.propose(con))
+        assert (rep["compared"], rep["agree"]) == (1, 1)
 
     def test_unknown_units_fall_back_to_any_decade(self, db):
         con = db([fact("Revenue", "FY2024", 263527.0, units=None),
