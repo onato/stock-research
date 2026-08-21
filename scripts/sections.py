@@ -43,6 +43,8 @@ NOTES_RE = re.compile(
 TRAILER_RE = re.compile(r"(?:\s*\((?:continued|cont\.?)\))?[\s\d:|\-–—.]*$", re.IGNORECASE)
 
 MIN_POINTER_LINES = 5   # a contents entry is one line; a statement is many
+SUBCAPTION_WINDOW = 12  # a statement caption this soon after a summary one may be its sub-heading
+YEAR_RE = re.compile(r"\b(?:19|20)\d{2}\b")
 
 
 @dataclass(frozen=True)
@@ -67,13 +69,34 @@ def classify(line: str) -> tuple[str, str] | None:
 
 
 def index_text(text: str) -> list[Section]:
-    lines = text.splitlines()
+    lines = text.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()          # a final newline is not an extra line to sed
     hits = [(i + 1, *c) for i, ln in enumerate(lines) if (c := classify(ln))]
     out: list[Section] = []
-    for n, (start, kind, caption) in enumerate(hits):
+    chained = False
+    for n, (start, found, caption) in enumerate(hits):
+        kind = found
         end = hits[n + 1][0] - 1 if n + 1 < len(hits) else len(lines)
+        # A statement caption a few lines into a summary block, with a row of
+        # three or more years just above or below it, is the summary's own
+        # sub-heading
+        # (0001.HK "Ten Year Summary" repeats "CONSOLIDATED INCOME STATEMENT";
+        # its first column is 2015). Once one sub-heading is found, the
+        # block's later ones follow without needing their own year row.
+        if kind == "statement" and out and out[-1].kind == "summary" \
+                and out[-1].end - out[-1].start + 1 <= SUBCAPTION_WINDOW \
+                and (chained or _many_years(lines[max(0, start - 5):start + 5])):
+            kind, chained = "summary", True
+        elif kind != "statement" or not out or out[-1].kind != "summary":
+            chained = False
         out.append(Section(kind, caption, start, end))
     return out
+
+
+def _many_years(block: list[str]) -> bool:
+    years = set(YEAR_RE.findall(" ".join(block)))
+    return len(years) >= 3
 
 
 def section_of(secs: list[Section], line_no: int) -> str:

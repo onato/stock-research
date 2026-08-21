@@ -106,10 +106,27 @@ def parse_num(tok: str) -> float | None:
     return -v if neg else v
 
 
+def split_lines(text: str) -> list[str]:
+    """Split on newlines only. pdftotext puts a form feed at each page break
+    and str.splitlines() would count it as a line, putting every line_no
+    after the first page ahead of what `sed -n` / an editor shows."""
+    lines = text.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    return lines
+
+
 def period_from_filename(name: str) -> str | None:
     """Filenames follow {TICKER}_{type}_{period}.txt (see CLAUDE.md)."""
     m = re.search(r"_(FY\d{4})", name, re.IGNORECASE)
     if m:
+        # {T}_HalfYear_FY2025 names the half by its fiscal year; the period
+        # is still the half. A quarterly file named this way does not say
+        # which quarter, so it stays undated rather than guessed.
+        if re.search(r"_(HalfYear|Interim)_", name, re.IGNORECASE):
+            return f"H1-{m.group(1)[2:]}"
+        if re.search(r"_Quarterly_", name, re.IGNORECASE):
+            return None
         return m.group(1).upper()
     m = re.search(r"_(H[12])[-_ ]?(\d{4})", name, re.IGNORECASE)
     if m:

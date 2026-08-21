@@ -118,3 +118,18 @@ class TestPatternVocabulary:
     def test_us_equity_award_tax_phrasing(self):
         assert "EquityAwardTaxes" in self.find(
             "Taxes paid related to net share settlement of equity awards")
+
+
+class TestHalfYearNamedByFiscalYear:
+    def test_halfyear_fy_is_the_first_half(self):
+        # 18 corpus files are named {T}_HalfYear_FY2025.txt; the period is the
+        # half, not the year, or the interim collides with the annual.
+        assert bf.period_from_filename("TWL.NZ_HalfYear_FY2025.txt") == "H1-2025"
+        assert bf.period_from_filename("X.HK_Interim_FY2024.txt") == "H1-2024"
+
+    def test_quarterly_fy_is_undated(self):
+        # Which quarter? The name does not say, so no period is the honest answer.
+        assert bf.period_from_filename("X_Quarterly_FY2025.txt") is None
+
+    def test_annual_fy_unchanged(self):
+        assert bf.period_from_filename("X.NZ_Annual_FY2025.txt") == "FY2025"

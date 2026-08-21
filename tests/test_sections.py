@@ -35,6 +35,27 @@ class TestIndexText:
         assert starts[27].kind == "notes"
         assert starts[31].kind == "notes"          # "4. SEGMENT INFORMATION"
 
+    def test_statement_subcaption_inside_a_summary_block_is_summary(self, text):
+        # 0001.HK's Ten Year Summary repeats "CONSOLIDATED INCOME STATEMENT" as
+        # a sub-heading; its first column is 2015, not the filing's year.
+        starts = {s.start: s for s in sections.index_text(text)}
+        assert starts[33].kind == "summary"
+        assert starts[34].kind == "summary"
+        assert starts[37].kind == "summary"
+
+    def test_year_row_above_the_subcaption_also_counts(self):
+        # 0001.HK prints the 2015..2024 header once, above the first sub-heading.
+        text = ("Ten Year Summary\n\n        2015  2016  2017  2018\n\n"
+                "CONSOLIDATED INCOME STATEMENT\nHK$ million\nRevenue 1 2 3 4\n"
+                "CONSOLIDATED STATEMENT OF FINANCIAL POSITION\nTotal assets 5 6 7 8\n")
+        kinds = [s.kind for s in sections.index_text(text)]
+        assert kinds == ["summary", "summary", "summary"]
+
+    def test_form_feed_does_not_shift_line_numbers(self):
+        text = "\fCONSOLIDATED INCOME STATEMENT\nRevenue 1 2\n\fx\n"
+        assert sections.index_text(text)[0].start == 1
+        assert sections.index_text(text)[0].end == 3
+
     def test_prose_mentioning_a_statement_is_not_a_caption(self, text):
         assert 29 not in {s.start for s in sections.index_text(text)}
 

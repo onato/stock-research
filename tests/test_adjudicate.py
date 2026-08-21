@@ -12,6 +12,7 @@ import sys
 
 import adjudicate
 import pytest
+import sections
 
 FACT_COLS = ("metric", "period", "value_raw", "units_hint", "source_file",
              "line_no", "context", "confidence", "currency")
@@ -148,6 +149,19 @@ class TestSectionAndStaticGuards:
         p = cell(adjudicate.propose(con, self.secs()), "revenue", "FY2024")
         assert [c.value_raw for c in p.shortlist] == [2.0, 3.0, 1.0]
 
+    def test_within_a_statement_section_the_earlier_line_wins(self, db):
+        # 0001.HK cash: the cash-flow statement's opening balance (context
+        # says "cash flow") must not outrank the balance-sheet line.
+        secs = {"X.NZ_Annual_FY2024.txt": [
+            sections.Section("statement", "FINANCIAL POSITION", 51, 120),
+            sections.Section("statement", "CASH FLOWS", 121, 200)]}
+        con = db([fact("CashAndEquivalents", "FY2024", 127323.0, line=150,
+                       context="Consolidated statement of cash flows"),
+                  fact("CashAndEquivalents", "FY2024", 121303.0, line=60,
+                       context="Current assets")])
+        p = cell(adjudicate.propose(con, secs), "cash_and_equivalents", "FY2024")
+        assert [c.value_raw for c in p.shortlist] == [121303.0, 127323.0]
+
     def test_value_repeating_across_periods_is_static_text(self, db):
         # ARG.NZ: capex "33,220" in five different periods -- a facility limit
         # or commitment line that matched the pattern, not a cash flow.
@@ -159,6 +173,18 @@ class TestSectionAndStaticGuards:
         q = cell(adjudicate.propose(con), "capex", "FY2023")
         assert q.status == "contested"
         assert "repeat" in q.rationale
+
+    def test_negative_count_or_total_is_a_stray_match(self, db):
+        # 0001.HK: shares_outstanding = -41 resolved as the lone candidate.
+        con = db([fact("SharesOutstanding", "FY2024", -41.0, line=10)])
+        p = cell(adjudicate.propose(con), "shares_outstanding", "FY2024")
+        assert p.status == "contested"
+        assert "negative" in p.rationale
+
+    def test_zero_net_income_is_a_dash_row(self, db):
+        con = db([fact("NetIncome", "FY2024", 0.0, line=10),
+                  fact("NetIncome", "FY2024", 17088.0, line=60)])
+        assert cell(adjudicate.propose(con), "net_income", "FY2024").value_raw == 17088.0
 
     def test_zero_total_is_a_dash_row(self, db):
         con = db([fact("TotalAssets", "FY2024", 0.0, line=10),

@@ -59,7 +59,10 @@ TIER = {"statement_line": 3, "prior_year_column": 2, "prose": 1}
 SECTION_SCORE = {"statement": 2, "other": 1, "notes": 0, "summary": -1}
 # Metrics for which a printed 0 is a dash row, not a value.
 NONZERO = {"revenue", "total_assets", "total_liabilities", "shareholders_equity",
-           "shares_outstanding"}
+           "shares_outstanding", "net_income"}
+# Metrics that cannot be negative; a negative match is a stray line.
+NONNEG = {"revenue", "total_assets", "total_liabilities", "shares_outstanding",
+          "cash_and_equivalents"}
 # Metrics that legitimately repeat the same figure across periods.
 STATIC_EXEMPT = {"shares_outstanding", "eps", "dividend_per_share"}
 STATIC_PERIODS = 3
@@ -89,7 +92,9 @@ class Candidate:
     section: str = "other"   # from sections.py; "other" when unindexed
 
     def rank(self) -> tuple[int, int, int, int, str]:
-        ctx = self.context or ""
+        # Context keywords stand in for the section only when the file was
+        # not indexed; inside a known section they would double-count.
+        ctx = self.context if self.section == "other" else ""
         score = (1 if STATEMENT_RE.search(ctx) else 0) - (1 if NOTE_RE.search(ctx) else 0)
         # Primary statements precede the notes, so an earlier line wins ties.
         return (-TIER.get(self.confidence, 0), -SECTION_SCORE.get(self.section, 1),
@@ -150,6 +155,8 @@ def _guard(metric: str, c: Candidate, static: set[float]) -> str | None:
         return f"values that repeat in {STATIC_PERIODS}+ periods (static text, not a figure)"
     if c.value_raw == 0 and metric in NONZERO:
         return "zero/dash rows"
+    if c.value_raw < 0 and metric in NONNEG:
+        return "negative values for a metric that cannot be negative"
     return None
 
 

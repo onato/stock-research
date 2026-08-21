@@ -91,3 +91,14 @@ class TestNoteColumnFixture:
         facts = list(bf.scan_file(f))
         assert [x["value_raw"] for x in facts] == [150000.0, 140000.0]
         assert facts[0]["period"] == "FY2024"
+
+
+class TestLineNumbersMatchTheFile:
+    def test_form_feed_does_not_start_a_new_line(self):
+        # pdftotext writes a form feed at every page break. str.splitlines()
+        # treats it as a line break, sed/editors do not; facts.line_no must
+        # agree with `sed -n` or every pointer the agent follows is late.
+        text = "\fRevenue  10  9\nCost of sales  (4)  (3)\n\fTotal assets  50  40\n"
+        facts = list(bf.BaseParser().scan(text, "X.NZ_Annual_FY2024.txt"))
+        lines = {f["metric"]: f["line_no"] for f in facts}
+        assert lines == {"Revenue": 1, "CostOfRevenue": 2, "TotalAssets": 3}

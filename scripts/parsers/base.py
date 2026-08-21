@@ -78,7 +78,7 @@ class BaseParser:
 
     def scan(self, text: str, filename: str) -> Iterator[dict[str, Any]]:
         """Yield candidate facts from one extracted filing."""
-        lines = text.splitlines()
+        lines = common.split_lines(text)
         period = common.period_from_filename(filename)
         column_periods = self.column_periods(period)
         units_hint = self.units_hint(lines)
