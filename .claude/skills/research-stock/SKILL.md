@@ -125,7 +125,11 @@ This picks the extraction path for the ticker's exchange:
 It falls back from XBRL to text automatically when SEC has no coverage (ADRs,
 foreign private issuers), and logs a gap when neither path produces anything.
 
-Writes to `./research/$ARGUMENTS/Reports/$ARGUMENTS.duckdb`. Takes ~1 second.
+Writes to `./research/$ARGUMENTS/Reports/$ARGUMENTS.duckdb`, then runs
+`scripts/adjudicate.py`, which resolves what the candidates already settle and
+writes `./research/$ARGUMENTS/Reports/$ARGUMENTS_Worksheet.md` -- the grid of
+resolved / contested / missing cells the agent reviews. Takes a few seconds,
+no model.
 
 **This must run before the financial-parser agent is spawned.** The agent
 queries the facts table instead of grepping the filings — that search
@@ -134,9 +138,13 @@ ticker, roughly 60% of its total cost.
 
 ### Step 5b: Adjudicate with the financial-parser agent
 
-The agent (`.claude/agents/financial-parser.md`) resolves competing candidates,
+The agent (`.claude/agents/financial-parser.md`) reviews the worksheet --
+accepting resolved cells, deciding contested and definition-sensitive ones,
+opening filings only at the statement line ranges the worksheet names --
 determines units and currency, and writes **both** the `core_metrics` table and
-the exported CSV. `core_metrics` uses a fixed schema shared by every ticker in
+the exported CSV. Tell it the worksheet path in the task prompt
+(`./research/$ARGUMENTS/Reports/$ARGUMENTS_Worksheet.md`); it should not grep
+the filings. `core_metrics` uses a fixed schema shared by every ticker in
 this repo (see `scripts/schema.py`), which is what makes cross-ticker
 screening possible.
 

@@ -19,10 +19,17 @@ Example:
    (US filers skip PDFs: `scripts/build_facts_xbrl.py` pulls typed data from the SEC XBRL API)
 3. `scripts/build_facts.py` scans the .txt files and writes every candidate value to the
    `facts` table in `research/{TICKER}/Reports/{TICKER}.duckdb`
-4. The financial-parser agent adjudicates `facts` → the canonical `core_metrics` table
+4. `scripts/adjudicate.py` (run by `extract.py`; `make adjudicate TICKER=X`) resolves
+   what the candidates settle by themselves -- single, unanimous, or corroborated by a
+   later filing's comparative column -- and writes `{TICKER}_Worksheet.md` (gitignored):
+   a grid of ✓ / ~ / ? / ✗ cells with ranked shortlists and statement line ranges.
+   `scripts/sections.py` supplies the ranges. `--check` grades ✓ cells against an
+   existing `core_metrics` (94% carried the right number on 5 NZX tickers; units and
+   half-year labels stay the agent's call).
+5. The financial-parser agent reviews the worksheet → the canonical `core_metrics` table
    (fixed cross-ticker schema; company-specific metrics go in `kpis`). DDL and column
    aliases live in `scripts/schema.py`.
-5. `python3 scripts/export_csv.py {TICKER}` derives `{TICKER}_Metrics.csv` from
+6. `python3 scripts/export_csv.py {TICKER}` derives `{TICKER}_Metrics.csv` from
    `core_metrics`. **Never hand-write the CSV** — the script applies the snake_case →
    CamelCase header mapping and refuses to shrink an existing CSV.
 

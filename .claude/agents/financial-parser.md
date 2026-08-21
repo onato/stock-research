@@ -1,6 +1,6 @@
 ---
 name: financial-parser
-description: Adjudicates extracted financial facts in the ticker DuckDB into core_metrics, then exports the Metrics CSV from it
+description: Reviews the pre-adjudicated worksheet of extracted facts, writes core_metrics in the ticker DuckDB, then exports the Metrics CSV from it
 tools: Bash, Read, Grep, Write
 model: opus
 ---
@@ -64,16 +64,19 @@ Look for metrics specific to the company's business model:
 - **Financial Services**: AUM, transaction volume, NIM
 - **Retail**: Same-store sales, store count
 
-## Parsing Strategy: query the facts table, don't grep
+## Parsing Strategy: review the worksheet, don't search
 
-`build_facts.py` has already scanned every extracted filing and written
-candidate values to `./research/{TICKER}/Reports/{TICKER}.duckdb`. **Query it. Do not
-grep the .txt files to find numbers** — that search is already done, and
-repeating it is what made this step the most expensive part of the workflow
-(183 turns and 18.2M cache-read tokens on one ticker).
+`extract.py` has already (1) scanned every extracted filing into the `facts`
+table and (2) run `adjudicate.py`, which decides what those candidates settle
+by themselves and writes **`./research/{TICKER}/Reports/{TICKER}_Worksheet.md`**.
+Your job is **review, not search**. The last version of this step spent 65% of
+its tool calls grepping `Extracted/*.txt` and paging through the same annual
+report five to seven times (ARB.NZ: 81 of 124 calls, 489 KB of filing text
+through context) to re-find numbers that were already in `facts`.
 
-Your job is **adjudication, not search**: the extractor deliberately emits
-every candidate and never decides between them.
+**Budget: about 30 tool calls.** One `Read` of the worksheet, a handful of
+`sed -n A,Bp` openings for missing cells, one bulk `INSERT`, one export. If you
+pass 40 calls, write what is resolved, log the rest as gaps, and stop.
 
 ### Step 0 — check whether the work is already done
 
@@ -95,41 +98,47 @@ duckdb ./research/{TICKER}/Reports/{TICKER}.duckdb -c "
 - **both 0** — neither path worked; read the filings directly and log a gap
   (see Fallback).
 
-### Step 1 — see what was found
+### Step 1 — read the worksheet (one call)
 
 ```bash
-duckdb ./research/{TICKER}/Reports/{TICKER}.duckdb -c "
-  SELECT metric, count(*) n, count(DISTINCT period) periods
-  FROM facts GROUP BY metric ORDER BY n DESC"
+cat ./research/{TICKER}/Reports/{TICKER}_Worksheet.md
 ```
 
-### Step 2 — pull one metric's candidates with context
+It has six parts. Work through them in order:
 
-```bash
-duckdb ./research/{TICKER}/Reports/{TICKER}.duckdb -c "
-  SELECT period, value_raw, source_file, line_no, confidence, context
-  FROM facts
-  WHERE metric = 'Revenue' AND confidence = 'statement_line'
-  ORDER BY period DESC, line_no"
-```
+| section | cell mark | what to do |
+|---|---|---|
+| **Grid** | `✓ ~ ? ✗` per (period, metric) | your map of the work; nothing else to find |
+| **Resolved** | `✓` | accept unless a judgment rule below says otherwise (one candidate, several that agree, or one repeated by a later filing's comparative column) |
+| **Confirm definition** | `~` | the proposal plus every other distinct statement value. These are capex, total_debt, ebitda, stock_based_comp, eps, net_income -- metrics where the right *line* depends on a definition (capex with or without intangibles, total vs attributable profit, basic vs diluted EPS, which borrowings are debt). Decide from the listed values and their `file:line`; open the file only if the listed lines genuinely do not settle it |
+| **Contested** | `?` | a ranked shortlist, tagged `[evidence/section]` (`stmt` = a statement line, `prior` = a later filing's comparative column; section = statement / summary / notes). Usually the first entry is right; a value from a *summary* table is often another year's column |
+| **Missing** | `✗` | no candidate. Each line names the filing and the **statement line ranges** to open. Use `sed -n A,Bp` on that range -- never `grep` |
+| **Filings** | -- | one row per file: its own period, the units printed on the page, currency. Make **one units decision per filing** here, not per cell |
 
-`confidence` values:
-- `statement_line` — first numeric column of a financial-statement line. Prefer these.
-- `prior_year_column` — the comparative column on the same line. Its `period` is
-  NULL because the extractor will not guess which year it belongs to. Useful as a
-  **cross-check** against the value extracted from that year's own filing; a
-  mismatch means one of the two is misread.
+The same proposals are in the `proposed_metrics` table
+(`metric, kind, period, status, rung, value_raw, units_hint, ...`) if you prefer
+SQL; `kind = 'kpi'` rows are metrics with no core column (InterestIncome,
+DividendsPaid, DeferredRevenue, CashTaxesPaid, EquityAwardTaxes,
+ShareRepurchases, Depreciation) -- write those to `kpis`.
 
-### Step 3 — resolve conflicts yourself
+### Step 2 — what the worksheet cannot decide for you
 
-Several candidates per metric per period is normal and expected — a figure
-appears in the primary statement, again in a note, and again in the narrative.
-Choose using the judgment rules below, preferring the audited primary statement
-over prose. **Read the `context` column** (±2 lines) rather than re-opening the
-source file; only fall back to `Read` on the .txt when the context genuinely
-does not settle it.
+- **Half-year labels.** A file named `H1-2024` is labelled `H1 FY2024` by the
+  scanner. Check the "six months ended ..." line of one half-year filing against
+  the company's year end and, if the filename convention is off by one fiscal
+  year, relabel **every** half-year consistently. (On ARB.NZ the agent and the
+  filenames disagreed by one year on 38 cells; the values were right.)
+- **Units.** `units_hint` is the scale printed on the page and is sometimes
+  wrong or NULL (ARB.NZ's USD-millions statements carry a "thousands" hint).
+  Sanity-check magnitude once per filing; see Step 3.
+- **Definitions** (the `~` cells) -- yours.
 
-### Step 4 — units and currency are YOUR call
+**Rules on reading filings:** no `grep` over `Extracted/`; no `Read` of a
+filing without a `file:start-end` pointer from the worksheet; never open the
+same file twice. If the pointer range does not contain the figure, the
+extractor missed it -- log a gap (below) and move on.
+
+### Step 3 — units and currency are YOUR call
 
 **The extractor never scales anything.** `value_raw` is exactly as printed, and
 `units_hint` is often NULL because filings frequently state units in a table
@@ -169,9 +178,10 @@ listing does not guarantee GBP and an NZX listing does not guarantee NZD:
 
 ### Fallback — and log what was missing
 
-If the facts table has no usable candidate for a metric (extractor not run, a
-pattern that matched nothing, or a filing layout it could not parse), fall back
-to reading the `Extracted/*.txt` directly.
+If a cell is `✗` and the statement range the worksheet points to does not
+contain the figure, or the worksheet itself is missing (`extract.py` did not
+run -- run `python3 scripts/adjudicate.py {TICKER}` yourself first), only then
+open a filing by line range.
 
 **Then record the gap**, so the extractor can be improved instead of every
 future run paying the same fallback cost:
