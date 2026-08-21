@@ -21,9 +21,17 @@ from collections.abc import Iterable
 from pathlib import Path
 
 import refresh_plan
+import sync_portfolio_queue
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 QUEUE_DIR = REPO_ROOT / "queue"
+# The live source behind priority.txt. Read directly when present (local
+# runs) so a new position is queued the moment it is bought; the committed
+# file is only the fallback for CI, where the sibling repo is absent.
+# None = derive from REPO_ROOT at call time (so tests that retarget
+# REPO_ROOT never see the real tracker); set to pin an explicit path.
+PORTFOLIO_JSON: Path | None = None
+PRIORITY_FILE = "priority.txt"
 
 # Reuse the date parsing already used by the screen-investments skill so
 # staleness here means the same thing it does there.
@@ -92,10 +100,46 @@ def has_reports(ticker: str) -> bool:
     return reports.is_dir() and any(reports.iterdir())
 
 
+def portfolio_path() -> Path:
+    """PORTFOLIO_JSON env var, else the module override, else the
+    sibling-repo default next to REPO_ROOT."""
+    env = os.environ.get("PORTFOLIO_JSON")
+    if env:
+        return Path(env)
+    if PORTFOLIO_JSON is not None:
+        return Path(PORTFOLIO_JSON)
+    return (Path(REPO_ROOT).parent / "portfolio-tracker" / "data"
+            / "user_portfolio.json")
+
+
+def priority_tickers() -> list[str] | None:
+    """Holdings then watchlist from the live tracker; None when absent.
+
+    Never merged with priority.txt: a stale committed file would re-queue a
+    position that has since been sold.
+    """
+    tagged = sync_portfolio_queue.portfolio_tickers(portfolio_path())
+    return None if tagged is None else [t for t, _ in tagged]
+
+
+def queue_sources() -> list[tuple[str, list[str]]]:
+    """(name, tickers) in consumption order, with the live portfolio
+    standing in for priority.txt when it is available."""
+    live = priority_tickers()
+    out: list[tuple[str, list[str]]] = []
+    if live is not None:
+        out.append((PRIORITY_FILE, live))
+    for qf in queue_files():
+        if qf.name == PRIORITY_FILE and live is not None:
+            continue
+        out.append((qf.name, read_tickers(qf)))
+    return out
+
+
 def pick_new(exclude: Iterable[str] = ()) -> str | None:
     exclude = set(exclude)
-    for qf in queue_files():
-        for ticker in read_tickers(qf):
+    for _, tickers in queue_sources():
+        for ticker in tickers:
             if ticker in exclude:
                 continue
             if not has_reports(ticker):

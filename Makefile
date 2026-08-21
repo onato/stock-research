@@ -28,7 +28,7 @@ LEADERBOARD ?= 15   # rows shown by `make screen`
 .DEFAULT_GOAL := help
 .PHONY: help run digest status screen integrity missing prune-stubs standardize-scale research facts evals evals-all \
         cost gaps exchange-eval facts-xbrl screen-metrics check-currency ledger ledger-backfill queue-prune \
-        screen-fundamentals backfill-units canonical-iv \
+        screen-fundamentals backfill-units canonical-iv sync-portfolio \
         test test-country lint coverage typecheck
 
 help: ## Show this help
@@ -52,6 +52,9 @@ run: ## Research the next few tickers, score them, report fixes, then rank every
 	@echo "==> refreshing drifted prices (free, no model)"
 	@$(MAKE) --no-print-directory refresh-price APPLY=1 || true
 	@echo
+	@# The selector reads the portfolio tracker live; this keeps the
+	@# committed fallback (used by CI, which lacks the sibling repo) current.
+	@$(MAKE) --no-print-directory sync-portfolio
 	@# TICKER=X researches just that one; otherwise take the next TICKERS
 	@# from the queue. Without this, `make run TICKER=X` would silently
 	@# ignore the argument and research something else entirely.
@@ -70,6 +73,9 @@ endif
 	@$(MAKE) --no-print-directory digest
 	@echo
 	@$(MAKE) --no-print-directory screen
+
+sync-portfolio: ## Regenerate queue/priority.txt from ../portfolio-tracker (no-op without it)
+	@$(PY) $(SCRIPTS)/sync_portfolio_queue.py
 
 digest: ## Cost + quality + suggested fixes for the last batch
 	@$(PY) $(SCRIPTS)/after_run.py
