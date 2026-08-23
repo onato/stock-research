@@ -56,7 +56,7 @@ class TestCurrencyLabel:
         add_ticker(tmp_path, "HFL.NZ",
                    inputs_currency="NZD (outputs) / GBP (fundamentals)",
                    top_currency="NZD")
-        rows, _unranked = screen_dcf.screen(_args(tmp_path))
+        rows, _unranked, _excluded = screen_dcf.screen(_args(tmp_path))
         assert rows[0]["currency"] == "NZD"
 
     def test_afi_shape_also_resolves(self, tmp_path):
@@ -64,19 +64,19 @@ class TestCurrencyLabel:
                    inputs_currency=(
                        "AUD (fundamentals) / NZD (reported valuation outputs)"),
                    top_currency="NZD")
-        rows, _unranked = screen_dcf.screen(_args(tmp_path))
+        rows, _unranked, _excluded = screen_dcf.screen(_args(tmp_path))
         assert rows[0]["currency"] == "NZD"
 
     def test_plain_code_is_untouched(self, tmp_path):
         add_ticker(tmp_path, "DCBO", inputs_currency="USD",
                    top_currency="USD")
-        rows, _unranked = screen_dcf.screen(_args(tmp_path))
+        rows, _unranked, _excluded = screen_dcf.screen(_args(tmp_path))
         assert rows[0]["currency"] == "USD"
 
     def test_inputs_code_still_wins_when_it_is_a_code(self, tmp_path):
         """inputs.currency stays the primary source when it is usable."""
         add_ticker(tmp_path, "XX", inputs_currency="EUR", top_currency="USD")
-        rows, _unranked = screen_dcf.screen(_args(tmp_path))
+        rows, _unranked, _excluded = screen_dcf.screen(_args(tmp_path))
         assert rows[0]["currency"] == "EUR"
 
     def test_prose_with_no_top_level_falls_back_to_none(self, tmp_path):
@@ -84,14 +84,14 @@ class TestCurrencyLabel:
         add_ticker(tmp_path, "YY",
                    inputs_currency="NZD (outputs) / GBP (fundamentals)",
                    top_currency=None)
-        rows, _unranked = screen_dcf.screen(_args(tmp_path))
+        rows, _unranked, _excluded = screen_dcf.screen(_args(tmp_path))
         assert rows[0]["currency"] in (None, "")
 
     def test_rendered_html_has_no_prose_currency(self, tmp_path):
         add_ticker(tmp_path, "HFL.NZ",
                    inputs_currency="NZD (outputs) / GBP (fundamentals)",
                    top_currency="NZD")
-        rows, _unranked = screen_dcf.screen(_args(tmp_path))
+        rows, _unranked, _excluded = screen_dcf.screen(_args(tmp_path))
         html = screen_dcf.row_html(1, rows[0], "", {})
         assert "(fundamentals)" not in html
         assert "(outputs)" not in html

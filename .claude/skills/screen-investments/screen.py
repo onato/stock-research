@@ -128,6 +128,55 @@ def load_dcf(path):
         return None
 
 
+# Why a row is never in question, however large its ranked upside would be.
+# "Terminal" valuation models are ones where the DCF itself says this is not
+# a going business being valued but a shell, wind-down or liquidation being
+# scenario-weighted (BGI.NZ ranked #1 at +980% on a frozen $0.004 print).
+TERMINAL_MODEL_WORDS = ("shell", "liquidation", "waterfall",
+                        "wind_down", "wind-down", "going_concern")
+
+
+def load_never(root):
+    """{ticker: reason} from state/never_interested.txt (hand-maintained).
+
+    Lines are `TICKER  reason...`; blank lines and #-comments are skipped.
+    Like state/companies.json, the file lives beside the root as well as
+    inside it (--root defaults to `research`, state/ sits next to it).
+    """
+    candidates = (os.path.join(root, "state", "never_interested.txt"),
+                  os.path.join(os.path.dirname(os.path.abspath(root)),
+                               "state", "never_interested.txt"))
+    for path in candidates:
+        try:
+            with open(path) as f:
+                out = {}
+                for raw in f:
+                    line = raw.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    parts = line.split(None, 1)
+                    out[parts[0]] = (parts[1] if len(parts) > 1
+                                     else "listed in never_interested.txt")
+                return out
+        except OSError:
+            continue
+    return {}
+
+
+def exclusion_reason(ticker, dcf, iv, never):
+    """Why this ticker is not under consideration, or None if it is."""
+    if ticker in never:
+        return never[ticker]
+    method = str(dcf.get("valuation_method")
+                 or dcf.get("valuation_model") or "").lower()
+    for word in TERMINAL_MODEL_WORDS:
+        if word in method:
+            return f"terminal valuation model: {method}"
+    if iv is not None and iv <= 0:
+        return "equity worthless (weighted IV \u2264 0)"
+    return None
+
+
 def discover(root):
     """Yield (ticker, dcf_path, analysis_path) for every {T}/Reports/{T}_DCF.json."""
     for name in sorted(os.listdir(root)):
@@ -143,6 +192,7 @@ def discover(root):
 def screen(args):
     rows = []
     only = {t.strip() for t in args.only.split(",")} if args.only else None
+    never = load_never(args.root)
 
     for ticker, dcf_path, ana_path in discover(args.root):
         if only and ticker not in only:
@@ -201,6 +251,7 @@ def screen(args):
 
         rows.append({
             "ticker": ticker,
+            "excluded_reason": exclusion_reason(ticker, d, iv, never),
             "currency": ccy,
             "live_currency": live_ccy,
             "price": price,
@@ -215,11 +266,16 @@ def screen(args):
             "flags": flags,
         })
 
-    # rank: ranked (has upside) first by upside desc; unranked after
-    ranked = [r for r in rows if r.get("upside_pct") is not None]
-    unranked = [r for r in rows if r.get("upside_pct") is None]
+    # Three buckets: excluded (never in question) is carved out first, so a
+    # dead shell's arithmetic "upside" cannot top the leaderboard; then
+    # ranked (has upside) by upside desc; unranked (no comparable number) last.
+    excluded = [r for r in rows if r.get("excluded_reason")]
+    live = [r for r in rows if not r.get("excluded_reason")]
+    ranked = [r for r in live if r.get("upside_pct") is not None]
+    unranked = [r for r in live if r.get("upside_pct") is None]
     ranked.sort(key=lambda r: r["upside_pct"], reverse=True)
-    return ranked, unranked
+    excluded.sort(key=lambda r: r["ticker"])
+    return ranked, unranked, excluded
 
 
 def fmt_price(r):
@@ -375,7 +431,7 @@ def row_html(i, r, summary, co):
     )) + "</tr>"
 
 
-def write_html(ranked, unranked, meta, scores, companies, path):
+def write_html(ranked, unranked, excluded, meta, scores, companies, path):
     head = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -449,7 +505,7 @@ h2 {{ font-size: 1.1em; color: #00d4aa; margin: 5px 0 10px 5px; }}
 <p class="meta">{len(companies) or len(ranked) + len(unranked)} companies tracked &nbsp;&middot;&nbsp;
 as of {esc(meta["generated_at"])} &nbsp;&middot;&nbsp;
 {"LIVE" if meta["live"] else "STORED"} prices &nbsp;&middot;&nbsp;
-{len(ranked)} ranked / {len(unranked)} unranked &nbsp;&middot;&nbsp;
+{len(ranked)} ranked / {len(unranked)} unranked / {len(excluded)} not under consideration &nbsp;&middot;&nbsp;
 upside = weighted IV / price &minus; 1</p>
 </div>
 <div class="controls">
@@ -502,6 +558,33 @@ upside = weighted IV / price &minus; 1</p>
 </table>
 </div>
 """
+    excluded_html = ""
+    if excluded:
+        x_rows = "\n".join(
+            tr_open(r.get("ticker", "?"), companies.get(r.get("ticker"), {}))
+            + f'<td><a href="{dashboard_href(r.get("ticker", "?"))}">{esc(r.get("ticker", "?"))}</a></td>'
+            + company_td(companies.get(r.get("ticker"), {}))
+            + f"<td>{esc(fmt_price(r))}</td>"
+            + num_td(r.get("weighted_iv"),
+                     f"{r['weighted_iv']:.2f}" if r.get("weighted_iv") is not None else "&mdash;")
+            + f'<td class="co">{esc(r.get("excluded_reason", ""))}</td>'
+            + "</tr>"
+            for r in excluded)
+        excluded_html = f"""<h2>Not under consideration</h2>
+<div class="card">
+<table>
+<thead><tr><th>Ticker</th><th>Company</th><th>Price</th><th>Weighted IV</th><th>Why never</th></tr></thead>
+<tbody>
+{x_rows}
+</tbody>
+</table>
+<p class="footnote">Dead shells, liquidations and worthless equity are excluded
+automatically from the DCF's own verdict; state/never_interested.txt adds
+names by hand (one <code>TICKER&nbsp;&nbsp;reason</code> per line). These rows
+never enter the ranking.</p>
+</div>
+"""
+
     footnote = "<p class=\"footnote\">" + " &middot; ".join(
         f"<b>{esc(k)}</b>: {esc(v)}" for k, v in FLAG_MEANINGS
     ) + (" &middot; <b>Eval</b>: tier-1 scorecard pass rate (F fails / W warns), "
@@ -571,7 +654,8 @@ document.querySelector('#lb thead').addEventListener('click', (e) => {
 });
 </script>
 """
-    doc = head + ranked_table + unranked_html + footnote + "\n" + sort_js + "</body>\n</html>\n"
+    doc = (head + ranked_table + unranked_html + excluded_html + footnote
+           + "\n" + sort_js + "</body>\n</html>\n")
     with open(path, "w") as f:
         f.write(doc)
     print(f"Index/leaderboard written to {path}")
@@ -592,7 +676,7 @@ def main():
     _r = (args.root or ".").strip("/")
     HREF_PREFIX = "" if _r in ("", ".") else _r + "/"
 
-    ranked, unranked = screen(args)
+    ranked, unranked, excluded = screen(args)
     meta = {"generated_at": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
             "live": args.live}
 
@@ -615,6 +699,13 @@ def main():
                   + (f"  (price={fmt_price(r)})"
                      if r.get('price') is not None else ""))
 
+    if excluded:
+        print("\nNot under consideration (never in question):")
+        for r in excluded:
+            iv = (f"iv={r['weighted_iv']:.2f}"
+                  if r.get("weighted_iv") is not None else "iv=\u2014")
+            print(f"   {r['ticker']:<9} {iv:<10} {r.get('excluded_reason', '')}")
+
     stale = [r for r in ranked if any(f.startswith('STALE') for f in r['flags'])]
     drift = [r for r in ranked if any(f.startswith('PRICE_DRIFT') for f in r['flags'])]
     if stale:
@@ -630,6 +721,7 @@ def main():
     if args.json:
         with open(args.json, "w") as f:
             json.dump({"ranked": ranked, "unranked": unranked,
+                       "excluded": excluded,
                        "generated": str(today()),
                        "generated_at": meta["generated_at"],
                        "live": args.live}, f, indent=2)
@@ -638,13 +730,20 @@ def main():
     if args.html:
         companies = load_companies(args.root)
         # Tracked companies with no DCF yet still belong on the index page.
-        covered = {r.get("ticker") for r in ranked + unranked}
+        covered = {r.get("ticker") for r in ranked + unranked + excluded}
         extras = [{"ticker": t, "flags": ["NO_DCF"], "note": "no DCF model yet"}
                   for t in sorted(companies)
                   if t not in covered
                   and os.path.isdir(os.path.join(args.root, t, "Reports"))]
-        write_html(ranked, unranked + extras, meta, load_scores(args.root),
-                   companies, args.html)
+        # A tracked-but-never ticker with no DCF still belongs at the bottom,
+        # not in "Not ranked" where it reads as pending work.
+        never = load_never(args.root)
+        extra_excluded = [dict(e, excluded_reason=never[e["ticker"]])
+                          for e in extras if e["ticker"] in never]
+        extras = [e for e in extras if e["ticker"] not in never]
+        write_html(ranked, unranked + extras,
+                   sorted(excluded + extra_excluded, key=lambda r: r["ticker"]),
+                   meta, load_scores(args.root), companies, args.html)
 
 
 if __name__ == "__main__":
