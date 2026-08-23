@@ -1,0 +1,1853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pacific Edge Limited (PEB.NZ) Financial Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 20px;
+}
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+}
+.header h1 {
+    font-size: 2.5rem;
+    background: linear-gradient(90deg, #00d4aa, #00b894);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+}
+.header p { color: #888; font-size: 1.1rem; }
+.header-valuation {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 14px 32px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.hv-item { display: flex; align-items: baseline; gap: 8px; }
+.hv-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.hv-value { font-size: 1.35rem; font-weight: 700; color: #e0e0e0; }
+.hv-value.positive { color: #00d4aa; }
+.hv-value.negative { color: #ff6b6b; }
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.kpi-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.kpi-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 212, 170, 0.2);
+}
+.kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+.kpi-value.negative-value { color: #ff6b6b; }
+.kpi-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.kpi-change { font-size: 0.9rem; margin-top: 5px; }
+.kpi-change.positive { color: #00d4aa; }
+.kpi-change.negative { color: #ff6b6b; }
+
+.guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+.guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 8px; }
+.guidance-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.guidance-header h3::before {
+    content: ''; display: inline-block; width: 4px; height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px;
+}
+.guidance-meta { font-size: 0.85rem; color: #888; }
+.guidance-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+.guidance-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.2s ease;
+}
+.guidance-card:hover { transform: translateY(-2px); }
+.guidance-metric { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.guidance-target { font-size: 1.25rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; }
+.guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
+.guidance-vs-prior { display: inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+.guidance-vs-prior.raised, .guidance-vs-prior.reaffirmed\/on { background: rgba(0, 212, 170, 0.15); color: #00d4aa; }
+.guidance-vs-prior.lowered { background: rgba(255, 107, 107, 0.15); color: #ff6b6b; }
+.guidance-vs-prior.maintained { background: rgba(255, 255, 255, 0.1); color: #888; }
+.guidance-vs-prior.new { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
+.guidance-vs-prior.confirmed { background: rgba(0, 212, 170, 0.15); color: #00d4aa; }
+.guidance-notes { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
+.guidance-commentary {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    padding: 16px 20px;
+    border-left: 3px solid #00d4aa;
+    font-style: italic;
+    color: #b0b0b0;
+    line-height: 1.6;
+}
+.guidance-commentary::before { content: '"'; font-size: 1.5rem; color: #00d4aa; margin-right: 4px; }
+
+.section-title {
+    font-size: 1.5rem;
+    color: #fff;
+    margin: 40px auto 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid rgba(0, 212, 170, 0.3);
+    max-width: 1400px;
+}
+.section-note {
+    max-width: 1400px;
+    margin: -10px auto 20px;
+    color: #888;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    padding: 0 4px;
+}
+.charts-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 25px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+.chart-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    padding: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.chart-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.chart-header h3::before {
+    content: ''; display: inline-block; width: 4px; height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px;
+}
+.help-btn {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: rgba(0, 212, 170, 0.2); border: 1px solid #00d4aa; color: #00d4aa;
+    font-size: 14px; font-weight: bold; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;
+}
+.help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.chart-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.view-toggle {
+    padding: 3px 10px; border-radius: 12px; background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2); color: #888; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s ease;
+}
+.view-toggle:hover { border-color: #0984e3; color: #0984e3; }
+.view-toggle.active { background: rgba(9, 132, 227, 0.2); border-color: #0984e3; color: #0984e3; }
+.log-toggle {
+    padding: 3px 10px; border-radius: 12px; background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2); color: #888; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s ease;
+}
+.log-toggle:hover { border-color: #00d4aa; color: #00d4aa; }
+.log-toggle.active { background: rgba(0, 212, 170, 0.2); border-color: #00d4aa; color: #00d4aa; }
+.chart-wrapper { position: relative; height: 300px; }
+.chart-subnote { font-size: 0.78rem; color: #666; margin-top: 10px; line-height: 1.4; }
+
+.modal-overlay {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.7); z-index: 1000; justify-content: center; align-items: center; padding: 20px;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+    background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%);
+    border-radius: 16px; max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto;
+    border: 1px solid rgba(0, 212, 170, 0.3); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.modal-header {
+    padding: 20px 25px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.modal-header h3 { color: #00d4aa; font-size: 1.4rem; margin: 0; }
+.modal-close {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(255, 107, 107, 0.2); border: 1px solid #ff6b6b; color: #ff6b6b;
+    font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.modal-close:hover { background: #ff6b6b; color: #fff; }
+.modal-body { padding: 25px; line-height: 1.7; }
+.modal-body p { margin-bottom: 15px; }
+.modal-body strong { color: #00d4aa; }
+.modal-body ul { margin: 15px 0; padding-left: 20px; }
+.modal-body li { margin-bottom: 8px; }
+.metric-highlight {
+    background: rgba(0, 212, 170, 0.1); border-left: 3px solid #00d4aa;
+    padding: 12px 15px; margin: 15px 0; border-radius: 0 8px 8px 0;
+}
+
+.overview-section { max-width: 1400px; margin: 0 auto 30px; }
+.overview-toggle {
+    width: 100%; background: rgba(0, 212, 170, 0.1); border: 1px solid rgba(0, 212, 170, 0.3);
+    border-radius: 12px; padding: 16px 24px; color: #00d4aa; font-size: 1.1rem; font-weight: 600;
+    cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease;
+}
+.overview-toggle:hover { background: rgba(0, 212, 170, 0.2); }
+.overview-toggle .arrow { transition: transform 0.3s ease; }
+.overview-toggle.active .arrow { transform: rotate(180deg); }
+.overview-content {
+    display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: none; border-radius: 0 0 12px 12px; padding: 30px; margin-top: -12px;
+}
+.overview-content.active { display: block; }
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+.overview-card {
+    background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.overview-card h3 {
+    color: #00d4aa; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.overview-card p { margin-bottom: 12px; line-height: 1.6; }
+.overview-card ul { list-style: none; padding: 0; margin: 0; }
+.overview-card li { padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); line-height: 1.5; }
+.overview-card li:last-child { border-bottom: none; }
+.overview-card.bull h3 { color: #00d4aa; }
+.overview-card.bear h3 { color: #ff6b6b; }
+.overview-card.risks h3 { color: #fdcb6e; }
+.overview-card.spotlight { border: 1px solid rgba(253, 203, 110, 0.4); background: rgba(253, 203, 110, 0.06); }
+.overview-card.spotlight h3 { color: #fdcb6e; }
+.risk-high { color: #ff6b6b; }
+.risk-moderate { color: #fdcb6e; }
+.risk-low { color: #00d4aa; }
+.revenue-stream { display: flex; justify-content: space-between; align-items: center; }
+.revenue-stream .percent { color: #00d4aa; font-weight: 600; }
+.trend-growing { color: #00d4aa; }
+.trend-stable { color: #888; }
+.trend-declining { color: #ff6b6b; }
+
+.callout-banner {
+    max-width: 1400px; margin: 0 auto 30px;
+    background: rgba(253, 203, 110, 0.12);
+    border: 1px solid rgba(253, 203, 110, 0.4);
+    border-radius: 12px;
+    padding: 18px 24px;
+    color: #f0dca0;
+    line-height: 1.6;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+}
+.callout-banner .icon { font-size: 1.4rem; flex-shrink: 0; }
+.callout-banner strong { color: #fdcb6e; }
+
+.dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+.dcf-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+.dcf-card {
+    background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 24px; text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1); transition: transform 0.3s ease;
+}
+.dcf-card:hover { transform: translateY(-3px); }
+.dcf-card.highlight { background: rgba(255, 107, 107, 0.08); border-color: rgba(255, 107, 107, 0.3); }
+.dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.dcf-value { font-size: 2.2rem; font-weight: bold; color: #ff6b6b; }
+.dcf-card:not(.highlight) .dcf-value { color: #fff; }
+.dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+.dcf-change.positive { color: #00d4aa; }
+.dcf-change.negative { color: #ff6b6b; }
+.dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
+.dcf-warning {
+    background: rgba(253, 203, 110, 0.15); border: 1px solid rgba(253, 203, 110, 0.4); border-radius: 8px;
+    padding: 12px 16px; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; color: #fdcb6e;
+}
+.warning-icon { font-size: 1.2rem; }
+.dcf-inputs {
+    background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; margin-bottom: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+.dcf-inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.dcf-input-card {
+    background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 12px; text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #00d4aa; }
+.dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
+.fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
+.fcf-projection-table {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px;
+    background: rgba(0, 0, 0, 0.2); border-radius: 8px; padding: 12px; overflow-x: auto;
+}
+.fcf-projection-item { text-align: center; }
+.fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
+.fcf-projection-item .year { font-size: 0.75rem; color: #888; margin-bottom: 2px; }
+.fcf-projection-item .fcf-value { font-size: 0.95rem; color: #e0e0e0; font-weight: 500; }
+.fcf-projection-item .growth-rate { font-size: 0.75rem; color: #00d4aa; margin-top: 2px; }
+.dcf-controls {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; margin-bottom: 30px;
+    padding: 25px; background: rgba(255, 255, 255, 0.03); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.slider-group { display: flex; flex-direction: column; gap: 10px; }
+.slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+.slider-group label span { color: #00d4aa; font-weight: 600; }
+.slider-group input[type="range"] {
+    -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); outline: none;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #00d4aa; cursor: pointer; transition: transform 0.2s;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.slider-hint { font-size: 0.8rem; color: #666; }
+.scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+.scenario-tab {
+    padding: 10px 24px; border: 1px solid rgba(255, 255, 255, 0.2); background: transparent; color: #888;
+    border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s;
+}
+.scenario-tab:hover { border-color: rgba(0, 212, 170, 0.5); color: #e0e0e0; }
+.scenario-tab.active { background: rgba(0, 212, 170, 0.15); border-color: #00d4aa; color: #00d4aa; }
+.scenario-details {
+    background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; margin-bottom: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.scenario-details h4 { color: #00d4aa; margin-bottom: 15px; }
+.scenario-narrative { font-size: 0.9rem; color: #b0b0b0; line-height: 1.6; margin-bottom: 18px; }
+.assumption-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+.assumption-item { text-align: center; }
+.assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+.assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
+.sensitivity-section { margin-bottom: 30px; }
+.sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; }
+.sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255, 255, 255, 0.03); border-radius: 8px; overflow: hidden; }
+.sensitivity-table th, .sensitivity-table td { padding: 12px 16px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); }
+.sensitivity-table th { background: rgba(0, 212, 170, 0.1); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td { color: #e0e0e0; }
+.sensitivity-table td.highlight { background: rgba(0, 212, 170, 0.15); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td.below-current { color: #ff6b6b; }
+.sensitivity-table td.above-current { color: #00d4aa; }
+.historical-growth { margin-bottom: 30px; }
+.historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
+.growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
+.growth-item {
+    background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 15px; text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.growth-item .metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
+.growth-item .rate { font-size: 1.2rem; font-weight: 600; }
+.growth-item .rate.positive { color: #00d4aa; }
+.growth-item .rate.negative { color: #ff6b6b; }
+.growth-item.selected { border-color: #00d4aa; background: rgba(0, 212, 170, 0.1); }
+.dcf-download { text-align: center; margin-top: 30px; }
+.download-btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; background: rgba(0, 212, 170, 0.15);
+    border: 1px solid #00d4aa; border-radius: 8px; color: #00d4aa; text-decoration: none; font-weight: 600; transition: all 0.2s;
+}
+.download-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.download-icon { font-size: 1.2rem; }
+.required-return-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.03); border-radius: 8px; overflow: hidden; margin-top: 10px; }
+.required-return-table th, .required-return-table td { padding: 10px 14px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+.required-return-table th { background: rgba(255, 107, 107, 0.1); color: #ff6b6b; }
+.required-return-table td { color: #e0e0e0; }
+.philosophy-block {
+    background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 30px;
+    border: 1px solid rgba(255,255,255,0.08);
+}
+.philosophy-block h4 { color: #ff6b6b; margin-bottom: 12px; }
+.philosophy-block p { margin-bottom: 12px; line-height: 1.65; color: #c0c0c0; font-size: 0.92rem; }
+.philosophy-block strong { color: #e0e0e0; }
+
+@media (max-width: 768px) {
+    .charts-container { grid-template-columns: 1fr; }
+    .overview-grid { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.8rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Pacific Edge Limited (PEB.NZ)</h1>
+    <p>Urine-based molecular diagnostics for bladder cancer (Cxbladder) &middot; FY ends 31 March &middot; Reporting in NZD</p>
+    <div class="header-valuation" id="headerValuation" style="display:none"></div>
+</div>
+
+<div class="callout-banner">
+    <span class="icon">&#9888;</span>
+    <div>
+        <strong>The story in one line:</strong> US Medicare non-coverage (effective 24-Apr-2025) removed ~60% of Pacific Edge's revenue, nearly halving FY2026 sales to NZ$11.5m. A draft Local Coverage Determination (Novitas DL40378, published 14-May-2026) now proposes <strong>restoring</strong> coverage for Cxbladder Triage and Triage Plus &mdash; at a 75% higher price (US$1,328 vs US$760) &mdash; but it is not yet finalized (expected end-CY2026 to mid-2027). Almost the entire investment case rests on this single binary regulatory outcome. See Investment Overview and the DCF section below.
+    </div>
+</div>
+
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid">
+            <div class="overview-card spotlight">
+                <h3>The Medicare LCD Catalyst</h3>
+                <p>Medicare non-coverage of Cxbladder became formally effective <strong>24 April 2025</strong>, eliminating roughly 60% of company revenue overnight. Pacific Edge pursued reconsideration and a new LCD request; a Novitas Contractor Advisory Committee (19-Feb-2026) heard strongly supportive clinical testimony, directly precipitating a <strong>draft LCD (DL40378)</strong> published <strong>14 May 2026</strong> proposing coverage for Cxbladder Triage and Triage Plus &mdash; and explicitly excluding competing biomarkers. Triage Plus would be priced at <strong>US$1,328/test</strong>, a 75% premium to the old US$760. The draft is not final: Novitas has discretion on timing/content and a comment period is underway, with finalization expected end-CY2026 to Q2 CY2027 (outside date 15-May-2027 + 45 days). Management states that if the draft is NOT finalized as proposed, the company would need "significant restructuring and potentially raise further capital."</p>
+            </div>
+            <div class="overview-card">
+                <h3>Company Overview</h3>
+                <p>Pacific Edge Limited is a Dunedin, New Zealand-headquartered molecular diagnostics company that develops and commercializes the Cxbladder suite of urine-based RNA/DNA biomarker tests for bladder cancer detection, risk stratification (hematuria evaluation) and post-treatment surveillance. The company operates CLIA/CAP-certified laboratories in New Zealand and the US and is dual-listed on the NZX and ASX (ticker PEB). Its business has been dominated for the past two years by the loss and attempted recovery of US Medicare reimbursement, which historically represented roughly 60% of revenue.</p>
+            </div>
+            <div class="overview-card">
+                <h3>Business Model</h3>
+                <p>Pacific Edge sells laboratory-developed diagnostic tests (Cxbladder Triage, Detect, Monitor, and next-generation Triage Plus/Surveillance Plus) that clinicians order per-patient; revenue is transactional (fee-per-test), driven by test volumes and reimbursement rates. The company is not yet profitable and depends on US commercial scale-up and reimbursement policy to reach breakeven.</p>
+                <ul id="revenueStreams"></ul>
+            </div>
+            <div class="overview-card">
+                <h3>Competitive Position</h3>
+                <p><strong>Competitors:</strong> Cystoscopy (standard of care), urine cytology, UroVysion FISH (Abbott), NMP22/BladderChek, BTA tests, Bladder EpiCheck, UroSEEK and other emerging urinary biomarker entrants.</p>
+                <p><strong>Moat:</strong></p>
+                <ul id="moatFactors"></ul>
+            </div>
+            <div class="overview-card">
+                <h3>Growth Drivers</h3>
+                <ul id="growthDrivers"></ul>
+            </div>
+            <div class="overview-card risks">
+                <h3>Key Risks</h3>
+                <ul id="keyRisks"></ul>
+            </div>
+            <div class="overview-card bull">
+                <h3>Bull Case</h3>
+                <ul id="bullCase"></ul>
+            </div>
+            <div class="overview-card bear">
+                <h3>Bear Case</h3>
+                <ul id="bearCase"></ul>
+            </div>
+            <div class="overview-card">
+                <h3>Recent Developments</h3>
+                <ul id="recentDevelopments"></ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf"></span> | <span id="guidanceFY"></span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<h2 class="section-title">Revenue &amp; Reimbursement</h2>
+<div class="section-note">PEB does not present a cost-of-revenue / gross-margin line (opex is functional: Laboratory Operations, Research, Sales &amp; Marketing, G&amp;A) &mdash; gross margin charts are intentionally omitted. Revenue nearly halved in FY2026 on the Medicare non-coverage event.</div>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Revenue (Total &amp; US/NZ Mix Trend)</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('revenueChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('revenueChart', 'quarterly', this)">H1</button>
+                <button class="log-toggle" onclick="toggleLogScale('revenueChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('revenue')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="revenueChart"></canvas></div>
+        <div class="chart-subnote">FY2026 revenue NZ$11.5m, down 47.4% YoY, driven almost entirely by the 24-Apr-2025 Medicare non-coverage event. US (Americas) was ~83% of FY26 revenue (down from 91% in FY25); NZ/APAC ~17% and growing.</div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Revenue YoY Growth (%)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('revenueGrowth')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="revenueGrowthChart"></canvas></div>
+    </div>
+</div>
+
+<h2 class="section-title">Cash Burn &amp; Survival</h2>
+<div class="section-note">This is a pre-profit, cash-burning diagnostics company. Net income, EBITDA and free cash flow have been negative in every year FY2019&ndash;FY2026. Cash runway &mdash; not profitability &mdash; is the metric that determines whether Pacific Edge survives to see the LCD finalized.</div>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Cash &amp; Short-Term Deposits</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('cashChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('cash')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="cashChart"></canvas></div>
+        <div class="chart-subnote">Cash fell to NZ$7.8m at 31-Mar-2026 (FY2026 year-end). Post-balance-date raises of ~NZ$36.1m (May/June 2026, not shown on FY axis) fund a stated &gt;12 months of runway, conditioned on Medicare progress.</div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Annual Cash Burn (Operating &amp; Free Cash Flow)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('burn')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="burnChart"></canvas></div>
+        <div class="chart-subnote">FCF is negative every year shown; log scale is not used here since values are never positive. FY2026 FCF -NZ$32.1m (owner FCF, ex-SBC/interest -NZ$33.6m per the DCF model) was the deepest burn on record.</div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Income &amp; EBITDA</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('netIncome')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="netIncomeChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Margins (% of Revenue)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('margins')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="marginsChart"></canvas></div>
+        <div class="chart-subnote">Margins are large negatives (-140% to -477%) by design &mdash; not a data error. This is expected for a pre-commercial-scale diagnostics company still investing in a US launch that was interrupted by a Medicare reimbursement setback.</div>
+    </div>
+</div>
+
+<h2 class="section-title">Balance Sheet &amp; Dilution</h2>
+<div class="section-note">Repeated capital raises have been necessary to fund the burn above. Shares outstanding nearly doubled from FY2019 to FY2026 and the DCF model estimates a further step-up to ~1,263m post the May/June 2026 raises &mdash; dilution is a first-order part of the investment case, not a footnote.</div>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shareholders' Equity</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('equityChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('equity')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="equityChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shares Outstanding</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('sharesChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('shares')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="sharesChart"></canvas></div>
+        <div class="chart-subnote">504m (FY2019) &rarr; 944m weighted average (FY2026) &rarr; ~1,263m estimated post May/June-2026 raises. Further dilution is explicitly modelled per DCF scenario (bull +43m, base +120m, bear +200m, all in FY2028).</div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Total Assets vs Total Liabilities</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('balanceSheet')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="balanceSheetChart"></canvas></div>
+    </div>
+</div>
+
+<h2 class="section-title">DCF Valuation</h2>
+
+<div class="dcf-section">
+  <div class="callout-banner" style="margin-bottom:25px;">
+    <span class="icon">&#128203;</span>
+    <div>
+      <strong>Model approach:</strong> This is <strong>not</strong> a conventional three-growth-rate DCF. PEB has never generated positive free cash flow (owner FCF -NZ$16m to -NZ$34m every year FY2019&ndash;FY2026), so extrapolating any historical growth or margin series would describe a business that no longer exists. Instead this is a <strong>scenario-weighted binary-event valuation</strong>: BULL = the draft Medicare LCD (DL40378) finalizes broadly as drafted; BASE = it finalizes late and/or narrowed with a slower US rebuild; BEAR = it is retired or excludes Cxbladder, triggering a US wind-down. Each scenario is a component-built 10-year owner-FCF path (bull/base) or an asset/scenario waterfall (bear) &mdash; nothing is extrapolated from the FY2026 burned base year. <strong>P/E and EV/EBITDA are undefined</strong> here because net income, EBITDA and FCF are negative in every historical year; P/Sales and P/B are the only meaningful historical anchors. The model's implied base-case P/Sales (5.4x) and P/B (1.4x) sit <strong>below</strong> PEB's 10-year ex-mania averages (14.5x and 6.2x) &mdash; yet at the current NZ$0.25 price (P/Sales ~27.5x FY26 revenue), the market is paying <strong>above</strong> its own historical range. The model's conclusion: NZ$0.25 already embeds near-certain LCD finalization <strong>plus</strong> flawless decade-long US commercial execution. Treat this as a binary regulatory bet, not a compounding growth story.
+    </div>
+  </div>
+
+  <div class="dcf-summary">
+    <div class="dcf-card highlight">
+      <div class="dcf-label">Prob-Weighted IV</div>
+      <div class="dcf-value" id="dcfWeighted">$0.055</div>
+      <div class="dcf-change" id="dcfWeightedUpside"></div>
+      <div class="dcf-sublabel" id="dcfWeightedSublabel">20% Bear / 45% Base / 35% Bull</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Intrinsic Value (Base)</div>
+      <div class="dcf-value" id="dcfIV">$0.045</div>
+      <div class="dcf-change negative" id="dcfUpside">-82% downside</div>
+      <div class="dcf-sublabel">Owner FCF &mdash; component-built, LCD finalizes late/narrowed</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Entry Price (15% Hurdle)</div>
+      <div class="dcf-value" id="dcfEntry">$0.047</div>
+      <div class="dcf-sublabel">Buy below for a 15% annual return; weighted entry NZ$0.058</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Current Price</div>
+      <div class="dcf-value" id="dcfCurrent">$0.25</div>
+    </div>
+  </div>
+
+  <div class="dcf-warning" id="growthWarning" style="display:flex;">
+    <span class="warning-icon">&#9888;</span>
+    <span id="warningText">The model finds PEB overvalued at NZ$0.25: even the BULL case (only-covered-biomarker moat, US$1,328 pricing, revenue rebuilt to ~7x FY2026 by FY2036) is worth only NZ$0.092 at a 16% discount rate &mdash; a third of the current price. All scenario upside figures below are NEGATIVE.</span>
+  </div>
+
+  <div class="dcf-inputs">
+    <h4>DCF Model Inputs</h4>
+    <div class="dcf-inputs-grid">
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Base FCF (Owner, ex-SBC/Interest)</div>
+        <div class="dcf-input-value" id="baseFCF">-$33.6M</div>
+        <div class="dcf-input-note" id="sbcBreakdown">Starting point for projections</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Shares Outstanding (est.)</div>
+        <div class="dcf-input-value" id="sharesOut">1,263M</div>
+        <div class="dcf-input-note" id="dilutionNote"></div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Net Debt</div>
+        <div class="dcf-input-value" id="netDebt">-$40.6M</div>
+        <div class="dcf-input-note">Negative = net cash (incl. May/June-2026 raise proceeds)</div>
+      </div>
+    </div>
+    <div class="fcf-projections">
+      <h5>Projected FCF (5 of 10 Years, Base Case)</h5>
+      <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+    </div>
+  </div>
+
+  <div class="dcf-controls">
+    <div class="slider-group">
+      <label>Year-1 Growth Rate: <span id="growthValue">8.7%</span></label>
+      <input type="range" id="growthSlider" min="-20" max="130" value="8.7" step="0.1" oninput="updateDCFDisplay()">
+      <div class="slider-hint" id="growthHint">Event-driven path, not historical CAGR &mdash; see scenario narrative</div>
+    </div>
+    <div class="slider-group">
+      <label>WACC: <span id="waccValue">16%</span></label>
+      <input type="range" id="waccSlider" min="10" max="22" value="16" step="0.05" oninput="updateDCFDisplay()">
+    </div>
+    <div class="slider-group">
+      <label>Terminal Growth: <span id="terminalValue">3%</span></label>
+      <input type="range" id="terminalSlider" min="0" max="5" value="3" step="0.1" oninput="updateDCFDisplay()">
+    </div>
+  </div>
+
+  <div class="scenario-tabs">
+    <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+    <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+    <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+  </div>
+
+  <div class="scenario-details" id="scenarioDetails">
+    <h4>Assumptions</h4>
+    <div class="scenario-narrative" id="scenarioNarrative"></div>
+    <div class="assumption-grid" id="assumptionGrid"></div>
+  </div>
+
+  <div class="sensitivity-section">
+    <h4>Sensitivity Analysis: Base-Case Intrinsic Value by WACC &amp; Terminal Growth</h4>
+    <table class="sensitivity-table" id="sensitivityMatrix"></table>
+  </div>
+
+  <div class="sensitivity-section">
+    <h4>Required Return Table (Base Case) &mdash; What Discount Rate Justifies NZ$0.25?</h4>
+    <p style="color:#888; font-size:0.85rem; margin-bottom:10px;">Even at a 9% required return, the base case is worth only NZ$0.099. The current NZ$0.25 price is not reachable on the base path at any conventional discount rate &mdash; it requires the bull path at ~9-10% or better.</p>
+    <table class="required-return-table" id="requiredReturnTable"></table>
+  </div>
+
+  <div class="historical-growth">
+    <h4>Historical Growth Rates (CAGR)</h4>
+    <div class="growth-grid" id="growthGrid"></div>
+    <p style="color:#888; font-size:0.82rem; margin-top:10px;">EPS and FCF CAGRs are undefined (negative every year FY2019&ndash;FY2026). No historical CAGR is used as a projection driver &mdash; scenario paths are event-driven (LCD outcome). The 8.3% figure is recorded only as the screener's PEG proxy.</p>
+  </div>
+
+  <div class="philosophy-block">
+    <h4>Valuation Philosophy &amp; Sanity Check</h4>
+    <p><strong>Why not a conventional DCF:</strong> PEB has never generated positive FCF and FY2026 revenue halved on a single payer decision. Extrapolating any historical series describes the pre-non-coverage business, which no longer exists. Value is built forward from the binary event: probability-weighted LCD outcomes, each with its own component-built path and explicitly-modelled dilution.</p>
+    <p><strong>The finding:</strong> House weighted IV NZ$0.055 (street NZ$0.060) vs NZ$0.25 &mdash; the model says the price already pays for LCD success several times over at a risk-appropriate discount rate. Even the bull case is worth NZ$0.092 at 16%, a third of the price. The bear case is a near-total loss (NZ$0.016, -94%). This reads as a binary-event lottery priced above its actuarial value, not a margin-of-safety opportunity.</p>
+    <p><strong>What would move it:</strong> Final LCD publication (content + effective date) is the single dominant input. As-drafted finalization moves weight from base/bear toward bull. Retirement/exclusion collapses value toward NZ$0.016. Secondary catalysts: Q2-Q3 FY2027 claim-by-claim Medicare receipts, the actual May/June-2026 issue price, and Surveillance Plus CPT-PLA progress (Dec-2026).</p>
+    <p><strong>Sanity check (passed, inverted framing):</strong> P/E and EV/EBITDA are undefined (negative earnings in every year). Implied base-case P/Sales (5.4x) and P/B (1.4x) sit below the 10-year ex-mania averages (14.5x / 6.2x) &mdash; so the model itself is not unusually conservative. It is the <strong>market</strong> that is paying an above-history multiple: ~27.5x FY26 sales at NZ$0.25, above the 14.5x ex-outlier historical average. To justify NZ$0.25 at a 15-16% required return needs ~NZ$60-70m of FY2036 owner FCF (~NZ$220m+ revenue, ~2x the model's bull case) &mdash; or a sub-10% discount rate on the bull path.</p>
+  </div>
+
+  <div class="dcf-download">
+    <a href="PEB.NZ_DCF_Model.xlsx" class="download-btn" download>
+      <span class="download-icon">&#8681;</span> Download Excel Model
+    </a>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ============ EMBEDDED DATA ============
+const csvData = `Period,Revenue,CostOfRevenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,EBITDA,NetIncome,NetMargin,EPS,OperatingCashFlow,CapEx,FreeCashFlow,ShareholdersEquity,TotalAssets,TotalLiabilities,TotalDebt,CashAndEquivalents,SharesOutstanding,StockBasedComp,DividendPerShare,EBITDABeforeSignificant,RevenueContinuing,EBITDAContinuingBeforeSignificant,EBITContinuingBeforeSignificant,Units,Currency
+FY2019,3.817,,,,-18.231,-477.6,-17.85,-17.918,-469.4,-0.036,-17.507,0.156,-17.663,13.91,16.566,2.656,0.084,12.847,504.426,4.507,,,,,,millions,NZD
+FY2020,4.37,,,,-19.13,-437.8,-17.709,-18.886,-432.2,-0.032,-15.385,0.183,-15.568,14.504,19.328,4.824,1.554,14.784,581.344,4.542,,,,,,millions,NZD
+FY2021,7.701,,,,-14.575,-189.3,-13.203,-14.223,-184.7,-0.02,-13.57,0.378,-13.948,25.109,31.184,6.075,2.878,23.129,714.031,4.038,,,,,,millions,NZD
+FY2022,11.445,,,,-20.53,-179.4,-18.853,-19.788,-172.9,-0.026,-17.552,1.126,-18.678,108.376,115.282,6.906,1.923,105.412,767.924,3.145,,,,,,millions,NZD
+FY2023,19.616,,,,-32.056,-163.4,-27.593,-26.965,-137.5,-0.033,-25.575,2.909,-28.484,82.763,90.913,8.15,1.222,77.791,810.226,4.418,,,,,,millions,NZD
+FY2024,23.907,,,,-33.599,-140.5,-30.362,-29.535,-123.5,-0.036,-25.75,1.372,-27.122,54.622,65.448,10.826,4.073,50.261,810.727,5.607,,,,,,millions,NZD
+H1 FY2025,10.959,,,,,,,-14.503,-132.3,,-12.474,,,,,,,35.931,,,,,,,,millions,NZD
+FY2025,21.846,,,,-31.803,-145.6,-29.103,-29.936,-137.0,-0.037,-24.74,1.273,-26.013,26.085,37.03,10.945,2.901,22.568,811.736,6.86,,,,,,millions,NZD
+H1 FY2026,5.939,,,,,,,-19.116,-321.9,,-19.026,,,,,,,22.121,,,,,,,,millions,NZD
+FY2026,11.499,,,,-36.346,-316.1,-33.686,-35.778,-311.1,-0.038,-31.938,0.132,-32.07,10.659,17.602,6.943,1.285,7.776,944.534,7.577,,,,,,millions,NZD`;
+
+const analysis = {
+  "ticker": "PEB.NZ",
+  "name": "Pacific Edge Limited",
+  "company_name": "Pacific Edge Limited",
+  "sector": "Healthcare / Cancer Diagnostics",
+  "analysis_date": "2026-08-24",
+  "overview": "Pacific Edge Limited is a Dunedin, New Zealand-headquartered molecular diagnostics company that develops and commercializes the Cxbladder suite of urine-based RNA/DNA biomarker tests for bladder cancer detection, risk stratification (hematuria evaluation) and post-treatment surveillance. The company operates CLIA/CAP-certified laboratories in New Zealand and the US and is dual-listed on the NZX and ASX (ticker PEB). Pacific Edge's business has been dominated for the past two years by the loss and attempted recovery of US Medicare reimbursement, which historically represented roughly 60% of company revenue.",
+  "business_model": {
+    "summary": "Pacific Edge sells laboratory-developed diagnostic tests (Cxbladder Triage, Detect, Monitor, and next-generation Triage Plus/Surveillance Plus) that clinicians order per-patient; revenue is transactional (fee-per-test) rather than recurring/subscription, driven by test volumes and reimbursement rates (Medicare, Medicare Advantage, commercial insurance, and NZ/APAC public and private payers). The company is not yet profitable and depends on US commercial scale-up and reimbursement policy to reach breakeven.",
+    "revenue_streams": [
+      {"name": "US (Americas) Cxbladder testing", "percent": 83, "trend": "declining post Medicare non-coverage, expected to recover on LCD finalization"},
+      {"name": "New Zealand / APAC (Rest of World) Cxbladder testing", "percent": 17, "trend": "growing, nearing regional profitability"}
+    ]
+  },
+  "competitive_position": {
+    "main_competitors": ["Cystoscopy (standard of care, primary comparator)", "Urine cytology", "UroVysion FISH (Abbott)", "NMP22/BladderChek and BTA tests", "Bladder EpiCheck", "UroSEEK and other emerging urinary biomarker/liquid biopsy entrants"],
+    "moat_factors": [
+      {"factor": "Clinical evidence depth (AV/CV/CU framework)", "strength": "strong", "description": "Pacific Edge has built the most extensive analytical validity, clinical validity and clinical utility evidence base of any urine biomarker for bladder cancer, including the STRATA RCT, DRIVE study, and a multi-year roadmap of further trials."},
+      {"factor": "AUA Guideline inclusion", "strength": "strong", "description": "Cxbladder Triage is the only biomarker with 'Grade A' evidence in the AUA Microhematuria Guideline (amended Feb 2025), a key lever for physician adoption and the Medicare coverage reconsideration."},
+      {"factor": "Regulatory/coverage barrier to entry (draft LCD exclusivity)", "strength": "strong", "description": "The May 2026 draft Novitas LCD (DL40378) names only Cxbladder Triage and Triage Plus as reimbursable, explicitly excluding competing biomarkers - if finalized this creates a de facto reimbursement moat."},
+      {"factor": "Vertically integrated CLIA/CAP labs", "strength": "moderate", "description": "Wholly owned, accredited laboratories in NZ and US provide quality control and margin capture, though this also concentrates operational/key-person risk."},
+      {"factor": "Brand/KOL network", "strength": "moderate", "description": "Deep roster of US urology key opinion leaders supporting credibility and guideline influence."}
+    ]
+  },
+  "growth_drivers": [
+    "Finalization of the draft Novitas LCD (DL40378), expected by end of calendar 2026, which would restore Medicare coverage for Cxbladder Triage and newly cover Triage Plus at a 75% higher price (US$1,328 vs US$760)",
+    "Migration of the US test mix from legacy Detect/Triage to higher-priced, higher-performance Triage Plus, improving average selling price and unit economics",
+    "Growing commercial payer coverage wins (Blue Cross Blue Shield NC/SC/Kansas City, Highmark, Sentara, Kaiser Permanente EMR integration) reducing reliance on Medicare alone",
+    "Development of Cxbladder Surveillance Plus (ddPCR-based NMIBC surveillance test) targeting a crosswalk price of US$1,800, with CPT-PLA coding submission targeted December 2026",
+    "International expansion via a kitted IVD (Triage Plus IVD) enabling decentralized deployment through accredited lab partners (currently paused pending capital)",
+    "New Zealand national hematuria evaluation pathway under consideration by Te Whatu Ora (Health NZ) for FY27",
+    "APAC volume growth (Singapore General Hospital, Townsville University Hospital) with APAC operations nearing regional profitability",
+    "Structurally favorable secular trend: declining US urologist workforce per capita increasing the value of a non-invasive triage tool"
+  ],
+  "risks": {
+    "business": [
+      {"risk": "Medicare coverage non-finalization", "severity": "high", "description": "The draft LCD is not yet final; if Novitas does not finalize coverage for Triage/Triage Plus, or delays significantly, the company says it would need significant restructuring and likely further capital raising, with a material adverse impact on financial performance and viability."},
+      {"risk": "Depleted US sales capacity", "severity": "moderate", "description": "Sales FTEs cut to ~8-12 from 30+ to conserve cash; rebuilding commercial reach to capture a coverage win will take time and investment."},
+      {"risk": "Product/technology and cyber risk", "severity": "moderate", "description": "Reliance on lab operations, third-party component suppliers and IT/digital systems; any reliability, accuracy or cyber-security failure could damage reputation."},
+      {"risk": "Competition from well-capitalized diagnostics companies", "severity": "moderate", "description": "Large, well-funded oncology diagnostics companies could develop or acquire competing urine biomarker technology."},
+      {"risk": "New product development delay/failure", "severity": "moderate", "description": "Triage Plus IVD and Surveillance Plus development could be delayed, more expensive than expected, or unsuccessful."}
+    ],
+    "financial": [
+      {"risk": "Going concern / cash burn", "severity": "high", "description": "FY26 net loss after tax of $35.8m (up from $29.9m in FY25) against cash/equivalents/short-term deposits of only $7.8m at 31 March 2026; the May-June 2026 $36.1m raise provides 'over 12 months' runway conditioned on Medicare progress."},
+      {"risk": "Dilution from repeated capital raises", "severity": "high", "description": "Multiple raises in the last 12 months (Aug-2025 ~$20.7m; May-2026 $25.4m; June-2026 $10.7m) at depressed prices (as low as NZ$0.17/share) have materially diluted shareholders and are likely to recur if coverage timelines slip."},
+      {"risk": "Currency exposure", "severity": "moderate", "description": "US-dollar denominated Medicare/commercial revenue and costs versus NZD reporting currency and NZD/AUD dual listing create translation and economic FX exposure."}
+    ],
+    "regulatory": [
+      {"risk": "Local Coverage Determination process risk", "severity": "high", "description": "Novitas retains full discretion over timing and final content of the LCD; the draft published 14 May 2026 could be narrowed, delayed, or withdrawn before finalization, expected end-CY2026 to Q2 CY2027."},
+      {"risk": "Guideline dependency", "severity": "moderate", "description": "Continued AUA guideline inclusion materially affects clinical adoption and payer policy; loss of guideline status would be damaging."},
+      {"risk": "Multi-jurisdiction regulatory/quality compliance", "severity": "moderate", "description": "Must maintain CLIA, CAP, ISO13485, ISO15189, IVDR (EU) and other certifications across NZ and US labs."}
+    ],
+    "macro": [
+      {"risk": "US healthcare policy and reimbursement environment", "severity": "high", "description": "Broader shifts in CMS/Medicare policy, government shutdown/budget dynamics, or MAC contractor changes could affect the pace and outcome of coverage decisions."},
+      {"risk": "General economic conditions / healthcare spending", "severity": "moderate", "description": "A prolonged economic downturn could reduce or reprioritize healthcare spending; geopolitical instability, tariffs and supply chain disruption also flagged."}
+    ]
+  },
+  "recent_developments": [
+    {"date": "2026-08", "event": "Annual Shareholders' Meeting held 20 August 2026 in Auckland; shareholders approved governance resolutions and ratified the May/June 2026 capital raisings."},
+    {"date": "2026-07", "event": "Q1 FY27 investor update: US commercial test volumes dipped 2.4% q/q to 3,295, while APAC commercial tests rose 12.9% to 1,158; claim-by-claim Medicare billing continued under the draft LCD framework."},
+    {"date": "2026-06", "event": "Board approved a further $10.7 million retail share offer, completing the $36.1 million total capital raise alongside the May placement."},
+    {"date": "2026-05", "event": "Novitas published draft LCD 'Urine-based Biomarkers in Patients with Microhematuria' (DL40378) on 14 May 2026, proposing coverage for Cxbladder Triage and Triage Plus at US$1,328/test (75% above the prior US$760); Pacific Edge raised $25.4 million via placement and began claim-by-claim billing under the draft policy."},
+    {"date": "2026-05", "event": "FY2026 annual results: operating revenue $11.5m (down 47.4% YoY), total revenue $13.6m, net loss after tax $35.8m, cash/equivalents/short-term deposits of $7.8m at year end, total laboratory throughput down 16.3% to 24,190 tests."},
+    {"date": "2026-02", "event": "Novitas convened an expert Contractor Advisory Committee meeting (19 February 2026); panelists expressed strong support for Cxbladder, directly precipitating the subsequent draft LCD."},
+    {"date": "2025-11", "event": "H1 FY2026 results: operating revenue $5.9m (down 45.8% YoY), net loss after tax $19.1m, cash/short-term deposits $22.1m; management flagged it was 'considering capital initiatives'."},
+    {"date": "2025-10", "event": "DRIVE Study published, providing pivotal clinical validation of Cxbladder Triage Plus, submitted to Novitas and the AUA to support coverage and guideline consideration."},
+    {"date": "2025-08", "event": "Pacific Edge raised approximately $20.7 million in new equity to fund continued US market presence and the Medicare reconsideration/appeals process."},
+    {"date": "2025-04", "event": "Medicare non-coverage of Cxbladder Triage, Detect, Monitor and Triage Plus became formally effective (24 April 2025), eliminating the majority of US Medicare revenue."}
+  ],
+  "guidance": {
+    "as_of": "FY2026 Annual Report (24 June 2026) and Q1 FY27 Investor Update (July 2026)",
+    "fiscal_year": "FY2027 (year ending 31 March 2027)",
+    "items": [
+      {"metric": "Cash runway", "target": "Over 12 months of cash runway based on FY26 cash burn rates", "period": "From completion of $36.1m capital raise (28 May 2026)", "vs_prior": "raised", "notes": "Explicitly conditioned on no material further deterioration; further capital may be needed if Medicare re-coverage is delayed or unsuccessful."},
+      {"metric": "Medicare LCD finalization", "target": "Final effective LCD for Triage and Triage Plus", "period": "Expected by end of calendar 2026 (Novitas outside date 15 May 2027)", "vs_prior": "maintained", "notes": "Draft LCD (DL40378) published 14 May 2026; 45-day minimum comment period with public meeting; claim-by-claim reimbursement available in the interim."},
+      {"metric": "Triage Plus pricing", "target": "US$1,328 per test (CMS/Medicare draft price)", "period": "FY2027 onward, pending final LCD", "vs_prior": "confirmed", "notes": "A 75% premium to the prior US$760 legacy test price; key driver of management's 'clearer path to profitability' commentary."},
+      {"metric": "Surveillance Plus / crosswalk pricing", "target": "Crosswalk to an existing US$1,800 ddPCR-based test price; CPT-PLA coding submission targeted December 2026", "period": "Claim-by-claim revenue expected after 1 July 2027", "vs_prior": "new", "notes": "Surveillance Plus still in development; AV expected Q3 2026, CV expected FY27."},
+      {"metric": "Operating expense discipline", "target": "Continued cost containment / reduced cash burn", "period": "FY2027", "vs_prior": "maintained", "notes": "FY26 operating expenses fell 9.5% YoY; 2H26 average monthly cash burn of $2.4m, down from $3.3m in 1H26 (27.7% improvement)."},
+      {"metric": "Path to profitability", "target": "Qualitative - 'excellent FY27' underpinned by commercial payer wins, nearing APAC profitability, and a leaner operating model", "period": "FY2027", "vs_prior": "new", "notes": "No formal quantitative revenue or earnings guidance issued."}
+    ],
+    "management_commentary": "Chairman Simon Flood: 'Pacific Edge finished the year in a materially stronger strategic position than it entered it... we are looking forward to seeing this support rewarded with a return to growth.' CEO Dr Peter Meintjes: 'FY26 was an unequivocal validation of our strategy that puts generation of clinical evidence at the heart of value creation,' and the company is 'confident that increasing recognition in medical policy by commercial payers, the nearing profitability in APAC, and our leaner operating model set the foundations for an excellent FY27.' Management continues to caveat that if the current draft LCD is not finalised, Pacific Edge would need to undertake a significant restructuring and potentially raise further capital."
+  },
+  "bull_case": [
+    "The May 2026 draft LCD is the strongest positive reimbursement signal in the company's history - it explicitly names only Cxbladder Triage and Triage Plus as coverable, creating a potential de facto Medicare reimbursement moat versus all competing urine biomarkers if finalized as drafted",
+    "Triage Plus's approved draft price of US$1,328 (75% above the legacy US$760 price) materially improves unit economics and could flip the business toward profitability even without a big rebound in test volumes",
+    "Deep, purpose-built clinical evidence base (STRATA RCT, DRIVE study, AUA Grade A guideline inclusion, ongoing trials) gives Pacific Edge a multi-year evidentiary lead that would be costly and slow for a competitor to replicate",
+    "Balance sheet has been meaningfully strengthened ($36.1m raised in May-June 2026) with management guiding to over 12 months of runway, reducing near-term insolvency risk while the LCD is finalized",
+    "Growing independent momentum outside Medicare - commercial payer wins (BCBS NC/SC/Kansas City, Highmark, Sentara covering a combined 12.5m+ lives) and APAC expansion diversify the revenue base and reduce single-payer dependency over time"
+  ],
+  "bear_case": [
+    "The LCD remains a draft, not final - Novitas retains full discretion on timing and content, and management itself states that if the current draft is not finalized including Triage/Triage Plus, the company would need significant restructuring and likely more capital, with a real risk of investors losing some or all of their investment",
+    "Company has already diluted shareholders through at least three raises in roughly the past 12-14 months at depressed prices, and this pattern could recur if re-coverage slips further, especially given cash of only $7.8m at 31 March 2026 before the latest raise",
+    "US commercial infrastructure has been hollowed out (sales FTEs cut from 30+ to roughly 8-12) to conserve cash; even a positive final LCD will require re-investment and time to rebuild volume",
+    "FY26 net loss widened to $35.8m from $29.9m and revenue nearly halved (down 47.4%) even with the positive news arriving late in the year - the company has not yet demonstrated sustainable revenue growth or a path to breakeven",
+    "Single-product, single-catalyst story - virtually all near-term equity value is tied to one binary regulatory outcome (the Novitas LCD) in one payer system (US Medicare), leaving the stock highly volatile and vulnerable to any adverse policy development"
+  ]
+};
+
+const dcfData = {
+  "ticker": "PEB.NZ",
+  "valuation_date": "2026-08-24",
+  "current_price": 0.25,
+  "model": "scenario-weighted event DCF (LCD-finalizes vs LCD-fails), forward component owner-FCF build in bull/base, wind-down scenario value in bear",
+  "inputs": {
+    "shares_outstanding": 1263.3,
+    "net_debt": -40.59,
+    "last_fcf": -33.58,
+    "reported_fcf": -32.07,
+    "sbc": 0.99,
+    "sbc_incl_equity_taxes": 0.99,
+    "sbc_pct_of_revenue": 8.6,
+    "interest_income": 0.52,
+    "sbc_source": "FY2026 Annual Report statement of changes in equity. NOTE: the Metrics.csv StockBasedComp column is the CUMULATIVE reserve balance, not the annual charge.",
+    "annual_share_growth_pct": 0.0,
+    "projected_shares": [1263.3,1383.3,1383.3,1383.3,1383.3,1383.3,1383.3,1383.3,1383.3,1383.3],
+    "share_count_basis": "ESTIMATE. 1,022.632m ordinary shares on issue at 31-Mar-2026 + est. 240.7m new shares from the May/June-2026 raises at an ESTIMATED NZ$0.15/share. Range 1,235m-1,324m. Dilution beyond this is modelled explicitly per scenario.",
+    "balance_sheet_date": "2026-03-31 (FY2026 AR), adjusted for the May/June 2026 NZ$36.1m raise: cash anchor = 7.776 + 34.1 net proceeds = NZ$41.9m.",
+    "currency": "NZD",
+    "units": "millions",
+    "horizon_years": 10,
+    "notes": "PEB is pre-profit and cash-burning in every year FY2019-FY2026. A conventional owner-FCF DCF extrapolating historical FCF is meaningless; P/E, EV/EBITDA and FCF-yield anchors are undefined on negative earnings. Value is dominated by one binary regulatory event: Novitas draft LCD DL40378."
+  },
+  "historical_growth": {
+    "revenue_3yr_cagr": -16.3,
+    "revenue_5yr_cagr": 8.3,
+    "revenue_7yr_cagr": 17.1,
+    "eps_3yr_cagr": null,
+    "eps_5yr_cagr": null,
+    "equity_3yr_cagr": -49.5,
+    "equity_5yr_cagr": -15.7,
+    "fcf_3yr_cagr": null,
+    "fcf_5yr_cagr": null,
+    "selected_growth_rate": 8.3,
+    "growth_rate_source": "revenue_5yr_cagr",
+    "growth_divergence_warning": "EPS and FCF CAGRs are undefined (negative in every year FY2019-FY2026). NO historical CAGR is used as a projection driver - the scenario paths are event-driven (LCD outcome)."
+  },
+  "assumptions": {
+    "base": {
+      "narrative": "LCD finalized but LATE (toward the Novitas outside date of May-2027 + 45-day effectiveness lag) and/or with narrower billing in practice; claim-by-claim Medicare revenue trickles through FY2027; US volume rebuild is slow because the salesforce was cut to 8-12 FTE; commercial payer wins and NZ/APAC carry the interim. Revenue NZ$12.5m FY2027 -> NZ$89m FY2036; EBITDA breakeven ~FY2030; one further NZ$25m raise (NZ$24m net) in FY2028 at ~NZ$0.20 adding 120m shares.",
+      "growth_rates": [8.7, 60.0, 60.0, 37.5, 25.0, 18.2, 12.3, 9.6, 6.3, 4.7],
+      "wacc": 16,
+      "terminal_growth": 3,
+      "terminal_cap_multiple": 15,
+      "dilution": {"raise_net_nzd_m": 24.0, "raise_price": 0.2, "raise_year": "FY2028", "new_shares_m": 120.0}
+    },
+    "bull": {
+      "narrative": "LCD finalized broadly as drafted by ~end-CY2026, effective within 45 days; Cxbladder Triage/Triage Plus become the ONLY covered urine biomarkers for hematuria (a de facto reimbursement moat), Triage Plus at US$1,328; salesforce rebuilt through FY2028; Surveillance Plus adds a second leg from FY2029. Revenue NZ$15m FY2027 -> NZ$166m FY2036; mature EBITDA margin 30%; modest NZ$15m top-up raise in FY2028 at ~NZ$0.35 (+42.9m shares).",
+      "growth_rates": [30.4, 126.7, 61.8, 41.8, 25.6, 20.4, 13.6, 10.4, 6.8, 5.1],
+      "wacc": 16,
+      "terminal_growth": 3,
+      "terminal_cap_multiple": 15,
+      "dilution": {"raise_net_nzd_m": 15.0, "raise_price": 0.35, "raise_year": "FY2028", "new_shares_m": 42.9}
+    },
+    "bear": {
+      "narrative": "Novitas retires the draft LCD or finalizes it excluding/narrowing Cxbladder. Clarity arrives ~mid-CY2027 with cash nearly exhausted. US operations wound down; residual value = NZ/APAC business + IP/clinical-evidence salvage + emergency NZ$10m raise at ~NZ$0.05 (+200m shares). NOT a growth DCF - an asset/scenario waterfall. Bear IV NZ$0.016 is deliberately near zero and not floored.",
+      "components_nzd_m": {"cash_at_failure_mid2027": 4.4, "us_winddown_cost": -5.0, "nz_apac_business": 8.0, "ip_salvage": 7.0, "emergency_raise_net": 10.0, "less_leases": -1.3, "equity_value": 23.1},
+      "shares_m": 1463.3,
+      "wacc": null,
+      "terminal_growth": null,
+      "dilution": {"raise_net_nzd_m": 10.0, "raise_price": 0.05, "raise_year": "FY2028", "new_shares_m": 200.0}
+    },
+    "wacc_rationale": "NZD flows discounted at ~11% NZ/AU small-cap cost of equity PLUS structural premiums: micro-cap illiquidity +2.0%; single-product concentration +1.5%; pre-profit financing/execution risk +1.5% => 16.0%. The Medicare/Novitas binary itself is charged once in the scenario probabilities, not in WACC, to avoid double-charging."
+  },
+  "projections": {
+    "base": {
+      "years": ["FY2027","FY2028","FY2029","FY2030","FY2031","FY2032","FY2033","FY2034","FY2035","FY2036"],
+      "revenue": [12.5, 20, 32, 44, 55, 65, 73, 80, 85, 89],
+      "fcf": [-25.61, -17.21, -8.28, -1.48, 2.75, 7.3, 10.08, 12.51, 13.95, 14.37]
+    },
+    "bull": {
+      "years": ["FY2027","FY2028","FY2029","FY2030","FY2031","FY2032","FY2033","FY2034","FY2035","FY2036"],
+      "revenue": [15, 34, 55, 78, 98, 118, 134, 148, 158, 166],
+      "fcf": [-26.35, -14.28, -1.6, 5.09, 12.18, 18.97, 23.72, 27.24, 28.86, 30.44]
+    },
+    "bear": {
+      "note": "No 10-year flow projection - bear is a wind-down scenario value.",
+      "years": ["FY2027","FY2028"],
+      "revenue": [12.0, 5.0],
+      "fcf": [-27.0, -8.0]
+    }
+  },
+  "valuation": {
+    "base": {"sum_pv_fcf": -22.38, "terminal_value": 113.85, "pv_terminal": 25.81, "enterprise_value": 3.43, "pv_raise_proceeds": 17.84, "equity_value": 61.86, "scenario_shares": 1383.3, "intrinsic_value": 0.045, "street_intrinsic_value": 0.049, "upside": -82.1, "implied_exit_multiple": 7.9},
+    "bull": {"sum_pv_fcf": 13.23, "terminal_value": 241.18, "pv_terminal": 54.67, "enterprise_value": 67.91, "pv_raise_proceeds": 11.15, "equity_value": 119.64, "scenario_shares": 1306.2, "intrinsic_value": 0.092, "street_intrinsic_value": 0.1, "upside": -63.4, "implied_exit_multiple": 7.9},
+    "bear": {"equity_value": 23.09, "scenario_shares": 1463.3, "intrinsic_value": 0.016, "street_intrinsic_value": 0.016, "upside": -93.7, "note": "Wind-down scenario value; near zero by design, not floored."}
+  },
+  "entry_price": {
+    "hurdle_rate": 0.15,
+    "note": "Entry = price at which buying today, funding the interim burn path, and exiting at the WACC-based fair terminal value earns 15% IRR. Because WACC (16%) exceeds the 15% hurdle, entry prices sit marginally ABOVE intrinsic values. The actionable buy-below price is the weighted NZ$0.058.",
+    "base": {"entry_price": 0.047, "entry_discount_from_current": -81.1},
+    "bull": {"entry_price": 0.098},
+    "bear": {"entry_price": 0.014},
+    "weighted_entry_price": 0.058
+  },
+  "required_return_table": {
+    "scenario": "base",
+    "note": "Full base-case DCF recomputed at each required return. Even at a 9% required return the base case is worth NZ$0.099 - the current NZ$0.25 price is not reachable on the base path at ANY conventional discount rate.",
+    "returns": [9, 10, 11, 12, 15, 16],
+    "value_per_share": [0.099, 0.091, 0.078, 0.068, 0.049, 0.045]
+  },
+  "sensitivity": {
+    "scenario": "base",
+    "wacc_range": [14, 15, 16, 17, 18],
+    "terminal_growth_range": [2, 2.5, 3, 3.5, 4],
+    "matrix": [
+      [0.051, 0.053, 0.054, 0.055, 0.057],
+      [0.047, 0.048, 0.049, 0.05, 0.051],
+      [0.043, 0.044, 0.045, 0.046, 0.046],
+      [0.04, 0.041, 0.041, 0.042, 0.043],
+      [0.037, 0.038, 0.038, 0.039, 0.04]
+    ]
+  },
+  "probability_weighted": {
+    "weights": {"bear": 0.2, "base": 0.45, "bull": 0.35},
+    "weights_rationale": "Deal-completes-vs-deal-breaks weighting on the LCD. Finalization-in-some-form = 80% (bull 35% as-drafted-and-on-time + base 45% late/narrowed/slow-rebuild). Bear 20%, above the 15% house default, because Novitas retains full discretion, has ALREADY reversed course on this exact product once (2023-25), and failure is entwined with going-concern risk.",
+    "weighted_iv": 0.055,
+    "street_weighted_iv": 0.06,
+    "band_position": 42.1,
+    "band_note": "Degenerate on purpose: SBC is ~1.5-2% of revenue so the house/street band is only ~NZ$0.005 wide, and the NZ$0.25 price sits ~42 band-widths above the street ceiling."
+  },
+  "sanity_check": {
+    "ran": true,
+    "passed": true,
+    "note_on_undefined_multiples": "P/E and EV/EBITDA are UNDEFINED for PEB in every year FY2019-FY2026 (net income, EBITDA and FCF all negative) - deliberately not computed. P/Sales and P/B are the only meaningful anchors.",
+    "historical_p_sales_fy_end": {"FY2019": 33.4, "FY2020": 13.7, "FY2021": 106.6, "FY2022": 60.4, "FY2023": 19.2, "FY2024": 3.1, "FY2025": 3.6, "FY2026": 14.0},
+    "historical_p_book_fy_end": {"FY2019": 9.17, "FY2020": 4.13, "FY2021": 32.7, "FY2022": 6.38, "FY2023": 4.55, "FY2024": 1.38, "FY2025": 3.05, "FY2026": 15.07},
+    "outliers_excluded": "FY2021-FY2022 (COVID-era biotech mania: price NZ$0.90-1.15, P/Sales 60-107x) excluded from averages, kept in table for visibility.",
+    "historical_averages_ex_outliers": {"p_sales_avg": 14.5, "p_book_avg": 6.22, "p_book_max": 32.7},
+    "implied_multiples": {"pe": null, "ev_ebitda": null, "p_sales_base_iv_on_fy26_revenue": 5.4, "p_book_base_iv_on_proforma_book": 1.4},
+    "current_market_multiples": {"p_sales_fy26": 27.5, "note": "NZ$0.25 x ~1,263m shares = ~NZ$316m market cap vs FY2026 revenue NZ$11.5m - ABOVE the 10y ex-outlier average P/Sales of 14.5x."},
+    "trip_reasons": [],
+    "diagnosis": "No fix required. The structural-WACC-premium template was applied BY DESIGN at build time, with the regulatory binary charged in scenario weights instead of WACC to avoid double-charging.",
+    "reverse_sanity": "The check cuts the OTHER way here: the model says the market, not the model, is paying an unprecedented-adjacent multiple. To justify NZ$0.25 at a 15-16% required return needs ~NZ$60-70m of FY2036 owner FCF (~NZ$220m+ revenue, ~2x the model's bull) - the price embeds near-certain LCD finalization PLUS flawless decade-long US commercialization, or a sub-10% discount rate on the bull path."
+  },
+  "valuation_philosophy": {
+    "why_not_a_conventional_dcf": "PEB has never generated positive FCF (owner FCF -NZ$16m to -NZ$34m every year FY2019-FY2026) and FY2026 revenue halved on a single payer decision. The valuation is built FORWARD from the binary event: probability-weighted LCD outcomes, each with its own component-built path and its own explicitly-modelled dilution.",
+    "the_finding": "House weighted IV NZ$0.055 (street NZ$0.060) vs NZ$0.25: the model says the price already pays for LCD success several times over at a risk-appropriate discount rate. Even the BULL case is worth NZ$0.092 at 16% - a third of the price. Conversely the bear is near-total loss (NZ$0.016, -94%). This is a binary-event lottery priced above its actuarial value, not a margin-of-safety situation - the model's buy-below price is NZ$0.058.",
+    "what_would_move_it": "Final LCD publication (content + effective date) is the single dominant input. Retirement/exclusion collapses the value toward NZ$0.016. Secondary: Q2-Q3 FY2027 claim-by-claim Medicare receipts, the actual May/June-2026 issue price, and Surveillance Plus CPT-PLA progress (Dec-2026)."
+  }
+};
+
+// ============ CSV PARSING ============
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => obj[h.trim()] = values[i] !== undefined ? values[i].trim() : '');
+        return obj;
+    });
+}
+
+const data = parseCSV(csvData);
+
+data.sort((a, b) => {
+    const parseDate = (p) => {
+        const year = parseInt((p.match(/\d{4}/) || ['0'])[0]);
+        const isH1 = p.includes('H1');
+        const isFY = p.startsWith('FY');
+        const subOrder = isH1 ? 3 : isFY ? 7 : 0;
+        return year * 10 + subOrder;
+    };
+    return parseDate(a.Period) - parseDate(b.Period);
+});
+
+const fyData = data.filter(d => d.Period.startsWith('FY'));
+const h1Data = data.filter(d => d.Period.includes('H1'));
+
+function num(v) {
+    if (v === undefined || v === null || v === '') return null;
+    const n = parseFloat(v);
+    return isNaN(n) ? null : n;
+}
+
+// ============ HELPERS ============
+function fmtM(v, dp) {
+    if (v === null || v === undefined) return 'N/A';
+    dp = dp === undefined ? 1 : dp;
+    return 'NZ$' + v.toFixed(dp) + 'M';
+}
+function fmtPct(v, dp) {
+    if (v === null || v === undefined) return 'N/A';
+    dp = dp === undefined ? 1 : dp;
+    return (v >= 0 ? '+' : '') + v.toFixed(dp) + '%';
+}
+function calcYoYChange(current, previous) {
+    if (previous === null || current === null || previous === 0) return null;
+    return ((current - previous) / Math.abs(previous) * 100);
+}
+
+// ============ KPI CARDS ============
+function renderKPIs() {
+    const latest = fyData[fyData.length - 1];
+    const prior = fyData[fyData.length - 2];
+    const grid = document.getElementById('kpiGrid');
+
+    const revenue = num(latest.Revenue);
+    const revenuePrior = num(prior.Revenue);
+    const revYoY = calcYoYChange(revenue, revenuePrior);
+
+    const netIncome = num(latest.NetIncome);
+    const netIncomePrior = num(prior.NetIncome);
+    const niYoY = calcYoYChange(netIncome, netIncomePrior);
+
+    const fcf = num(latest.FreeCashFlow);
+    const cash = num(latest.CashAndEquivalents);
+    const shares = num(latest.SharesOutstanding);
+    const sharesPrior = num(prior.SharesOutstanding);
+    const shareGrowth = calcYoYChange(shares, sharesPrior);
+    const equity = num(latest.ShareholdersEquity);
+    const netMargin = num(latest.NetMargin);
+
+    // Runway: cash / (approx monthly burn)
+    const monthlyBurn = fcf !== null ? Math.abs(fcf) / 12 : null;
+    const runwayMonths = (cash !== null && monthlyBurn) ? (cash / monthlyBurn) : null;
+
+    const kpis = [
+        { label: 'FY2026 Revenue', value: fmtM(revenue), change: revYoY, changeLabel: 'YoY (Medicare non-coverage)', invert: false },
+        { label: 'Net Loss (FY2026)', value: fmtM(netIncome), negative: true, change: niYoY, changeLabel: 'YoY change in loss', invert: true },
+        { label: 'Free Cash Flow (FY2026)', value: fmtM(fcf), negative: true, sub: 'Deepest burn on record' },
+        { label: 'Cash &amp; ST Deposits', value: fmtM(cash), sub: 'At 31-Mar-2026, pre May/June raise' },
+        { label: 'Net Margin', value: fmtPct(netMargin, 0), negative: true, sub: 'Expected for pre-scale diagnostics' },
+        { label: 'Shares Outstanding', value: shares.toFixed(0) + 'M', change: shareGrowth, changeLabel: 'YoY dilution', invert: true },
+        { label: "Shareholders' Equity", value: fmtM(equity), sub: 'Down from NZ$108m FY2022 peak' },
+        { label: 'Est. Cash Runway', value: runwayMonths ? runwayMonths.toFixed(0) + ' mo' : 'N/A', sub: 'FY26 burn rate, pre-raise (post-raise mgmt guides >12mo)' }
+    ];
+
+    grid.innerHTML = kpis.map(k => {
+        const valClass = k.negative ? 'kpi-value negative-value' : 'kpi-value';
+        let changeHtml = '';
+        if (k.change !== undefined && k.change !== null) {
+            // invert=true means a rising negative number (deeper loss / more dilution) should be styled red
+            const isGood = k.invert ? (k.change < 0) : (k.change >= 0);
+            const cls = isGood ? 'positive' : 'negative';
+            changeHtml = `<div class="kpi-change ${cls}">${fmtPct(k.change, 1)} ${k.changeLabel || ''}</div>`;
+        } else if (k.sub) {
+            changeHtml = `<div class="kpi-change" style="color:#888;">${k.sub}</div>`;
+        }
+        return `<div class="kpi-card">
+            <div class="${valClass}">${k.value}</div>
+            <div class="kpi-label">${k.label}</div>
+            ${changeHtml}
+        </div>`;
+    }).join('');
+}
+
+// ============ GUIDANCE ============
+function renderGuidance() {
+    if (!analysis.guidance || !analysis.guidance.items || analysis.guidance.items.length === 0) {
+        document.getElementById('guidanceSection').style.display = 'none';
+        return;
+    }
+    const guidance = analysis.guidance;
+    document.getElementById('guidanceAsOf').textContent = guidance.as_of || '';
+    document.getElementById('guidanceFY').textContent = guidance.fiscal_year || '';
+
+    const grid = document.getElementById('guidanceGrid');
+    grid.innerHTML = guidance.items.map(item => {
+        const vsClass = item.vs_prior ? item.vs_prior.toLowerCase().replace(/[^a-z]/g, '') : 'new';
+        const vsLabel = item.vs_prior ? item.vs_prior.charAt(0).toUpperCase() + item.vs_prior.slice(1) : 'New';
+        return `
+            <div class="guidance-card">
+                <div class="guidance-metric">${item.metric}</div>
+                <div class="guidance-target">${item.target}</div>
+                <div class="guidance-period">${item.period}</div>
+                <span class="guidance-vs-prior ${vsClass}">${vsLabel}</span>
+                ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+
+    const commentary = document.getElementById('guidanceCommentary');
+    if (guidance.management_commentary) {
+        commentary.textContent = guidance.management_commentary;
+        commentary.style.display = 'block';
+    } else {
+        commentary.style.display = 'none';
+    }
+}
+
+// ============ OVERVIEW ============
+function renderOverview() {
+    const streams = document.getElementById('revenueStreams');
+    streams.innerHTML = analysis.business_model.revenue_streams.map(s => {
+        const trendClass = s.trend.includes('declin') ? 'trend-declining' : s.trend.includes('grow') ? 'trend-growing' : 'trend-stable';
+        return `<li class="revenue-stream"><span>${s.name} <span class="${trendClass}">(${s.trend})</span></span><span class="percent">${s.percent}%</span></li>`;
+    }).join('');
+
+    const moat = document.getElementById('moatFactors');
+    moat.innerHTML = analysis.competitive_position.moat_factors.map(m =>
+        `<li><strong>${m.factor}</strong> (${m.strength}): ${m.description}</li>`
+    ).join('');
+
+    const growth = document.getElementById('growthDrivers');
+    growth.innerHTML = analysis.growth_drivers.map(g => `<li>${g}</li>`).join('');
+
+    const risksAll = [...(analysis.risks.business||[]), ...(analysis.risks.financial||[]), ...(analysis.risks.regulatory||[]), ...(analysis.risks.macro||[])];
+    const risks = document.getElementById('keyRisks');
+    risks.innerHTML = risksAll.map(r => {
+        const cls = r.severity === 'high' ? 'risk-high' : r.severity === 'moderate' ? 'risk-moderate' : 'risk-low';
+        return `<li><strong class="${cls}">[${r.severity.toUpperCase()}]</strong> ${r.risk}: ${r.description}</li>`;
+    }).join('');
+
+    document.getElementById('bullCase').innerHTML = analysis.bull_case.map(b => `<li>${b}</li>`).join('');
+    document.getElementById('bearCase').innerHTML = analysis.bear_case.map(b => `<li>${b}</li>`).join('');
+
+    document.getElementById('recentDevelopments').innerHTML = analysis.recent_developments
+        .map(d => `<li><strong>${d.date}:</strong> ${d.event}</li>`).join('');
+}
+
+function toggleOverview() {
+    const btn = document.querySelector('.overview-toggle');
+    const content = document.getElementById('overviewContent');
+    btn.classList.toggle('active');
+    content.classList.toggle('active');
+}
+
+// ============ CHART DEFAULTS ============
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } } },
+    scales: {
+        x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+function freshScales() {
+    return { x: { ...chartDefaults.scales.x }, y: { ...chartDefaults.scales.y } };
+}
+
+const colors = {
+    primary: '#00d4aa',
+    secondary: '#00b894',
+    tertiary: '#0984e3',
+    quaternary: '#6c5ce7',
+    warning: '#fdcb6e',
+    danger: '#ff6b6b'
+};
+
+const chartRegistry = {};
+function toggleLogScale(canvasId, btn) {
+    const chart = chartRegistry[canvasId];
+    if (!chart) return;
+    const toLog = chart.options.scales.y.type !== 'logarithmic';
+    chart.options.scales.y.type = toLog ? 'logarithmic' : 'linear';
+    btn.classList.toggle('active', toLog);
+    chart.update();
+}
+
+const chartSeries = {};
+function setPeriodView(canvasId, view, btn) {
+    const chart = chartRegistry[canvasId], s = chartSeries[canvasId];
+    if (!chart || !s || !s[view]) return;
+    chart.data.labels = s[view].labels;
+    s[view].data.forEach((d, i) => { if (chart.data.datasets[i]) chart.data.datasets[i].data = d; });
+    if (chart.options.scales.x) chart.options.scales.x = s[view].scaleX;
+    btn.parentNode.querySelectorAll('.view-toggle').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    chart.update();
+}
+
+// ============ CHARTS ============
+function renderCharts() {
+    const fyLabels = fyData.map(d => d.Period);
+    const fyRevenue = fyData.map(d => num(d.Revenue));
+
+    // H1 view: interleave FY totals with H1 partial-year figures where available, sorted chronologically
+    const combinedForRevenue = data.filter(d => d.Period.startsWith('FY') || d.Period.includes('H1'));
+    const combinedLabels = combinedForRevenue.map(d => d.Period);
+    const combinedRevenue = combinedForRevenue.map(d => num(d.Revenue));
+
+    // Revenue Chart
+    const revenueChart = new Chart(document.getElementById('revenueChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'Revenue (NZ$M)',
+                data: fyRevenue,
+                backgroundColor: fyLabels.map((l, i) => i === fyLabels.length - 1 ? 'rgba(255,107,107,0.65)' : 'rgba(0,212,170,0.65)'),
+                borderColor: fyLabels.map((l, i) => i === fyLabels.length - 1 ? colors.danger : colors.primary),
+                borderWidth: 1.5,
+                borderRadius: 4
+            }]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['revenueChart'] = revenueChart;
+    chartSeries['revenueChart'] = {
+        annual: { labels: fyLabels, data: [fyRevenue], scaleX: freshScales().x },
+        quarterly: { labels: combinedLabels, data: [combinedRevenue], scaleX: freshScales().x }
+    };
+
+    // Revenue YoY growth
+    const revYoYData = fyData.map((d, i) => {
+        if (i === 0) return null;
+        return calcYoYChange(num(d.Revenue), num(fyData[i-1].Revenue));
+    });
+    const revenueGrowthChart = new Chart(document.getElementById('revenueGrowthChart'), {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'Revenue YoY %',
+                data: revYoYData,
+                borderColor: colors.tertiary,
+                backgroundColor: 'rgba(9,132,227,0.15)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 4,
+                segment: {
+                    borderColor: ctx => (ctx.p1.parsed.y < 0 ? colors.danger : colors.tertiary)
+                }
+            }]
+        },
+        options: {
+            ...chartDefaults,
+            scales: { ...freshScales(), y: { ...freshScales().y, ticks: { ...freshScales().y.ticks, callback: v => v + '%' } } }
+        }
+    });
+    chartRegistry['revenueGrowthChart'] = revenueGrowthChart;
+
+    // Cash chart
+    const fyCash = fyData.map(d => num(d.CashAndEquivalents));
+    const cashChart = new Chart(document.getElementById('cashChart'), {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'Cash & ST Deposits (NZ$M)',
+                data: fyCash,
+                borderColor: colors.primary,
+                backgroundColor: 'rgba(0,212,170,0.15)',
+                fill: true,
+                tension: 0.25,
+                pointRadius: 4,
+                pointBackgroundColor: fyLabels.map((l,i) => i === fyLabels.length-1 ? colors.danger : colors.primary)
+            }]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['cashChart'] = cashChart;
+
+    // Burn chart (OCF & FCF)
+    const fyOCF = fyData.map(d => num(d.OperatingCashFlow));
+    const fyFCF = fyData.map(d => num(d.FreeCashFlow));
+    const burnChart = new Chart(document.getElementById('burnChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'Operating Cash Flow (NZ$M)', data: fyOCF, backgroundColor: 'rgba(108,92,231,0.6)', borderColor: colors.quaternary, borderWidth: 1.5, borderRadius: 4 },
+                { label: 'Free Cash Flow (NZ$M)', data: fyFCF, backgroundColor: 'rgba(255,107,107,0.6)', borderColor: colors.danger, borderWidth: 1.5, borderRadius: 4 }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['burnChart'] = burnChart;
+
+    // Net Income & EBITDA
+    const fyNI = fyData.map(d => num(d.NetIncome));
+    const fyEBITDA = fyData.map(d => num(d.EBITDA));
+    const netIncomeChart = new Chart(document.getElementById('netIncomeChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'Net Loss (NZ$M)', data: fyNI, backgroundColor: 'rgba(255,107,107,0.6)', borderColor: colors.danger, borderWidth: 1.5, borderRadius: 4 },
+                { label: 'EBITDA (NZ$M)', data: fyEBITDA, backgroundColor: 'rgba(253,203,110,0.6)', borderColor: colors.warning, borderWidth: 1.5, borderRadius: 4 }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['netIncomeChart'] = netIncomeChart;
+
+    // Margins
+    const fyOpMargin = fyData.map(d => num(d.OperatingMargin));
+    const fyNetMargin = fyData.map(d => num(d.NetMargin));
+    const marginsChart = new Chart(document.getElementById('marginsChart'), {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'Operating Margin %', data: fyOpMargin, borderColor: colors.warning, backgroundColor: 'rgba(253,203,110,0.1)', tension: 0.25, pointRadius: 3 },
+                { label: 'Net Margin %', data: fyNetMargin, borderColor: colors.danger, backgroundColor: 'rgba(255,107,107,0.1)', tension: 0.25, pointRadius: 3 }
+            ]
+        },
+        options: {
+            ...chartDefaults,
+            scales: { ...freshScales(), y: { ...freshScales().y, ticks: { ...freshScales().y.ticks, callback: v => v + '%' } } }
+        }
+    });
+    chartRegistry['marginsChart'] = marginsChart;
+
+    // Equity
+    const fyEquity = fyData.map(d => num(d.ShareholdersEquity));
+    const equityChart = new Chart(document.getElementById('equityChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{ label: "Shareholders' Equity (NZ$M)", data: fyEquity, backgroundColor: 'rgba(0,212,170,0.6)', borderColor: colors.primary, borderWidth: 1.5, borderRadius: 4 }]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['equityChart'] = equityChart;
+
+    // Shares Outstanding
+    const fyShares = fyData.map(d => num(d.SharesOutstanding));
+    const sharesChart = new Chart(document.getElementById('sharesChart'), {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [{ label: 'Shares Outstanding (M)', data: fyShares, borderColor: colors.quaternary, backgroundColor: 'rgba(108,92,231,0.15)', fill: true, tension: 0.2, pointRadius: 4 }]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['sharesChart'] = sharesChart;
+
+    // Balance sheet
+    const fyAssets = fyData.map(d => num(d.TotalAssets));
+    const fyLiab = fyData.map(d => num(d.TotalLiabilities));
+    const balanceSheetChart = new Chart(document.getElementById('balanceSheetChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'Total Assets (NZ$M)', data: fyAssets, backgroundColor: 'rgba(0,212,170,0.6)', borderColor: colors.primary, borderWidth: 1.5, borderRadius: 4 },
+                { label: 'Total Liabilities (NZ$M)', data: fyLiab, backgroundColor: 'rgba(255,107,107,0.6)', borderColor: colors.danger, borderWidth: 1.5, borderRadius: 4 }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['balanceSheetChart'] = balanceSheetChart;
+}
+
+// ============ METRIC MODALS ============
+const metricDescriptions = {
+    revenue: {
+        title: "Revenue",
+        content: `<p><strong>Revenue</strong> is Pacific Edge's total income from Cxbladder test sales across the US (Americas) and New Zealand/APAC markets.</p>
+            <div class="metric-highlight"><strong>For PEB:</strong> Revenue is transactional (fee-per-test), not subscription. US Medicare historically drove ~60% of revenue. Non-coverage effective 24-Apr-2025 nearly halved FY2026 revenue to NZ$11.5m from NZ$21.8m in FY2025. The FY2026 bar is highlighted red to flag this structural break &mdash; it is not organic decline.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Claim-by-claim Medicare billing under the draft LCD (began May 2026) — early evidence of revenue recovery pace</li>
+                <li>Test volume trends (US commercial tests were down 2.4% q/q in Q1 FY27 per the latest investor update)</li>
+                <li>Mix shift toward higher-priced Triage Plus (US$1,328) versus legacy tests (US$760)</li>
+                <li>NZ/APAC growth, which is largely insulated from the US Medicare story</li>
+            </ul>`
+    },
+    revenueGrowth: {
+        title: "Revenue YoY Growth",
+        content: `<p>Year-over-year percentage change in annual revenue.</p>
+            <div class="metric-highlight"><strong>For PEB:</strong> The FY2026 decline (-47.4%) is a single regulatory event (Medicare non-coverage), not a demand or competitive failure. Prior years show strong organic growth as the US Medicare business scaled.</div>
+            <p><strong>What to watch:</strong> A return to positive growth in FY2027/FY2028 would be the clearest confirmation that the LCD is translating into real claim reimbursement.</p>`
+    },
+    cash: {
+        title: "Cash & Short-Term Deposits",
+        content: `<p>Total cash, cash equivalents and short-term deposits on the balance sheet at fiscal year-end.</p>
+            <div class="metric-highlight"><strong>For PEB:</strong> This is the single most important chart in the dashboard for a pre-profit company. Cash fell to just NZ$7.8m at 31-Mar-2026 — a critical low point. Post-balance-date raises of ~NZ$36.1m (May/June 2026, not reflected in the FY2026 bar) restored the balance and management guides to &gt;12 months of runway, but that runway is explicitly conditioned on continued Medicare progress.</div>
+            <p><strong>What to watch:</strong> Every subsequent capital raise announcement, the pace of cash consumption relative to the ~NZ$2.4m/month FY26 2H burn rate, and any going-concern language in future filings.</p>`
+    },
+    burn: {
+        title: "Cash Burn (Operating & Free Cash Flow)",
+        content: `<p><strong>Operating Cash Flow</strong> and <strong>Free Cash Flow</strong> (OCF less capex) measured annually.</p>
+            <div class="metric-highlight"><strong>For PEB:</strong> Both have been negative in every year FY2019-FY2026 without exception. FY2026 FCF of -NZ$32.1m was the deepest burn on record, despite management reporting a 27.7% improvement in monthly burn rate between 1H26 (NZ$3.3m/mo) and 2H26 (NZ$2.4m/mo) as cost cuts took hold.</div>
+            <p><strong>What to watch:</strong> The DCF model's owner FCF (which strips SBC and interest income) is even more negative at -NZ$33.6m for FY2026. A shrinking burn rate combined with the LCD taking effect would be the key signal of an approaching inflection.</p>`
+    },
+    netIncome: {
+        title: "Net Loss & EBITDA",
+        content: `<p><strong>Net income</strong> and <strong>EBITDA</strong> (earnings before interest, tax, depreciation and amortization).</p>
+            <div class="metric-highlight"><strong>For PEB:</strong> Both are negative in every single year shown — this is expected for a pre-commercial-scale diagnostics company still investing heavily in US market development. FY2026 net loss of NZ$35.8m (up from NZ$29.9m in FY2025) reflects both the revenue collapse and continued legal/regulatory costs pursuing Medicare reconsideration.</div>
+            <p><strong>What to watch:</strong> The DCF base case models EBITDA breakeven around FY2030 at ~NZ$44m revenue — a multi-year path even in a successful LCD outcome.</p>`
+    },
+    margins: {
+        title: "Operating & Net Margins",
+        content: `<p>Operating income and net income as a percentage of revenue.</p>
+            <div class="metric-highlight"><strong>For PEB:</strong> Margins are large negative percentages (-140% to -477% across FY2019-FY2026) — this is not a data error. It reflects a small revenue base relative to fixed lab, R&D, sales and regulatory-legal costs. FY2026's -316% net margin is the worst on record, driven by the revenue collapse landing on a cost base that had not yet been fully right-sized.</div>
+            <p><strong>What to watch:</strong> Margin improvement will come primarily from revenue recovery (operating leverage) post-LCD rather than further cost cuts, since the sales force has already been reduced from 30+ to 8-12 FTE.</p>`
+    },
+    equity: {
+        title: "Shareholders' Equity",
+        content: `<p>Total shareholders' equity (book value) at fiscal year-end.</p>
+            <div class="metric-highlight"><strong>For PEB:</strong> Equity peaked at NZ$108m in FY2022 after a large capital raise, then has been steadily consumed by annual losses, falling to just NZ$10.7m at FY2026 year-end (pre the May/June 2026 raise). This is the balance-sheet mirror of the cash-burn story above.</div>
+            <p><strong>What to watch:</strong> Post-raise equity should recover materially in FY2027, but continued losses will erode it again absent a genuine revenue inflection.</p>`
+    },
+    shares: {
+        title: "Shares Outstanding",
+        content: `<p>Weighted average ordinary shares outstanding for the fiscal year.</p>
+            <div class="metric-highlight"><strong>For PEB:</strong> Shares outstanding have grown from 504m (FY2019) to a 944m weighted average in FY2026, and the DCF model estimates ~1,263m shares post the May/June 2026 raises (1,022.6m actually on issue at 31-Mar-2026 plus an estimated ~241m from the raises). Further dilution of 43-200m shares is explicitly modelled depending on DCF scenario. Serial dilution at depressed prices (as low as NZ$0.17/share) is a first-order feature of this investment, not a side effect.</div>
+            <p><strong>What to watch:</strong> The actual issue price of the May/June 2026 raises (not yet disclosed in the FY2026 AR) will pin down the true current share count; any further raise announcements before the LCD finalizes.</p>`
+    },
+    balanceSheet: {
+        title: "Total Assets vs Total Liabilities",
+        content: `<p>Total assets and total liabilities at fiscal year-end.</p>
+            <div class="metric-highlight"><strong>For PEB:</strong> Total assets are dominated by cash from recent raises rather than operating assets; total liabilities are modest (mostly lease liabilities and payables — total debt is just NZ$1.3m of IFRS-16 lease obligations at FY2026, no bank debt).</div>
+            <p><strong>What to watch:</strong> The gap between assets and liabilities (net assets = shareholders' equity) shrinking toward liabilities would signal balance-sheet stress requiring another raise.</p>`
+    }
+};
+
+function openModal(key) {
+    const m = metricDescriptions[key];
+    if (!m) return;
+    document.getElementById('modalTitle').textContent = m.title;
+    document.getElementById('modalBody').innerHTML = m.content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ============ DCF SECTION ============
+let currentScenario = 'base';
+
+function fmtIV(v) {
+    const c = (dcfData.inputs && dcfData.inputs.currency === 'NZD') ? 'NZ$' : '$';
+    const a = Math.abs(v);
+    const dp = a >= 100 ? 0 : a >= 10 ? 1 : a >= 1 ? 2 : 4;
+    return c + v.toFixed(dp);
+}
+
+function isWeightedLive() {
+    const pw = dcfData.probability_weighted || {};
+    const w = pw.weights;
+    const a = dcfData.assumptions;
+    if (!w || !a || !a.base || !a.bull || !a.bear) return false;
+    if (!dcfData.inputs || dcfData.inputs.last_fcf == null) return false;
+    if (!dcfData.historical_growth || dcfData.historical_growth.selected_growth_rate == null) return false;
+    // Bear is a wind-down waterfall, not a growth-rate/WACC model -> sliders cannot
+    // reproduce it. Keep the weighted IV anchored to the JSON rather than pretend.
+    if (a.bear.wacc == null || a.bear.terminal_growth == null) return false;
+    const total = (w.bear || 0) + (w.base || 0) + (w.bull || 0);
+    if (Math.abs(total - 1) > 0.001) return false;
+    return true;
+}
+
+function calculateDCF(startGrowth, wacc, terminalGrowth) {
+    const years = 10;
+    const hurdle = 0.15;
+    const fcf = dcfData.inputs.last_fcf;
+    let pvFCF = 0;
+    let pvFCFHurdle = 0;
+    let projectedFCF = fcf;
+
+    // Use the base-case growth path shape, scaled by the ratio of the user's
+    // year-1 growth input to the base case's own year-1 growth, so the sliders
+    // move the whole path coherently rather than flattening it to one rate.
+    const baseGrowths = dcfData.assumptions.base.growth_rates;
+    const baseYear1 = baseGrowths[0];
+    const scaleFactor = baseYear1 !== 0 ? (1 + startGrowth / 100) / (1 + baseYear1 / 100) : 1;
+
+    for (let i = 0; i < years; i++) {
+        const pathGrowth = baseGrowths[i] !== undefined ? baseGrowths[i] : baseGrowths[baseGrowths.length - 1];
+        const yearGrowthFactor = (1 + pathGrowth / 100) * scaleFactor;
+        projectedFCF = i === 0 ? fcf * yearGrowthFactor : projectedFCF; // placeholder, replaced below
+    }
+
+    // Rebuild FCF path proportionally to the BASE case's own projected FCF path,
+    // scaled so that year-1 growth matches the slider. This preserves the
+    // component-built shape (loss-shrinking then turning positive) rather than
+    // compounding a single growth rate onto a negative FCF base (which is not
+    // meaningful - negative numbers "growing" at a rate flip sign incorrectly).
+    const baseFCFPath = dcfData.projections.base.fcf;
+    const growthShift = startGrowth - baseYear1;
+    const fcfPath = baseFCFPath.map(v => v + (v * (growthShift / 100) * 0.15)); // modest sensitivity nudge
+
+    pvFCF = 0;
+    pvFCFHurdle = 0;
+    let lastFCF = fcfPath[fcfPath.length - 1];
+    for (let i = 0; i < years; i++) {
+        const v = fcfPath[i];
+        pvFCF += v / Math.pow(1 + wacc / 100, i + 1);
+        pvFCFHurdle += v / Math.pow(1 + hurdle, i + 1);
+    }
+
+    const terminalFCF = lastFCF * (1 + terminalGrowth / 100);
+    const denom = (wacc / 100 - terminalGrowth / 100);
+    const terminalValue = denom > 0.001 ? terminalFCF / denom : terminalFCF / 0.001;
+    const pvTerminal = terminalValue / Math.pow(1 + wacc / 100, years);
+
+    const enterpriseValue = pvFCF + pvTerminal;
+
+    // Raise proceeds (base scenario dilution economics), discounted to PV
+    const dilution = dcfData.assumptions.base.dilution;
+    const raiseYear = 2; // FY2028 ~ year 2
+    const pvRaiseProceeds = dilution ? dilution.raise_net_nzd_m / Math.pow(1 + wacc / 100, raiseYear) : 0;
+
+    const equityValue = enterpriseValue - dcfData.inputs.net_debt + pvRaiseProceeds;
+    const exitShares = dcfData.valuation.base.scenario_shares;
+    const iv = equityValue / exitShares;
+
+    const terminalAtHurdle = terminalFCF / Math.max(hurdle - terminalGrowth / 100, 0.001);
+    const entryPrice = (pvFCFHurdle + terminalAtHurdle / Math.pow(1 + hurdle, years) + (dilution ? dilution.raise_net_nzd_m / Math.pow(1 + hurdle, raiseYear) : 0)
+                        - dcfData.inputs.net_debt) / exitShares;
+
+    return { iv: iv, entryPrice: entryPrice, pvFCF: pvFCF, pvTerminal: pvTerminal, enterpriseValue: enterpriseValue };
+}
+
+function weightedIV(growth, wacc, terminal) {
+    const pw = dcfData.probability_weighted || {};
+    const stored = pw.weighted_iv;
+    if (stored == null || !isWeightedLive()) return stored;
+
+    const a = dcfData.assumptions;
+    const cur = a[currentScenario] || a.base;
+    const bg = (Array.isArray(cur.growth_rates) && cur.growth_rates.length) ? cur.growth_rates[0] : dcfData.historical_growth.selected_growth_rate;
+    const bw = cur.wacc != null ? cur.wacc : a.base.wacc;
+    const bt = cur.terminal_growth != null ? cur.terminal_growth : a.base.terminal_growth;
+    if (growth === bg && wacc === bw && terminal === bt) return stored;
+
+    // Bear is a wind-down waterfall with no growth/WACC model - hold its
+    // component value fixed while base/bull respond to slider deltas.
+    const bearIV = dcfData.valuation.bear.intrinsic_value;
+
+    const now = pw.weights.base * calculateDCF(growth, wacc, terminal).iv
+              + pw.weights.bull * calculateDCF(growth + (30.4 - 8.7), wacc, terminal).iv
+              + pw.weights.bear * bearIV;
+    const ref = pw.weights.base * dcfData.valuation.base.intrinsic_value
+              + pw.weights.bull * dcfData.valuation.bull.intrinsic_value
+              + pw.weights.bear * bearIV;
+    if (!ref || !isFinite(ref) || !now || !isFinite(now)) return stored;
+    return stored * (now / ref);
+}
+
+function renderHeaderValuation() {
+    const el = document.getElementById('headerValuation');
+    if (!el) return;
+    const pw = dcfData.probability_weighted || {};
+    const wiv = pw.weighted_iv;
+    const price = dcfData.current_price;
+    if (wiv == null || price == null) return;
+    const ratio = wiv / price;
+    if (ratio > 20 || ratio < 0.001) return;
+    const up = (wiv - price) / price * 100;
+    const cls = up >= 0 ? 'positive' : 'negative';
+    const sign = up >= 0 ? '+' : '';
+    el.innerHTML = `<div class="hv-item"><span class="hv-label">Prob-Weighted IV</span><span class="hv-value">${fmtIV(wiv)}</span></div>
+        <div class="hv-item"><span class="hv-label">Current Price</span><span class="hv-value">${fmtIV(price)}</span></div>
+        <div class="hv-item"><span class="hv-label">Upside</span><span class="hv-value ${cls}">${sign}${up.toFixed(0)}%</span></div>`;
+    el.style.display = 'flex';
+}
+
+function renderDCFInputs() {
+    const inputs = dcfData.inputs;
+    const currency = 'NZ$';
+    const formatNum = (n) => {
+        const sign = n < 0 ? '-' : '';
+        return sign + currency + Math.abs(n).toFixed(1) + 'M';
+    };
+
+    document.getElementById('baseFCF').textContent = formatNum(inputs.last_fcf);
+    const sbcEl = document.getElementById('sbcBreakdown');
+    if (sbcEl) {
+        sbcEl.textContent = `${formatNum(inputs.reported_fcf)} reported − ${formatNum(inputs.sbc)} SBC − ${formatNum(inputs.interest_income)} interest`;
+    }
+
+    document.getElementById('sharesOut').textContent = inputs.shares_outstanding.toFixed(0) + 'M';
+    const dilEl = document.getElementById('dilutionNote');
+    if (dilEl) dilEl.textContent = 'Estimate; further scenario-specific dilution modelled explicitly';
+
+    const netDebt = inputs.net_debt;
+    const netDebtEl = document.getElementById('netDebt');
+    netDebtEl.textContent = (netDebt < 0 ? '-' : '') + currency + Math.abs(netDebt).toFixed(1) + 'M';
+    if (netDebt < 0) netDebtEl.style.color = '#00d4aa';
+
+    renderFCFProjections();
+}
+
+function renderFCFProjections() {
+    const scenario = currentScenario === 'bear' ? 'bear' : currentScenario;
+    const proj = dcfData.projections[scenario] || dcfData.projections.base;
+    const years = proj.years;
+    const fcfVals = proj.fcf;
+    const revVals = proj.revenue;
+    const currency = 'NZ$';
+
+    const formatFCF = (n) => {
+        const sign = n < 0 ? '-' : '+';
+        return sign + currency + Math.abs(n).toFixed(1) + 'M';
+    };
+
+    // Show first 5 years (or fewer if bear)
+    const n = Math.min(5, years.length);
+    let html = '';
+    for (let i = 0; i < n; i++) {
+        html += `<div class="fcf-projection-item header">${years[i]}</div>`;
+    }
+    html += '';
+    let row2 = '';
+    for (let i = 0; i < n; i++) {
+        row2 += `<div class="fcf-projection-item">
+            <div class="fcf-value">${formatFCF(fcfVals[i])}</div>
+            <div class="growth-rate">Rev ${currency}${revVals[i].toFixed(1)}M</div>
+        </div>`;
+    }
+    document.getElementById('fcfProjectionTable').innerHTML = html + row2;
+}
+
+window.updateDCFDisplay = function() {
+    const growth = parseFloat(document.getElementById('growthSlider').value);
+    const wacc = parseFloat(document.getElementById('waccSlider').value);
+    const terminal = parseFloat(document.getElementById('terminalSlider').value);
+
+    document.getElementById('growthValue').textContent = growth + '%';
+    document.getElementById('waccValue').textContent = wacc + '%';
+    document.getElementById('terminalValue').textContent = terminal + '%';
+
+    if (currentScenario === 'base') {
+        const result = calculateDCF(growth, wacc, terminal);
+        document.getElementById('dcfIV').textContent = fmtIV(result.iv);
+        document.getElementById('dcfEntry').textContent = fmtIV(result.entryPrice);
+        const upside = ((result.iv - dcfData.current_price) / dcfData.current_price * 100);
+        const upsideEl = document.getElementById('dcfUpside');
+        upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(0) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+        upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+    }
+
+    const wiv = weightedIV(growth, wacc, terminal);
+    document.getElementById('dcfWeighted').textContent = fmtIV(wiv);
+    const wUpEl = document.getElementById('dcfWeightedUpside');
+    if (wUpEl) {
+        const wUp = (wiv - dcfData.current_price) / dcfData.current_price * 100;
+        wUpEl.textContent = (wUp >= 0 ? '+' : '') + wUp.toFixed(0) + '% ' + (wUp >= 0 ? 'upside' : 'downside');
+        wUpEl.className = 'dcf-change ' + (wUp >= 0 ? 'positive' : 'negative');
+    }
+
+    if (currentScenario === 'base') {
+        const grid = document.getElementById('assumptionGrid');
+        if (grid) {
+            const result = calculateDCF(growth, wacc, terminal);
+            grid.innerHTML = `
+                <div class="assumption-item"><div class="label">Year-1 Growth</div><div class="value">${growth}%</div></div>
+                <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc}%</div></div>
+                <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${terminal}%</div></div>
+                <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#ff6b6b;">${fmtIV(result.iv)}</div></div>
+                <div class="assumption-item"><div class="label">Entry Price (15% hurdle)</div><div class="value" style="color:#ff6b6b;">${fmtIV(result.entryPrice)}</div></div>
+            `;
+        }
+    }
+};
+
+window.switchScenario = function(scenario) {
+    currentScenario = scenario;
+    document.querySelectorAll('.scenario-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.scenario === scenario);
+    });
+
+    const assumptions = dcfData.assumptions[scenario];
+    const valuation = dcfData.valuation[scenario];
+
+    document.getElementById('scenarioNarrative').textContent = assumptions.narrative || '';
+
+    renderFCFProjections();
+
+    const grid = document.getElementById('assumptionGrid');
+
+    if (scenario === 'bear') {
+        // Bear is a wind-down waterfall; sliders don't apply meaningfully
+        document.getElementById('growthSlider').disabled = true;
+        document.getElementById('waccSlider').disabled = true;
+        document.getElementById('terminalSlider').disabled = true;
+        const c = assumptions.components_nzd_m;
+        grid.innerHTML = `
+            <div class="assumption-item"><div class="label">Cash at Failure (mid-CY2027)</div><div class="value">NZ$${c.cash_at_failure_mid2027}M</div></div>
+            <div class="assumption-item"><div class="label">US Wind-down Cost</div><div class="value">-NZ$${Math.abs(c.us_winddown_cost)}M</div></div>
+            <div class="assumption-item"><div class="label">NZ/APAC Business Value</div><div class="value">NZ$${c.nz_apac_business}M</div></div>
+            <div class="assumption-item"><div class="label">IP/Evidence Salvage</div><div class="value">NZ$${c.ip_salvage}M</div></div>
+            <div class="assumption-item"><div class="label">Emergency Raise (net)</div><div class="value">NZ$${c.emergency_raise_net}M</div></div>
+            <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#ff6b6b;">${fmtIV(valuation.intrinsic_value)}</div></div>
+        `;
+    } else {
+        document.getElementById('growthSlider').disabled = false;
+        document.getElementById('waccSlider').disabled = false;
+        document.getElementById('terminalSlider').disabled = false;
+        document.getElementById('growthSlider').value = assumptions.growth_rates[0];
+        document.getElementById('waccSlider').value = assumptions.wacc;
+        document.getElementById('terminalSlider').value = assumptions.terminal_growth;
+
+        grid.innerHTML = `
+            <div class="assumption-item"><div class="label">Year-1 Growth</div><div class="value">${assumptions.growth_rates[0]}%</div></div>
+            <div class="assumption-item"><div class="label">Year-10 Growth</div><div class="value">${assumptions.growth_rates[9]}%</div></div>
+            <div class="assumption-item"><div class="label">WACC</div><div class="value">${assumptions.wacc}%</div></div>
+            <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${assumptions.terminal_growth}%</div></div>
+            <div class="assumption-item"><div class="label">Implied Exit Multiple</div><div class="value">${valuation.implied_exit_multiple}x</div></div>
+            <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#ff6b6b;">${fmtIV(valuation.intrinsic_value)}</div></div>
+        `;
+    }
+
+    // Update headline IV/entry cards to reflect the ACTUAL scenario valuation from JSON
+    // (guarantees exact match even when scenario !== base, where the slider model is
+    // not authoritative)
+    document.getElementById('dcfIV').textContent = fmtIV(valuation.intrinsic_value);
+    const upside = valuation.upside;
+    const upsideEl = document.getElementById('dcfUpside');
+    upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(1) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+    upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+    document.getElementById('dcfIV').previousElementSibling; // no-op guard
+
+    const entry = dcfData.entry_price[scenario];
+    if (entry) document.getElementById('dcfEntry').textContent = fmtIV(entry.entry_price);
+
+    updateDCFDisplay();
+};
+
+function renderHistoricalGrowth() {
+    const growth = dcfData.historical_growth;
+    const selectedSource = growth.growth_rate_source;
+    const grid = document.getElementById('growthGrid');
+    const metrics = [
+        { key: 'revenue_3yr_cagr', label: 'Revenue 3Y' },
+        { key: 'revenue_5yr_cagr', label: 'Revenue 5Y' },
+        { key: 'revenue_7yr_cagr', label: 'Revenue 7Y' },
+        { key: 'equity_3yr_cagr', label: 'Equity 3Y' },
+        { key: 'equity_5yr_cagr', label: 'Equity 5Y' },
+        { key: 'eps_3yr_cagr', label: 'EPS 3Y' },
+        { key: 'eps_5yr_cagr', label: 'EPS 5Y' },
+        { key: 'fcf_3yr_cagr', label: 'FCF 3Y' },
+        { key: 'fcf_5yr_cagr', label: 'FCF 5Y' }
+    ];
+    grid.innerHTML = metrics.map(m => {
+        const rate = growth[m.key];
+        const isSelected = m.key === selectedSource;
+        if (rate === null || rate === undefined) {
+            return `<div class="growth-item"><div class="metric">${m.label}</div><div class="rate" style="color:#666;">N/A</div></div>`;
+        }
+        const colorClass = rate >= 0 ? 'positive' : 'negative';
+        return `<div class="growth-item ${isSelected ? 'selected' : ''}"><div class="metric">${m.label}</div><div class="rate ${colorClass}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div></div>`;
+    }).join('');
+}
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const table = document.getElementById('sensitivityMatrix');
+    const currentPrice = dcfData.current_price;
+
+    let html = '<tr><th>WACC \\ Term G</th>';
+    sens.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+    html += '</tr>';
+
+    sens.wacc_range.forEach((wacc, i) => {
+        html += `<tr><th>${wacc}%</th>`;
+        sens.matrix[i].forEach((val, j) => {
+            const isHighlight = wacc === dcfData.assumptions.base.wacc && sens.terminal_growth_range[j] === dcfData.assumptions.base.terminal_growth;
+            const colorClass = val >= currentPrice ? 'above-current' : 'below-current';
+            html += `<td class="${isHighlight ? 'highlight' : colorClass}">${fmtIV(val)}</td>`;
+        });
+        html += '</tr>';
+    });
+    table.innerHTML = html;
+}
+
+function renderRequiredReturnTable() {
+    const rr = dcfData.required_return_table;
+    const table = document.getElementById('requiredReturnTable');
+    const currentPrice = dcfData.current_price;
+    let html = '<tr><th>Required Return</th>';
+    rr.returns.forEach(r => { html += `<th>${r}%</th>`; });
+    html += '</tr><tr><th>Base-Case IV</th>';
+    rr.value_per_share.forEach(v => {
+        const cls = v >= currentPrice ? 'above-current' : 'below-current';
+        html += `<td class="${cls}">${fmtIV(v)}</td>`;
+    });
+    html += '</tr>';
+    table.innerHTML = html;
+}
+
+function initDCF() {
+    if (!dcfData || !dcfData.valuation) return;
+
+    document.getElementById('dcfCurrent').textContent = fmtIV(dcfData.current_price);
+
+    const base = dcfData.assumptions.base;
+    document.getElementById('growthSlider').value = base.growth_rates[0];
+    document.getElementById('waccSlider').value = base.wacc;
+    document.getElementById('terminalSlider').value = base.terminal_growth;
+    document.getElementById('growthValue').textContent = base.growth_rates[0] + '%';
+    document.getElementById('waccValue').textContent = base.wacc + '%';
+    document.getElementById('terminalValue').textContent = base.terminal_growth + '%';
+    document.getElementById('growthHint').textContent = 'Event-driven path (LCD outcome), not historical CAGR';
+
+    const wsub = document.getElementById('dcfWeightedSublabel');
+    const wts = (dcfData.probability_weighted || {}).weights;
+    if (wsub && wts) {
+        const pct = (x) => Math.round(x * 100);
+        let txt = `${pct(wts.bear)}% Bear / ${pct(wts.base)}% Base / ${pct(wts.bull)}% Bull`;
+        if (!isWeightedLive()) txt += ' — fixed from model';
+        wsub.textContent = txt;
+    }
+
+    renderHeaderValuation();
+    renderDCFInputs();
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    renderRequiredReturnTable();
+
+    // Set headline IV/upside directly from JSON for the base case on load
+    document.getElementById('dcfIV').textContent = fmtIV(dcfData.valuation.base.intrinsic_value);
+    const upEl = document.getElementById('dcfUpside');
+    const up = dcfData.valuation.base.upside;
+    upEl.textContent = (up >= 0 ? '+' : '') + up.toFixed(1) + '% ' + (up >= 0 ? 'upside' : 'downside');
+    upEl.className = 'dcf-change ' + (up >= 0 ? 'positive' : 'negative');
+    document.getElementById('dcfEntry').textContent = fmtIV(dcfData.entry_price.base.entry_price);
+    document.getElementById('dcfWeighted').textContent = fmtIV(dcfData.probability_weighted.weighted_iv);
+    const wUp = (dcfData.probability_weighted.weighted_iv - dcfData.current_price) / dcfData.current_price * 100;
+    const wUpEl = document.getElementById('dcfWeightedUpside');
+    wUpEl.textContent = (wUp >= 0 ? '+' : '') + wUp.toFixed(0) + '% ' + (wUp >= 0 ? 'upside' : 'downside');
+    wUpEl.className = 'dcf-change ' + (wUp >= 0 ? 'positive' : 'negative');
+
+    switchScenario('base');
+}
+
+// ============ INIT ============
+renderKPIs();
+renderGuidance();
+renderOverview();
+renderCharts();
+initDCF();
+
+(function() {
+    var growthSlider = document.getElementById('growthSlider');
+    var waccSlider = document.getElementById('waccSlider');
+    var terminalSlider = document.getElementById('terminalSlider');
+    if (growthSlider) { growthSlider.oninput = window.updateDCFDisplay; growthSlider.onchange = window.updateDCFDisplay; }
+    if (waccSlider) { waccSlider.oninput = window.updateDCFDisplay; waccSlider.onchange = window.updateDCFDisplay; }
+    if (terminalSlider) { terminalSlider.oninput = window.updateDCFDisplay; terminalSlider.onchange = window.updateDCFDisplay; }
+})();
+</script>
+</body>
+</html>
