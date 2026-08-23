@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New Zealand Rural Land Company (NZL.NZ) Financial Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 20px;
+}
+.header { text-align: center; margin-bottom: 30px; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 15px; backdrop-filter: blur(10px); }
+.header h1 { font-size: 2.5rem; background: linear-gradient(90deg, #00d4aa, #00b894); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 10px; }
+.header p { color: #888; font-size: 1.1rem; }
+.header-valuation { display: flex; justify-content: center; flex-wrap: wrap; gap: 14px 32px; margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.08); }
+.hv-item { display: flex; align-items: baseline; gap: 8px; }
+.hv-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.hv-value { font-size: 1.35rem; font-weight: 700; color: #e0e0e0; }
+.hv-value.positive { color: #00d4aa; }
+.hv-value.negative { color: #ff6b6b; }
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px; max-width: 1400px; margin-left: auto; margin-right: auto; }
+.kpi-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; text-align: center; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s ease, box-shadow 0.3s ease; }
+.kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0,212,170,0.2); }
+.kpi-card.discount { border-color: rgba(255,107,107,0.4); background: rgba(255,107,107,0.07); }
+.kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+.kpi-card.discount .kpi-value { color: #ff6b6b; }
+.kpi-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.kpi-change { font-size: 0.9rem; margin-top: 5px; }
+.kpi-change.positive { color: #00d4aa; }
+.kpi-change.negative { color: #ff6b6b; }
+.guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+.guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 8px; }
+.guidance-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.guidance-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px; }
+.guidance-meta { font-size: 0.85rem; color: #888; }
+.guidance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.guidance-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 18px; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s ease; }
+.guidance-card:hover { transform: translateY(-2px); }
+.guidance-metric { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.guidance-target { font-size: 1.3rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; }
+.guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
+.guidance-vs-prior { display: inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+.guidance-vs-prior.raised { background: rgba(0,212,170,0.15); color: #00d4aa; }
+.guidance-vs-prior.lowered { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+.guidance-vs-prior.maintained { background: rgba(255,255,255,0.1); color: #888; }
+.guidance-vs-prior.suspended { background: rgba(255,107,107,0.2); color: #ff6b6b; }
+.guidance-vs-prior.new { background: rgba(99,102,241,0.15); color: #818cf8; }
+.guidance-notes { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
+.guidance-commentary { background: rgba(255,255,255,0.03); border-radius: 10px; padding: 16px 20px; border-left: 3px solid #00d4aa; font-style: italic; color: #b0b0b0; line-height: 1.6; }
+.guidance-commentary::before { content: '"'; font-size: 1.5rem; color: #00d4aa; margin-right: 4px; }
+.guidance-alert { background: rgba(255,107,107,0.12); border: 1px solid rgba(255,107,107,0.4); border-radius: 10px; padding: 14px 18px; margin-bottom: 15px; color: #ffb3b3; font-size: 0.92rem; line-height: 1.5; }
+.section-title { font-size: 1.5rem; color: #fff; margin: 40px auto 20px; padding-bottom: 10px; border-bottom: 2px solid rgba(0,212,170,0.3); max-width: 1400px; }
+.charts-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 25px; max-width: 1400px; margin: 0 auto; }
+.chart-card { background: rgba(255,255,255,0.05); border-radius: 15px; padding: 25px; border: 1px solid rgba(255,255,255,0.1); }
+.chart-card.full-width { grid-column: 1 / -1; }
+.chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.chart-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.chart-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px; }
+.chart-footnote { font-size: 0.75rem; color: #666; margin-bottom: 12px; line-height: 1.4; }
+.help-btn { width: 24px; height: 24px; border-radius: 50%; background: rgba(0,212,170,0.2); border: 1px solid #00d4aa; color: #00d4aa; font-size: 14px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; }
+.help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.chart-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.view-toggle { padding: 3px 10px; border-radius: 12px; background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #888; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+.view-toggle:hover { border-color: #0984e3; color: #0984e3; }
+.view-toggle.active { background: rgba(9,132,227,0.2); border-color: #0984e3; color: #0984e3; }
+.log-toggle { padding: 3px 10px; border-radius: 12px; background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #888; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+.log-toggle:hover { border-color: #00d4aa; color: #00d4aa; }
+.log-toggle.active { background: rgba(0,212,170,0.2); border-color: #00d4aa; color: #00d4aa; }
+.chart-wrapper { position: relative; height: 300px; }
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
+.modal-overlay.active { display: flex; }
+.modal { background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%); border-radius: 16px; max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto; border: 1px solid rgba(0,212,170,0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+.modal-header { padding: 20px 25px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
+.modal-header h3 { color: #00d4aa; font-size: 1.4rem; margin: 0; }
+.modal-close { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,107,107,0.2); border: 1px solid #ff6b6b; color: #ff6b6b; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.modal-close:hover { background: #ff6b6b; color: #fff; }
+.modal-body { padding: 25px; line-height: 1.7; }
+.modal-body p { margin-bottom: 15px; }
+.modal-body strong { color: #00d4aa; }
+.modal-body ul { margin: 15px 0; padding-left: 20px; }
+.modal-body li { margin-bottom: 8px; }
+.metric-highlight { background: rgba(0,212,170,0.1); border-left: 3px solid #00d4aa; padding: 12px 15px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+.overview-section { max-width: 1400px; margin: 0 auto 30px; }
+.overview-toggle { width: 100%; background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.3); border-radius: 12px; padding: 16px 24px; color: #00d4aa; font-size: 1.1rem; font-weight: 600; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease; }
+.overview-toggle:hover { background: rgba(0,212,170,0.2); }
+.overview-toggle .arrow { transition: transform 0.3s ease; }
+.overview-toggle.active .arrow { transform: rotate(180deg); }
+.overview-content { display: none; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-top: none; border-radius: 0 0 12px 12px; padding: 30px; margin-top: -12px; }
+.overview-content.active { display: block; }
+.overview-lead { background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.3); border-radius: 12px; padding: 18px 22px; margin-bottom: 25px; line-height: 1.6; }
+.overview-lead strong { color: #ff6b6b; }
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+.overview-card { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; border: 1px solid rgba(255,255,255,0.08); }
+.overview-card h3 { color: #00d4aa; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.overview-card p { margin-bottom: 12px; line-height: 1.6; }
+.overview-card ul { list-style: none; padding: 0; margin: 0; }
+.overview-card li { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); line-height: 1.5; }
+.overview-card li:last-child { border-bottom: none; }
+.overview-card.bull h3 { color: #00d4aa; }
+.overview-card.bear h3 { color: #ff6b6b; }
+.overview-card.risks h3 { color: #fdcb6e; }
+.risk-high { color: #ff6b6b; font-weight: 600; }
+.risk-moderate { color: #fdcb6e; font-weight: 600; }
+.risk-low { color: #00d4aa; font-weight: 600; }
+.revenue-stream { display: flex; justify-content: space-between; align-items: center; }
+.revenue-stream .percent { color: #00d4aa; font-weight: 600; }
+.trend-growing { color: #00d4aa; }
+.trend-stable { color: #888; }
+.trend-declining { color: #ff6b6b; }
+.trend-at { color: #fdcb6e; }
+.dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+.dcf-banner { background: rgba(253,203,110,0.12); border: 1px solid rgba(253,203,110,0.4); border-radius: 12px; padding: 18px 22px; margin-bottom: 25px; color: #fdcb6e; line-height: 1.65; font-size: 0.93rem; }
+.dcf-banner strong { color: #ffe4a8; }
+.dcf-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+.dcf-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 24px; text-align: center; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s ease; }
+.dcf-card:hover { transform: translateY(-3px); }
+.dcf-card.highlight { background: rgba(0,212,170,0.1); border-color: rgba(0,212,170,0.3); }
+.dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.dcf-value { font-size: 2.2rem; font-weight: bold; color: #00d4aa; }
+.dcf-card:not(.highlight) .dcf-value { color: #fff; }
+.dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+.dcf-change.positive { color: #00d4aa; }
+.dcf-change.negative { color: #ff6b6b; }
+.dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
+.dcf-warning { background: rgba(253,203,110,0.15); border: 1px solid rgba(253,203,110,0.4); border-radius: 8px; padding: 12px 16px; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; color: #fdcb6e; }
+.warning-icon { font-size: 1.2rem; }
+.dcf-inputs { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.08); }
+.dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+.dcf-inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.dcf-input-card { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
+.dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #00d4aa; }
+.dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
+.fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
+.fcf-projection-table { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 12px; }
+.fcf-projection-item { text-align: center; }
+.fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
+.fcf-projection-item .year { font-size: 0.75rem; color: #888; margin-bottom: 2px; }
+.fcf-projection-item .fcf-value { font-size: 1rem; color: #e0e0e0; font-weight: 500; }
+.fcf-projection-item .growth-rate { font-size: 0.75rem; color: #00d4aa; margin-top: 2px; }
+.dcf-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; margin-bottom: 30px; padding: 25px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
+.slider-group { display: flex; flex-direction: column; gap: 10px; }
+.slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+.slider-group label span { color: #00d4aa; font-weight: 600; }
+.slider-group input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); outline: none; }
+.slider-group input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #00d4aa; cursor: pointer; transition: transform 0.2s; }
+.slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.slider-hint { font-size: 0.8rem; color: #666; }
+.scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+.scenario-tab { padding: 10px 24px; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: #888; border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s; }
+.scenario-tab:hover { border-color: rgba(0,212,170,0.5); color: #e0e0e0; }
+.scenario-tab.active { background: rgba(0,212,170,0.15); border-color: #00d4aa; color: #00d4aa; }
+.scenario-details { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.08); }
+.scenario-details h4 { color: #00d4aa; margin-bottom: 15px; }
+.assumption-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+.assumption-item { text-align: center; }
+.assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+.assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
+.sensitivity-section { margin-bottom: 30px; }
+.sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; }
+.sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.03); border-radius: 8px; overflow: hidden; }
+.sensitivity-table th, .sensitivity-table td { padding: 12px 16px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+.sensitivity-table th { background: rgba(0,212,170,0.1); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td { color: #e0e0e0; }
+.sensitivity-table td.highlight { background: rgba(0,212,170,0.15); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td.below-current { color: #ff6b6b; }
+.sensitivity-table td.above-current { color: #00d4aa; }
+.historical-growth { margin-bottom: 30px; }
+.historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
+.growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
+.growth-item { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 15px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+.growth-item .metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
+.growth-item .rate { font-size: 1.2rem; font-weight: 600; }
+.growth-item .rate.positive { color: #00d4aa; }
+.growth-item .rate.negative { color: #ff6b6b; }
+.growth-item.selected { border-color: #00d4aa; background: rgba(0,212,170,0.1); }
+.dcf-download { text-align: center; margin-top: 30px; }
+.download-btn { display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; background: rgba(0,212,170,0.15); border: 1px solid #00d4aa; border-radius: 8px; color: #00d4aa; text-decoration: none; font-weight: 600; transition: all 0.2s; }
+.download-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.download-icon { font-size: 1.2rem; }
+.pb-table-wrap { max-width: 1400px; margin: 0 auto 30px; background: rgba(255,255,255,0.05); border-radius: 15px; padding: 25px; border: 1px solid rgba(255,255,255,0.1); }
+.pb-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+.pb-table th, .pb-table td { padding: 10px 14px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+.pb-table th { background: rgba(0,212,170,0.1); color: #00d4aa; }
+.pb-table td.stub { color: #fdcb6e; }
+@media (max-width: 768px) {
+    .charts-container { grid-template-columns: 1fr; }
+    .overview-grid { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.8rem; }
+    .fcf-projection-table { grid-template-columns: repeat(3, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>New Zealand Rural Land Company Limited (NZX: NZL)</h1>
+    <p>Externally managed NZ farmland landlord &middot; triple-net CPI-linked leases &middot; Dec FY end &middot; reporting in NZD</p>
+    <div class="header-valuation" id="headerValuation" style="display:none"></div>
+</div>
+
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-lead">
+            <strong>The central question is the NAV discount.</strong> NZL's NAV per share was $1.6094 at FY2025 year-end against a market price around $0.935 &mdash; a persistent 41.9% discount that has never closed below 0.557x book or above 0.740x book in 5.5 years listed. Layered on top: in July 2026 Kiwi Crunch Farms, the operator of NZL's Hawke's Bay orchard leases (~5.8% of NZRLI LP rent), entered receivership owing ~$300k in rent arrears, and the Board has <strong>suspended FY26 AFFO guidance</strong> as a result. A further ~7.3% of rent sits with related Wade Glass-linked Central Otago entities whose wider group has been cascading into liquidation &mdash; so roughly 13% of NZL's rent roll is currently under a credit cloud.
+        </div>
+        <div class="overview-grid" id="overviewGrid"></div>
+    </div>
+</div>
+
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf"></span> | <span id="guidanceFY"></span></span>
+    </div>
+    <div class="guidance-alert" id="guidanceAlert"></div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<h2 class="section-title">NAV Discount &amp; Valuation History</h2>
+<div class="pb-table-wrap">
+    <div class="chart-header">
+        <h3>Price vs NAV per Share (Price-to-Book)</h3>
+    </div>
+    <p style="color:#888; font-size:0.85rem; margin-bottom:6px;">NZL has never closed a fiscal year above 0.74x book or below 0.557x book since its Dec-2020 IPO. FY2022(Jun) and FY2022-6moStub reflect the June&rarr;December fiscal year-end transition (see footnote below charts).</p>
+    <div class="chart-wrapper" style="height:320px;">
+        <canvas id="pbChart"></canvas>
+    </div>
+    <table class="pb-table" id="pbTable"></table>
+</div>
+
+<h2 class="section-title">Rental Income, AFFO &amp; Dividends</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Rental Income</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('revenueChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('revenue')">?</button>
+            </div>
+        </div>
+        <div class="chart-footnote">FY2021 is a ~9.5-month post-IPO stub; FY2022-6moStub is a 6-month transition period (Jun&rarr;Dec year-end change). Neither is a full year &mdash; treat as non-comparable, not a growth collapse.</div>
+        <div class="chart-wrapper"><canvas id="revenueChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>AFFO per Share vs Dividend per Share</h3>
+            <div class="chart-header-actions"><button class="help-btn" onclick="openModal('affo')">?</button></div>
+        </div>
+        <div class="chart-footnote">Attributable AFFO, cents per share. Only FY2023-FY2025 are clean full calendar years on a consistent basis.</div>
+        <div class="chart-wrapper"><canvas id="affoChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>AFFO Payout Ratio</h3>
+            <div class="chart-header-actions"><button class="help-btn" onclick="openModal('payout')">?</button></div>
+        </div>
+        <div class="chart-wrapper"><canvas id="payoutChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>NAV per Share</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('navChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('nav')">?</button>
+            </div>
+        </div>
+        <div class="chart-footnote">NAV/share has been essentially flat FY2023-FY2025 ($1.602 &rarr; $1.617 &rarr; $1.609) despite portfolio growth &mdash; per-share value is diluted by new equity issuance and performance-fee shares.</div>
+        <div class="chart-wrapper"><canvas id="navChart"></canvas></div>
+    </div>
+</div>
+
+<h2 class="section-title">Balance Sheet, Leverage &amp; Share Count</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Total Assets vs Total Debt</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('assetsChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('assets')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="assetsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Gearing (Debt / Total Tangible Assets)</h3>
+            <div class="chart-header-actions"><button class="help-btn" onclick="openModal('gearing')">?</button></div>
+        </div>
+        <div class="chart-wrapper"><canvas id="gearingChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shares Outstanding</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('sharesChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('shares')">?</button>
+            </div>
+        </div>
+        <div class="chart-footnote">Grew from 60.6m at IPO to 146.1m at FY2025 via capital raises and the DRP &mdash; this is why per-share metrics, not absolute ones, are the right lens on NZL.</div>
+        <div class="chart-wrapper"><canvas id="sharesChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Rent Mix by Land Use (FY2025)</h3>
+            <div class="chart-header-actions"><button class="help-btn" onclick="openModal('rentmix')">?</button></div>
+        </div>
+        <div class="chart-wrapper"><canvas id="rentMixChart"></canvas></div>
+    </div>
+</div>
+
+<h2 class="section-title">Reported Earnings (Context Only &mdash; Not Performance Metrics)</h2>
+<div class="charts-container">
+    <div class="chart-card full-width">
+        <div class="chart-header">
+            <h3>Reported Net Income vs Rental Income</h3>
+            <div class="chart-header-actions"><button class="help-btn" onclick="openModal('netincome')">?</button></div>
+        </div>
+        <div class="chart-footnote"><strong style="color:#fdcb6e;">Caution:</strong> Reported NetIncome is dominated by unrealised IAS 40 fair-value land revaluations (e.g. FY2022 $39.7m, FY2024 $24.9m vs rental income of just $8.2m/$19.9m). This is NOT operating performance &mdash; use AFFO instead. Net margin is deliberately omitted from this dashboard as it exceeds 100% in some years and is meaningless for a net-lease land trust.</div>
+        <div class="chart-wrapper"><canvas id="netIncomeChart"></canvas></div>
+    </div>
+</div>
+
+<h2 class="section-title">DCF Valuation</h2>
+<div class="dcf-section">
+  <div class="dcf-banner">
+    <strong>Model approach:</strong> a naive NAV-based model (NAV/share $1.6094 with no discount) would print an intrinsic value of $1.61 and +72% upside &mdash; but NZL has <strong>never traded above 0.74x book</strong> in its 5.5-year listed history (P/B range 0.557&ndash;0.740, mean 0.63; see the historical table above). Every exit price-to-book multiple in this model was therefore hard-constrained to that observed band rather than assuming discount closure. This is <strong>not</strong> a standard owner-FCF DCF: it discounts NZL's attributable AFFO/dividend stream at a cost of equity (AFFO is already post-interest, so there is no WACC and no net-debt bridge), with terminal value = exit P/B &times; projected NAV per share. The conclusion: NZL is an <strong>income-and-modest-growth vehicle trading near fair value at a structurally persistent discount</strong>, not a discount-closure multi-bagger.
+  </div>
+
+  <div class="dcf-summary">
+    <div class="dcf-card highlight">
+      <div class="dcf-label">Prob-Weighted IV</div>
+      <div class="dcf-value" id="dcfWeighted">$0.89</div>
+      <div class="dcf-change" id="dcfWeightedUpside"></div>
+      <div class="dcf-sublabel" id="dcfWeightedSublabel"></div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Intrinsic Value (Base)</div>
+      <div class="dcf-value" id="dcfIV">$0.90</div>
+      <div class="dcf-change" id="dcfUpside"></div>
+      <div class="dcf-sublabel">Attributable AFFO capitalized at cost of equity; exit = 0.63x NAV</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Entry Price (15% hurdle)</div>
+      <div class="dcf-value" id="dcfEntry">$0.72</div>
+      <div class="dcf-sublabel">Buy below for a 15% annual return (incl. interim dividends)</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Current Price</div>
+      <div class="dcf-value" id="dcfCurrent">$0.94</div>
+    </div>
+  </div>
+
+  <div class="dcf-warning" id="growthWarning">
+    <span class="warning-icon">&#9888;</span>
+    <span id="warningText">Rental income FY2023&rarr;FY2025 CAGR 20.5% vs NAV/share CAGR 0.2% and AFFO/share +9.9%: portfolio growth was acquisition-funded with new equity and debt, so per-share accrual is far below headline portfolio growth. This model uses per-share AFFO growth only.</span>
+  </div>
+
+  <div class="dcf-inputs">
+    <h4>Model Inputs</h4>
+    <div class="dcf-inputs-grid">
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Attributable AFFO (FY25)</div>
+        <div class="dcf-input-value" id="baseFCF">$7.93M</div>
+        <div class="dcf-input-note" id="sbcBreakdown">5.43 cps; consolidated AFFO $11.01M less Roc Partners' ~25% LP share $3.08M</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Shares Outstanding</div>
+        <div class="dcf-input-value" id="sharesOut">146.14M</div>
+        <div class="dcf-input-note" id="dilutionNote">Held flat &mdash; buyback authorised but dormant; performance-fee shares captured inside NAV growth assumption</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">NAV per Share (FY25)</div>
+        <div class="dcf-input-value" id="netDebt">$1.6094</div>
+        <div class="dcf-input-note">Already nets the $79.6M Roc Partners LP-unit liability</div>
+      </div>
+    </div>
+    <div class="fcf-projections">
+      <h5>Projected AFFO per Share (5-Year, cents)</h5>
+      <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+    </div>
+  </div>
+
+  <div class="dcf-controls">
+    <div class="slider-group">
+      <label>AFFO/Share Growth (Y1 rate): <span id="growthValue">4.5%</span></label>
+      <input type="range" id="growthSlider" min="0" max="8" value="4.5" step="0.1" oninput="updateDCFDisplay()">
+      <div class="slider-hint" id="growthHint">Based on forward AFFO/share path (CPI-linked reviews fading toward long-run CPI)</div>
+    </div>
+    <div class="slider-group">
+      <label>Cost of Equity: <span id="waccValue">9.25%</span></label>
+      <input type="range" id="waccSlider" min="8" max="11" value="9.25" step="0.05" oninput="updateDCFDisplay()">
+      <div class="slider-hint">NZ 10yr risk-free + rural-land equity premium + small-cap illiquidity + tenant-credit + refi-tenor premia</div>
+    </div>
+    <div class="slider-group">
+      <label>Exit P/B: <span id="terminalValue">0.63</span></label>
+      <input type="range" id="terminalSlider" min="0.50" max="0.78" value="0.63" step="0.01" oninput="updateDCFDisplay()">
+      <div class="slider-hint">Constrained to the observed 0.557&ndash;0.740 listed-history band</div>
+    </div>
+  </div>
+
+  <div class="scenario-tabs">
+    <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+    <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+    <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+  </div>
+
+  <div class="scenario-details" id="scenarioDetails">
+    <div class="scenario-assumptions">
+      <h4>Assumptions</h4>
+      <div class="assumption-grid" id="assumptionGrid"></div>
+    </div>
+  </div>
+
+  <div class="sensitivity-section">
+    <h4>Sensitivity Analysis: Intrinsic Value by Cost of Equity &amp; Exit P/B</h4>
+    <table class="sensitivity-table" id="sensitivityMatrix"></table>
+  </div>
+
+  <div class="historical-growth">
+    <h4>Historical Growth Rates</h4>
+    <div class="growth-grid" id="growthGrid"></div>
+  </div>
+
+  <div class="dcf-download">
+    <a href="NZL.NZ_DCF_Model.xlsx" class="download-btn" download>
+      <span class="download-icon">&#8681;</span> Download Excel Model
+    </a>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ======================= EMBEDDED DATA =======================
+const csvData = `Period,Revenue,CostOfRevenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,EBITDA,NetIncome,NetMargin,EPS,OperatingCashFlow,CapEx,FreeCashFlow,ShareholdersEquity,TotalAssets,TotalLiabilities,TotalDebt,CashAndEquivalents,SharesOutstanding,StockBasedComp,DividendPerShare,EBITDABeforeSignificant,RevenueContinuing,EBITDAContinuingBeforeSignificant,EBITContinuingBeforeSignificant,Units,Currency
+FY2022-6moStub,5.681,,,,4.206,,,5.265,92.7,4.59,2.524,-0.121,2.403,190.939,298.82,107.881,106.968,1.942,115602000.0,0.495,,,,,,millions,NZD
+FY2021,0.498,,,,-1.82,,,15.115,,37.49,-0.826,-120.685,-121.511,110.254,164.937,54.683,54.254,20.496,78931000.0,1.625,,,,,,millions,NZD
+H1 2022,3.766,,,,2.952,,,3.168,84.1,3.55,2.857,,,131.75,221.374,89.624,88.5,2.427,96900000.0,0.0,,,,,,millions,NZD
+FY2022,8.215,,,,2.629,,,39.68,,42.43,4.169,-90.673,-86.504,186.595,289.015,102.42,100.768,1.004,112649000.0,4.115,,,,,,millions,NZD
+FY2023,15.35,,,,12.492,,,10.854,70.7,8.06,5.989,-65.441,-59.452,223.092,369.831,146.739,145.48,1.258,139295000.0,0.901,1.7,,,,,millions,NZD
+H1 2024,9.099,,,,7.49,,,12.384,136.1,9.18,4.869,-33.077,-28.208,216.892,423.494,206.602,128.788,6.135,139796000.0,0.0,,,,,,millions,NZD
+FY2024,19.869,,,,15.965,,,24.88,125.2,17.75,9.018,-38.723,-29.705,231.102,444.543,213.441,131.207,5.52,142954000.0,0.829,4.0,,,,,millions,NZD
+H1 2025,10.931,,,,8.932,,,3.478,31.8,2.42,4.214,-5.606,-1.392,230.456,445.213,214.757,133.451,3.671,145025000.0,0.0,2.16,,,,,millions,NZD
+FY2025,22.276,,,,17.449,,,7.856,35.3,5.43,9.515,-6.732,2.783,235.198,452.085,216.887,132.717,5.918,146138526.0,0.583,4.91,,,,,millions,NZD`;
+
+const analysis = {
+  "ticker": "NZL.NZ",
+  "company_name": "New Zealand Rural Land Company Limited",
+  "sector": "Rural Land / Agricultural REIT",
+  "analysis_date": "2026-08-23",
+  "overview": "New Zealand Rural Land Company (NZX: NZL) is an externally managed listed land trust that owns New Zealand rural land -- predominantly dairy farmland, plus forestry/carbon and horticulture -- and leases it back to farming and forestry operators on long, triple-net, CPI-linked leases. NZL is structurally a landlord rather than an agricultural producer: it collects rent, not farm profit, and is insulated from on-farm operating costs, but it is exposed to tenant credit risk and land valuation cycles. As at 31 December 2025 it owned 17,077 hectares (25% economically owned by co-investor Roc Partners) across nine tenants, with total assets of $452.1m and NAV per share of $1.6094, against a market price of roughly $0.92-0.94 -- a persistent ~40-43% discount to NAV that is the central question for the stock.",
+  "business_model": {
+    "summary": "NZL buys productive NZ rural land and leases it to operating farmers/foresters/horticulturalists under long-dated triple-net leases with regular, uncapped CPI rent reviews (3-yearly for dairy, annual for forestry/horticulture). Revenue is contractual rental income, not farm profit share, so it behaves like a REIT: predictable, inflation-linked cash flow, funded partly with bank debt, distributed to shareholders as dividends targeting 90-100% of AFFO. The manager (external, related-party) sources acquisitions and administers leases; NZL itself has no employees.",
+    "revenue_streams": [
+      {"name": "Dairy and support land rent", "percent": 51, "trend": "stable"},
+      {"name": "Forestry/carbon land rent", "percent": 31, "trend": "growing"},
+      {"name": "Horticulture land rent", "percent": 8, "trend": "at"},
+      {"name": "Support/other rent", "percent": 10, "trend": "stable"}
+    ],
+    "customer_type": "B2B -- nine institutional/commercial farming, forestry and horticulture tenants on triple-net leases (10-30 year terms, rights of renewal); 100% occupancy at FY25 year-end, WALT 11.6 years",
+    "geographic_mix": "All New Zealand: Canterbury and Southland/Otago dairy, Central North Island forestry, Hawke's Bay and Central Otago horticulture"
+  },
+  "competitive_position": {
+    "main_competitors": [
+      "PGG Wrightson Real Estate / private farm ownership (dominant model)",
+      "Pamu / Landcorp (state-owned farmer)",
+      "Direct competition from farmer-owners, iwi/Maori land trusts, and family partnerships",
+      "Overseas/institutional pension and super funds (subject to OIO restrictions)",
+      "Allied Farmers Limited (NZX: ALF) -- owns the manager"
+    ],
+    "market_position": "Self-described as the only pure-play listed vehicle offering direct exposure to New Zealand rural land; a small-cap niche REIT with no direct like-for-like listed NZ peer.",
+    "moat_factors": [
+      {"factor": "Scarcity of productive NZ farmland", "strength": "moderate", "description": "Land is a finite, appreciating asset in a country marketed globally for low-cost, low-emission dairy/protein production."},
+      {"factor": "Long CPI-linked triple-net leases", "strength": "moderate", "description": "11.6-year WALT with uncapped CPI rent reviews provides inflation-protected cash flow."},
+      {"factor": "First-mover listed structure", "strength": "weak-to-moderate", "description": "Being the only NZX-listed pure-play rural land vehicle is a niche advantage, but has not translated into a valuation premium."},
+      {"factor": "OIO barrier to foreign buyers", "strength": "moderate (double-edged)", "description": "OIO rules narrow the competing buyer pool (helps NZL acquire) but also narrow NZL's own exit buyer pool and secondary liquidity, likely contributing to the NAV discount."}
+    ],
+    "weaknesses": [
+      "No genuine network effects or switching costs",
+      "External management with base fee + acquisition/transaction fee + performance fee creates fee leakage and misaligned incentives typical of vehicles that trade at a discount to NAV",
+      "Small scale ($452m total assets) limits trading liquidity and index inclusion, perpetuating the NAV discount",
+      "Tenant concentration risk realised in 2026 (Kiwi Crunch collapse)",
+      "No genuine pricing power over tenants beyond CPI mechanisms"
+    ]
+  },
+  "growth_drivers": [
+    "CPI-linked rent reviews: 61.0% of NZL's leases (by value) reviewed in FY26, incl. 100% of forestry/horticulture and 7% of pastoral (accumulated CPI ~9.5% pastoral, ~2.5% forestry/horticulture)",
+    "Disciplined, yield-accretive acquisitions funded by asset recycling -- FY25 sold two pastoral farms above valuation to fund a higher-yielding Canterbury dairy farm acquisition",
+    "New 'YieldPlusGrowth' capital framework post Feb-2026 KPMG review: equity raised only if AFFO/share accretive, buybacks assessed on a yield basis",
+    "Portfolio diversification beyond dairy into forestry/carbon (31%) and horticulture (8%)",
+    "Co-investment with Roc Partners (25% equity partner since Jan-2024) funds acquisitions without NZL bearing 100% of capital",
+    "Strong dairy sector fundamentals (record Fonterra payouts in FY25, declining farmer debt-to-asset ratios)",
+    "Structural NZ ETS/carbon supply shortfall could support forestry/carbon land values"
+  ],
+  "risks": {
+    "business": [
+      {"risk": "Tenant default/insolvency", "severity": "high", "description": "Kiwi Crunch Farms (Hawke's Bay orchards, ~5.8% of NZRLI LP rent) entered receivership July 2026, ~$300k rent arrears, FY26 guidance suspended. A further ~7.3% of rent sits with related Wade Glass/Consolidated Fruits-linked entities. This is the single largest live risk to the stock."},
+      {"risk": "External management conflicts of interest", "severity": "high", "description": "Manager wholly owned by NZX-listed Allied Farmers. Externally managed vehicles structurally trade at NAV discounts; NZSA's 2026 AGM assessment questioned whether shareholders would be better served by liquidation given the 43% NAV discount."},
+      {"risk": "Small scale and thin liquidity", "severity": "moderate", "description": "~$135-140m market cap on a small exchange; thin trading likely perpetuates the NAV discount."},
+      {"risk": "Land/tenant concentration by sector and geography", "severity": "moderate", "description": "Nine tenants across a handful of regions; dairy alone is 51% of lease income."}
+    ],
+    "financial": [
+      {"risk": "Leverage and refinancing", "severity": "moderate", "description": "Gearing 29.4% at FY25, weighted avg cost of debt 5.3% (96% hedged), weighted avg term to expiry only 1.4-1.5 years -- recurring refinancing/rate-reset risk."},
+      {"risk": "Performance/transaction fee structure dilutes shareholders", "severity": "moderate", "description": "0.50% NAV base fee + 1.25% transaction fee + $30k/lease + 10%-of-NAV-growth performance fee; FY25 fees ~$1.93m against $7.9m NPAT."},
+      {"risk": "Redeemable Limited Partnership Units (Roc Partners)", "severity": "moderate", "description": "$79.6m non-current liability with its own fair-value movements flowing through P&L, adding volatility to reported NPAT distinct from AFFO."}
+    ],
+    "regulatory": [
+      {"risk": "OIO restrictions on farmland ownership/exit", "severity": "moderate", "description": "2025 Amendment Act kept farmland under the existing rigorous OIO screening, keeping the buyer pool narrow and constraining exit liquidity."},
+      {"risk": "Nitrogen/nutrient and water regulation on dairy land", "severity": "moderate", "description": "NZ freshwater/nutrient rules affect tenant profitability and rent-setting."},
+      {"risk": "ETS/carbon policy uncertainty", "severity": "moderate", "description": "Nov-2025 removal of NDC alignment requirement unsettled carbon market confidence; ~$109m of NZL's book is forestry land."},
+      {"risk": "Climate reporting mandate uncertain but voluntarily continuing", "severity": "low", "description": "Proposed legislation may remove mandatory climate-reporting status; NZL will keep reporting voluntarily."}
+    ],
+    "macro": [
+      {"risk": "Interest rate sensitivity", "severity": "moderate", "description": "Weighted average debt term only ~1.4-1.5 years; AFFO and dividend capacity sensitive to NZ rate moves at each refinancing/hedge-roll date."},
+      {"risk": "Dairy commodity cycle", "severity": "moderate", "description": "Fonterra's 2026/27 forecast cut from $9.75 to $9.25/kgMS; dairy is 51% of NZL's rent roll."},
+      {"risk": "NZ farmland valuation cycle / appraisal risk", "severity": "moderate", "description": "NAV driven by independent land valuations, inherently less liquid and more judgement-based than listed securities."},
+      {"risk": "Extreme weather / climate physical risk", "severity": "low-moderate", "description": "NZL's own climate scenario analysis flags increased water stress and extreme weather risk."}
+    ]
+  },
+  "macro_factors": {
+    "industry_outlook": "NZ agricultural land values forecast to keep rising on constrained supply and improving farmer balance sheets; NZ dairy posted a 15-year-high payout in FY25 though FY26/27 forecasts have softened.",
+    "cyclicality": "Moderate. Rental income is contractual and CPI-linked (low near-term cyclicality), but land values, tenant covenant strength and acquisition growth are tied to the agricultural commodity cycle and NZ interest rates.",
+    "interest_rate_sensitivity": "Moderate-high given ~29-30% gearing, short (~1.4-1.5 year) average debt maturity, and a REIT-like 90-100% AFFO distribution policy.",
+    "key_input_costs": ["Cost of bank debt (5.3% weighted average, 96% hedged)", "Land acquisition prices", "External management/performance fees"]
+  },
+  "recent_developments": [
+    {"date": "2026-07", "event": "Kiwi Crunch Farms (Hawke's Bay orchard leases, ~5.8% of NZRLI LP rental income) entered voluntary administration then receivership, leaving ~$300k rent arrears. NZL suspended FY26 earnings guidance, is seeking new tenants, notes early third-party interest."},
+    {"date": "2026-07/08", "event": "NZL settled purchase of the remaining SI Orchards property in Roxburgh East from a Wade Glass-linked entity, even as other Glass-group entities (Kiwi Crunch, Consolidated Fruits) were in financial distress -- underscoring related-party/tenant-concentration risk."},
+    {"date": "2026-02", "event": "FY2025 result: NPAT $7.9m, AFFO $7.9m (5.43 cps, +9.9% YoY); NAV/share $1.6094 (+28.8% since IPO); gearing 29.4% (96% hedged); WALT fell to 11.6 years from 12.5; FY26 AFFO guidance $8.25m-$8.75m (later suspended)."},
+    {"date": "2026-02", "event": "Board adopted revised dividend policy post KPMG capital review: quarterly distributions targeting 90-100% of AFFO, dynamic DRP, new 'YieldPlusGrowth' capital management framework."},
+    {"date": "2026-02", "event": "Final FY25 dividend 2.75 cps (100% of H2 AFFO), full-year FY25 dividends 4.91 cps (90.5% of FY25 AFFO), payable April 2026."},
+    {"date": "2025-05", "event": "Renewed a $46m banking facility tranche out to June 2028; two further tranches expected to renew in H1 FY26."},
+    {"date": "2025 (H1)", "event": "Settled 305-hectare Canterbury dairy farm acquisition for $15.5m (5.9% year-1 lease rate), funded partly by selling two pastoral farms above book value."},
+    {"date": "2025", "event": "Share buyback programme remained authorised but inactive -- zero shares repurchased in FY25 despite the widest discount to NAV."}
+  ],
+  "guidance": {
+    "as_of": "FY2025 Annual Result / Presentation (27 February 2026); guidance subsequently suspended July 2026",
+    "fiscal_year": "FY2026",
+    "items": [
+      {"metric": "AFFO", "target": "$8.25m - $8.75m (5.65 - 5.99 cps on 146,138,526 shares), midpoint +7.1% vs FY25", "period": "FY2026", "vs_prior": "suspended", "notes": "Issued at FY25 result (Feb 2026); formally suspended by the Board in July 2026 following the Kiwi Crunch Farms tenant collapse."},
+      {"metric": "Full-year dividend", "target": "5.36 - 5.69 cps (~95% of forecast AFFO)", "period": "FY2026", "vs_prior": "suspended", "notes": "Framed under the new 90-100% of AFFO quarterly distribution policy; likely revisited once the Kiwi Crunch impact is known."},
+      {"metric": "CPI-linked rent reviews", "target": "61.0% of leases (by value) subject to CPI review in FY26; ~9.5% accumulated CPI on pastoral leases, ~2.5% on forestry/horticulture", "period": "FY2026", "vs_prior": "new", "notes": "Not directly affected by Kiwi Crunch; supports underlying rental growth independent of the tenant issue."},
+      {"metric": "Capital management framework", "target": "Equity raised only if AFFO/share accretive; buybacks/growth assessed on a yield basis", "period": "Ongoing/medium-term", "vs_prior": "new", "notes": "Qualitative policy commitment; practical test is whether the Board deploys the buyback given the ~40%+ NAV discount."}
+    ],
+    "management_commentary": "Chair Rob Campbell: FY25 'delivered sustainable growth in value and dividends for shareholders and effective risk management.' The KPMG capital review found NZL is 'primarily valued by investors on the sustainability and reliability of its cash yield, with asset values and NTA viewed as secondary considerations' -- an implicit acknowledgement that the NAV discount is unlikely to close on carrying-value grounds alone. Post period-end, management's tone on Kiwi Crunch has emphasised early third-party re-leasing interest, but no revised guidance had been issued as of the FY25 report."
+  },
+  "bull_case": [
+    "Contracted, CPI-linked, triple-net rental income with 100% occupancy pre-Kiwi Crunch and an 11.6-year WALT gives visible, inflation-protected cash flow largely insulated from on-farm operating costs and commodity swings",
+    "Trading at a ~40-43% discount to $1.6094 NAV per share gives a wide margin of safety if even partial NAV validation occurs -- via buybacks, capital-recycling asset sales at/above book, or a takeout",
+    "AFFO and dividends have grown every year since listing (AFFO/share +77.5% since FY22), and the new 90-100%-of-AFFO quarterly policy, if delivered, gives a high-visibility income stream (~5.3% yield pre-Kiwi Crunch)",
+    "Post-KPMG review, management has reframed strategy around per-share AFFO accretion and a yield-based capital allocation test -- the correct playbook for closing a NAV discount if actually executed",
+    "Structural tailwinds: NZ farmland scarcity, OIO restrictions narrowing competing buyers, record dairy payout cycle improving tenant covenant strength, tight NZU/carbon supply outlook"
+  ],
+  "bear_case": [
+    "Kiwi Crunch Farms collapse (July 2026) is a live, unresolved credit event -- ~5.8% of rent gone immediately, guidance suspended, and a further ~7.3% sitting with related Wade Glass-linked entities cascading into liquidation -- directly undermining the 'triple-net leases eliminate risk' thesis",
+    "External management fee structure (~$1.93m combined fees in FY25 against $7.9m NPAT) is a classic driver of persistent NAV discounts -- and the discount has not narrowed despite years of NAV growth",
+    "Small scale and thin NZX liquidity likely perpetuate the discount structurally; the buyback has been almost entirely dormant (zero shares bought in FY25) despite the discount being at its widest",
+    "OIO rules that keep foreign capital out of NZ farmland also cap the pool of buyers for NZL's own properties and for the company as a whole, limiting a takeout/privatisation catalyst",
+    "Leveraged land owner (29.4% gearing, only ~1.4-1.5 years weighted average debt term) exposed to refinancing/rate-reset risk, while dairy payout forecasts have already been cut, a leading indicator of potential tenant covenant softening"
+  ]
+};
+
+const dcfData = {
+  "ticker": "NZL.NZ",
+  "valuation_date": "2026-08-23",
+  "current_price": 0.935,
+  "model": "AFFO-holding-period at cost of equity (REIT/property-trust row): 5-year attributable AFFO/dividend stream discounted at CoE, terminal value = exit P/B x projected NAV/share constrained to the observed 0.56-0.74 listed-history P/B band; cross-checked by direct Gordon capitalization of normalized attributable AFFO at CoE and by NAV-with-exit-discount. NOT an owner-FCF DCF.",
+  "inputs": {
+    "shares_outstanding": 146.138526,
+    "last_fcf": 7.932,
+    "affo_per_share_cps": 5.43,
+    "consolidated_affo": 11.014,
+    "nav_per_share": 1.6094,
+    "net_assets": 235.198,
+    "gearing_pct": 29.4,
+    "weighted_cost_of_debt_pct": 5.3,
+    "debt_hedged_pct": 96.0,
+    "debt_term_years": 1.45,
+    "walt_years": 11.6,
+    "currency": "NZD",
+    "redeemable_lp_units": 79.563
+  },
+  "historical_growth": {
+    "selected_growth_rate": 4.0,
+    "growth_rate_source": "forward_affo_per_share_base_path",
+    "growth_divergence_warning": "Rental income FY2023->FY2025 CAGR 20.5% vs NAV/share CAGR 0.2% and AFFO/share +9.9% -- portfolio growth was acquisition-funded with new equity (115.6m -> 146.1m shares) and debt, so PER-SHARE accrual is far below portfolio growth. Model uses per-share growth only.",
+    "affo_per_share_1yr_growth": 9.9,
+    "affo_per_share_3yr_cagr": 21.1,
+    "nav_per_share_2yr_cagr": 0.2,
+    "revenue_2yr_cagr": 20.5
+  },
+  "assumptions": {
+    "base": {
+      "affo_y1_cps": 5.5,
+      "affo_growth_rates": [4.5, 4.0, 3.5, 3.0],
+      "payout_ratio": 0.95,
+      "nav_per_share_growth": 1.0,
+      "exit_pb": 0.63,
+      "cost_of_equity": 9.25,
+      "rationale": "Y1 = withdrawn FY26 guidance midpoint 5.82 cps less ~0.32 cps Kiwi Crunch drag. Growth = CPI-linked reviews fading to CPI. NAV growth 1.0%/yr: modest net revaluations after 90-100% AFFO payout, performance-fee dilution and DRP drag. Exit P/B 0.63 = 5.5-year listed-history mean; discount treated as STRUCTURAL."
+    },
+    "bull": {
+      "affo_y1_cps": 5.82,
+      "affo_growth_rates": [5.5, 5.0, 4.5, 4.0],
+      "payout_ratio": 0.95,
+      "nav_per_share_growth": 2.5,
+      "exit_pb": 0.74,
+      "cost_of_equity": 8.75,
+      "rationale": "Hawke's Bay orchards re-let quickly at comparable rent, withdrawn FY26 guidance midpoint achieved; strong dairy payouts lift land values. Exit P/B 0.74 = historical MAXIMUM, justified only by a stated catalyst (buyback execution, manager internalisation, takeover). Discount closure to 1.0x NOT assumed even in bull."
+    },
+    "bear": {
+      "affo_y1_cps": 4.6,
+      "affo_growth_rates": [2.0, 3.0, 3.0, 2.5],
+      "payout_ratio": 0.9,
+      "nav_per_share_growth": -1.5,
+      "exit_pb": 0.52,
+      "cost_of_equity": 10.5,
+      "rationale": "Credit contagion: full-year loss of Kiwi Crunch 5.8% rent, half-loss of related Wade Glass-linked 7.3%, arrears written off -> Y1 4.60 cps. Dairy payout cut softens tenant covenants; land values fall; refinancing at higher spreads. Exit P/B 0.52, below the 0.557 FY-end minimum, for a credit-impaired story."
+    }
+  },
+  "cost_of_equity_build": {
+    "wacc_rationale": "Cost of EQUITY (not WACC): AFFO is post-interest so debt is priced inside the flow. Base 9.25% = NZ 10yr risk-free 4.40% + rural-land asset-class equity premium 3.10% + NZX small-cap illiquidity premium 1.00% + tenant-concentration/credit premium 0.50% + short-debt-tenor refinancing premium 0.25%. Market-implied CoE cross-check: trailing attributable AFFO yield 5.81% at $0.935 + ~3% per-share growth ~ 8.8-9.0%, so base CoE sits deliberately ABOVE market-implied. Bull 8.75% (credit premium largely released on re-letting); bear 10.50% (credit premium 1.50%, refi 0.75%)."
+  },
+  "valuation": {
+    "base": { "intrinsic_value": 0.902, "upside": -3.5, "exit_pb": 0.63, "exit_nav_per_share": 1.6915, "implied_pb_at_iv": 0.56, "implied_trailing_affo_yield_pct": 6.02 },
+    "bull": { "intrinsic_value": 1.123, "upside": 20.1, "exit_pb": 0.74, "exit_nav_per_share": 1.8209, "implied_pb_at_iv": 0.698, "implied_trailing_affo_yield_pct": 4.84 },
+    "bear": { "intrinsic_value": 0.633, "upside": -32.3, "exit_pb": 0.52, "exit_nav_per_share": 1.4923, "implied_pb_at_iv": 0.393, "implied_trailing_affo_yield_pct": 8.58 }
+  },
+  "entry_price": {
+    "hurdle_rate": 0.15,
+    "hurdle_note": "House 15% hurdle -- demanding for an income vehicle; entry prices are correspondingly deep.",
+    "base": { "entry_price": 0.718, "entry_discount_from_current": -23.2 },
+    "bull": { "entry_price": 0.872 },
+    "bear": { "entry_price": 0.531 },
+    "weighted_entry_price": 0.71
+  },
+  "sensitivity": {
+    "axes": "rows = cost of equity (%), cols = exit P/B (base-case cash flows and NAV path)",
+    "coe_range": [8.25, 8.75, 9.25, 9.75, 10.25],
+    "exit_pb_range": [0.52, 0.557, 0.63, 0.7, 0.74],
+    "matrix": [
+      [0.815, 0.857, 0.94, 1.02, 1.065],
+      [0.798, 0.84, 0.921, 0.999, 1.043],
+      [0.782, 0.823, 0.902, 0.978, 1.022],
+      [0.767, 0.806, 0.884, 0.958, 1.001],
+      [0.752, 0.79, 0.866, 0.939, 0.98]
+    ]
+  },
+  "probability_weighted": {
+    "weights": { "bear": 0.25, "base": 0.5, "bull": 0.25 },
+    "weights_rationale": "Bear elevated to 25% (vs house 15%): a LIVE tenant credit event. Bull trimmed to 25%: discount-closure catalysts are plausible but management's buyback has been dormant through the widest discount, and OIO rules shrink the takeout buyer pool.",
+    "weighted_iv": 0.89
+  },
+  "affo_capitalization_cross_check": {
+    "method": "Direct Gordon capitalization of normalized attributable AFFO at CoE",
+    "base": { "affo_y1_cps": 5.5, "coe": 9.25, "long_run_growth": 2.75, "value": 0.846 },
+    "range": [0.81, 0.88],
+    "nav_exit_discount_cross_check": { "nav": 1.6094, "pb_band": [0.557, 0.74], "value_range": [0.9, 1.19], "note": "NAV x historical-mean 0.63 = $1.01" },
+    "reconciles": "AFFO capitalization ($0.81-0.88) and holding-period model ($0.90) agree within ~7%; the NAV-band cross-check brackets both. The gap to the naive NAV of $1.61 is the structural discount, deliberately NOT assumed to close."
+  },
+  "sanity_check": {
+    "pb_table": [
+      { "fy": "FY2021(Jun)", "price": 1.034, "nav": 1.397, "pb": 0.74, "stub": false },
+      { "fy": "FY2022(Jun)", "price": 1.006, "nav": 1.656, "pb": 0.607, "stub": false },
+      { "fy": "FY2022-6moStub", "price": 1.055, "nav": 1.652, "pb": 0.639, "stub": true },
+      { "fy": "FY2023", "price": 0.94, "nav": 1.602, "pb": 0.587, "stub": false },
+      { "fy": "FY2024", "price": 0.9, "nav": 1.617, "pb": 0.557, "stub": false },
+      { "fy": "FY2025", "price": 1.04, "nav": 1.609, "pb": 0.646, "stub": false }
+    ],
+    "pb_avg": 0.63,
+    "pb_min": 0.557,
+    "pb_max": 0.74,
+    "diagnosis": "No trip. Base IV $0.902 implies 0.561x P/B -- inside the observed 0.557-0.740 5.5-year band. NZL has NEVER traded above 0.74x book since its Dec-2020 IPO; the discount-closure error (which would print IV $1.61 / +72%) was designed out ex ante by constraining every exit P/B to the observed band."
+  },
+  "valuation_philosophy": "NZL's 42% discount to NAV is treated as STRUCTURAL, not a mispricing to be harvested. Evidence: (1) the stock has never closed a fiscal year above 0.74x book in 5.5 listed years, including at IPO; (2) the Feb-2026 KPMG capital review found investors price NZL on cash yield with NAV 'a secondary consideration'; (3) external management fees (~$1.93m total FY25 vs $7.9m NPAT) are the classic driver of persistent NAV discounts; (4) OIO farmland screening shrinks both the asset exit-buyer pool and the corporate takeout pool; (5) the buyback stayed at zero through FY25 despite the widest discount. Therefore the valuation capitalizes the ATTRIBUTABLE cash yield at cost of equity and exits at an in-band P/B: NZL is an income-plus-modest-growth vehicle priced off a ~6% AFFO yield, not an asset play at $1.61."
+};
+
+// Hard-coded KPI series (from duckdb kpis table / Analysis / DCF JSON -- not present in the core CSV)
+const kpiSeries = {
+  years: ["FY2023", "FY2024", "FY2025"],
+  rentalIncome: [15.350, 19.869, 22.276],
+  affoAttributable: [null, 7.06, 7.932], // FY2024 approx from 4.94cps x ~142.95m shares
+  affoPerShareCps: [null, 4.94, 5.43],
+  dividendPerShareCps: [1.70, 4.00, 4.91],
+  navPerShareDollars: [1.602, 1.617, 1.609],
+  payoutRatioPct: [null, 81.0, 90.5],
+  gearingPct: [null, null, 29.4],
+  totalAssets: [369.831, 444.543, 452.085],
+  totalDebt: [145.480, 131.207, 132.717],
+  sharesOutMillions: [139.295, 142.954, 146.139]
+};
+
+// ======================= PARSE CSV =======================
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => obj[h.trim()] = values[i]?.trim());
+        return obj;
+    });
+}
+const data = parseCSV(csvData);
+
+function parseDate(p) {
+    const year = parseInt(p.match(/\d{4}/)?.[0] || '0');
+    const isStub = p.includes('6moStub');
+    const isH1 = p.includes('H1');
+    const isFY = p.startsWith('FY');
+    const subOrder = isH1 ? 1 : isStub ? 8 : isFY ? 9 : 0;
+    return year * 10 + subOrder;
+}
+data.sort((a, b) => parseDate(a.Period) - parseDate(b.Period));
+
+const fyData = data.filter(d => d.Period.startsWith('FY'));
+const fyLabels = fyData.map(d => d.Period.replace('FY2022-6moStub', 'FY2022*Stub').replace('FY2021', 'FY2021*'));
+
+// ======================= HELPERS =======================
+const colors = { primary: '#00d4aa', secondary: '#00b894', tertiary: '#0984e3', quaternary: '#6c5ce7', warning: '#fdcb6e', danger: '#ff6b6b' };
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } } },
+    scales: {
+        x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+function freshScales() {
+    return { x: { ...chartDefaults.scales.x }, y: { ...chartDefaults.scales.y } };
+}
+const chartRegistry = {};
+function toggleLogScale(canvasId, btn) {
+    const chart = chartRegistry[canvasId];
+    if (!chart) return;
+    const toLog = chart.options.scales.y.type !== 'logarithmic';
+    chart.options.scales.y.type = toLog ? 'logarithmic' : 'linear';
+    btn.classList.toggle('active', toLog);
+    chart.update();
+}
+function fmtM(n) { return '$' + n.toFixed(1) + 'M'; }
+function fmtC(n) { return n.toFixed(2) + 'c'; }
+
+// ======================= OVERVIEW =======================
+function toggleOverview() {
+    const btn = document.querySelector('.overview-toggle');
+    const content = document.getElementById('overviewContent');
+    btn.classList.toggle('active');
+    content.classList.toggle('active');
+}
+function renderOverview() {
+    const grid = document.getElementById('overviewGrid');
+    const trendClass = (t) => {
+        if (!t) return 'trend-stable';
+        if (t.indexOf('grow') === 0) return 'trend-growing';
+        if (t.indexOf('declin') === 0) return 'trend-declining';
+        if (t.indexOf('at') === 0) return 'trend-at';
+        return 'trend-stable';
+    };
+    const sevClass = (s) => s === 'high' ? 'risk-high' : (s === 'moderate' ? 'risk-moderate' : 'risk-low');
+    grid.innerHTML = `
+        <div class="overview-card">
+            <h3>Company Overview</h3>
+            <p>${analysis.overview}</p>
+        </div>
+        <div class="overview-card">
+            <h3>Business Model</h3>
+            <p>${analysis.business_model.summary}</p>
+            <ul>
+                ${analysis.business_model.revenue_streams.map(r => `<li class="revenue-stream"><span>${r.name} <span class="${trendClass(r.trend)}">(${r.trend})</span></span><span class="percent">${r.percent}%</span></li>`).join('')}
+            </ul>
+        </div>
+        <div class="overview-card">
+            <h3>Competitive Position</h3>
+            <p><strong>Competitors:</strong> ${analysis.competitive_position.main_competitors.join('; ')}</p>
+            <p><strong>Moat:</strong></p>
+            <ul>${analysis.competitive_position.moat_factors.map(m => `<li><strong>${m.factor}</strong> (${m.strength}) &mdash; ${m.description}</li>`).join('')}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Growth Drivers</h3>
+            <ul>${analysis.growth_drivers.map(g => `<li>${g}</li>`).join('')}</ul>
+        </div>
+        <div class="overview-card risks">
+            <h3>Key Risks</h3>
+            <ul>
+                ${[...analysis.risks.business, ...analysis.risks.financial, ...analysis.risks.regulatory, ...analysis.risks.macro]
+                  .map(r => `<li><span class="${sevClass(r.severity)}">[${r.severity.toUpperCase()}]</span> <strong>${r.risk}</strong> &mdash; ${r.description}</li>`).join('')}
+            </ul>
+        </div>
+        <div class="overview-card bull">
+            <h3>Bull Case</h3>
+            <ul>${analysis.bull_case.map(b => `<li>${b}</li>`).join('')}</ul>
+        </div>
+        <div class="overview-card bear">
+            <h3>Bear Case</h3>
+            <ul>${analysis.bear_case.map(b => `<li>${b}</li>`).join('')}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Recent Developments</h3>
+            <ul>${analysis.recent_developments.map(d => `<li><strong>${d.date}:</strong> ${d.event}</li>`).join('')}</ul>
+        </div>
+    `;
+}
+
+// ======================= KPI CARDS =======================
+function renderKPIs() {
+    const grid = document.getElementById('kpiGrid');
+    const discountPct = ((1.6094 - 0.935) / 1.6094 * 100).toFixed(1);
+    const cards = [
+        { label: 'NAV per Share (FY25)', value: '$1.6094', change: '+28.8% since IPO', cls: 'positive' },
+        { label: 'Share Price (current)', value: '$0.935', change: null },
+        { label: 'Discount to NAV', value: discountPct + '%', change: 'never closed below 0.557x or above 0.740x P/B', cls: 'negative', discount: true },
+        { label: 'AFFO per Share (FY25)', value: '5.43c', change: '+9.9% YoY', cls: 'positive' },
+        { label: 'Dividend per Share (FY25)', value: '4.91c', change: '90.5% of AFFO', cls: 'positive' },
+        { label: 'Dividend Yield', value: '5.25%', change: 'on $0.935', cls: 'positive' },
+        { label: 'Gearing (FY25)', value: '29.4%', change: '96% hedged, 5.3% wtd cost of debt', cls: null },
+        { label: 'WALT', value: '11.6 yrs', change: 'nine tenants, 100% occupied pre-Kiwi Crunch', cls: null }
+    ];
+    grid.innerHTML = cards.map(c => `
+        <div class="kpi-card ${c.discount ? 'discount' : ''}">
+            <div class="kpi-value">${c.value}</div>
+            <div class="kpi-label">${c.label}</div>
+            ${c.change ? `<div class="kpi-change ${c.cls || ''}">${c.change}</div>` : ''}
+        </div>
+    `).join('');
+}
+
+// ======================= GUIDANCE =======================
+function renderGuidance() {
+    if (!analysis.guidance || !analysis.guidance.items || analysis.guidance.items.length === 0) {
+        document.getElementById('guidanceSection').style.display = 'none';
+        return;
+    }
+    const guidance = analysis.guidance;
+    document.getElementById('guidanceAsOf').textContent = guidance.as_of || '';
+    document.getElementById('guidanceFY').textContent = guidance.fiscal_year || '';
+
+    document.getElementById('guidanceAlert').innerHTML =
+        '<strong>FY26 guidance suspended (July 2026).</strong> Following the Kiwi Crunch Farms receivership, the Board withdrew its FY26 AFFO and dividend guidance pending clarity on re-tenanting or disposal of the affected Hawke\'s Bay orchard properties. Figures below are as issued at the February 2026 FY2025 result, prior to suspension.';
+
+    const grid = document.getElementById('guidanceGrid');
+    grid.innerHTML = guidance.items.map(item => {
+        const vsClass = item.vs_prior ? item.vs_prior.toLowerCase() : 'new';
+        const vsLabel = item.vs_prior ? item.vs_prior.charAt(0).toUpperCase() + item.vs_prior.slice(1) : 'New';
+        return `
+            <div class="guidance-card">
+                <div class="guidance-metric">${item.metric}</div>
+                <div class="guidance-target">${item.target}</div>
+                <div class="guidance-period">${item.period}</div>
+                <span class="guidance-vs-prior ${vsClass}">${vsLabel}</span>
+                ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+
+    const commentary = document.getElementById('guidanceCommentary');
+    if (guidance.management_commentary) {
+        commentary.textContent = guidance.management_commentary;
+        commentary.style.display = 'block';
+    } else {
+        commentary.style.display = 'none';
+    }
+}
+
+// ======================= P/B TABLE + CHART =======================
+function renderPBTable() {
+    const t = dcfData.sanity_check.pb_table;
+    const table = document.getElementById('pbTable');
+    let html = '<tr><th>Fiscal Year</th><th>Price</th><th>NAV/Share</th><th>P/B</th></tr>';
+    t.forEach(r => {
+        html += `<tr><td class="${r.stub ? 'stub' : ''}">${r.fy}${r.stub ? ' *' : ''}</td><td>$${r.price.toFixed(3)}</td><td>$${r.nav.toFixed(3)}</td><td>${r.pb.toFixed(3)}x</td></tr>`;
+    });
+    table.innerHTML = html;
+
+    const ctx = document.getElementById('pbChart').getContext('2d');
+    chartRegistry['pbChart'] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: t.map(r => r.fy),
+            datasets: [
+                { label: 'Share Price', data: t.map(r => r.price), borderColor: colors.tertiary, backgroundColor: 'rgba(9,132,227,0.1)', fill: false, tension: 0.2 },
+                { label: 'NAV per Share', data: t.map(r => r.nav), borderColor: colors.primary, backgroundColor: 'rgba(0,212,170,0.1)', fill: false, tension: 0.2 }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+}
+
+// ======================= CHARTS =======================
+function renderCharts() {
+    // Rental Income (FY only, honest labels)
+    chartRegistry['revenueChart'] = new Chart(document.getElementById('revenueChart').getContext('2d'), {
+        type: 'bar',
+        data: { labels: fyLabels, datasets: [{ label: 'Rental Income ($M)', data: fyData.map(d => parseFloat(d.Revenue)), backgroundColor: colors.primary }] },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+
+    // AFFO vs Dividend per share
+    chartRegistry['affoChart'] = new Chart(document.getElementById('affoChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: kpiSeries.years,
+            datasets: [
+                { label: 'AFFO per Share (cps)', data: kpiSeries.affoPerShareCps, backgroundColor: colors.primary },
+                { label: 'Dividend per Share (cps)', data: kpiSeries.dividendPerShareCps, backgroundColor: colors.tertiary }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+
+    // Payout ratio
+    chartRegistry['payoutChart'] = new Chart(document.getElementById('payoutChart').getContext('2d'), {
+        type: 'line',
+        data: { labels: kpiSeries.years, datasets: [{ label: 'AFFO Payout Ratio (%)', data: kpiSeries.payoutRatioPct, borderColor: colors.warning, backgroundColor: 'rgba(253,203,110,0.15)', fill: true, tension: 0.2, spanGaps: true }] },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+
+    // NAV per share
+    chartRegistry['navChart'] = new Chart(document.getElementById('navChart').getContext('2d'), {
+        type: 'line',
+        data: { labels: kpiSeries.years, datasets: [{ label: 'NAV per Share ($)', data: kpiSeries.navPerShareDollars, borderColor: colors.primary, backgroundColor: 'rgba(0,212,170,0.1)', fill: true, tension: 0.2 }] },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+
+    // Assets vs Debt
+    chartRegistry['assetsChart'] = new Chart(document.getElementById('assetsChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'Total Assets ($M)', data: fyData.map(d => parseFloat(d.TotalAssets)), backgroundColor: colors.primary },
+                { label: 'Total Debt ($M)', data: fyData.map(d => parseFloat(d.TotalDebt)), backgroundColor: colors.danger }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+
+    // Gearing
+    chartRegistry['gearingChart'] = new Chart(document.getElementById('gearingChart').getContext('2d'), {
+        type: 'line',
+        data: { labels: kpiSeries.years, datasets: [{ label: 'Gearing (%)', data: kpiSeries.gearingPct, borderColor: colors.warning, backgroundColor: 'rgba(253,203,110,0.15)', fill: true, tension: 0.2, spanGaps: true }] },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+
+    // Shares outstanding
+    chartRegistry['sharesChart'] = new Chart(document.getElementById('sharesChart').getContext('2d'), {
+        type: 'bar',
+        data: { labels: fyLabels, datasets: [{ label: 'Shares Outstanding (M)', data: fyData.map(d => parseFloat(d.SharesOutstanding) / 1e6), backgroundColor: colors.quaternary }] },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+
+    // Rent mix
+    chartRegistry['rentMixChart'] = new Chart(document.getElementById('rentMixChart').getContext('2d'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Dairy & Support Land', 'Forestry/Carbon', 'Horticulture', 'Support/Other'],
+            datasets: [{ data: [51, 31, 8, 10], backgroundColor: [colors.primary, colors.tertiary, colors.warning, colors.quaternary] }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } } } }
+    });
+
+    // Net income (context only)
+    chartRegistry['netIncomeChart'] = new Chart(document.getElementById('netIncomeChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'Rental Income ($M)', data: fyData.map(d => parseFloat(d.Revenue)), backgroundColor: colors.primary },
+                { label: 'Reported Net Income ($M, incl. FV revaluations)', data: fyData.map(d => parseFloat(d.NetIncome)), backgroundColor: colors.warning }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+}
+
+// ======================= HELP MODALS =======================
+const metricDescriptions = {
+    revenue: { title: "Rental Income", content: `<p><strong>Rental Income</strong> is the contractual, triple-net, CPI-linked rent NZL collects from its nine farming/forestry/horticulture tenants.</p><div class="metric-highlight"><strong>For NZL:</strong> This is the cleanest top-line metric&mdash;unlike NetIncome it excludes unrealised land revaluations. FY2023 $15.35m &rarr; FY2024 $19.87m &rarr; FY2025 $22.28m, growing largely via acquisitions funded by new equity and debt.</div><p><strong>What to watch:</strong></p><ul><li>CPI rent reviews landing as scheduled (61% of leases by value reviewed in FY26)</li><li>Any rent loss from the Kiwi Crunch Farms vacancy (~5.8% of NZRLI LP rent)</li><li>FY2021 and FY2022-6moStub are not full years&mdash;don't read them as a growth collapse</li></ul>` },
+    affo: { title: "AFFO per Share vs Dividend per Share", content: `<p><strong>AFFO (Adjusted Funds From Operations)</strong> is NZL's REIT-style cash earnings measure&mdash;rental income less cash operating costs and interest, adjusted for non-cash items, attributable to NZL shareholders (net of Roc Partners' ~25% LP interest).</p><div class="metric-highlight"><strong>For NZL:</strong> AFFO, not NetIncome, is the right lens on operating performance. FY2025 attributable AFFO was $7.932m (5.43 cps), +9.9% YoY. Dividends are set as a target percentage of AFFO (90-100% under the new policy).</div><p><strong>What to watch:</strong></p><ul><li>AFFO/share growth (the true per-share compounding metric, not gross portfolio growth)</li><li>Whether dividends track AFFO or run ahead of it (unsustainable) or behind it (retained capital)</li><li>Impact of the Kiwi Crunch Farms rent loss on FY26 AFFO once guidance resumes</li></ul>` },
+    payout: { title: "AFFO Payout Ratio", content: `<p>The <strong>AFFO Payout Ratio</strong> is dividends declared divided by AFFO for the period.</p><div class="metric-highlight"><strong>For NZL:</strong> New policy (Feb 2026) targets 90-100% of AFFO, paid quarterly. FY2025 was 90.5% (4.91 cps dividend / 5.43 cps AFFO).</div><p><strong>What to watch:</strong></p><ul><li>A ratio persistently above 100% would imply the dividend is not fully covered by cash earnings</li><li>Any cut below the 90-100% policy band would signal balance sheet stress (e.g. post Kiwi Crunch)</li></ul>` },
+    nav: { title: "NAV per Share", content: `<p><strong>Net Asset Value (NAV) per Share</strong> is shareholders' equity divided by shares outstanding&mdash;the independent-valuation-based book value of NZL's land portfolio net of all liabilities, including the Roc Partners LP-unit liability.</p><div class="metric-highlight"><strong>For NZL:</strong> NAV/share was $1.6094 at FY2025, versus a market price of ~$0.935&mdash;a 41.9% discount. NAV/share has been nearly flat FY2023-FY2025 ($1.602 &rarr; $1.617 &rarr; $1.609) despite portfolio growth, because new equity issuance and performance-fee shares dilute per-share value even as gross assets rise.</div><p><strong>What to watch:</strong></p><ul><li>The discount to NAV, which has never closed below 0.557x or above 0.740x book in 5.5 listed years</li><li>Whether buybacks are actually deployed at this discount (dormant through FY25)</li><li>Independent land revaluation gains/losses feeding into NAV</li></ul>` },
+    assets: { title: "Total Assets vs Total Debt", content: `<p>Total Assets is the fair value of NZL's land portfolio plus cash and other assets; Total Debt is drawn bank facilities.</p><div class="metric-highlight"><strong>For NZL:</strong> Total assets grew from $369.8m (FY2023) to $452.1m (FY2025) via acquisitions; total debt has been broadly flat around $131-145m, meaning gearing has trended down as the equity base (new raises, DRP, retained AFFO) has grown faster than debt.</div><p><strong>What to watch:</strong></p><ul><li>Whether future acquisitions are funded more by debt or equity</li><li>Land revaluation swings driving the assets line independent of cash flow</li></ul>` },
+    gearing: { title: "Gearing (Debt / Total Tangible Assets)", content: `<p><strong>Gearing</strong> is NZL's key leverage covenant metric: total drawn debt divided by total tangible assets.</p><div class="metric-highlight"><strong>For NZL:</strong> FY2025 gearing was 29.4%, with $132.7m drawn against $138.9m total facilities, weighted average cost of debt 5.3% (96% hedged, up from 65% at FY24). Weighted average debt term is only 1.4-1.5 years, meaning much of the book reprices/refinances frequently.</div><p><strong>What to watch:</strong></p><ul><li>Gearing relative to bank covenant limits (typically ~40-50% for land-backed REITs)</li><li>Refinancing outcomes on the short-dated debt book (two tranches expected to renew H1 FY26)</li><li>Hedge coverage as rates move</li></ul>` },
+    shares: { title: "Shares Outstanding", content: `<p>Total ordinary shares on issue.</p><div class="metric-highlight"><strong>For NZL:</strong> Grew from 60.6m at IPO (Dec-2020) to 146.1m at FY2025&mdash;more than doubling via capital raises, the DRP, and performance-fee shares issued to the manager. This dilution is why per-share metrics (AFFO/share, NAV/share, DPS) matter far more than absolute dollar figures for judging NZL's performance.</div><p><strong>What to watch:</strong></p><ul><li>Whether new equity issuance is AFFO/share accretive (the stated post-KPMG-review policy)</li><li>Whether the authorised but dormant buyback is ever deployed to shrink the count at this discount</li></ul>` },
+    rentmix: { title: "Rent Mix by Land Use", content: `<p>The composition of NZL's rental income by underlying land use/tenant sector.</p><div class="metric-highlight"><strong>For NZL:</strong> Dairy & support land is 51% of rent, forestry/carbon 31%, horticulture 8%, other support 10%. The horticulture segment includes the Hawke's Bay orchards leased to Kiwi Crunch Farms, which entered receivership in July 2026&mdash;a reminder that "triple-net" does not eliminate tenant credit risk.</div><p><strong>What to watch:</strong></p><ul><li>Any further deterioration in the horticulture book (Wade Glass-linked related entities)</li><li>Diversification progress into forestry/carbon as a partial offset to dairy concentration</li></ul>` },
+    netincome: { title: "Reported Net Income (Context Only)", content: `<p><strong>Reported Net Income</strong> under IFRS/IAS 40 fair-value accounting includes unrealised gains/losses on land revaluations, which can swamp the underlying rental economics.</p><div class="metric-highlight"><strong>Caution for NZL:</strong> FY2022 NPAT was $39.7m against rental income of just $8.2m; FY2024 NPAT was $24.9m against rent of $19.9m (net margin &gt;100%). These are non-cash valuation movements, not operating performance. Net margin is deliberately omitted from KPI cards on this dashboard because it is meaningless here.</div><p><strong>What to watch:</strong></p><ul><li>Use AFFO, not NetIncome or EPS, to judge NZL's operating performance</li><li>Land revaluation direction is still informative about NAV trajectory, just not about cash profitability</li></ul>` }
+};
+function openModal(key) {
+    document.getElementById('modalTitle').textContent = metricDescriptions[key].title;
+    document.getElementById('modalBody').innerHTML = metricDescriptions[key].content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ======================= DCF SECTION =======================
+let currentScenario = 'base';
+
+function fmtIV(v) {
+    return '$' + v.toFixed(3).replace(/0$/, '').replace(/\.$/, '');
+}
+function fmtIV2(v) {
+    return '$' + v.toFixed(2);
+}
+
+function initDCF() {
+    if (!dcfData || !dcfData.valuation) return;
+
+    document.getElementById('dcfCurrent').textContent = '$' + dcfData.current_price.toFixed(3);
+
+    const base = dcfData.assumptions.base;
+    document.getElementById('growthSlider').value = base.affo_growth_rates[0];
+    document.getElementById('waccSlider').value = base.cost_of_equity;
+    document.getElementById('terminalSlider').value = base.exit_pb;
+    document.getElementById('growthValue').textContent = base.affo_growth_rates[0] + '%';
+    document.getElementById('waccValue').textContent = base.cost_of_equity + '%';
+    document.getElementById('terminalValue').textContent = base.exit_pb.toFixed(2);
+
+    document.getElementById('growthHint').textContent =
+        'Based on ' + dcfData.historical_growth.growth_rate_source.replace(/_/g, ' ');
+
+    const wsub = document.getElementById('dcfWeightedSublabel');
+    const wts = dcfData.probability_weighted.weights;
+    if (wsub && wts) {
+        const pct = (x) => Math.round(x * 100);
+        wsub.textContent = `${pct(wts.bull)}% Bull / ${pct(wts.base)}% Base / ${pct(wts.bear)}% Bear`;
+    }
+
+    renderHeaderValuation();
+    renderDCFInputs();
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    updateDCFDisplay();
+    switchScenario('base');
+}
+
+function renderHeaderValuation() {
+    const el = document.getElementById('headerValuation');
+    if (!el) return;
+    const pw = dcfData.probability_weighted;
+    const wiv = pw.weighted_iv;
+    const price = dcfData.current_price;
+    if (wiv == null || price == null) return;
+    const up = (wiv - price) / price * 100;
+    const cls = up >= 0 ? 'positive' : 'negative';
+    const sign = up >= 0 ? '+' : '';
+    el.innerHTML =
+        `<div class="hv-item"><span class="hv-label">Prob-Weighted IV</span><span class="hv-value">${fmtIV2(wiv)}</span></div>
+         <div class="hv-item"><span class="hv-label">Current Price</span><span class="hv-value">${fmtIV2(price)}</span></div>
+         <div class="hv-item"><span class="hv-label">Upside</span><span class="hv-value ${cls}">${sign}${up.toFixed(1)}%</span></div>`;
+    el.style.display = 'flex';
+}
+
+function renderDCFInputs() {
+    // Static base-case AFFO projection table
+    renderAFFOProjections(dcfData.assumptions.base.affo_growth_rates[0]);
+}
+
+function renderAFFOProjections(startGrowth, scenario) {
+    // Mirrors calculateDCF exactly: same scenario anchor and the same proportional
+    // scaling of the decline path, so the table can never disagree with the IV above it.
+    const sc = dcfData.assumptions[scenario] || dcfData.assumptions.base;
+    const y1 = sc.affo_y1_cps;
+    const basePath = sc.affo_growth_rates;
+    const scale = startGrowth / basePath[0];
+    const growthPath = basePath.map(g => g * scale);
+    let cps = y1;
+    const values = [y1];
+    for (let i = 0; i < 4; i++) {
+        cps = cps * (1 + growthPath[i] / 100);
+        values.push(cps);
+    }
+    let html = `
+        <div class="fcf-projection-item header">FY26</div>
+        <div class="fcf-projection-item header">FY27</div>
+        <div class="fcf-projection-item header">FY28</div>
+        <div class="fcf-projection-item header">FY29</div>
+        <div class="fcf-projection-item header">FY30</div>
+        <div class="fcf-projection-item header">&nbsp;</div>
+    `;
+    for (let i = 0; i < 5; i++) {
+        html += `<div class="fcf-projection-item">
+            <div class="fcf-value">${values[i].toFixed(2)}c</div>
+            <div class="growth-rate">${i === 0 ? 'Y1' : '+' + growthPath[i - 1].toFixed(1) + '%'}</div>
+        </div>`;
+    }
+    html += `<div class="fcf-projection-item"></div>`;
+    document.getElementById('fcfProjectionTable').innerHTML = html;
+}
+
+// Core DCF calc: attributable AFFO/dividend stream discounted at Cost of Equity,
+// terminal value = exit P/B x projected NAV per share.
+function calculateDCF(affoY1Growth, coe, exitPB, scenario) {
+    const years = 5;
+    const hurdle = 0.15;
+    const shares = dcfData.inputs.shares_outstanding; // held flat
+    // Scenario-specific anchors: each scenario has its own Y1 AFFO and NAV growth
+    // (bull assumes the withdrawn FY26 guidance mid is achieved, bear a fuller
+    // Kiwi Crunch / Wade Glass rent loss), so they must come from the JSON rather
+    // than being hardcoded to base. Defaults to base for free-form slider moves.
+    const sc = dcfData.assumptions[scenario] || dcfData.assumptions.base;
+    const payoutRatio = sc.payout_ratio;
+    const navGrowth = sc.nav_per_share_growth;
+
+    // AFFO/share path: Y1 anchor from the scenario; if the slider differs from that
+    // scenario's own first-year growth, scale the whole 4-step decline path
+    // proportionally so growth direction/magnitude tracks the slider.
+    const baseGrowthPath = sc.affo_growth_rates;
+    const scale = affoY1Growth / baseGrowthPath[0];
+    const growthPath = baseGrowthPath.map(g => g * scale);
+
+    let affoCps = sc.affo_y1_cps;
+    let navPerShare = dcfData.inputs.nav_per_share;
+    let pvDividends = 0;
+    let pvDividendsHurdle = 0;
+    const dividendsCps = [];
+
+    for (let i = 0; i < years; i++) {
+        if (i > 0) affoCps = affoCps * (1 + growthPath[i - 1] / 100);
+        const divCps = affoCps * payoutRatio;
+        dividendsCps.push(divCps);
+        navPerShare = navPerShare * (1 + navGrowth / 100);
+        const df = 1 / Math.pow(1 + coe / 100, i + 1);
+        const dfHurdle = 1 / Math.pow(1 + hurdle, i + 1);
+        pvDividends += divCps * df;
+        pvDividendsHurdle += divCps * dfHurdle;
+    }
+
+    const exitValueCps = exitPB * navPerShare * 100; // navPerShare in dollars -> cents
+    const pvExit = exitValueCps / Math.pow(1 + coe / 100, years);
+    const pvExitHurdle = exitValueCps / Math.pow(1 + hurdle, years);
+
+    const ivCps = pvDividends + pvExit;
+    const iv = ivCps / 100;
+
+    const entryPriceCps = pvDividendsHurdle + pvExitHurdle;
+    const entryPrice = entryPriceCps / 100;
+
+    return { iv, entryPrice, pvDividends: pvDividends / 100, pvExit: pvExit / 100, navPerShareExit: navPerShare, dividendsCps };
+}
+
+function weightedIV(growth, coe, exitPB) {
+    const pw = dcfData.probability_weighted;
+    const stored = pw.weighted_iv;
+    const a = dcfData.assumptions;
+    const bg = a.base.affo_growth_rates[0], bc = a.base.cost_of_equity, be = a.base.exit_pb;
+    if (growth === bg && coe === bc && exitPB === be) return stored;
+
+    const dGrowth = growth - bg, dCoe = coe - bc, dPB = exitPB - be;
+    let sum = 0;
+    for (const sc of ['bull', 'base', 'bear']) {
+        const w = pw.weights[sc];
+        const sg = a[sc].affo_growth_rates[0] + dGrowth;
+        const sc_coe = Math.max(a[sc].cost_of_equity + dCoe, 1);
+        const s_pb = Math.max(a[sc].exit_pb + dPB, 0.1);
+        sum += w * calculateDCF(sg, sc_coe, s_pb, sc).iv;
+    }
+    const ref = (() => {
+        let r = 0;
+        for (const sc of ['bull', 'base', 'bear']) {
+            r += pw.weights[sc] * calculateDCF(a[sc].affo_growth_rates[0], a[sc].cost_of_equity, a[sc].exit_pb, sc).iv;
+        }
+        return r;
+    })();
+    if (!ref || !isFinite(ref)) return stored;
+    return stored * (sum / ref);
+}
+
+window.updateDCFDisplay = function() {
+    const growth = parseFloat(document.getElementById('growthSlider').value);
+    const coe = parseFloat(document.getElementById('waccSlider').value);
+    const exitPB = parseFloat(document.getElementById('terminalSlider').value);
+
+    document.getElementById('growthValue').textContent = growth.toFixed(1) + '%';
+    document.getElementById('waccValue').textContent = coe.toFixed(2) + '%';
+    document.getElementById('terminalValue').textContent = exitPB.toFixed(2);
+
+    renderAFFOProjections(growth, currentScenario);
+
+    const result = calculateDCF(growth, coe, exitPB, currentScenario);
+
+    document.getElementById('dcfIV').textContent = fmtIV2(result.iv);
+    document.getElementById('dcfEntry').textContent = fmtIV2(result.entryPrice);
+
+    const upside = ((result.iv - dcfData.current_price) / dcfData.current_price * 100);
+    const upsideEl = document.getElementById('dcfUpside');
+    upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(1) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+    upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+    const wiv = weightedIV(growth, coe, exitPB);
+    document.getElementById('dcfWeighted').textContent = fmtIV2(wiv);
+    const wUpEl = document.getElementById('dcfWeightedUpside');
+    if (wUpEl) {
+        const wUp = (wiv - dcfData.current_price) / dcfData.current_price * 100;
+        wUpEl.textContent = (wUp >= 0 ? '+' : '') + wUp.toFixed(1) + '% ' + (wUp >= 0 ? 'upside' : 'downside');
+        wUpEl.className = 'dcf-change ' + (wUp >= 0 ? 'positive' : 'negative');
+    }
+
+    const grid = document.getElementById('assumptionGrid');
+    if (grid) {
+        grid.innerHTML = `
+            <div class="assumption-item"><div class="label">AFFO Growth (Y1)</div><div class="value">${growth.toFixed(1)}%</div></div>
+            <div class="assumption-item"><div class="label">Cost of Equity</div><div class="value">${coe.toFixed(2)}%</div></div>
+            <div class="assumption-item"><div class="label">Exit P/B</div><div class="value">${exitPB.toFixed(2)}x</div></div>
+            <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa;">$${result.iv.toFixed(3)}</div></div>
+            <div class="assumption-item"><div class="label">Entry Price</div><div class="value" style="color:#00d4aa;">$${result.entryPrice.toFixed(3)}</div></div>
+        `;
+    }
+};
+
+window.switchScenario = function(scenario) {
+    currentScenario = scenario;
+    document.querySelectorAll('.scenario-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.scenario === scenario);
+    });
+
+    const assumptions = dcfData.assumptions[scenario];
+    const valuation = dcfData.valuation[scenario];
+
+    document.getElementById('growthSlider').value = assumptions.affo_growth_rates[0];
+    document.getElementById('waccSlider').value = assumptions.cost_of_equity;
+    document.getElementById('terminalSlider').value = assumptions.exit_pb;
+
+    const grid = document.getElementById('assumptionGrid');
+    grid.innerHTML = `
+        <div class="assumption-item"><div class="label">AFFO Y1 (cps)</div><div class="value">${assumptions.affo_y1_cps.toFixed(2)}</div></div>
+        <div class="assumption-item"><div class="label">AFFO Growth Y1</div><div class="value">${assumptions.affo_growth_rates[0]}%</div></div>
+        <div class="assumption-item"><div class="label">Payout Ratio</div><div class="value">${(assumptions.payout_ratio * 100).toFixed(0)}%</div></div>
+        <div class="assumption-item"><div class="label">NAV Growth/yr</div><div class="value">${assumptions.nav_per_share_growth}%</div></div>
+        <div class="assumption-item"><div class="label">Exit P/B</div><div class="value">${assumptions.exit_pb.toFixed(2)}x</div></div>
+        <div class="assumption-item"><div class="label">Cost of Equity</div><div class="value">${assumptions.cost_of_equity}%</div></div>
+        <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa;">$${valuation.intrinsic_value.toFixed(3)}</div></div>
+        <div class="assumption-item"><div class="label">Upside/Downside</div><div class="value" style="color:${valuation.upside >= 0 ? '#00d4aa' : '#ff6b6b'};">${valuation.upside >= 0 ? '+' : ''}${valuation.upside}%</div></div>
+    `;
+
+    updateDCFDisplay();
+};
+
+function renderHistoricalGrowth() {
+    const growth = dcfData.historical_growth;
+    const grid = document.getElementById('growthGrid');
+    const metrics = [
+        { key: 'affo_per_share_1yr_growth', label: 'AFFO/Share 1Y' },
+        { key: 'affo_per_share_3yr_cagr', label: 'AFFO/Share 3Y' },
+        { key: 'nav_per_share_2yr_cagr', label: 'NAV/Share 2Y' },
+        { key: 'revenue_2yr_cagr', label: 'Rental Income 2Y' }
+    ];
+    grid.innerHTML = metrics.map(m => {
+        const rate = growth[m.key];
+        const isSelected = m.key === 'affo_per_share_1yr_growth' && growth.growth_rate_source.indexOf('affo') >= 0;
+        const colorClass = rate >= 0 ? 'positive' : 'negative';
+        return `
+            <div class="growth-item ${isSelected ? 'selected' : ''}">
+                <div class="metric">${m.label}</div>
+                <div class="rate ${colorClass}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const table = document.getElementById('sensitivityMatrix');
+    const currentPrice = dcfData.current_price;
+
+    let html = '<tr><th>CoE \\ Exit P/B</th>';
+    sens.exit_pb_range.forEach(pb => { html += `<th>${pb.toFixed(2)}x</th>`; });
+    html += '</tr>';
+
+    sens.coe_range.forEach((coe, i) => {
+        html += `<tr><th>${coe.toFixed(2)}%</th>`;
+        sens.matrix[i].forEach((val, j) => {
+            const isHighlight = Math.abs(coe - dcfData.assumptions.base.cost_of_equity) < 0.01 &&
+                               Math.abs(sens.exit_pb_range[j] - dcfData.assumptions.base.exit_pb) < 0.001;
+            const colorClass = val >= currentPrice ? 'above-current' : 'below-current';
+            html += `<td class="${isHighlight ? 'highlight' : colorClass}">$${val.toFixed(3)}</td>`;
+        });
+        html += '</tr>';
+    });
+
+    table.innerHTML = html;
+}
+
+// ======================= INIT =======================
+renderOverview();
+renderKPIs();
+renderGuidance();
+renderPBTable();
+renderCharts();
+initDCF();
+
+(function() {
+    var growthSlider = document.getElementById('growthSlider');
+    var waccSlider = document.getElementById('waccSlider');
+    var terminalSlider = document.getElementById('terminalSlider');
+    if (growthSlider) { growthSlider.oninput = window.updateDCFDisplay; growthSlider.onchange = window.updateDCFDisplay; }
+    if (waccSlider) { waccSlider.oninput = window.updateDCFDisplay; waccSlider.onchange = window.updateDCFDisplay; }
+    if (terminalSlider) { terminalSlider.oninput = window.updateDCFDisplay; terminalSlider.onchange = window.updateDCFDisplay; }
+})();
+</script>
+</body>
+</html>
