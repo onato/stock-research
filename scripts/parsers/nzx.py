@@ -78,9 +78,10 @@ class NZXParser(BaseParser):
     ]
     PROSE_WINDOW = 60   # chars searched either side of the amount
 
-    def scan(self, text: str, filename: str) -> Iterator[dict[str, Any]]:
+    def scan(self, text: str, filename: str,
+             fy_end_month: int | None = None) -> Iterator[dict[str, Any]]:
         self._lines: list[str] = common.split_lines(text)
-        yield from super().scan(text, filename)
+        yield from super().scan(text, filename, fy_end_month)
         yield from self._prose_facts(filename)
 
     def _prose_facts(self, filename: str) -> Iterator[dict[str, Any]]:

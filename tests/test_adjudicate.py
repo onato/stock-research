@@ -330,6 +330,23 @@ class TestMissingPointers:
         assert "100-160" not in missing
 
 
+class TestOwnPeriodFromFacts:
+    def test_files_own_period_follows_the_scanner_not_the_filename(self, db):
+        # 0016.HK: HalfYear_H1-2024 is "six months ended 31 December 2024" for a
+        # June year-end, which the scanner labels H1 FY2025. The worksheet's
+        # Filings table and the corroboration logic must agree with it.
+        con = db([fact("Revenue", "H1 FY2025", 5500.0, file="X.HK_HalfYear_H1-2024.txt"),
+                  fact("Revenue", "H1 FY2024", 5000.0, file="X.HK_HalfYear_H1-2024.txt",
+                       confidence="prior_year_column"),
+                  fact("Revenue", "FY2025", 12000.0, file="X.HK_Annual_FY2025.txt")])
+        ps = adjudicate.propose(con)
+        text = adjudicate.worksheet("X.HK", ps, {})
+        filings = text.split("## Filings")[1]
+        assert "| X.HK_HalfYear_H1-2024.txt | H1 FY2025 (filename says H1 FY2024) |" in filings
+        assert "| X.HK_Annual_FY2025.txt | FY2025 |" in filings
+        assert cell(ps, "revenue", "H1 FY2024").status == "contested"   # comparative only
+
+
 class TestVocabulary:
     def test_undated_rows_are_skipped_and_odd_labels_kept(self, db):
         # A None period (undated comparative) is not a cell; a label the period

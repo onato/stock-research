@@ -20,7 +20,8 @@ class EuronextParser(BaseParser):
 
     DECL_RE = re.compile(r"in (thousands|millions|billions) of euros?\b", re.IGNORECASE)
 
-    def scan(self, text: str, filename: str) -> Iterator[dict[str, Any]]:
+    def scan(self, text: str, filename: str,
+             fy_end_month: int | None = None) -> Iterator[dict[str, Any]]:
         lines = text.splitlines()
         self._nearest: list[str | None] = []
         current: str | None = None
@@ -29,7 +30,7 @@ class EuronextParser(BaseParser):
             if m:
                 current = m.group(1).lower()
             self._nearest.append(current)
-        yield from super().scan(text, filename)
+        yield from super().scan(text, filename, fy_end_month)
 
     def units_hint(self, lines: list[str]) -> str | None:
         for line in lines:

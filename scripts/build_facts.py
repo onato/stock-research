@@ -27,6 +27,7 @@ Usage: build_facts.py TICKER [--show]
 """
 
 import pathlib
+import re
 import sys
 from collections.abc import Iterator
 from typing import Any
@@ -41,9 +42,13 @@ from parsers.common import (  # noqa: F401  (re-exported API)
     COMPILED,
     LABEL_RE,
     PATTERNS,
+    expected_span,
+    fiscal_year_end,
     normalize_label,
     parse_num,
     period_from_filename,
+    period_from_text,
+    split_lines,
 )
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
@@ -66,10 +71,27 @@ def ticker_for(path: pathlib.Path) -> str:
     return path.name.split("_", 1)[0]
 
 
-def scan_file(path: pathlib.Path) -> Iterator[dict[str, Any]]:
+def scan_file(path: pathlib.Path,
+              fy_end_month: int | None = None) -> Iterator[dict[str, Any]]:
     """Yield candidate facts from one extracted filing."""
     parser = get_parser(ticker_for(path))
-    yield from parser.scan(path.read_text(errors="replace"), path.name)
+    yield from parser.scan(path.read_text(errors="replace"), path.name, fy_end_month)
+
+
+def folder_fiscal_year_end(files: list[pathlib.Path]) -> int | None:
+    """The fiscal-year-end month of the newest annual report, so interims
+    can be labelled by fiscal year (a June year-end's December half is H1)."""
+    latest: tuple[str, int] | None = None
+    for f in files:
+        if not re.search(r"_(Annual|10K|20F)_", f.name, re.IGNORECASE):
+            continue
+        lines = split_lines(f.read_text(errors="replace"))
+        month = fiscal_year_end(lines)
+        stated = period_from_text(lines, expected_span=12) or ""
+        # Year ends change (VUL.AX June -> December): the newest report rules.
+        if month and (latest is None or stated > latest[0]):
+            latest = (stated, month)
+    return latest[1] if latest else None
 
 
 def main() -> int:
@@ -86,8 +108,9 @@ def main() -> int:
 
     files = sorted(extracted.glob("*.txt"))
     facts: list[dict[str, Any]] = []
+    fy_end = folder_fiscal_year_end(files)
     for f in files:
-        facts.extend(scan_file(f))
+        facts.extend(scan_file(f, fy_end))
 
     import duckdb
     db = REPO / "research" / ticker / "Reports" / f"{ticker}.duckdb"

@@ -123,11 +123,12 @@ ShareRepurchases, Depreciation) -- write those to `kpis`.
 
 ### Step 2 — what the worksheet cannot decide for you
 
-- **Half-year labels.** A file named `H1-2024` is labelled `H1 FY2024` by the
-  scanner. Check the "six months ended ..." line of one half-year filing against
-  the company's year end and, if the filename convention is off by one fiscal
-  year, relabel **every** half-year consistently. (On ARB.NZ the agent and the
-  filenames disagreed by one year on 38 cells; the values were right.)
+- **Periods come from the filing, not the filename.** The scanner reads "for
+  the six months ended 31 December 2024" against the fiscal-year end it learned
+  from the annual reports, so a June year-end's December half is `H1 FY2025`
+  even when the file is named `H1-2024`. The Filings table says "(filename says
+  ...)" where the two disagree -- trust the stated period; only if a file has
+  no such statement does the filename label stand, and then you check it.
 - **Units.** `units_hint` is the scale printed on the page and is sometimes
   wrong or NULL (ARB.NZ's USD-millions statements carry a "thousands" hint).
   Sanity-check magnitude once per filing; see Step 3.

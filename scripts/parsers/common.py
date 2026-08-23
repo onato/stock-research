@@ -7,6 +7,7 @@ convention — the parts that are the same in Auckland, Hong Kong and London.
 """
 
 import re
+from collections import Counter
 
 # Metric -> regexes matched against the line label. Sourced from the search
 # strings already documented in .claude/agents/financial-parser.md.
@@ -139,6 +140,108 @@ def split_lines(text: str) -> list[str]:
     if lines and lines[-1] == "":
         lines.pop()
     return lines
+
+
+MONTHS = {m: i for i, m in enumerate(
+    ("january", "february", "march", "april", "may", "june", "july", "august",
+     "september", "october", "november", "december"), 1)}
+MONTHS.update({k[:3]: v for k, v in list(MONTHS.items())})
+SPAN = {"year": 12, "twelve months": 12, "six months": 6, "half year": 6, "half-year": 6,
+        "three months": 3, "quarter": 3, "nine months": 9}
+_SPANS = "|".join(sorted(SPAN, key=len, reverse=True))
+# "for the six months ended 31 December 2024" / "year ended December 31, 2024"
+PERIOD_PHRASE_RE = re.compile(
+    r"\b(" + _SPANS + r")\s+(?:period\s+)?ended\s+(?:on\s+)?(?:"
+    r"(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9}),?\s+(\d{4})"
+    r"|([A-Za-z]{3,9})\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4}))"
+    r"((?:\s+(?:19|20)\d{2}\b)*)", re.IGNORECASE)   # "..., 2013  2014  2015" column runs
+MIN_PHRASE_VOTES = 3
+# A period cited less than half as often as the most-cited one is a bond
+# maturity, an outlook or a stray comparative, not the filing's own
+# (ARB.NZ FY2016: 12 vs 2; 0363.HK: 166 vs 3). Among the rest the latest
+# wins, which is how a mislabelled download (SPOT's FY2020 file is the 2018
+# 20-F: 38 x 2018, 22 x 2017) gets its real year.
+PHRASE_FLOOR_DIV = 2
+
+
+def period_phrases(lines: list[str]) -> Counter[tuple[int, int, int]]:
+    """(months, end_year, end_month) for every 'N months ended <date>' phrase."""
+    votes: Counter[tuple[int, int, int]] = Counter()
+    for line in lines:
+        for m in PERIOD_PHRASE_RE.finditer(line):
+            span = SPAN[m.group(1).lower()]
+            month_name = (m.group(3) or m.group(5)).lower()
+            year = int(m.group(4) or m.group(7))
+            # US tables head several years under one date: the last is current.
+            run = [int(y) for y in re.findall(r"(?:19|20)\d{2}", m.group(8) or "")]
+            if run:
+                year = max(year, *run)
+            month = MONTHS.get(month_name) or MONTHS.get(month_name[:3])
+            if month:
+                votes[(span, year, month)] += 1
+    return votes
+
+
+def fiscal_year_end(lines: list[str]) -> int | None:
+    """Month the fiscal year ends, from the file's own 'year ended' phrases."""
+    annual = Counter({k: v for k, v in period_phrases(lines).items() if k[0] == 12})
+    if not annual:
+        return None
+    (_, _, month), n = annual.most_common(1)[0]
+    return month if n >= MIN_PHRASE_VOTES else None
+
+
+def expected_span(name: str) -> int | None:
+    """Months the filename's report type says the filing covers, or None."""
+    if re.search(r"_(Annual|10K|20F|40F)_|_FY\d{4}", name, re.IGNORECASE) \
+            and not re.search(r"_(HalfYear|Interim|Quarterly|10Q|6K)_", name, re.IGNORECASE):
+        return 12
+    if re.search(r"_(HalfYear|Interim)_|_H[12][-_ ]?\d{4}", name, re.IGNORECASE):
+        return 6
+    if re.search(r"_(Quarterly|10Q)_|_Q[1-4][-_ ]?\d{4}", name, re.IGNORECASE):
+        return 3
+    return None
+
+
+def period_from_text(lines: list[str], fy_end_month: int | None = None,
+                     expected_span: int | None = None) -> str | None:
+    """The period the filing says it covers, canonically spelled, or None.
+
+    An annual is FY<end year>. An interim needs the fiscal-year end to be
+    named: six months to December is H1 of a June year and H2 of a December
+    one. Fewer than MIN_PHRASE_VOTES mentions is a comparative or a quote,
+    not the filing's own period.
+    """
+    votes = period_phrases(lines)
+    if expected_span:
+        # An interim cites "year ended ..." in its comparatives more often
+        # than its own half-year line; only phrases of the filing's own
+        # length count.
+        votes = Counter({k: v for k, v in votes.items() if k[0] == expected_span})
+    # The filing's own period is the latest one it reports at least
+    # MIN_PHRASE_VOTES times; comparatives are cited more often but earlier.
+    if not votes:
+        return None
+    top = max(votes.values())
+    floor = max(MIN_PHRASE_VOTES, -(-top // PHRASE_FLOOR_DIV))   # ceil(top / 2)
+    sure = [k for k, v in votes.items() if v >= floor]
+    if not sure:
+        return None
+    span, year, month = max(sure, key=lambda k: (k[1], k[2]))
+    if span == 12:
+        return f"FY{year}"
+    fye = fy_end_month or None
+    if fye is None:
+        return None
+    fy = year if month <= fye else year + 1
+    into = (month - fye) % 12 or 12        # months from the fiscal year start
+    if span == 6:
+        return f"H1 FY{fy}" if into == 6 else f"H2 FY{fy}" if into == 12 else None
+    if span == 3:
+        return f"Q{into // 3} FY{fy}" if into % 3 == 0 else None
+    if span == 9:
+        return f"9M FY{fy}" if into == 9 else None
+    return None
 
 
 def period_from_filename(name: str) -> str | None:

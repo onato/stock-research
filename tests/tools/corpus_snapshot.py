@@ -47,9 +47,13 @@ def main():
         suffix = ticker.rsplit(".", 1)[1] if "." in ticker else ""
         if args.suffix and suffix != args.suffix:
             continue
-        for f in sorted(extracted.glob("*.txt")):
+        files = sorted(extracted.glob("*.txt"))
+        # Same drive as build_facts: interims are labelled against the
+        # fiscal-year end the folder's annual reports state.
+        fy_end = bf.folder_fiscal_year_end(files)
+        for f in files:
             rows.extend((ticker, *[fact.get(k) for k in FIELDS])
-                        for fact in bf.scan_file(f))
+                        for fact in bf.scan_file(f, fy_end))
 
     rows.sort(key=json.dumps)
     out = pathlib.Path(args.out)

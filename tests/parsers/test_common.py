@@ -195,3 +195,87 @@ class TestSharesPattern:
 
     def find(self, label):
         return [m for m, pats in bf.COMPILED.items() if any(p.search(label) for p in pats)]
+
+
+class TestPeriodFromText:
+    """The filing states its own period; the filename only guesses it.
+    0016.HK's HalfYear_H1-2024 file is "six months ended 31 December 2024"
+    for a June year-end, i.e. H1 FY2025, and ARB.NZ's half-years were one
+    fiscal year out the same way."""
+
+    def test_annual_is_labelled_by_its_end_year(self):
+        lines = ["Annual Report", "For the year ended 30 June 2025", "x",
+                 "for the year ended 30 June 2025", "year ended 30 June 2025",
+                 "year ended 30 June 2024"]
+        assert bf.period_from_text(lines) == "FY2025"
+        assert bf.fiscal_year_end(lines) == 6
+
+    def test_half_year_uses_the_fiscal_year_end(self):
+        lines = ["Interim Report", "For the six months ended 31 December 2024",
+                 "for the six months ended 31 December 2024",
+                 "six months ended 31 December 2024"]
+        assert bf.period_from_text(lines, fy_end_month=6) == "H1 FY2025"
+        assert bf.period_from_text(lines, fy_end_month=12) == "H2 FY2024"
+
+    def test_quarters_and_nine_months(self):
+        q = ["for the three months ended 30 September 2025"] * 3
+        assert bf.period_from_text(q, fy_end_month=12) == "Q3 FY2025"
+        assert bf.period_from_text(q, fy_end_month=6) == "Q1 FY2026"
+        nine = ["for the nine months ended September 30, 2025"] * 3
+        assert bf.period_from_text(nine, fy_end_month=12) == "9M FY2025"
+
+    def test_us_date_order_and_ordinals(self):
+        lines = ["For the year ended December 31, 2024", "year ended December 31st, 2024",
+                 "year ended December 31, 2024"]
+        assert bf.period_from_text(lines) == "FY2024"
+
+    def test_expected_span_filters_out_comparative_phrases(self):
+        # An interim cites "year ended 31 December 2024" in its comparatives
+        # more often than its own half-year line (0087.HK: 95 files flipped).
+        lines = ["year ended 31 December 2024"] * 5 + ["six months ended 30 June 2025"] * 3
+        assert bf.period_from_text(lines, fy_end_month=12, expected_span=12) == "FY2024"
+        assert bf.period_from_text(lines, fy_end_month=12, expected_span=6) == "H1 FY2025"
+        assert bf.period_from_text(lines, fy_end_month=12, expected_span=3) is None
+
+    def test_latest_period_wins_over_a_more_cited_prior_one(self):
+        # SPOT's "FY2020" 20-F is the 2018 filing: 38 x 2018 against 22 x 2017.
+        # Both clear the floor; the later one is the filing's own.
+        annual = ["year ended December 31, 2017"] * 22 + ["year ended December 31, 2018"] * 38
+        assert bf.period_from_text(annual) == "FY2018"
+        lines = ["six months ended 31 December 2025"] * 6 + ["six months ended 30 June 2026"] * 4
+        assert bf.period_from_text(lines, fy_end_month=12, expected_span=6) == "H1 FY2026"
+
+    def test_a_rarely_cited_later_period_is_a_quote(self):
+        # ARB.NZ FY2016 statutory accounts: 12 x 2016 and 2 x 2019.
+        lines = ["year ended 30 June 2016"] * 12 + ["year ended 30 June 2019"] * 2
+        assert bf.period_from_text(lines, expected_span=12) == "FY2016"
+
+    def test_rare_forward_looking_mentions_do_not_outrank_the_report_year(self):
+        # 0363.HK FY2021: 166 x "year ended 31 December 2021", 3 x "... 2023"
+        # (bond maturities). Latest-wins needs a relevance floor.
+        lines = ["year ended 31 December 2021"] * 166 + ["year ended 31 December 2023"] * 3
+        assert bf.period_from_text(lines, expected_span=12) == "FY2021"
+
+    def test_expected_span_from_filename(self):
+        assert bf.expected_span("X_Annual_FY2025.txt") == 12
+        assert bf.expected_span("X_HalfYear_H1-2024.txt") == 6
+        assert bf.expected_span("X_Interim_FY2024.txt") == 6
+        assert bf.expected_span("X_Quarterly_Q3-2025.txt") == 3
+        assert bf.expected_span("X_10Q_Q3-2025.txt") == 3
+        assert bf.expected_span("X_10K_FY2025.txt") == 12
+        assert bf.expected_span("X_Presentation.txt") is None
+
+    def test_interim_without_a_known_year_end_is_unlabelled(self):
+        assert bf.period_from_text(["six months ended 31 December 2024"] * 3) is None
+
+    def test_us_three_year_column_header_takes_the_last_year(self):
+        # GOOG 10-K: every note is headed "Year Ended December 31, 2013 2014 2015";
+        # the filing's year is the last of the run, not the first.
+        lines = ["                 Year Ended December 31,   2013      2014      2015"] * 3
+        assert bf.period_from_text(lines, expected_span=12) == "FY2015"
+        lines = ["Three Months Ended March 31, 2024 2025"] * 3
+        assert bf.period_from_text(lines, fy_end_month=12, expected_span=3) == "Q1 FY2025"
+
+    def test_two_mentions_are_not_enough(self):
+        # CMO.NZ FY2023: two OCR-mangled "year ended 30 June 2013" lines.
+        assert bf.period_from_text(["year ended 30 June 2025"] * 2) is None

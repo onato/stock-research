@@ -256,12 +256,20 @@ def propose(con: duckdb.DuckDBPyConnection,
     rows = con.execute(
         "SELECT metric, period, value_raw, units_hint, source_file, line_no,"
         " context, confidence, currency FROM facts").fetchall()
+    # A file's own period is what its statement lines carry: the scanner
+    # reads it from the filing ("six months ended 31 December 2024" against
+    # the fiscal-year end), so it can differ from the filename's guess.
+    stated: dict[str, Counter[str]] = defaultdict(Counter)
+    for _m, period, _v, _u, src, _l, _c, conf, _cc in rows:
+        if conf == "statement_line" and period:
+            stated[src][_canon(period) or period] += 1
     own: dict[str, str | None] = {}
     cells: dict[tuple[str, str], dict[str, list[Candidate]]] = defaultdict(
         lambda: defaultdict(list))
     for metric, period, value, units, src, line, ctx, conf, ccy in rows:
         if src not in own:
-            own[src] = _canon(common.period_from_filename(src))
+            own[src] = (stated[src].most_common(1)[0][0] if stated[src]
+                        else _canon(common.period_from_filename(src)))
         p = _canon(period)
         if p is None or value is None:
             continue
@@ -474,7 +482,11 @@ def _render(ticker: str, props: list[Proposal],
         own_p, units, ccy, cnt = seen[f]
         u = units.most_common(1)[0][0]
         flag = " ⚠ no units on page" if u == "NULL" else ""
-        lines.append(f"| {f} | {own_p or '?'} | {u}{flag} | "
+        named = _canon(common.period_from_filename(f))
+        label = own_p or "?"
+        if own_p and named and named != own_p:
+            label += f" (filename says {named})"
+        lines.append(f"| {f} | {label} | {u}{flag} | "
                      f"{ccy.most_common(1)[0][0]} | {cnt} |")
     lines.append("")
     return "\n".join(lines)

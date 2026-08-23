@@ -157,3 +157,34 @@ class TestLoneNoteRefLine:
         facts = list(bf.BaseParser().scan(self.TEXT, "X.HK_Annual_FY2020.txt"))
         eps = [(f["value_raw"], f["line_no"], f["confidence"]) for f in facts if f["metric"] == "EPS"]
         assert eps == [(-0.86, 2, "statement_line"), (0.23, 2, "prior_year_column")]
+
+
+class TestTextPeriodOverridesFilename:
+    TEXT = ("Interim Report\nFor the six months ended 31 December 2024\n"
+            "Condensed consolidated income statement\n"
+            "for the six months ended 31 December 2024\n"
+            "six months ended 31 December 2024\n"
+            "Revenue   12,345   11,000\n")
+
+    def test_statement_wins_over_the_filename(self):
+        facts = list(bf.BaseParser().scan(self.TEXT, "X.HK_HalfYear_H1-2024.txt", fy_end_month=6))
+        assert [f["period"] for f in facts] == ["H1 FY2025", "H1 FY2024"]
+
+    def test_half_year_file_ignores_annual_comparative_phrases(self):
+        text = ("year ended 31 December 2024\n" * 4
+                + "six months ended 30 June 2025\n" * 3
+                + "Revenue   12,345   11,000\n")
+        facts = list(bf.BaseParser().scan(text, "X.HK_HalfYear_H1-2025.txt", fy_end_month=12))
+        assert [f["period"] for f in facts] == ["H1 FY2025", "H1 FY2024"]
+
+    def test_untyped_filename_is_never_relabelled_from_text(self):
+        # A presentation or shareholder letter quotes "year ended ..." freely;
+        # without a report type in the name there is nothing to check it against.
+        text = "year ended 31 December 2017\n" * 3 + "Revenue   12,345   11,000\n"
+        facts = list(bf.BaseParser().scan(text, "letter-to-shareholders-1q18.txt", fy_end_month=12))
+        assert [f["period"] for f in facts] == [None, None]
+
+    def test_filename_stands_when_the_text_is_silent(self):
+        facts = list(bf.BaseParser().scan("Revenue   12,345   11,000\n",
+                                          "X.HK_HalfYear_H1-2024.txt", fy_end_month=6))
+        assert [f["period"] for f in facts] == ["H1-2024", "H1 FY2023"]

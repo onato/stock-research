@@ -76,10 +76,18 @@ class BaseParser:
     # The driver. Hermetic: text in, fact dicts out. No I/O.
     # ------------------------------------------------------------------
 
-    def scan(self, text: str, filename: str) -> Iterator[dict[str, Any]]:
-        """Yield candidate facts from one extracted filing."""
+    def scan(self, text: str, filename: str,
+             fy_end_month: int | None = None) -> Iterator[dict[str, Any]]:
+        """Yield candidate facts from one extracted filing.
+
+        The period is what the filing says it covers ("six months ended 31
+        December 2024", read against the fiscal-year end the caller learned
+        from the annual reports); the filename is the fallback.
+        """
         lines = common.split_lines(text)
-        period = common.period_from_filename(filename)
+        span = common.expected_span(filename)
+        period = ((common.period_from_text(lines, fy_end_month, span) if span else None)
+                  or common.period_from_filename(filename))
         column_periods = self.column_periods(period)
         units_hint = self.units_hint(lines)
         currency = self.currency(lines)

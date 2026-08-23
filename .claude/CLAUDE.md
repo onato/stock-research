@@ -81,6 +81,12 @@ screening table. Three rules the derivations exist to enforce:
 PEG uses the DCF's `historical_growth.selected_growth_rate` (stored as a **percent**)
 as a forward proxy — it is not an analyst estimate, and the output says so.
 
+A filing's period is read from its own "for the year / six months ended <date>"
+statement (`parsers.common.period_from_text`), against the fiscal-year-end month
+`build_facts.py` learns from the folder's annual reports; the filename is only the
+fallback. Filenames were one fiscal year out for June/March year-ends (0016.HK's
+`H1-2024` is H1 FY2025), which was the "period-shift" class of worksheet error.
+
 Period labels come in 13 format families across 2,274 labels; `scripts/periods.py` is
 the single parser. `H1 2026`, `H1-2026`, `H1 FY2026` and `H1-FY2026` all name the same
 six months of **fiscal** 2026. Do not hand-roll period parsing — not even
