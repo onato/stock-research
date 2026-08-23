@@ -201,6 +201,12 @@ HALT_FILE="$LOG_DIR/.halt-rate-limit"
 export HALT_FILE
 rm -f "$HALT_FILE"
 
+# GNU parallel prepends $PARALLEL from the environment to its own options.
+# `make run PARALLEL=3` exports it (make exports command-line variables), so
+# parallel read `3` as the command to run and every worker failed with
+# `bash: line 1: 3: command not found`. It is make's knob, not parallel's.
+unset PARALLEL
+
 # --line-buffer + --tagstring keep concurrent output attributable per ticker.
 # --resume reads the joblog and skips arguments that already completed.
 printf '%s\n' "${TICKERS[@]}" |
