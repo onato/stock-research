@@ -42,6 +42,7 @@ def ticker_at(repo, ticker, *, filings=(), csv_periods=(), days_old=0):
         "valuation_date": when.isoformat(),
         "current_price": 100.0,
     }))
+    (base / "Reports" / f"{ticker}_Dashboard.html").write_text("x")
 
 
 class TestRoute:

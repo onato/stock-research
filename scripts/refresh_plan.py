@@ -208,7 +208,6 @@ def plan_tier(repo: pathlib.Path | str, ticker: str, *,
     tier-2 narrative refresh subsumes the free numeric pass.
     """
     repo = pathlib.Path(repo)
-    dcf = repo / "research" / ticker / "Reports" / f"{ticker}_DCF.json"
 
     # Report whichever filing is newest on disk -- extracted or merely
     # downloaded -- so the reason names the period that triggered the tier.
@@ -232,8 +231,17 @@ def plan_tier(repo: pathlib.Path | str, ticker: str, *,
     def plan(tier: int, reason: str) -> RefreshPlan:
         return RefreshPlan(ticker, tier, reason, age, drift, *labels)
 
-    if not dcf.exists():
-        return plan(3, "no DCF: never researched, or a run died partway")
+    # A fresh DCF.json is not proof of a finished run: a session limit can
+    # kill the pipeline between the DCF and the dashboard (NZX.NZ 2026-08-24),
+    # and valuation_date is then TODAY -- so an age check calls the ticker
+    # current and the retry skips the model, leaving it incomplete forever.
+    # Every deliverable must exist (the same trio research_one.sh checks).
+    reports = repo / "research" / ticker / "Reports"
+    missing = [want for want in ("Metrics.csv", "DCF.json", "Dashboard.html")
+               if not (reports / f"{ticker}_{want}").exists()]
+    if missing:
+        return plan(3, f"missing {', '.join(missing)}: "
+                       "never researched, or a run died partway")
     if has_new_filings(repo, ticker):
         newest = labels[0] or "?"
         return plan(3, f"new filing {newest} not in the CSV")

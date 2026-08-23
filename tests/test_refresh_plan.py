@@ -48,6 +48,7 @@ def ticker_at(repo, ticker, *, filings=(), downloaded=(), csv_periods=(),
         "valuation_date": when.isoformat(),
         "current_price": price,
     }))
+    (base / "Reports" / f"{ticker}_Dashboard.html").write_text("<html></html>")
     return base
 
 
@@ -205,6 +206,37 @@ class TestPlanTier:
         assert plan.newest_csv == "Q1-2026"
         assert plan.ticker == "DCBO"
         assert plan.reason
+
+
+class TestDiedPartway:
+    """A run that dies mid-pipeline leaves SOME deliverables behind.
+
+    NZX.NZ (2026-08-24): the session limit hit during dashboard generation,
+    after Metrics.csv and DCF.json were written. valuation_date was that
+    morning, so the retry was classified tier 1 "nothing changed" and skipped
+    the model -- the ticker stayed INCOMPLETE forever. A fresh DCF.json is
+    not proof of a finished run; every deliverable must exist.
+    """
+
+    def test_missing_dashboard_is_tier_three(self, repo):
+        base = ticker_at(repo, "NZX.NZ", filings=["NZX.NZ_Annual_FY2026.txt"],
+                         csv_periods=["FY2026"], days_old=0)
+        (base / "Reports" / "NZX.NZ_Dashboard.html").unlink()
+        plan = refresh_plan.plan_tier(repo, "NZX.NZ")
+        assert plan.tier == 3
+        assert "Dashboard" in plan.reason
+
+    def test_missing_csv_is_tier_three_even_with_fresh_dcf(self, repo):
+        base = ticker_at(repo, "AAA", filings=["AAA_Presentation_ASM.txt"],
+                         days_old=0)
+        assert not (base / "Reports" / "AAA_Metrics.csv").exists()
+        plan = refresh_plan.plan_tier(repo, "AAA")
+        assert plan.tier == 3
+
+    def test_complete_fresh_ticker_stays_tier_one(self, repo):
+        ticker_at(repo, "AAA", filings=["AAA_Annual_FY2026.txt"],
+                  csv_periods=["FY2026"], days_old=0)
+        assert refresh_plan.plan_tier(repo, "AAA").tier == 1
 
 
 class TestEdges:
