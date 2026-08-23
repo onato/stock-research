@@ -53,6 +53,20 @@ _BARE_YEAR = re.compile(r"^(\d{4})$")
 _HALF = re.compile(r"^H([12]) (\d{4})$")
 _QUARTER = re.compile(r"^Q([1-4]) (\d{4})$")
 _MONTHS = re.compile(r"^(\d{1,2})M (\d{4})$")
+# A fiscal year cut short (or stretched) by a balance-date change:
+# `FY2021-7mo`, `FY2025-8mo`. NZK.NZ changed balance date twice and produces
+# both. The length is inferred, but the period stays OTHER -- `is_annual`
+# must keep saying False so no TTM path ever sums a 7-month year.
+_STUB_YEAR = re.compile(r"^FY(\d{4}) (\d{1,2})MO$")
+
+# A trailing 3-letter month names WHICH month-end a period ran to, for
+# tickers whose balance date moved: NZK.NZ has both a 12-month year to
+# 31 Jan 2025 and an 8-month stub to 30 Sep 2025, and a bare `FY2025`
+# cannot tell them apart. The suffix disambiguates the period; it says
+# nothing about its length, so it is stripped and the rest parses as
+# normal (`FY2025-Jan` is a full year, `H1 FY2026-Jul` a normal half).
+_MONTH_QUALIFIER = re.compile(
+    r"[ -](JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)$")
 
 # `FY` is dropped only when it prefixes a 4-digit year inside a multi-token
 # label (`H1 FY2026` -> `H1 2026`). A bare `FY2026` keeps it: there, `FY` is
@@ -124,8 +138,16 @@ def parse(label: str | None) -> Period:
     ptype: PeriodType = "OTHER"
     months: int | None = None
 
+    # Strip a trailing month qualifier so the label parses on its own shape.
+    # Done after the IRREGULAR lookup so a hardcoded entry always wins.
+    norm = _MONTH_QUALIFIER.sub("", norm)
+
     if m := _ANNUAL.match(norm):
         year, ptype, months = int(m.group(1)), "FY", 12
+    elif m := _STUB_YEAR.match(norm):
+        # Year and length are known; ptype stays OTHER so it sorts in the
+        # right place without ever counting as a comparable full year.
+        year, months = int(m.group(1)), int(m.group(2))
     elif m := _HALF.match(norm):
         half = m.group(1)
         year, months = int(m.group(2)), 6

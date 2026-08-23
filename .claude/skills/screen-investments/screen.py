@@ -254,9 +254,20 @@ def load_scores(root):
 
 def load_companies(root):
     """{ticker: {name, sector}} from state/companies.json (maintained by the
-    research-stock skill). Missing file just means bare tickers on the page."""
-    data = load_dcf(os.path.join(root, "state", "companies.json"))
-    return data if isinstance(data, dict) else {}
+    research-stock skill). Missing file just means bare tickers on the page.
+
+    `state/` sits BESIDE `research/`, but --root defaults to `research`, so
+    the file is looked for next to the root as well as inside it. Joining
+    only onto the root blanked the company column for every row.
+    """
+    candidates = (os.path.join(root, "state", "companies.json"),
+                  os.path.join(os.path.dirname(os.path.abspath(root)),
+                               "state", "companies.json"))
+    for path in candidates:
+        data = load_dcf(path)
+        if isinstance(data, dict) and data:
+            return data
+    return {}
 
 
 # Sentinel that sinks "—" cells to the bottom of any descending numeric sort.

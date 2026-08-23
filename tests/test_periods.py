@@ -162,3 +162,89 @@ class TestPriorYear:
 
     def test_prior_year_of_unparseable_is_none(self):
         assert periods.prior_year(periods.parse("banana")) is None
+
+
+class TestStubYears:
+    """`FY####-#mo` names a fiscal year shortened by a balance-date change.
+
+    NZK.NZ changed its balance date twice -- to 31 Jan (a 7-month stub) and
+    then to 30 Sep (an 8-month stub) -- so `FY2021-7mo` and `FY2025-8mo`
+    both appear in its metrics. Before this rule only the four hardcoded
+    IRREGULAR labels parsed, and a single-digit stub fell through every
+    regex to `fiscal_year=None`, which sorts it to the top of the CSV as
+    year 0. The month count is inferred, but `is_annual` stays False: a
+    7-month year summed into a TTM is exactly the plausible-wrong number
+    the irregular table exists to prevent.
+    """
+
+    @pytest.mark.parametrize(
+        ("label", "year", "months"),
+        [
+            ("FY2021-7mo", 2021, 7),
+            ("FY2025-8mo", 2025, 8),
+            ("FY2020-10mo", 2020, 10),
+            ("FY2019-15mo", 2019, 15),
+        ],
+    )
+    def test_stub_parses_with_year_and_length(self, label, year, months):
+        p = periods.parse(label)
+        assert (p.fiscal_year, p.ptype, p.months) == (year, "OTHER", months)
+
+    def test_stub_is_never_annual(self):
+        assert not periods.is_annual(periods.parse("FY2021-7mo"))
+        assert not periods.is_annual(periods.parse("FY2025-8mo"))
+
+    def test_stub_sorts_chronologically(self):
+        """The bug this fixes: a stub sorted to year 0, ahead of FY2016."""
+        labels = ["FY2024", "FY2021-7mo", "FY2016", "FY2025-8mo"]
+        assert sorted(labels, key=periods.sort_key) == [
+            "FY2016", "FY2021-7mo", "FY2024", "FY2025-8mo",
+        ]
+
+    def test_hardcoded_irregulars_still_win(self):
+        """`FY2018-6moStub` has a trailing word the general rule won't match."""
+        p = periods.parse("FY2018-6moStub")
+        assert (p.fiscal_year, p.months) == (2018, 6)
+
+
+class TestMonthQualifiedLabels:
+    """`FY2025-Jan` names a fiscal year by the month it ended in.
+
+    A balance-date change makes the bare year ambiguous: NZK.NZ has both a
+    12-month year to 31 Jan 2025 and an 8-month stub to 30 Sep 2025, and
+    both would otherwise be `FY2025`. Qualifying with the end month
+    disambiguates them. `FY2016-Jun` was already in the corpus as a
+    hardcoded irregular; this generalises it so a new one does not need a
+    code change to sort correctly.
+
+    The month suffix says nothing about length, so a qualified FY keeps
+    FY's 12 months and a qualified H1 keeps H1's 6 -- the suffix only
+    disambiguates WHICH period, never how long it was.
+    """
+
+    @pytest.mark.parametrize(
+        ("label", "year", "ptype", "months"),
+        [
+            ("FY2025-Jan", 2025, "FY", 12),
+            ("FY2016-Jun", 2016, "FY", 12),      # the incumbent hardcoded one
+            ("H1 FY2026-Jul", 2026, "H1", 6),
+            ("H1 FY2026-Mar", 2026, "H1", 6),
+        ],
+    )
+    def test_month_qualified(self, label, year, ptype, months):
+        p = periods.parse(label)
+        assert (p.fiscal_year, p.ptype, p.months) == (year, ptype, months)
+
+    def test_qualified_year_is_annual(self):
+        """A month-qualified full year is still a comparable 12 months."""
+        assert periods.is_annual(periods.parse("FY2025-Jan"))
+
+    def test_qualified_sorts_with_its_year(self):
+        labels = ["FY2024", "H1 FY2026-Jul", "FY2025-Jan", "FY2016"]
+        assert sorted(labels, key=periods.sort_key) == [
+            "FY2016", "FY2024", "FY2025-Jan", "H1 FY2026-Jul",
+        ]
+
+    def test_a_bare_month_word_is_not_a_year(self):
+        """Guard the regex: only a 3-letter month follows the year."""
+        assert periods.parse("FY2025-Restated").fiscal_year is None
