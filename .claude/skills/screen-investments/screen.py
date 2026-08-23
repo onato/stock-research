@@ -539,6 +539,13 @@ search.addEventListener('keydown', (e) => {
     const visible = applyFilter();
     if (visible.length === 1) window.location = visible[0].dataset.href;
 });
+document.addEventListener('keydown', (e) => {
+    if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (document.activeElement === search) return;
+    e.preventDefault();
+    search.focus();
+    search.select();
+});
 applyFilter();
 
 document.querySelector('#lb thead').addEventListener('click', (e) => {
