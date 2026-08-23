@@ -1753,20 +1753,27 @@ function weightedIV(growth, wacc, terminal) {
     const stored = pw.weighted_iv;
     if (stored == null || !isWeightedLive()) return stored;
 
+    // Deltas are measured from the SELECTED scenario's own defaults -- NOT the
+    // base case's. switchScenario() resets the sliders to the chosen scenario, so
+    // measuring from base would read "Bear tab" as a large slider move and the
+    // 25/50/25 blend would jump on every tab click (FLOW.AS, 2026-08-23).
     const a = dcfData.assumptions;
-    const bg = dcfData.historical_growth.selected_growth_rate;
-    const bw = a.base.wacc, bt = a.base.terminal_growth;
+    const cur = a[currentScenario] || a.base;
+    const bg = (Array.isArray(cur.growth_rates) && cur.growth_rates.length)
+        ? cur.growth_rates[0] : dcfData.historical_growth.selected_growth_rate;
+    const bw = cur.wacc != null ? cur.wacc : a.base.wacc;
+    const bt = cur.terminal_growth != null ? cur.terminal_growth : a.base.terminal_growth;
     if (growth === bg && wacc === bw && terminal === bt) return stored;
 
-    // Re-weight all three scenarios, applying the user's deltas from the base
-    // defaults to bull and bear as well.
+    // Re-weight all three scenarios, applying the user's deltas (from the
+    // selected scenario's defaults) to every scenario.
     const at = (g, k, t) => {
         const w = pw.weights;
         const startOf = (sc) => (a[sc] && Array.isArray(a[sc].growth_rates) && a[sc].growth_rates.length)
-            ? a[sc].growth_rates[0] : bg;
+            ? a[sc].growth_rates[0] : dcfData.historical_growth.selected_growth_rate;
         let sum = 0;
         for (const sc of ['bull', 'base', 'bear']) {
-            const sg = (sc === 'base' ? bg : startOf(sc)) + (g - bg);
+            const sg = startOf(sc) + (g - bg);
             const sk = (a[sc].wacc != null ? a[sc].wacc : bw) + (k - bw);
             const st = (a[sc].terminal_growth != null ? a[sc].terminal_growth : bt) + (t - bt);
             // Gordon blows up as WACC approaches terminal growth; keep a floor.
