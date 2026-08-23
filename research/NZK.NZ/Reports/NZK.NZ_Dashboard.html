@@ -1,0 +1,2001 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New Zealand King Salmon (NZK.NZ) Financial Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 20px;
+}
+.header {
+    text-align: center;
+    margin-bottom: 20px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+}
+.header h1 {
+    font-size: 2.5rem;
+    background: linear-gradient(90deg, #00d4aa, #00b894);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+}
+.header p { color: #888; font-size: 1.1rem; }
+.header-valuation {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 14px 32px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.hv-item { display: flex; align-items: baseline; gap: 8px; }
+.hv-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.hv-value { font-size: 1.35rem; font-weight: 700; color: #e0e0e0; }
+.hv-value.positive { color: #00d4aa; }
+.hv-value.negative { color: #ff6b6b; }
+
+.fiscal-note {
+    max-width: 1400px;
+    margin: 0 auto 25px;
+    background: rgba(253, 203, 110, 0.1);
+    border: 1px solid rgba(253, 203, 110, 0.35);
+    border-radius: 12px;
+    padding: 16px 22px;
+    color: #f0d9a8;
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+.fiscal-note strong { color: #fdcb6e; }
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.kpi-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0, 212, 170, 0.2); }
+.kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+.kpi-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.kpi-change { font-size: 0.9rem; margin-top: 5px; }
+.kpi-change.positive { color: #00d4aa; }
+.kpi-change.negative { color: #ff6b6b; }
+.kpi-change.neutral { color: #888; }
+.kpi-sub { font-size: 0.75rem; color: #666; margin-top: 4px; }
+
+.guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+.guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 8px; }
+.guidance-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.guidance-header h3::before {
+    content: ''; display: inline-block; width: 4px; height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px;
+}
+.guidance-meta { font-size: 0.85rem; color: #888; }
+.guidance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.guidance-card { background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 18px; border: 1px solid rgba(255, 255, 255, 0.1); transition: transform 0.2s ease; }
+.guidance-card:hover { transform: translateY(-2px); }
+.guidance-metric { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.guidance-target { font-size: 1.4rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; }
+.guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
+.guidance-vs-prior { display: inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+.guidance-vs-prior.raised { background: rgba(0, 212, 170, 0.15); color: #00d4aa; }
+.guidance-vs-prior.lowered { background: rgba(255, 107, 107, 0.15); color: #ff6b6b; }
+.guidance-vs-prior.maintained { background: rgba(255, 255, 255, 0.1); color: #888; }
+.guidance-vs-prior.new, .guidance-vs-prior['raised/narrowed'] { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
+.guidance-notes { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
+.guidance-commentary {
+    background: rgba(255, 255, 255, 0.03); border-radius: 10px; padding: 16px 20px;
+    border-left: 3px solid #00d4aa; font-style: italic; color: #b0b0b0; line-height: 1.6;
+}
+.guidance-commentary::before { content: '"'; font-size: 1.5rem; color: #00d4aa; margin-right: 4px; }
+
+.section-title {
+    font-size: 1.5rem; color: #fff; margin: 40px auto 20px; padding-bottom: 10px;
+    border-bottom: 2px solid rgba(0, 212, 170, 0.3); max-width: 1400px;
+}
+.subsection-title {
+    font-size: 1.05rem; color: #00d4aa; margin: 0 auto 15px; max-width: 1400px; font-weight: 600;
+}
+.charts-container {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 25px; max-width: 1400px; margin: 0 auto 10px;
+}
+.chart-card { background: rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 25px; border: 1px solid rgba(255, 255, 255, 0.1); }
+.chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 8px; }
+.chart-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.chart-header h3::before {
+    content: ''; display: inline-block; width: 4px; height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px;
+}
+.help-btn {
+    width: 24px; height: 24px; border-radius: 50%; background: rgba(0, 212, 170, 0.2);
+    border: 1px solid #00d4aa; color: #00d4aa; font-size: 14px; font-weight: bold; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;
+}
+.help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.chart-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.view-toggle {
+    padding: 3px 10px; border-radius: 12px; background: transparent; border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #888; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;
+}
+.view-toggle:hover { border-color: #0984e3; color: #0984e3; }
+.view-toggle.active { background: rgba(9, 132, 227, 0.2); border-color: #0984e3; color: #0984e3; }
+.log-toggle {
+    padding: 3px 10px; border-radius: 12px; background: transparent; border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #888; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;
+}
+.log-toggle:hover { border-color: #00d4aa; color: #00d4aa; }
+.log-toggle.active { background: rgba(0, 212, 170, 0.2); border-color: #00d4aa; color: #00d4aa; }
+.chart-wrapper { position: relative; height: 300px; }
+.chart-note { font-size: 0.75rem; color: #666; margin-top: 12px; line-height: 1.5; }
+
+.modal-overlay {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.7); z-index: 1000; justify-content: center; align-items: center; padding: 20px;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+    background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%); border-radius: 16px; max-width: 600px;
+    width: 100%; max-height: 80vh; overflow-y: auto; border: 1px solid rgba(0, 212, 170, 0.3);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.modal-header { padding: 20px 25px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); display: flex; justify-content: space-between; align-items: center; }
+.modal-header h3 { color: #00d4aa; font-size: 1.4rem; margin: 0; }
+.modal-close {
+    width: 32px; height: 32px; border-radius: 50%; background: rgba(255, 107, 107, 0.2);
+    border: 1px solid #ff6b6b; color: #ff6b6b; font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+.modal-close:hover { background: #ff6b6b; color: #fff; }
+.modal-body { padding: 25px; line-height: 1.7; }
+.modal-body p { margin-bottom: 15px; }
+.modal-body strong { color: #00d4aa; }
+.modal-body ul { margin: 15px 0; padding-left: 20px; }
+.modal-body li { margin-bottom: 8px; }
+.metric-highlight { background: rgba(0, 212, 170, 0.1); border-left: 3px solid #00d4aa; padding: 12px 15px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+.metric-warning { background: rgba(253, 203, 110, 0.1); border-left: 3px solid #fdcb6e; padding: 12px 15px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+
+.overview-section { max-width: 1400px; margin: 0 auto 30px; }
+.overview-toggle {
+    width: 100%; background: rgba(0, 212, 170, 0.1); border: 1px solid rgba(0, 212, 170, 0.3); border-radius: 12px;
+    padding: 16px 24px; color: #00d4aa; font-size: 1.1rem; font-weight: 600; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease;
+}
+.overview-toggle:hover { background: rgba(0, 212, 170, 0.2); }
+.overview-toggle .arrow { transition: transform 0.3s ease; }
+.overview-toggle.active .arrow { transform: rotate(180deg); }
+.overview-content {
+    display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: none; border-radius: 0 0 12px 12px; padding: 30px; margin-top: -12px;
+}
+.overview-content.active { display: block; }
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+.overview-card { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.overview-card h3 { color: #00d4aa; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+.overview-card p { margin-bottom: 12px; line-height: 1.6; }
+.overview-card ul { list-style: none; padding: 0; margin: 0; }
+.overview-card li { padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); line-height: 1.5; }
+.overview-card li:last-child { border-bottom: none; }
+.overview-card.bull h3 { color: #00d4aa; }
+.overview-card.bear h3 { color: #ff6b6b; }
+.overview-card.risks h3 { color: #fdcb6e; }
+.risk-high { color: #ff6b6b; font-weight: 600; }
+.risk-moderate { color: #fdcb6e; font-weight: 600; }
+.risk-low { color: #00d4aa; font-weight: 600; }
+.revenue-stream { display: flex; justify-content: space-between; align-items: center; }
+.revenue-stream .percent { color: #00d4aa; font-weight: 600; }
+.trend-growing { color: #00d4aa; }
+.trend-stable { color: #888; }
+.trend-declining { color: #ff6b6b; }
+
+/* DCF Valuation Section */
+.dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+.dcf-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+.dcf-card { background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 24px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.1); transition: transform 0.3s ease; }
+.dcf-card:hover { transform: translateY(-3px); }
+.dcf-card.highlight { background: rgba(0, 212, 170, 0.1); border-color: rgba(0, 212, 170, 0.3); }
+.dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.dcf-value { font-size: 2.2rem; font-weight: bold; color: #00d4aa; }
+.dcf-card:not(.highlight) .dcf-value { color: #fff; }
+.dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+.dcf-change.positive { color: #00d4aa; }
+.dcf-change.negative { color: #ff6b6b; }
+.dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
+.dcf-philosophy {
+    background: rgba(0, 212, 170, 0.06); border: 1px solid rgba(0, 212, 170, 0.25); border-radius: 10px;
+    padding: 18px 22px; margin-bottom: 25px; line-height: 1.7; font-size: 0.92rem; color: #cfd8dc;
+}
+.dcf-philosophy strong { color: #00d4aa; }
+.dcf-verdict { font-weight: 600; color: #00d4aa; }
+.dcf-warning {
+    background: rgba(253, 203, 110, 0.15); border: 1px solid rgba(253, 203, 110, 0.4); border-radius: 8px;
+    padding: 12px 16px; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; color: #fdcb6e;
+}
+.warning-icon { font-size: 1.2rem; }
+.dcf-inputs { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+.dcf-inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.dcf-input-card { background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 12px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.05); }
+.dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #00d4aa; }
+.dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
+.fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
+.fcf-projection-table { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; background: rgba(0, 0, 0, 0.2); border-radius: 8px; padding: 12px; }
+.fcf-projection-item { text-align: center; }
+.fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
+.fcf-projection-item .fcf-value { font-size: 1rem; color: #e0e0e0; font-weight: 500; }
+.fcf-projection-item .growth-rate { font-size: 0.75rem; color: #00d4aa; margin-top: 2px; }
+.dcf-controls {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; margin-bottom: 30px;
+    padding: 25px; background: rgba(255, 255, 255, 0.03); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.slider-group { display: flex; flex-direction: column; gap: 10px; }
+.slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+.slider-group label span { color: #00d4aa; font-weight: 600; }
+.slider-group input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); outline: none; }
+.slider-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #00d4aa; cursor: pointer; transition: transform 0.2s;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.slider-hint { font-size: 0.8rem; color: #666; }
+.scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+.scenario-tab {
+    padding: 10px 24px; border: 1px solid rgba(255, 255, 255, 0.2); background: transparent; color: #888;
+    border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s;
+}
+.scenario-tab:hover { border-color: rgba(0, 212, 170, 0.5); color: #e0e0e0; }
+.scenario-tab.active { background: rgba(0, 212, 170, 0.15); border-color: #00d4aa; color: #00d4aa; }
+.scenario-details { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; margin-bottom: 15px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.scenario-details h4 { color: #00d4aa; margin-bottom: 15px; }
+.scenario-narrative { font-size: 0.85rem; color: #aaa; line-height: 1.6; margin-bottom: 18px; }
+.assumption-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+.assumption-item { text-align: center; }
+.assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+.assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
+.sensitivity-section { margin-bottom: 30px; }
+.sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; }
+.sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255, 255, 255, 0.03); border-radius: 8px; overflow: hidden; }
+.sensitivity-table th, .sensitivity-table td { padding: 12px 16px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); }
+.sensitivity-table th { background: rgba(0, 212, 170, 0.1); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td { color: #e0e0e0; }
+.sensitivity-table td.highlight { background: rgba(0, 212, 170, 0.15); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td.below-current { color: #ff6b6b; }
+.sensitivity-table td.above-current { color: #00d4aa; }
+.historical-growth { margin-bottom: 30px; }
+.historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
+.growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
+.growth-item { background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 15px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); }
+.growth-item .metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
+.growth-item .rate { font-size: 1.2rem; font-weight: 600; }
+.growth-item .rate.positive { color: #00d4aa; }
+.growth-item .rate.negative { color: #ff6b6b; }
+.growth-item.selected { border-color: #00d4aa; background: rgba(0, 212, 170, 0.1); }
+.growth-item .na { color: #666; font-size: 1rem; }
+.dcf-download { text-align: center; margin-top: 30px; }
+.download-btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; background: rgba(0, 212, 170, 0.15);
+    border: 1px solid #00d4aa; border-radius: 8px; color: #00d4aa; text-decoration: none; font-weight: 600; transition: all 0.2s;
+}
+.download-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.download-icon { font-size: 1.2rem; }
+
+@media (max-width: 768px) {
+    .charts-container { grid-template-columns: 1fr; }
+    .overview-grid { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.8rem; }
+    .fcf-projection-table { grid-template-columns: repeat(3, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>New Zealand King Salmon Investments Limited (NZK.NZ)</h1>
+    <p>Premium King (Chinook) salmon aquaculture &middot; Marlborough Sounds, NZ &middot; FY end 30 September (changed twice) &middot; Reporting in NZD millions</p>
+    <div class="header-valuation" id="headerValuation" style="display:none"></div>
+</div>
+
+<div class="fiscal-note">
+    <strong>Fiscal calendar changed twice &mdash; read the charts accordingly.</strong>
+    NZK's balance date moved from 30 June to 31 January in 2021 (a <strong>7-month stub</strong>, "FY2021-7mo",
+    covering Jul&ndash;Jan) and then from 31 January to 30 September in 2025 (an <strong>8-month stub</strong>,
+    "FY2025-8mo", covering Feb&ndash;Sep 2025). The current fiscal year (FY2026) runs 1 October to 30 September.
+    Stub periods are shown with a hatched/lighter bar style on annual charts &mdash; they are shorter windows,
+    not a collapse in trading. No year-over-year growth figure on this dashboard compares a stub against a full
+    year, or a June-basis year against a January-basis year; where that comparison would be misleading the
+    figure is marked <strong>"n/m"</strong> (not meaningful). Annual and half-year series are always kept on
+    separate charts. The share count also stepped from ~139m to ~541m at the FY2022/FY2023 dilutive
+    recapitalization &mdash; per-share figures before and after that point are not comparable.
+</div>
+
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid">
+            <div class="overview-card">
+                <h3>Company Overview</h3>
+                <p id="ovOverview"></p>
+            </div>
+            <div class="overview-card">
+                <h3>Business Model</h3>
+                <p id="ovBizSummary"></p>
+                <ul id="ovRevenueStreams"></ul>
+            </div>
+            <div class="overview-card">
+                <h3>Competitive Position</h3>
+                <p><strong>Competitors:</strong> <span id="ovCompetitors"></span></p>
+                <p><strong>Market position:</strong> <span id="ovMarketPosition"></span></p>
+                <p><strong>Moat:</strong></p>
+                <ul id="ovMoat"></ul>
+            </div>
+            <div class="overview-card">
+                <h3>Growth Drivers</h3>
+                <ul id="ovGrowth"></ul>
+            </div>
+            <div class="overview-card risks">
+                <h3>Key Risks</h3>
+                <ul id="ovRisks"></ul>
+            </div>
+            <div class="overview-card bull">
+                <h3>Bull Case</h3>
+                <ul id="ovBull"></ul>
+            </div>
+            <div class="overview-card bear">
+                <h3>Bear Case</h3>
+                <ul id="ovBear"></ul>
+            </div>
+            <div class="overview-card">
+                <h3>Recent Developments</h3>
+                <ul id="ovRecent"></ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf"></span> | <span id="guidanceFY"></span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<h2 class="section-title">Financial Performance</h2>
+
+<p class="subsection-title">Annual Series (June-basis FY16&ndash;FY20, then Jan-basis, then Sep-basis &mdash; stub periods hatched)</p>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Revenue &amp; Gross Profit</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('revenueChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('revenue')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="revenueChart"></canvas></div>
+        <p class="chart-note">Annual only (no meaningful quarterly cadence for a harvest-cycle business). Hatched/lighter bars = stub periods (FY2021-7mo is 7 months, FY2025-8mo is 8 months) &mdash; not directly comparable to 12-month bars.</p>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Gross Margin %</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('grossMargin')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="grossMarginChart"></canvas></div>
+        <p class="chart-note">Percentage metric &mdash; no log toggle. Stub periods marked with a distinct point style.</p>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>EBITDA &amp; NPAT</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('ebitdaNpat')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="ebitdaNpatChart"></canvas></div>
+        <p class="chart-note">No log toggle: both series cross zero (FY2022 mortality-crisis NPAT &minus;$73.2m, EBITDA &minus;$15.6m). This is GAAP EBITDA, not management's "Pro-Forma Operating EBITDA" &mdash; see the Pro-Forma vs GAAP chart below.</p>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Operating Cash Flow vs CapEx</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('ocfCapex')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="ocfCapexChart"></canvas></div>
+        <p class="chart-note">No log toggle: OCF and CapEx both cross/approach zero in places. CapEx is shown as a positive magnitude for readability (it is a cash outflow).</p>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Free Cash Flow</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('fcf')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="fcfChart"></canvas></div>
+        <p class="chart-note">No log toggle: FCF is negative in most years (heavy, lumpy Blue Endeavour / stay-in-business capex against a volatile biological cash engine).</p>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shareholders&rsquo; Equity &amp; Net Cash/Debt</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('equityNetDebt')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="equityNetDebtChart"></canvas></div>
+        <p class="chart-note">No log toggle: net cash/debt crosses zero. Equity fell sharply into FY2022 (crisis losses), then jumped on the dilutive 2022 rights issue (share count 139m &rarr; 541m) before recovering FY2023 onward.</p>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shares Outstanding</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('sharesChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('shares')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="sharesChart"></canvas></div>
+        <p class="chart-note">The ~139m &rarr; ~541m step at the FY2022 rights issue breaks per-share continuity: EPS, NAV/share and any per-share CAGR before vs after this point are not comparable.</p>
+    </div>
+</div>
+
+<p class="subsection-title" style="margin-top:35px;">Half-Year Series (H1 FY2018&hellip;H1 FY2026-Mar, most recent half)</p>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Half-Year Revenue &amp; NPAT</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('h1RevNpat')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="h1RevNpatChart"></canvas></div>
+        <p class="chart-note">No log toggle: NPAT crosses zero repeatedly. Two "H1 FY2026" rows exist because of the balance-date change: H1 FY2026-Jul (6mo to 31 Jul 2025, still transitioning) and H1 FY2026-Mar (6mo to 31 Mar 2026, the current comparative half). Only H1 FY2026-Mar is the latest normal-cadence half.</p>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Half-Year EBITDA</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('h1Ebitda')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="h1EbitdaChart"></canvas></div>
+        <p class="chart-note">GAAP EBITDA by half. The swing from H1 FY2026-Jul (&minus;$25.1m, transitional/winter) to H1 FY2026-Mar (+$24.0m) illustrates both real recovery and strong seasonality &mdash; not an apples-to-apples pair, since -Jul and -Mar cover different 6-month windows around the balance-date change.</p>
+    </div>
+</div>
+
+<h2 class="section-title">Earnings Quality</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>GAAP EBITDA vs Pro-Forma Operating EBITDA (H1 periods)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('proForma')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="proFormaChart"></canvas></div>
+        <p class="chart-note">Illustrative recent halves only (GAAP EBITDA per the metrics CSV vs Pro-Forma figures disclosed in results/guidance, NZ$m). Management guides FY26 on Pro-Forma Operating EBITDA $30&ndash;34m; GAAP and pro-forma have diverged materially period to period.</p>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>FY26 Guided Harvest Ramp (G&amp;G MT)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('harvestRamp')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="harvestRampChart"></canvas></div>
+        <p class="chart-note">Guided ranges shown as midpoints with min/max error bars via a floating bar; FY26 is guidance, FY27/FY28 are multi-year targets, not booked results.</p>
+    </div>
+</div>
+
+<h2 class="section-title">DCF Valuation</h2>
+
+<div class="dcf-section">
+  <div class="dcf-philosophy" id="dcfPhilosophy"></div>
+
+  <div class="dcf-summary">
+    <div class="dcf-card highlight">
+      <div class="dcf-label">Prob-Weighted IV</div>
+      <div class="dcf-value" id="dcfWeighted">$0.00</div>
+      <div class="dcf-change" id="dcfWeightedUpside"></div>
+      <div class="dcf-sublabel" id="dcfWeightedSublabel"></div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Intrinsic Value (Base)</div>
+      <div class="dcf-value" id="dcfIV">$0.00</div>
+      <div class="dcf-change positive" id="dcfUpside"></div>
+      <div class="dcf-sublabel">Owner FCF &mdash; component-built, mid-cycle margins</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Entry Price (15% CAGR)</div>
+      <div class="dcf-value" id="dcfEntry">$0.00</div>
+      <div class="dcf-sublabel">Buy below for a 15% annual return (incl. interim FCF)</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Current Price</div>
+      <div class="dcf-value" id="dcfCurrent">$0.00</div>
+      <div class="dcf-sublabel">NZD, NZX/ASX dual-listed &mdash; no FX conversion needed</div>
+    </div>
+  </div>
+
+  <div class="dcf-warning" id="growthWarning" style="display: none;">
+    <span class="warning-icon">&#9888;</span>
+    <span id="warningText"></span>
+  </div>
+
+  <div class="dcf-inputs">
+    <h4>DCF Model Inputs</h4>
+    <div class="dcf-inputs-grid">
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Base FCF (after SBC)</div>
+        <div class="dcf-input-value" id="baseFCF">$0M</div>
+        <div class="dcf-input-note" id="sbcBreakdown">Starting point for projections</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Shares Outstanding</div>
+        <div class="dcf-input-value" id="sharesOut">0M</div>
+        <div class="dcf-input-note" id="dilutionNote"></div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Net Debt</div>
+        <div class="dcf-input-value" id="netDebt">$0M</div>
+        <div class="dcf-input-note">Negative = net cash</div>
+      </div>
+    </div>
+    <div class="fcf-projections">
+      <h5>Projected FCF (5-Year, illustrative toy model from sliders &mdash; see note below)</h5>
+      <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+      <p class="chart-note">The analyst's actual 10-year component-built model (revenue &times; EBITDA margin &minus; D&amp;A &minus; tax &minus; capex &minus; working capital) drives the scenario cards and sensitivity table below. The 5-year table above and the sliders use a simplified single-growth-rate approximation for interactivity; it will not exactly match the scenario figures.</p>
+    </div>
+  </div>
+
+  <div class="dcf-controls">
+    <div class="slider-group">
+      <label>Growth Rate: <span id="growthValue">8%</span></label>
+      <input type="range" id="growthSlider" min="0" max="30" value="8" step="0.1" oninput="updateDCFDisplay()">
+      <div class="slider-hint" id="growthHint">Based on blended clean-window revenue CAGR</div>
+    </div>
+    <div class="slider-group">
+      <label>WACC: <span id="waccValue">17.5%</span></label>
+      <input type="range" id="waccSlider" min="6" max="25" value="17.5" step="0.05" oninput="updateDCFDisplay()">
+    </div>
+    <div class="slider-group">
+      <label>Terminal Growth: <span id="terminalValue">2%</span></label>
+      <input type="range" id="terminalSlider" min="0" max="5" value="2" step="0.1" oninput="updateDCFDisplay()">
+    </div>
+  </div>
+
+  <div class="scenario-tabs">
+    <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+    <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+    <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+  </div>
+
+  <div class="scenario-details" id="scenarioDetails">
+    <h4>Assumptions</h4>
+    <p class="scenario-narrative" id="scenarioNarrative"></p>
+    <div class="assumption-grid" id="assumptionGrid"></div>
+  </div>
+
+  <div class="sensitivity-section">
+    <h4>Sensitivity Analysis: Intrinsic Value by WACC &amp; Terminal Growth (Base Case)</h4>
+    <table class="sensitivity-table" id="sensitivityMatrix"></table>
+  </div>
+
+  <div class="historical-growth">
+    <h4>Historical Growth Rates (CAGR)</h4>
+    <div class="growth-grid" id="growthGrid"></div>
+    <p class="chart-note" id="growthNotes" style="margin-top:15px;"></p>
+  </div>
+
+  <div class="dcf-download">
+    <a href="NZK.NZ_DCF_Model.xlsx" class="download-btn" download>
+      <span class="download-icon">&#8681;</span> Download Excel Model
+    </a>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// EMBEDDED DATA
+// ============================================================
+const csvData = `Period,Revenue,CostOfRevenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,EBITDA,NetIncome,NetMargin,EPS,OperatingCashFlow,CapEx,FreeCashFlow,ShareholdersEquity,TotalAssets,TotalLiabilities,TotalDebt,CashAndEquivalents,SharesOutstanding,StockBasedComp,DividendPerShare,EBITDABeforeSignificant,RevenueContinuing,EBITDAContinuingBeforeSignificant,EBITContinuingBeforeSignificant,Units,Currency
+FY2016,114.06,-104.883,29.266,,,,13.816,2.593,,0.02,4.05,-6.972,-2.922,37.014,165.723,128.709,19.0,2.419,,,,,,,,millions,NZD
+FY2017,136.351,-119.879,57.957,,,,38.533,22.764,,0.16,5.33,-7.449,-2.119,158.675,204.512,45.837,0.414,10.647,,0.142,,,,,,millions,NZD
+H1 FY2018,87.688,-76.244,34.426,,,,4.728,15.735,,0.11,14.228,-5.263,8.965,171.454,226.851,55.397,1.513,15.529,138.32,0.121,,,,,,millions,NZD
+FY2018,160.271,-145.32,50.048,,,,28.482,16.125,,0.12,24.838,-14.022,10.816,166.301,215.974,49.673,0.461,14.428,,0.263,,,,,,millions,NZD
+H1 FY2019,87.881,-82.316,36.744,,,,7.007,15.08,,0.11,1.091,-8.812,-7.721,,216.974,68.765,0.416,7.425,,0.14,,,,,,millions,NZD
+FY2019,172.609,-172.147,44.822,,,,23.063,11.35,,0.08,10.841,-14.191,-3.35,168.752,222.06,53.308,0.416,6.231,,,,,,,,millions,NZD
+H1 FY2020,84.189,-74.83,47.886,,,,7.064,20.766,,0.15,2.041,-10.409,-8.368,187.441,272.067,84.626,3.104,4.962,,0.164,,,,,,millions,NZD
+FY2020,155.344,-145.768,58.349,,26.689,,36.074,18.004,,0.13,4.224,-16.148,-11.924,184.314,274.184,89.87,1.132,7.115,,0.167,,,,,,millions,NZD
+FY2021-7mo,95.239,-98.82,14.153,,4.975,,9.964,-7.079,,-0.05,-0.881,-4.837,-5.718,192.543,288.016,95.473,3.024,3.479,138.986,0.263,,,,,,millions,NZD
+H1 FY2021,82.279,-78.35,14.343,,,,0.274,-4.323,,-0.03,-6.679,-4.399,-11.078,194.415,298.565,104.15,2.614,5.581,,0.164,,,,,,millions,NZD
+H1 FY2022,80.095,-86.621,12.88,,,,-1.114,-5.596,,-0.04,8.973,-6.44,2.533,,,,,2.927,138.986,0.121,,,,,,millions,NZD
+FY2022,174.53,-177.774,12.743,,-84.973,,-15.593,-73.202,,-0.53,7.008,-10.295,-3.287,111.229,197.328,86.099,0.0,2.913,139.004,,,,,,,millions,NZD
+H1 FY2023,80.033,-89.921,-8.045,,,,-17.984,-24.487,,-0.05,9.282,-4.56,4.722,141.219,184.794,43.575,1.636,19.8,541.455,,,,,,,millions,NZD
+FY2023,167.131,-164.657,30.623,,3.276,,11.698,1.891,,0.0,10.475,-4.557,5.918,167.906,201.288,33.382,0.75,19.221,541.455,,,,,,,millions,NZD
+H1 FY2024,91.561,-84.435,27.11,,,,18.276,10.63,,0.02,11.768,-1.573,10.195,174.232,208.965,34.733,0.75,28.666,541.455,,,,,,,millions,NZD
+FY2024,187.106,-171.203,65.378,,39.405,,46.99,28.452,,0.05,13.213,-6.049,7.164,190.295,238.945,48.65,3.417,20.908,541.455,,,,,,,millions,NZD
+FY2025-8mo,117.719,-117.57,10.237,,-9.599,,-3.709,-6.327,,-0.01,10.63,-12.864,-2.234,197.338,241.269,43.931,2.0,45.629,538.182,0.069,,,,,,millions,NZD
+H1 FY2025,101.718,-100.454,24.61,,8.756,,12.481,6.006,,0.01,16.204,-5.212,10.992,193.59,241.398,47.808,1.131,28.298,538.686,,,,,,,millions,NZD
+FY2025-Jan,210.993,-193.039,45.365,,18.247,,26.384,13.359,,0.02,38.458,-10.743,27.715,197.031,252.196,55.165,4.505,49.738,538.433,0.14,,,,,,millions,NZD
+H1 FY2026-Jul,94.471,-89.986,-12.714,,-29.594,,-25.065,-20.845,,-0.04,19.645,-8.501,11.144,183.565,225.446,41.881,2.358,57.354,538.182,0.033,,,,,,millions,NZD
+H1 FY2026-Mar,100.253,-88.19,35.656,,19.027,,23.954,13.808,,0.03,7.306,-12.304,-4.998,211.256,263.033,51.777,1.934,40.155,538.182,0.069,,,,,,millions,NZD
+`;
+
+const analysis = {
+  "ticker": "NZK.NZ",
+  "company_name": "New Zealand King Salmon Investments Limited",
+  "sector": "Aquaculture / Food Producers",
+  "analysis_date": "2026-08-23",
+  "overview": "New Zealand King Salmon (NZKS) is the world's largest producer of farmed King (Chinook) salmon, farming premium branded salmon (Ora King, Regal, Omega Plus pet food by-products) in the Marlborough Sounds of New Zealand's South Island. It sells fresh and value-added salmon domestically and exports to North America, Australia, China and other Asian and European markets, and is dual-listed on the NZX (primary, NZK) and ASX (foreign exempt listing, NZK). The company is emerging from a multi-year biological crisis driven by warming sea temperatures and is now investing heavily in Blue Endeavour, a first-of-its-kind open-ocean farming site intended to materially increase production capacity in cooler water outside the Sounds.",
+  "business_model": {
+    "summary": "NZKS grows, harvests, processes and sells King salmon under premium brands, monetising through fresh/chilled wholefish, value-added (fillets, portions, smoked, ready-to-eat) product, and by-product pet-food (Omega Plus). Revenue is transactional/seasonal (tied to harvest cycles and Christmas-period peak demand) rather than contractual/recurring, and is highly sensitive to biological performance (mortality, feed conversion, harvest weight) which drives both volume and cost of goods sold.",
+    "revenue_streams": [
+      {"name": "New Zealand (domestic)", "percent": 38, "trend": "growing"},
+      {"name": "North America", "percent": 37, "trend": "stable"},
+      {"name": "Australia", "percent": 15, "trend": "stable"},
+      {"name": "China", "percent": 4, "trend": "growing"},
+      {"name": "Asia ex-China & Japan", "percent": 2, "trend": "declining"},
+      {"name": "Japan", "percent": 2, "trend": "stable"},
+      {"name": "Europe", "percent": 2, "trend": "declining"}
+    ],
+    "customer_type": "Mixed B2B and B2C — foodservice, retail and wholesale distributor channels domestically and in export markets, with growing direct/retail brand presence (Ora King, Regal)",
+    "geographic_mix": "1HY26 revenue split: New Zealand 38%, North America 37%, Australia 15%, China 4%, Japan 2%, Asia ex-China/Japan 2%, Europe 2% (NZ$100.3m total revenue, 6 months to 31 Mar 2026)"
+  },
+  "competitive_position": {
+    "main_competitors": ["Sanford Limited (Big Glory Bay King Salmon, Stewart Island)", "Mowi (Atlantic salmon, global scale)", "Cooke Aquaculture / Tassal (Atlantic salmon, Australia/Tasmania)", "Leroy Seafood Group (Atlantic salmon)", "Generic Atlantic salmon imports (Chile, Norway, Scotland) in NZK's export markets"],
+    "market_position": "NZKS is the dominant producer of farmed King (Chinook) salmon globally, supplying the large majority of New Zealand's ~15,000 tonne annual King salmon harvest (NZ itself produces roughly 75% of world King salmon supply). Its only meaningful domestic competitor, Sanford's Big Glory Bay, is materially smaller. Globally, NZKS competes less on volume (King salmon is under 1% of world salmon supply) and more on premium positioning against much larger Atlantic salmon producers.",
+    "moat_factors": [
+      {"factor": "Species scarcity / category leadership", "strength": "strong", "description": "King (Chinook) salmon is a genuinely rare, higher-fat, premium species; NZKS controls the large majority of global supply and owns essentially all of the long-dated NZ marine farming consents needed to grow it at scale"},
+      {"factor": "Brand", "strength": "moderate", "description": "Ora King is an internationally recognised premium chef/culinary brand (10-year ambassador programme, strong US/Australia visibility); Regal leads the NZ retail salmon category with high consideration-to-preference conversion (79%, per Tracksuit)"},
+      {"factor": "Regulatory barrier to entry", "strength": "strong", "description": "Marine farming consents in the Marlborough Sounds and the new Cook Strait open-ocean zone (Blue Endeavour, consented to 2057) are scarce, contested and take years to obtain, making replication by a new entrant very difficult"},
+      {"factor": "Vertical integration", "strength": "moderate", "description": "Owns hatcheries, sea farms, processing and increasingly logistics (own wellboat, feed warehouse), giving cost and quality control advantages over less integrated players"}
+    ],
+    "weaknesses": [
+      "Single species, single country and largely single-region (Marlborough Sounds) production concentration creates acute biological and climate exposure",
+      "Small absolute scale versus global Atlantic salmon majors (Mowi, Cooke, Leroy) limits negotiating leverage with global retail/foodservice buyers and caps economies of scale",
+      "History of volatile, hard-to-forecast biological performance undermines customer supply reliability and has previously forced supply rationing"
+    ]
+  },
+  "growth_drivers": [
+    "Blue Endeavour open-ocean farm (Cook Strait site, consented to 2057): pilot pens now in the water (relocated to site April 2026, first fish transfer expected late May/June 2026); at full commercial scale (two blocks of 10 pens, ~10,000t/annum) management guides to a potential ~$350m annual export revenue uplift versus current base",
+    "Ronja King wellboat (NZ's first purpose-built salmon wellboat, operational from late May 2026) unlocks an incremental ~2,000 mt/annum of harvest from existing inshore sites even before Blue Endeavour scales, worth a guided $60m+ in annual revenue uplift",
+    "Multi-year harvest ramp already guided: FY26 ~5,950-6,050 G&G MT, rising to FY27 ~7,200-7,600 MT (unchanged) and FY28 ~8,500-9,100 MT (raised from ~8,200-8,800 MT)",
+    "Pilot Recirculating Aquaculture System (RAS) at Tentburn (targeted operational late 2026/early 2027) aimed at improving smolt quality, freshwater capacity and biological resilience ahead of the Blue Endeavour ramp",
+    "Genomics/thermotolerance breeding programme (first thermotolerant fish went to sea 2026) targeting structurally lower mortality and better summer performance over time",
+    "New Cloudy Bay (Blenheim) site purchased for future factory/processing capacity expansion to handle the coming volume increase",
+    "China and broader Asian retail/foodservice expansion for the Regal brand from a very low current base (~4% of revenue)"
+  ],
+  "risks": {
+    "business": [
+      {"risk": "Climate/sea-temperature-driven mass mortality", "severity": "high", "description": "The company's existential risk. Warming Marlborough Sounds sea temperatures drove a mass mortality event (up to ~42% in warm-water sites) and a NZ$73m loss in the year to Jan-2022, forcing a deeply discounted 2022 rights issue. Biological performance remains volatile year to year even after multiple mitigation investments (summer diet, thermotolerant breeding, cooler-site strategy)"},
+      {"risk": "Single-species, single-region concentration", "severity": "high", "description": "Nearly all production is King salmon farmed in the Marlborough Sounds/Cook Strait; there is no meaningful geographic or species diversification to fall back on if conditions in that specific marine environment deteriorate"},
+      {"risk": "Customer/channel and premium-price dependence", "severity": "moderate", "description": "Business depends on maintaining premium pricing versus much cheaper Atlantic salmon in foodservice and retail channels; a recessionary pullback in premium foodservice spend or oversupply of Atlantic salmon could pressure realised prices"},
+      {"risk": "Non-GAAP guidance / earnings quality", "severity": "moderate", "description": "Management guides the market to 'Pro-Forma Operating EBITDA', which strips out NZ IAS 41 biological-asset fair-value swings and early FX close-outs and has diverged materially from statutory GAAP EBITDA (e.g., 1HY26 GAAP EBITDA $24.0m vs Pro-Forma $17.2m; prior period GAAP EBITDA of -$25.1m vs Pro-Forma +$5.7m) — investors must read both figures and understand the reconciliation to avoid being misled by fair-value noise in either direction"}
+    ],
+    "financial": [
+      {"risk": "Growth capex funding", "severity": "moderate", "description": "FY26 guided capex of $18-25m (mostly Blue Endeavour pilot, RAS and Cloudy Bay) is being funded from a net cash balance of ~$43m (Mar-2026); further scale-up of Blue Endeavour to full ~10,000t capacity will likely require materially more capital and could necessitate debt or equity funding, diluting shareholders"},
+      {"risk": "FX exposure", "severity": "moderate", "description": "Majority of revenue is exported (North America, Australia, Asia, Europe) and priced in foreign currencies (primarily USD/AUD) against an NZD cost base; FX hedging (early close-outs) is a recurring pro-forma adjustment item"},
+      {"risk": "Feed and input cost inflation", "severity": "moderate", "description": "Feed cost per kg rose ~15% YoY in 1HY26, partly due to a new, more effective but pricier summer diet and global freight/raw-material cost pressure linked to the Middle East conflict; management flags these pressures likely persisting into FY27"}
+    ],
+    "regulatory": [
+      {"risk": "Marine farming consent dependence", "severity": "moderate", "description": "The business is entirely dependent on long-dated resource consents (expiring 2044-2057 across sites) for its right to farm; while currently secure, any future tightening of environmental/consent conditions (benthic impact, marine mammal protections) could constrain operations or add compliance cost"},
+      {"risk": "Balance-date changes reduce comparability", "severity": "low", "description": "NZK changed its fiscal year-end twice — from 31 January to a 31 January date reaffirmed in 2021 (7-month stub) and then to 30 September in 2025 (an 8-month stub, FY25 (Sept) covering Feb-Sep 2025). This creates several non-standard, non-comparable reporting periods (FY25 (Jan), FY25 (Sept), 1HY25 (Jan), 1HY25 (Sept)) that can confuse historical trend analysis and automated screening tools"}
+    ],
+    "macro": [
+      {"risk": "Ocean warming / climate change trend", "severity": "high", "description": "Structural, not just cyclical: rising baseline sea temperatures in the Marlborough Sounds are the root cause of the FY22/23 crisis and remain the central long-term threat to the inshore farming base, which is precisely why Blue Endeavour's cooler open-ocean water is strategically critical"},
+      {"risk": "Global shipping/fuel cost shocks", "severity": "moderate", "description": "Middle East conflict-related freight and fuel surcharges were cited as an active risk to FY26 guidance (subsequently proved less severe than feared as of the August 2026 upgrade, but the conflict remains unresolved)"}
+    ],
+    "execution": [
+      {"risk": "Blue Endeavour execution and timeline slippage", "severity": "high", "description": "The mooring grid installation for the Blue Endeavour pilot was delayed from original targets (originally expected calendar-2025, only completed March 2026, with pens relocated to site in April 2026 and first fish transfer targeted late May/early June 2026); a technically novel, world-first open-ocean farming system carries meaningful risk of further delay, cost overrun, or underperformance versus the ~$350m full-scale revenue ambition"},
+      {"risk": "Small-cap illiquidity", "severity": "moderate", "description": "NZK is a small-cap dual-listed stock (52-week range roughly NZ$0.20-$0.27) with a concentrated shareholder register (Oregon Group holds a large stake), which can mean thin trading liquidity and outsized price moves on newsflow"}
+    ]
+  },
+  "macro_factors": {
+    "industry_outlook": "Global demand for premium, sustainably farmed seafood protein continues to grow, and King salmon in particular is a scarce, high-value niche within the broader salmon category; NZ industry bodies and government (Primary Sector Growth Fund co-funding of NZK's 'Future Farming' programme) are actively backing aquaculture expansion, including fast-tracking of open-ocean consenting",
+    "cyclicality": "Moderately cyclical/seasonal — sales peak around the Christmas/summer period in NZ and are sensitive to premium foodservice and retail discretionary spend in export markets, compounded by an idiosyncratic biological cycle (mortality, harvest timing) that is arguably a bigger driver of year-to-year results than macro demand",
+    "interest_rate_sensitivity": "Low-to-moderate direct sensitivity given the company currently holds net cash (~$43m at Mar-2026), but rising rates would raise the cost of any future debt-funded Blue Endeavour scale-up and depress the value of long-dated growth cash flows in a DCF sense",
+    "key_input_costs": ["Salmon feed (marine and plant-based inputs)", "Freight/fuel for feed and product logistics", "Labour (Marlborough/Nelson region)", "Vessel/wellboat operating costs"]
+  },
+  "recent_developments": [
+    {"date": "2026-08", "event": "NZK upgraded FY26 guidance again: Pro-Forma EBITDA raised to $30m-$34m (from $23m-$29m) and Pro-Forma EBIT to $21m-$25m (from $13m-$19m), with harvest volume narrowed to 5,950-6,050 G&G MT, citing strong fish performance and smaller-than-feared supply-chain/fuel-surcharge impact from the Middle East conflict; management flagged cost pressures persisting into FY27"},
+    {"date": "2026-05", "event": "1HY26 results (6 months to 31 Mar 2026): GAAP NPAT of $13.8m (vs a $20.8m loss in the prior comparable 6-month period), revenue of $100.3m (+6%), GAAP EBITDA $24.0m and Pro-Forma EBITDA $17.2m (vs Pro-Forma $5.7m prior period) — a swing to profitability driven by materially improved biological performance (lower mortality, better feed conversion, higher harvest weight) and improved processing efficiencies"},
+    {"date": "2026-04/2026-05", "event": "Blue Endeavour pilot pens successfully relocated to the open-ocean Cook Strait site after mooring-grid installation was completed in March 2026 (following earlier delays); NZ's first purpose-built salmon wellboat, the Ronja King, arrived in Picton late April 2026 and became operational late May 2026"},
+    {"date": "2025-11", "event": "FY25 (Sept) annual results released — an 8-month transitional period (Feb-Sep 2025) following the second balance-date change, reporting a net loss after tax of $6.3m and Pro-Forma EBITDA of $7.1m as the business continued recovering from reduced feed-outs/harvest earlier in the cycle"},
+    {"date": "2025 (ongoing)", "event": "Company continuing its multi-year fish-health and resilience programme: new summer diet rollout, genomics-based breeding for thermotolerance (first thermotolerant fish to sea in 2026), improved seal protection, dedicated in-house fish veterinarian"}
+  ],
+  "guidance": {
+    "as_of": "August 2026 guidance upgrade (post 1HY26, pre FY26 year-end)",
+    "fiscal_year": "FY2026 (12 months to 30 September 2026)",
+    "items": [
+      {"metric": "Pro-Forma Operating EBITDA", "target": "$30m-$34m", "period": "FY2026", "vs_prior": "raised", "notes": "Upgraded from $23m-$29m (which itself had been upgraded in April 2026 from $19m-$27m); narrowing and raising driven by continued strong fish performance and smaller-than-feared fuel/supply-chain cost impact from the Middle East conflict"},
+      {"metric": "Pro-Forma Operating EBIT", "target": "$21m-$25m", "period": "FY2026", "vs_prior": "raised", "notes": "Upgraded from $13m-$19m"},
+      {"metric": "Harvest volume (G&G)", "target": "5,950-6,050 metric tonnes", "period": "FY2026", "vs_prior": "raised", "notes": "Narrowed from the prior 5,800-6,100 MT range as confidence in the upper end increased"},
+      {"metric": "CapEx", "target": "$18m-$25m", "period": "FY2026", "vs_prior": "maintained", "notes": "Includes Blue Endeavour pilot, RAS pilot and Cloudy Bay factory-site capex plus stay-in-business spend; 1HY26 actual capex was ~$12.7m ($9.0m growth / $3.7m stay-in-business)"},
+      {"metric": "Harvest volume (G&G) — forward years", "target": "FY27: ~7,200-7,600 MT (unchanged); FY28: ~8,500-9,100 MT (raised from ~8,200-8,800 MT)", "period": "FY2027-FY2028", "vs_prior": "raised", "notes": "Multi-year harvest ramp underpinning the medium-term growth case ahead of full Blue Endeavour commercial scale"}
+    ],
+    "management_commentary": "CEO Carl Carrington attributed the August 2026 upgrade to strong fish performance and a smaller-than-expected impact from global oil/supply-chain disruptions tied to the Middle East conflict, while cautioning that elevated cost pressures are expected to persist into FY27 and that continued investment in growth initiatives (Blue Endeavour, RAS, wellboat) may temporarily constrain near-term earnings ahead of new production volumes coming online. Formal FY2027 guidance is expected with full FY26 results in November 2026."
+  },
+  "bull_case": [
+    "Genuine recovery in train: swing from a $20.8m 6-month loss to $13.8m 6-month profit, with FY26 Pro-Forma EBITDA guidance upgraded three times in 2026 (April, and twice implied through to August) shows real, sustained operational improvement, not a one-off",
+    "Blue Endeavour is a rare, long-consented (to 2057), first-mover open-ocean asset that management guides could add ~$350m of annual export revenue at full scale — an order of magnitude above the current ~$180-200m annualised revenue base — funded initially from a healthy net cash position (~$43m)",
+    "Near-term, lower-risk uplift already de-risked: the Ronja King wellboat alone is guided to add ~2,000 mt/annum (~$60m+ revenue) from existing consented inshore sites, ahead of and independent from Blue Endeavour's full scale-up",
+    "Category leadership in a genuinely scarce, premium species (King salmon, <1% of global salmon supply) with strong brand equity (Ora King, Regal) gives structural pricing power versus commodity Atlantic salmon",
+    "Multi-year harvest guidance already visible out to FY28 (~8,500-9,100 MT, roughly 40-50% above FY26 volumes), giving investors a rare degree of medium-term production visibility in a historically volatile business"
+  ],
+  "bear_case": [
+    "The core existential risk — warming Marlborough Sounds sea temperatures causing mass mortality — is a structural climate trend, not a one-off event; the FY22 crisis (NZ$73m loss, deeply discounted rights issue) can recur, and even the current 'recovery' narrative is only 1-2 good biological seasons into a business with a multi-year history of missed forecasts",
+    "Blue Endeavour is unproven at scale: it is a world-first open-ocean King salmon farming system, has already suffered delays (mooring grid installation slipped roughly a year), and the flagship ~$350m revenue opportunity requires successful commercial-scale execution, additional capital, and market absorption of a very large volume increase — any one of which could disappoint",
+    "Non-GAAP guidance quality: management guides the market on 'Pro-Forma Operating EBITDA' which strips out large, genuinely economically relevant biological fair-value swings (IAS 41) — investors focused only on the guided metric can miss much larger swings in statutory GAAP earnings and book value",
+    "Small, illiquid, dual-region concentrated stock with a dominant shareholder (Oregon Group, ~40%) — limited float, thin trading, and governance/related-party dynamics typical of a controlled small-cap",
+    "Scaling Blue Endeavour and the harvest ramp to FY28 will likely require capital beyond current net cash once growth capex accelerates, creating dilution or leverage risk precisely when the company is trying to prove its growth thesis; input cost inflation (feed, freight/fuel) is also guided to persist into FY27, pressuring margins even as volumes grow"
+  ]
+};
+
+const dcfData = {
+ "ticker": "NZK.NZ",
+ "valuation_date": "2026-08-23",
+ "current_price": 0.24,
+ "inputs": {
+  "shares_outstanding": 538.182,
+  "net_debt": -38.221,
+  "last_fcf": 2.49,
+  "reported_fcf": 5.4,
+  "sbc": 0.14,
+  "sbc_incl_equity_taxes": 0.14,
+  "sbc_pct_of_revenue": 0.07,
+  "sbc_pct_path": [0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07],
+  "interest_income": 0.87,
+  "lease_principal_payments": 1.9,
+  "sbc_source": "FY25(Sept) annual report note: share based payment expense $69k (8mo) / $140k (FY2025-Jan 12mo); two small LTI schemes, no cash equity-award taxes disclosed",
+  "buyback_cash": 0,
+  "annual_share_growth_pct": 0.0,
+  "projected_shares": [538.182,538.182,538.182,538.182,538.182,538.182,538.182,538.182,538.182,538.182],
+  "share_count_basis": "538,182,273 ordinary shares per FY25(Sept) annual report and H1 FY2026 interims; LTI dilution negligible (~0.07% of revenue SBC); held FLAT — SBC fully expensed in flows",
+  "price_as_of": "2026-08-21T04:59:51Z regular close (Friday close; latest available on valuation date Sunday 2026-08-23)",
+  "balance_sheet_date": "2026-03-31",
+  "currency": "NZD",
+  "units": "millions",
+  "horizon_years": 10,
+  "notes": "MODEL: owner-FCF DCF (operating company route). FY0 anchor is FY2026E (12 months to 30 Sep 2026, guided): revenue ~NZ$191m, Pro-Forma EBITDA guidance $30-34m. LEASES (IFRS 16, treatment B): lease principal (~NZ$1.9m/yr) expensed inside EBITDA margin path; lease liabilities ($9.2m) EXCLUDED from net debt — net debt is borrowings $1.934m minus cash $40.155m = -$38.221m (Mar-2026). INTEREST INCOME (~$0.9m/yr) stripped. SBC ~$0.14m/yr (0.07% of revenue). last_fcf $2.49m = FY2026E reported-basis FCF est. $5.40m − SBC $0.14m − interest income $0.87m − lease principal $1.90m. GAAP vs PRO-FORMA WARNING: management guides on Pro-Forma Operating EBITDA which strips IAS 41 biological-asset fair-value swings; diverged materially from GAAP (H1 FY2026: GAAP EBITDA $23.95m vs Pro-Forma $17.23m). FUNDING: full-scale Blue Endeavour (~10,000t, ~$350m revenue ambition) is NOT in any scenario's explicit years.",
+  "fiscal_calendar_warning": "Balance date changed TWICE: FY2016-FY2020 = years to 30 June; FY2021-7mo = 7-month stub to 31 Jan 2021; FY2022-FY2025-Jan = years to 31 January; FY2025-8mo = 8-month stub to 30 Sep 2025; current basis = years to 30 September (FY2026 = 12mo to 30 Sep 2026). Stubs were never annualized and never used in CAGRs or multiples."
+ },
+ "historical_growth": {
+  "revenue_3yr_cagr": 6.5,
+  "revenue_5yr_cagr": null,
+  "eps_3yr_cagr": null,
+  "eps_5yr_cagr": null,
+  "equity_3yr_cagr": 21.0,
+  "equity_5yr_cagr": null,
+  "fcf_3yr_cagr": null,
+  "fcf_5yr_cagr": null,
+  "selected_growth_rate": 8.0,
+  "growth_rate_source": "blend of clean-window revenue CAGRs: June-basis FY2016->FY2020 4yr 8.0% and post-crisis Jan-basis FY2023->FY2025-Jan 2yr 12.4% (revenue), with post-crisis equity 2yr 8.3%; forward path instead anchored to guided FY27/FY28 harvest ramp",
+  "growth_divergence_warning": "equity 3yr CAGR 21.0% (FY2022->FY2025-Jan) vs revenue 3yr 6.5% diverges >30% — the equity CAGR is inflated by the 2022 rights-issue capital injection off the crisis-trough base (equity $111.2m at Jan-2022 AFTER the -$73.2m loss), not by earned returns. Do not use it as a growth proxy.",
+  "notes": "Balance date changed twice, so NO clean 5-year CAGR exists on any metric — 5yr fields are null rather than manufactured across mismatched year-ends. EPS and FCF CAGRs are not computable meaningfully: EPS crosses the 139m->541m recapitalization and sign flips (FY2022 -$0.53); FCF flips sign repeatedly. Owner-FCF series (reported FCF - SBC - interest income - lease principal): FY2023 4.01, FY2024 4.82, FY2025-Jan 24.53, FY2025-8mo -4.61, H1 FY2026-Mar -6.42."
+ },
+ "assumptions": {
+  "wacc": 17.5,
+  "wacc_rationale": "Built from NZD flows: NZ 10yr govt ~4.5% + NZX small-cap ERP ~7% -> ~11.5% standard NZ small-cap base. Structural premiums: +1.75% extreme biological/climate cyclicality; +2.0% small-cap illiquidity; +1.25% single-species/single-region concentration; +1.0% resource-consent/regulatory single-point-of-failure. Total 17.5%, applied identically to all three scenarios.",
+  "terminal_growth": 2.0,
+  "terminal_cap_multiple": 12,
+  "terminal_cap_rationale": "12x FCF cap (low end of the cyclical 12-15x band); Gordon at 17.5%/2.0% implies 6.6x and binds in all scenarios, well under the cap",
+  "base": {
+   "narrative": "BASE: the guided inshore ramp mostly delivers, with a haircut for NZK's history of missed biological forecasts — wellboat-enabled harvest growth toward ~7,200t then ~8,000t+, revenue decelerating from +15% to 2% terminal. Post-lease EBITDA margin recovers from 15.0% to a 17.0% mid-cycle level — deliberately below FY2024's 25% GAAP peak and above FY2025-Jan's 12.5%. Capex stays elevated (9.5% of revenue) through the Blue Endeavour pilot/RAS phase then fades to 5% maintenance. Working capital consumes 20% of each revenue increment. Cash tax ramps 18%->28% by year 3. No mortality catastrophe, no full-scale Blue Endeavour.",
+   "growth_rates": [15,12,8,6,5,4,3,2.5,2.5,2.0],
+   "ebitda_margin_path": [15.0,15.5,16.0,16.5,17.0,17.0,17.0,17.0,17.0,17.0],
+   "fcf_margin": 8.2,
+   "sbc_pct_path": [0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07],
+   "da_pct": 5.0,
+   "capex_pct_path": [9.5,9.0,8.0,7.0,6.5,6.0,5.5,5.5,5.0,5.0],
+   "wc_capture_pct": -20,
+   "cash_tax_rate_path": [18,24,28,28,28,28,28,28,28,28],
+   "wacc": 17.5,
+   "terminal_growth": 2.0,
+   "terminal_cap_multiple": 12
+  },
+  "bull": {
+   "narrative": "BULL: the recovery is structural, not a good season — thermotolerant breeding, summer diet and the wellboat hold mortality down; the guided ramp to ~9,000t delivers in full, and the Blue Endeavour PILOT succeeds, supporting a phased partial commercial scale-up (roughly half-scale by year 10, NOT the full 10,000t/~$350m ambition). Revenue compounds 17% tapering to 4%; premium King-salmon pricing power lifts post-lease margins to 19%; capex runs at 10% of revenue for five years to build it. Same tax ramp and WACC as base.",
+   "growth_rates": [17,16,14,13,12,10,8,6,5,4],
+   "ebitda_margin_path": [15.5,16.5,17.5,18.0,18.5,19.0,19.0,19.0,19.0,19.0],
+   "fcf_margin": 9.26,
+   "sbc_pct_path": [0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07],
+   "da_pct": 5.0,
+   "capex_pct_path": [10,10,10,9,8,7,6,5.5,5.0,5.0],
+   "wc_capture_pct": -20,
+   "cash_tax_rate_path": [18,24,28,28,28,28,28,28,28,28],
+   "wacc": 17.5,
+   "terminal_growth": 2.0,
+   "terminal_cap_multiple": 12
+  },
+  "bear": {
+   "narrative": "BEAR: a warm-summer mortality event recurs in FY2028 (year 2) — a real, recent, observed outcome (FY2022: up to ~42% mortality at warm sites, -$73.2m NPAT), not a tail fantasy. Revenue drops 18%, post-lease EBITDA margin collapses to ~1% in the event year and recovers only to a 14% mid-cycle (structurally warmer Sounds), harvest never reaches the FY28 guide. Blue Endeavour pilot disappoints and full scale-up is shelved. Destocking returns some working capital cash in the down year. Tax losses suppress cash tax through the recovery. The company survives on its $38m net cash without another rights issue — a second capital raise on crisis terms is the residual risk BELOW this case.",
+   "growth_rates": [10,-18,2,12,8,4,3,2,2,2],
+   "ebitda_margin_path": [14.0,1.0,6.0,11.0,13.0,13.5,14.0,14.0,14.0,14.0],
+   "fcf_margin": 6.04,
+   "sbc_pct_path": [0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07,0.07],
+   "da_pct": 5.0,
+   "capex_pct_path": [9.5,8.0,6.0,5.5,5.5,5.5,5.0,5.0,5.0,5.0],
+   "wc_capture_pct": -20,
+   "cash_tax_rate_path": [18,0,5,15,24,28,28,28,28,28],
+   "wacc": 17.5,
+   "terminal_growth": 2.0,
+   "terminal_cap_multiple": 12
+  }
+ },
+ "valuation": {
+  "base": {"sum_pv_fcf": 60.61, "terminal_value": 183.12, "pv_terminal": 36.51, "enterprise_value": 97.12, "equity_value": 135.34, "intrinsic_value": 0.2515, "upside": 4.8, "terminal_pct_of_value": 37.6, "implied_exit_multiple": 6.6},
+  "bull": {"sum_pv_fcf": 69.97, "terminal_value": 313.42, "pv_terminal": 62.48, "enterprise_value": 132.45, "equity_value": 170.68, "intrinsic_value": 0.3171, "upside": 32.1, "terminal_pct_of_value": 47.2, "implied_exit_multiple": 6.6},
+  "bear": {"sum_pv_fcf": 22.67, "terminal_value": 96.0, "pv_terminal": 19.14, "enterprise_value": 41.81, "equity_value": 80.03, "intrinsic_value": 0.1487, "upside": -38.0, "terminal_pct_of_value": 45.8, "implied_exit_multiple": 6.6}
+ },
+ "entry_price": {
+  "hurdle_rate": 0.15,
+  "base": {"entry_price": 0.2835, "entry_discount_from_current": 18.1},
+  "bull": {"entry_price": 0.366, "entry_discount_from_current": 52.5},
+  "bear": {"entry_price": 0.1645, "entry_discount_from_current": -31.5},
+  "weighted_entry_price": 0.2643,
+  "note": "The 15% hurdle is BELOW the 17.5% WACC, so hurdle entry prices sit ABOVE intrinsic value. The binding buy-below price is therefore the probability-weighted IV (NZ$0.234), not the weighted hurdle entry price (NZ$0.264). Bear-case entry NZ$0.164 vs price NZ$0.24: a 15% return from today requires avoiding the mortality-recurrence path."
+ },
+ "sensitivity": {
+  "wacc_range": [15.5,16.5,17.5,18.5,19.5],
+  "terminal_growth_range": [1.0,1.5,2.0,2.5,3.0],
+  "matrix": [
+   [0.2812,0.2847,0.2884,0.2925,0.2968],
+   [0.2628,0.2656,0.2686,0.2718,0.2753],
+   [0.2467,0.249,0.2515,0.2541,0.2569],
+   [0.2327,0.2346,0.2366,0.2387,0.241],
+   [0.2204,0.222,0.2236,0.2254,0.2272]
+  ]
+ },
+ "probability_weighted": {
+  "weights": {"bear": 0.3, "base": 0.5, "bull": 0.2},
+  "weights_rationale": "Moved off the 15/50/35 house default. Bear DOUBLED to 30%: mortality recurrence is an observed, recent outcome (FY2022) driven by a structural warming trend, and the current recovery is only 1-2 good biological seasons old. Bull CUT to 20%: it requires several independent things to go right. Base 50%: the guided, wellboat-enabled inshore ramp with a haircut.",
+  "weighted_iv": 0.2338,
+  "street_weighted_iv": 0.236,
+  "band_position": null,
+  "band_note": "Near-SBC-zero company (SBC ~0.07% of revenue): house and street IVs differ by ~NZ$0.002/share, so the accounting-regime band collapses and band_position is null rather than a degenerate figure."
+ },
+ "sanity_check": {
+  "ran": true,
+  "passed": true,
+  "diagnosis": "No trips. Base-case upside +4.8% is far below the 100% auto-trip threshold. Implied base P/B 0.64x vs 1.27x historical average (ex-crisis) and implied EV/EBITDA ~3.0-3.2x vs 7.37x average — the model prices NZK BELOW its own history, not above."
+ },
+ "valuation_philosophy": {
+  "summary": "NZK is valued as a severely cyclical biological producer, not a compounder. The engine is the house owner-FCF DCF, but every lever is set for cyclicality: (1) mid-cycle margins, never the recovery half — H1 FY2026's swing to +$13.8m NPAT follows a -$20.8m half and sits between a -$73m crisis and a +$28m peak, so the base margin (17% post-lease) deliberately sits well below the FY2024 peak; (2) a high-teens WACC (17.5%) carrying documented structural premiums for biology/climate, illiquidity, concentration and consent dependence; (3) a bear case that is an observed outcome — the FY2022 mortality event rerun — weighted at a full 30%; (4) Blue Endeavour treated as an option: the base case carries only the wellboat-enabled inshore ramp (haircut), the bull carries a partial phased scale-up, and the full ~10,000t/~$350m ambition appears in NO scenario's explicit years because it is unbuilt, capital-hungry and already late; (5) terminal growth 2.0% for a capacity-constrained producer, TV capped at 12x FCF (Gordon binds at 6.6x anyway); (6) GAAP-consistent cash economics with the pro-forma/GAAP divergence flagged rather than papered over. The result — weighted IV NZ$0.234 vs price NZ$0.24 — says the market is pricing NZK roughly fairly for its risk: the upside case is real but so is the recurrence risk, and neither dominates at this price.",
+  "what_would_change_the_view": "UP: two more clean biological years (FY27 harvest within guide), Blue Endeavour pilot fish surviving to harvest at commercial cost, or a funded path to scale without dilution — each would justify cutting the bear weight toward 15-20% and lifting IV toward the bull case. DOWN: any summer mortality spike, an FY27 guidance miss, or an equity raise for Blue Endeavour at a discount — the bear path activating."
+ }
+};
+
+// ============================================================
+// CSV PARSING & PERIOD HANDLING
+// ============================================================
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => obj[h.trim()] = values[i]?.trim());
+        return obj;
+    });
+}
+const allData = parseCSV(csvData);
+
+// Explicit chronological order (source of truth — do NOT infer from label text,
+// since these are non-standard fiscal periods that generic sorters mis-order).
+const ANNUAL_ORDER = ["FY2016","FY2017","FY2018","FY2019","FY2020","FY2021-7mo","FY2022","FY2023","FY2024","FY2025-Jan","FY2025-8mo"];
+const HALF_ORDER = ["H1 FY2018","H1 FY2019","H1 FY2020","H1 FY2021","H1 FY2022","H1 FY2023","H1 FY2024","H1 FY2025","H1 FY2026-Jul","H1 FY2026-Mar"];
+const STUBS = new Set(["FY2021-7mo","FY2025-8mo"]);
+
+const byPeriod = {};
+allData.forEach(d => { byPeriod[d.Period] = d; });
+
+const annualData = ANNUAL_ORDER.map(p => byPeriod[p]).filter(Boolean);
+const halfData = HALF_ORDER.map(p => byPeriod[p]).filter(Boolean);
+
+function num(v) { return (v === undefined || v === '' || v === null) ? null : parseFloat(v); }
+
+// Short display labels for the fiscal calendar
+const DISPLAY_LABEL = {
+    "FY2016":"FY16","FY2017":"FY17","FY2018":"FY18","FY2019":"FY19","FY2020":"FY20",
+    "FY2021-7mo":"FY21 (7mo)","FY2022":"FY22","FY2023":"FY23","FY2024":"FY24",
+    "FY2025-Jan":"FY25 (Jan)","FY2025-8mo":"FY25 (8mo)",
+    "H1 FY2018":"H1'18","H1 FY2019":"H1'19","H1 FY2020":"H1'20","H1 FY2021":"H1'21",
+    "H1 FY2022":"H1'22","H1 FY2023":"H1'23","H1 FY2024":"H1'24","H1 FY2025":"H1'25",
+    "H1 FY2026-Jul":"H1'26 (Jul)","H1 FY2026-Mar":"H1'26 (Mar)"
+};
+
+// ============================================================
+// OVERVIEW SECTION
+// ============================================================
+function toggleOverview() {
+    const btn = document.querySelector('.overview-toggle');
+    const content = document.getElementById('overviewContent');
+    btn.classList.toggle('active');
+    content.classList.toggle('active');
+}
+
+document.getElementById('ovOverview').textContent = analysis.overview;
+document.getElementById('ovBizSummary').textContent = analysis.business_model.summary;
+document.getElementById('ovRevenueStreams').innerHTML = analysis.business_model.revenue_streams.map(r =>
+    `<li class="revenue-stream"><span class="trend-${r.trend}">${r.name}</span><span class="percent">${r.percent}%</span></li>`
+).join('');
+document.getElementById('ovCompetitors').textContent = analysis.competitive_position.main_competitors.join(', ');
+document.getElementById('ovMarketPosition').textContent = analysis.competitive_position.market_position;
+document.getElementById('ovMoat').innerHTML = analysis.competitive_position.moat_factors.map(m =>
+    `<li><strong>${m.factor}</strong> (${m.strength}): ${m.description}</li>`
+).join('');
+document.getElementById('ovGrowth').innerHTML = analysis.growth_drivers.map(g => `<li>${g}</li>`).join('');
+
+const allRisks = [].concat(
+    analysis.risks.business || [], analysis.risks.financial || [],
+    analysis.risks.regulatory || [], analysis.risks.macro || [], analysis.risks.execution || []
+);
+document.getElementById('ovRisks').innerHTML = allRisks.map(r =>
+    `<li><span class="risk-${r.severity}">[${r.severity.toUpperCase()}]</span> <strong>${r.risk}</strong>: ${r.description}</li>`
+).join('');
+
+document.getElementById('ovBull').innerHTML = analysis.bull_case.map(b => `<li>${b}</li>`).join('');
+document.getElementById('ovBear').innerHTML = analysis.bear_case.map(b => `<li>${b}</li>`).join('');
+document.getElementById('ovRecent').innerHTML = analysis.recent_developments.map(r =>
+    `<li><strong>${r.date}:</strong> ${r.event}</li>`
+).join('');
+
+// ============================================================
+// KPI CARDS
+// ============================================================
+// Latest normal-cadence figures: H1 FY2026-Mar (latest half) and FY2025-Jan (latest
+// full, non-stub, comparable-basis annual year). FY2025-8mo is a stub so it is
+// shown separately, not blended into "latest annual".
+const latestHalf = byPeriod["H1 FY2026-Mar"];
+const priorHalfComparable = byPeriod["H1 FY2025"]; // Jan-basis prior comparable half (same ~6mo window type before the 2nd balance-date change) -- used only as directional colour, not a strict YoY
+const latestFullYear = byPeriod["FY2025-Jan"]; // last full 12-month year, Jan-basis
+const priorFullYear = byPeriod["FY2024"]; // also Jan-basis -> valid YoY comparison
+
+const kpis = [
+    {
+        label: "Revenue (H1 FY2026-Mar)",
+        value: "NZ$" + num(latestHalf.Revenue).toFixed(1) + "m",
+        change: (() => {
+            const cur = num(latestHalf.Revenue), prior = num(byPeriod["H1 FY2026-Jul"].Revenue);
+            return null; // -Jul and -Mar are different, non-adjacent-year halves around the balance-date change; not a YoY
+        })(),
+        sub: "6 months to 31 Mar 2026 (current fiscal calendar)"
+    },
+    {
+        label: "NPAT (H1 FY2026-Mar)",
+        value: "NZ$" + num(latestHalf.NetIncome).toFixed(1) + "m",
+        change: "n/m",
+        sub: "Swing from a $20.8m loss the prior (transitional) half"
+    },
+    {
+        label: "GAAP EBITDA (H1 FY2026-Mar)",
+        value: "NZ$" + num(latestHalf.EBITDA).toFixed(1) + "m",
+        change: "n/m",
+        sub: "vs Pro-Forma Operating EBITDA $17.2m (guided basis)"
+    },
+    {
+        label: "Revenue (FY2025-Jan, last full FY)",
+        value: "NZ$" + num(latestFullYear.Revenue).toFixed(0) + "m",
+        change: calcYoY(num(latestFullYear.Revenue), num(priorFullYear.Revenue)),
+        sub: "FY2024 → FY2025-Jan, both 12mo Jan-basis years — valid YoY"
+    },
+    {
+        label: "NPAT (FY2025-Jan, last full FY)",
+        value: "NZ$" + num(latestFullYear.NetIncome).toFixed(1) + "m",
+        change: calcYoY(num(latestFullYear.NetIncome), num(priorFullYear.NetIncome)),
+        sub: "vs FY2022 crisis trough of −$73.2m"
+    },
+    {
+        label: "Shareholders' Equity",
+        value: "NZ$" + num(latestHalf.ShareholdersEquity).toFixed(1) + "m",
+        change: null,
+        sub: "As at 31 Mar 2026"
+    },
+    {
+        label: "Net Cash",
+        value: "NZ$" + Math.abs(num(latestHalf.CashAndEquivalents) - num(latestHalf.TotalDebt)).toFixed(1) + "m",
+        change: null,
+        sub: "Cash $40.2m less borrowings $1.9m (excl. IFRS16 leases)"
+    },
+    {
+        label: "Shares Outstanding",
+        value: (num(latestHalf.SharesOutstanding)).toFixed(1) + "m",
+        change: null,
+        sub: "Flat since FY2023 rights issue (was ~139m pre-FY2022)"
+    }
+];
+
+function calcYoY(current, previous) {
+    if (previous === null || current === null || previous === 0) return null;
+    const pct = ((current - previous) / Math.abs(previous) * 100);
+    return pct;
+}
+
+function renderKPIs() {
+    const grid = document.getElementById('kpiGrid');
+    grid.innerHTML = kpis.map(k => {
+        let changeHtml = '';
+        if (k.change === 'n/m') {
+            changeHtml = `<div class="kpi-change neutral">n/m (spans stub/balance-date change)</div>`;
+        } else if (typeof k.change === 'number') {
+            const cls = k.change >= 0 ? 'positive' : 'negative';
+            const sign = k.change >= 0 ? '+' : '';
+            changeHtml = `<div class="kpi-change ${cls}">${sign}${k.change.toFixed(1)}% YoY</div>`;
+        }
+        return `
+            <div class="kpi-card">
+                <div class="kpi-value">${k.value}</div>
+                <div class="kpi-label">${k.label}</div>
+                ${changeHtml}
+                <div class="kpi-sub">${k.sub}</div>
+            </div>
+        `;
+    }).join('');
+}
+renderKPIs();
+
+// ============================================================
+// GUIDANCE SECTION
+// ============================================================
+function renderGuidance() {
+    if (!analysis.guidance || !analysis.guidance.items || analysis.guidance.items.length === 0) {
+        document.getElementById('guidanceSection').style.display = 'none';
+        return;
+    }
+    const guidance = analysis.guidance;
+    document.getElementById('guidanceAsOf').textContent = guidance.as_of || '';
+    document.getElementById('guidanceFY').textContent = guidance.fiscal_year || '';
+
+    const grid = document.getElementById('guidanceGrid');
+    grid.innerHTML = guidance.items.map(item => {
+        const vsClass = item.vs_prior ? item.vs_prior.toLowerCase().replace(/[^a-z]/g, '') : 'new';
+        const vsLabel = item.vs_prior ? item.vs_prior.charAt(0).toUpperCase() + item.vs_prior.slice(1) : 'New';
+        return `
+            <div class="guidance-card">
+                <div class="guidance-metric">${item.metric}</div>
+                <div class="guidance-target">${item.target}</div>
+                <div class="guidance-period">${item.period}</div>
+                <span class="guidance-vs-prior ${vsClass}">${vsLabel}</span>
+                ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+
+    const commentary = document.getElementById('guidanceCommentary');
+    if (guidance.management_commentary) {
+        commentary.textContent = guidance.management_commentary;
+        commentary.style.display = 'block';
+    } else {
+        commentary.style.display = 'none';
+    }
+}
+renderGuidance();
+
+// ============================================================
+// CHART DEFAULTS & HELPERS
+// ============================================================
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } } },
+    scales: {
+        x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+function freshScales() {
+    return { x: { ...chartDefaults.scales.x }, y: { ...chartDefaults.scales.y } };
+}
+const chartRegistry = {};
+function toggleLogScale(canvasId, btn) {
+    const chart = chartRegistry[canvasId];
+    if (!chart) return;
+    const toLog = chart.options.scales.y.type !== 'logarithmic';
+    chart.options.scales.y.type = toLog ? 'logarithmic' : 'linear';
+    btn.classList.toggle('active', toLog);
+    chart.update();
+}
+const colors = {
+    primary: '#00d4aa', secondary: '#00b894', tertiary: '#0984e3',
+    quaternary: '#6c5ce7', warning: '#fdcb6e', danger: '#ff6b6b', purple: '#a29bfe'
+};
+
+// Bar styling helper: stub periods rendered lighter/hatched via reduced opacity +
+// dashed border to visually distinguish 7mo/8mo windows from full 12mo years.
+function barColorsFor(periods, baseColor, stubColor) {
+    return periods.map(p => STUBS.has(p) ? (stubColor || 'rgba(253,203,110,0.55)') : baseColor);
+}
+function borderDashFor(periods) {
+    return periods.map(p => STUBS.has(p) ? [6, 3] : undefined);
+}
+function pointStyleFor(periods) {
+    return periods.map(p => STUBS.has(p) ? 'rectRot' : 'circle');
+}
+function pointRadiusFor(periods) {
+    return periods.map(p => STUBS.has(p) ? 7 : 4);
+}
+
+const annualPeriods = annualData.map(d => d.Period);
+const annualLabels = annualData.map(d => DISPLAY_LABEL[d.Period] || d.Period);
+const halfPeriods = halfData.map(d => d.Period);
+const halfLabels = halfData.map(d => DISPLAY_LABEL[d.Period] || d.Period);
+
+// ============================================================
+// CHART 1: Revenue & Gross Profit (annual)
+// ============================================================
+(function() {
+    const ctx = document.getElementById('revenueChart').getContext('2d');
+    const chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: annualLabels,
+            datasets: [
+                {
+                    label: 'Revenue',
+                    data: annualData.map(d => num(d.Revenue)),
+                    backgroundColor: barColorsFor(annualPeriods, colors.primary),
+                    borderColor: annualPeriods.map(p => STUBS.has(p) ? colors.warning : colors.primary),
+                    borderWidth: annualPeriods.map(p => STUBS.has(p) ? 2 : 0),
+                    borderDash: [], // per-bar dash not supported natively; conveyed via border color/width + note
+                },
+                {
+                    label: 'Gross Profit',
+                    data: annualData.map(d => num(d.GrossProfit)),
+                    backgroundColor: barColorsFor(annualPeriods, colors.secondary, 'rgba(0,184,148,0.4)'),
+                    borderColor: annualPeriods.map(p => STUBS.has(p) ? colors.warning : colors.secondary),
+                    borderWidth: annualPeriods.map(p => STUBS.has(p) ? 2 : 0),
+                }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['revenueChart'] = chart;
+})();
+
+// ============================================================
+// CHART 2: Gross Margin % (annual) — point style distinguishes stubs
+// ============================================================
+(function() {
+    const ctx = document.getElementById('grossMarginChart').getContext('2d');
+    const margins = annualData.map(d => {
+        const rev = num(d.Revenue), gp = num(d.GrossProfit);
+        return (rev && gp !== null) ? (gp / rev * 100) : null;
+    });
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: annualLabels,
+            datasets: [{
+                label: 'Gross Margin %',
+                data: margins,
+                borderColor: colors.tertiary,
+                backgroundColor: 'rgba(9,132,227,0.15)',
+                pointStyle: pointStyleFor(annualPeriods),
+                pointRadius: pointRadiusFor(annualPeriods),
+                pointBackgroundColor: annualPeriods.map(p => STUBS.has(p) ? colors.warning : colors.tertiary),
+                fill: true,
+                tension: 0.2
+            }]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['grossMarginChart'] = chart;
+})();
+
+// ============================================================
+// CHART 3: EBITDA & NPAT (annual)
+// ============================================================
+(function() {
+    const ctx = document.getElementById('ebitdaNpatChart').getContext('2d');
+    const chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: annualLabels,
+            datasets: [
+                {
+                    label: 'GAAP EBITDA',
+                    data: annualData.map(d => num(d.EBITDA)),
+                    backgroundColor: barColorsFor(annualPeriods, colors.quaternary, 'rgba(108,92,231,0.4)'),
+                    borderColor: annualPeriods.map(p => STUBS.has(p) ? colors.warning : colors.quaternary),
+                    borderWidth: annualPeriods.map(p => STUBS.has(p) ? 2 : 0),
+                },
+                {
+                    label: 'NPAT',
+                    data: annualData.map(d => num(d.NetIncome)),
+                    backgroundColor: barColorsFor(annualPeriods, colors.danger, 'rgba(255,107,107,0.4)'),
+                    borderColor: annualPeriods.map(p => STUBS.has(p) ? colors.warning : colors.danger),
+                    borderWidth: annualPeriods.map(p => STUBS.has(p) ? 2 : 0),
+                }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['ebitdaNpatChart'] = chart;
+})();
+
+// ============================================================
+// CHART 4: OCF vs CapEx (annual)
+// ============================================================
+(function() {
+    const ctx = document.getElementById('ocfCapexChart').getContext('2d');
+    const chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: annualLabels,
+            datasets: [
+                {
+                    label: 'Operating Cash Flow',
+                    data: annualData.map(d => num(d.OperatingCashFlow)),
+                    backgroundColor: barColorsFor(annualPeriods, colors.primary, 'rgba(0,212,170,0.4)'),
+                    borderColor: annualPeriods.map(p => STUBS.has(p) ? colors.warning : colors.primary),
+                    borderWidth: annualPeriods.map(p => STUBS.has(p) ? 2 : 0),
+                },
+                {
+                    label: 'CapEx (magnitude)',
+                    data: annualData.map(d => Math.abs(num(d.CapEx))),
+                    backgroundColor: barColorsFor(annualPeriods, colors.warning, 'rgba(253,203,110,0.35)'),
+                    borderColor: annualPeriods.map(p => STUBS.has(p) ? '#fff' : colors.warning),
+                    borderWidth: annualPeriods.map(p => STUBS.has(p) ? 2 : 0),
+                }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['ocfCapexChart'] = chart;
+})();
+
+// ============================================================
+// CHART 5: Free Cash Flow (annual)
+// ============================================================
+(function() {
+    const ctx = document.getElementById('fcfChart').getContext('2d');
+    const chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: annualLabels,
+            datasets: [{
+                label: 'Free Cash Flow',
+                data: annualData.map(d => num(d.FreeCashFlow)),
+                backgroundColor: annualData.map(d => {
+                    const v = num(d.FreeCashFlow);
+                    const isStub = STUBS.has(d.Period);
+                    if (isStub) return v >= 0 ? 'rgba(0,212,170,0.4)' : 'rgba(255,107,107,0.4)';
+                    return v >= 0 ? colors.primary : colors.danger;
+                }),
+                borderColor: annualPeriods.map(p => STUBS.has(p) ? colors.warning : 'transparent'),
+                borderWidth: annualPeriods.map(p => STUBS.has(p) ? 2 : 0),
+            }]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['fcfChart'] = chart;
+})();
+
+// ============================================================
+// CHART 6: Shareholders' Equity & Net Cash/Debt (annual)
+// ============================================================
+(function() {
+    const ctx = document.getElementById('equityNetDebtChart').getContext('2d');
+    const netCash = annualData.map(d => {
+        const cash = num(d.CashAndEquivalents), debt = num(d.TotalDebt);
+        return (cash === null || debt === null) ? null : (cash - debt);
+    });
+    const chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: annualLabels,
+            datasets: [
+                {
+                    label: "Shareholders' Equity",
+                    data: annualData.map(d => num(d.ShareholdersEquity)),
+                    backgroundColor: barColorsFor(annualPeriods, colors.secondary, 'rgba(0,184,148,0.4)'),
+                    borderColor: annualPeriods.map(p => STUBS.has(p) ? colors.warning : colors.secondary),
+                    borderWidth: annualPeriods.map(p => STUBS.has(p) ? 2 : 0),
+                    type: 'bar'
+                },
+                {
+                    label: 'Net Cash / (Debt)',
+                    data: netCash,
+                    type: 'line',
+                    borderColor: colors.tertiary,
+                    backgroundColor: 'rgba(9,132,227,0.15)',
+                    pointStyle: pointStyleFor(annualPeriods),
+                    pointRadius: pointRadiusFor(annualPeriods),
+                    pointBackgroundColor: annualPeriods.map(p => STUBS.has(p) ? colors.warning : colors.tertiary),
+                    tension: 0.2
+                }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['equityNetDebtChart'] = chart;
+})();
+
+// ============================================================
+// CHART 7: Shares Outstanding (annual)
+// ============================================================
+(function() {
+    const ctx = document.getElementById('sharesChart').getContext('2d');
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: annualLabels,
+            datasets: [{
+                label: 'Shares Outstanding (m)',
+                data: annualData.map(d => num(d.SharesOutstanding)),
+                borderColor: colors.purple,
+                backgroundColor: 'rgba(162,155,254,0.15)',
+                pointStyle: pointStyleFor(annualPeriods),
+                pointRadius: pointRadiusFor(annualPeriods),
+                pointBackgroundColor: annualPeriods.map(p => STUBS.has(p) ? colors.warning : colors.purple),
+                fill: true,
+                tension: 0,
+                spanGaps: true
+            }]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['sharesChart'] = chart;
+})();
+
+// ============================================================
+// CHART 8: Half-year Revenue & NPAT
+// ============================================================
+(function() {
+    const ctx = document.getElementById('h1RevNpatChart').getContext('2d');
+    const chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: halfLabels,
+            datasets: [
+                {
+                    label: 'H1 Revenue',
+                    data: halfData.map(d => num(d.Revenue)),
+                    backgroundColor: colors.primary
+                },
+                {
+                    label: 'H1 NPAT',
+                    data: halfData.map(d => num(d.NetIncome)),
+                    backgroundColor: halfData.map(d => num(d.NetIncome) >= 0 ? colors.secondary : colors.danger)
+                }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['h1RevNpatChart'] = chart;
+})();
+
+// ============================================================
+// CHART 9: Half-year EBITDA
+// ============================================================
+(function() {
+    const ctx = document.getElementById('h1EbitdaChart').getContext('2d');
+    const chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: halfLabels,
+            datasets: [{
+                label: 'H1 GAAP EBITDA',
+                data: halfData.map(d => num(d.EBITDA)),
+                backgroundColor: halfData.map(d => num(d.EBITDA) >= 0 ? colors.quaternary : colors.danger)
+            }]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['h1EbitdaChart'] = chart;
+})();
+
+// ============================================================
+// CHART 10: GAAP vs Pro-Forma EBITDA (illustrative recent halves)
+// ============================================================
+(function() {
+    const ctx = document.getElementById('proFormaChart').getContext('2d');
+    // GAAP figures from the metrics CSV; Pro-Forma figures per company disclosure
+    // (Analysis JSON / guidance commentary), not present in core_metrics.
+    const labels = ['H1 FY2026-Jul', 'H1 FY2026-Mar'];
+    const gaap = [num(byPeriod["H1 FY2026-Jul"].EBITDA), num(byPeriod["H1 FY2026-Mar"].EBITDA)];
+    const proForma = [5.7, 17.2]; // per company disclosure, NZ$m
+    const chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                { label: 'GAAP EBITDA', data: gaap, backgroundColor: colors.tertiary },
+                { label: 'Pro-Forma Operating EBITDA', data: proForma, backgroundColor: colors.warning }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['proFormaChart'] = chart;
+})();
+
+// ============================================================
+// CHART 11: FY26-28 Guided Harvest Ramp
+// ============================================================
+(function() {
+    const ctx = document.getElementById('harvestRampChart').getContext('2d');
+    const labels = ['FY2026', 'FY2027', 'FY2028'];
+    const mins = [5950, 7200, 8500];
+    const maxs = [6050, 7600, 9100];
+    const mids = mins.map((m, i) => (m + maxs[i]) / 2);
+    const chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Guided Harvest Range (min–max, midpoint shown)',
+                data: maxs.map((m, i) => [mins[i], m]),
+                backgroundColor: 'rgba(0,212,170,0.35)',
+                borderColor: colors.primary,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            ...chartDefaults,
+            scales: { ...freshScales(), y: { ...freshScales().y, title: { display: true, text: 'G&G Metric Tonnes', color: '#888' } } },
+            plugins: {
+                legend: { labels: { color: '#e0e0e0', font: { size: 11 } } },
+                tooltip: {
+                    callbacks: {
+                        label: (c) => `Range: ${mins[c.dataIndex]}–${maxs[c.dataIndex]} MT (mid ${mids[c.dataIndex]})`
+                    }
+                }
+            }
+        }
+    });
+    chartRegistry['harvestRampChart'] = chart;
+})();
+
+// ============================================================
+// HELP MODALS
+// ============================================================
+const metricDescriptions = {
+    revenue: {
+        title: "Revenue & Gross Profit",
+        content: `
+            <p><strong>Revenue</strong> is NZK's total sales of King salmon and related products (fresh/chilled, value-added, and Omega Plus pet-food by-products) across NZ, North America, Australia and Asia.</p>
+            <div class="metric-highlight"><strong>For NZK:</strong> revenue is driven far more by harvest volume and biological performance (mortality, feed conversion, average harvest weight) than by demand-side factors &mdash; a bad summer at sea can cut revenue as much as a soft export market.</div>
+            <div class="metric-warning"><strong>Fiscal calendar:</strong> bars for FY2021-7mo (7 months) and FY2025-8mo (8 months) are shown hatched/highlighted &mdash; they cover shorter windows than the 12-month bars around them, so a lower bar there is partly a shorter period, not purely weaker trading. FY2016-FY2020 are June year-ends; FY2022-FY2025(Jan) are January year-ends; the current basis is September.</div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Whether the FY26-28 guided harvest ramp (5,950-6,050 &rarr; 7,200-7,600 &rarr; 8,500-9,100 MT) converts into revenue growth at stable or improving average selling prices</li>
+                <li>Gross margin trend as a read on biological cost per kg vs realised pricing</li>
+            </ul>
+        `
+    },
+    grossMargin: {
+        title: "Gross Margin %",
+        content: `
+            <p><strong>Gross margin</strong> = Gross Profit / Revenue. For a biological producer, cost of goods sold embeds feed costs, mortality write-offs and harvest yield &mdash; so gross margin is a direct read on fish health, not just pricing.</p>
+            <div class="metric-highlight">FY2022's near-zero and FY2023's negative-turned-modest margins reflect the mass-mortality crisis flowing through cost of goods; the recovery to the mid-20s% by FY2024 is the clearest single indicator that the biological recovery is real.</div>
+            <p><strong>What to watch:</strong> feed cost inflation (~15% YoY in 1HY26) pressuring margin even as volumes recover; management flags this persisting into FY27.</p>
+        `
+    },
+    ebitdaNpat: {
+        title: "GAAP EBITDA & NPAT (Annual)",
+        content: `
+            <p>Statutory (GAAP) EBITDA and Net Profit After Tax, as reported under NZ IFRS, including IAS 41 biological-asset fair-value movements.</p>
+            <div class="metric-warning"><strong>FY2022 mortality catastrophe:</strong> NPAT of &minus;$73.2m and EBITDA of &minus;$15.6m in the year to Jan-2022 followed warming Marlborough Sounds sea temperatures causing mortality of up to ~42% at warm-water sites, forcing a deeply dilutive rights issue (share count 139m &rarr; 541m).</div>
+            <p><strong>For NZK:</strong> this is GAAP EBITDA, distinct from management's guided "Pro-Forma Operating EBITDA" which strips IAS 41 fair-value swings and FX close-outs &mdash; see the Earnings Quality section below for the divergence.</p>
+        `
+    },
+    ocfCapex: {
+        title: "Operating Cash Flow vs CapEx",
+        content: `
+            <p>Cash generated from operations against capital expenditure. CapEx is shown as a positive magnitude for visual comparison (it is a cash outflow).</p>
+            <div class="metric-highlight">CapEx has been consistently heavy and lumpy relative to OCF because of ongoing investment in the Blue Endeavour open-ocean farm, the Ronja King wellboat, RAS pilot and Cloudy Bay processing site &mdash; FY26 guided capex is $18-25m against a company with a market cap of only ~NZ$129m.</div>
+            <p><strong>What to watch:</strong> whether OCF can fund the Blue Endeavour build-out without a debt or equity raise; net cash (~$43m at Mar-2026) is currently the buffer.</p>
+        `
+    },
+    fcf: {
+        title: "Free Cash Flow",
+        content: `
+            <p>Operating Cash Flow less CapEx. Persistently negative or small-positive FCF is normal and expected for NZK during its growth-capex phase (Blue Endeavour, wellboat, RAS, Cloudy Bay).</p>
+            <div class="metric-highlight">FY2025-Jan's outsized +$27.7m FCF was destocking-inflated (working capital release), not a structural step-change &mdash; the DCF explicitly avoids grow-forward extrapolation of that single year.</div>
+            <p><strong>What to watch:</strong> FCF turning structurally positive as the harvest ramp delivers volume without a matching step-up in capex intensity.</p>
+        `
+    },
+    equityNetDebt: {
+        title: "Shareholders' Equity & Net Cash/Debt",
+        content: `
+            <p>Book equity and net cash position (cash less interest-bearing debt, excluding IFRS16 lease liabilities per the DCF's treatment).</p>
+            <div class="metric-warning">Equity fell from $184m (FY2020) to $111m (FY2022) on crisis losses, then jumped to $167m (FY2023) purely from the dilutive rights issue proceeds (share count 139m &rarr; 541m) &mdash; not from earned profit. Equity growth in this window is a capital-raise artefact, not organic value creation; the DCF's own <code>growth_divergence_warning</code> flags exactly this (equity 3yr CAGR 21.0% vs revenue 3yr CAGR 6.5%).</div>
+            <p><strong>For NZK:</strong> the company has held net cash throughout the recovery, which is what is funding Blue Endeavour's initial phases without dilution &mdash; so far.</p>
+        `
+    },
+    shares: {
+        title: "Shares Outstanding",
+        content: `
+            <p>Ordinary shares on issue.</p>
+            <div class="metric-warning"><strong>Step change:</strong> shares outstanding jumped from ~139m to ~541m at the FY2022/FY2023 rights issue used to recapitalize the balance sheet after the mortality crisis. EPS, book value per share, and any per-share CAGR spanning this point are not meaningful and are not shown on this dashboard.</div>
+            <p><strong>What to watch:</strong> the share count has been flat since (~538m), with SBC negligible (~0.07% of revenue) &mdash; but scaling Blue Endeavour to full commercial size would likely require new capital, which could mean a further step up.</p>
+        `
+    },
+    h1RevNpat: {
+        title: "Half-Year Revenue & NPAT",
+        content: `
+            <p>Six-month reporting periods. NZK reports interim results roughly mid-cycle each fiscal year; note this dashboard shows two distinct "H1 FY2026" columns because of the balance-date change: H1 FY2026-Jul (6mo to 31 Jul 2025, a transitional period under the old-into-new calendar) and H1 FY2026-Mar (6mo to 31 Mar 2026, the first half under the new September year-end cadence).</p>
+            <div class="metric-highlight">The swing from H1 FY2026-Jul (NPAT &minus;$20.8m) to H1 FY2026-Mar (NPAT +$13.8m) is real operational improvement (lower mortality, better feed conversion, higher harvest weight) but the two halves are NOT strictly comparable twelve months apart &mdash; they are adjacent halves either side of the balance-date transition, and summer/winter seasonality also differs between them.</div>
+        `
+    },
+    h1Ebitda: {
+        title: "Half-Year GAAP EBITDA",
+        content: `
+            <p>GAAP EBITDA by half-year period, showing the volatility inherent in a biological, seasonal business.</p>
+            <p><strong>What to watch:</strong> consistency of positive EBITDA halves as the fish-health programme (thermotolerant breeding, summer diet, in-house vet) takes hold, and how H2 FY2026 (not yet reported) compares once the whole 12-month FY26 September-basis year is complete in November 2026.</p>
+        `
+    },
+    proForma: {
+        title: "GAAP vs Pro-Forma Operating EBITDA",
+        content: `
+            <p>Management guides the market on <strong>Pro-Forma Operating EBITDA</strong>, a non-GAAP measure that strips out NZ IAS 41 biological-asset fair-value swings and early FX hedge close-outs from statutory GAAP EBITDA.</p>
+            <div class="metric-warning"><strong>Earnings quality flag:</strong> the two measures have diverged materially period to period &mdash; H1 FY2026-Mar: GAAP EBITDA $24.0m vs Pro-Forma $17.2m (GAAP higher); prior half H1 FY2026-Jul: GAAP &minus;$25.1m vs Pro-Forma +$5.7m (GAAP much lower). The sign and magnitude of the gap flips, so investors should read <em>both</em> figures rather than anchoring only on the guided pro-forma number, in either direction.</div>
+            <p>The DCF model in this dashboard is built on GAAP-consistent mid-cycle margins, not the pro-forma guidance figure, precisely to avoid this trap.</p>
+        `
+    },
+    harvestRamp: {
+        title: "FY26-28 Guided Harvest Ramp",
+        content: `
+            <p>Management's multi-year harvest volume guidance (Gutted &amp; Gilled metric tonnes), the clearest visible growth runway independent of Blue Endeavour's full commercial scale-up.</p>
+            <div class="metric-highlight">FY26: 5,950-6,050 MT (narrowed/raised Aug-2026). FY27: 7,200-7,600 MT (unchanged). FY28: 8,500-9,100 MT (raised from 8,200-8,800 MT) &mdash; roughly 40-50% above FY26 volumes, driven mainly by the Ronja King wellboat unlocking existing consented inshore sites rather than by Blue Endeavour, which is not yet at commercial harvest.</div>
+            <p><strong>What to watch:</strong> these are guided targets, not booked results &mdash; NZK has a multi-year history of missing biological forecasts, which is exactly why the DCF's base case applies a haircut to the guided ramp and the bear case models a recurrence of the FY2022-style mortality event before FY28 is reached.</p>
+        `
+    }
+};
+
+function openModal(key) {
+    document.getElementById('modalTitle').textContent = metricDescriptions[key].title;
+    document.getElementById('modalBody').innerHTML = metricDescriptions[key].content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ============================================================
+// DCF VALUATION SECTION
+// ============================================================
+let currentScenario = 'base';
+
+function fmtIV(v) {
+    const c = (dcfData.inputs && dcfData.inputs.currency) || '$';
+    const a = Math.abs(v);
+    const dp = a >= 100 ? 0 : a >= 10 ? 1 : a >= 1 ? 2 : 4;
+    return c + v.toFixed(dp);
+}
+
+function initDCF() {
+    if (!dcfData || !dcfData.valuation) return;
+
+    document.getElementById('dcfCurrent').textContent = 'NZ$' + dcfData.current_price.toFixed(2);
+
+    // No sanity-check warning banner (sanity_check.passed === true, no trips).
+    // growthWarning banner reused ONLY for the documented equity-CAGR divergence,
+    // which is a real, separately-flagged data-quality note (not a sanity trip).
+    if (dcfData.historical_growth.growth_divergence_warning) {
+        document.getElementById('growthWarning').style.display = 'flex';
+        document.getElementById('warningText').textContent = dcfData.historical_growth.growth_divergence_warning;
+    }
+
+    const base = dcfData.assumptions.base;
+    document.getElementById('growthSlider').value = dcfData.historical_growth.selected_growth_rate;
+    document.getElementById('waccSlider').value = base.wacc;
+    document.getElementById('terminalSlider').value = base.terminal_growth;
+
+    document.getElementById('growthValue').textContent = dcfData.historical_growth.selected_growth_rate + '%';
+    document.getElementById('waccValue').textContent = base.wacc + '%';
+    document.getElementById('terminalValue').textContent = base.terminal_growth + '%';
+
+    document.getElementById('growthHint').textContent =
+        'Based on ' + dcfData.historical_growth.growth_rate_source;
+
+    const wsub = document.getElementById('dcfWeightedSublabel');
+    const wts = (dcfData.probability_weighted || {}).weights;
+    if (wsub && wts) {
+        const pct = (x) => Math.round(x * 100);
+        let txt = `${pct(wts.bull)}% Bull / ${pct(wts.base)}% Base / ${pct(wts.bear)}% Bear`;
+        if (!isWeightedLive()) txt += ' — fixed from model';
+        wsub.textContent = txt;
+    }
+
+    // Valuation philosophy + plain verdict statement (required by task spec)
+    const philEl = document.getElementById('dcfPhilosophy');
+    if (philEl && dcfData.valuation_philosophy) {
+        const price = dcfData.current_price.toFixed(2);
+        const wiv = dcfData.probability_weighted.weighted_iv.toFixed(3);
+        philEl.innerHTML =
+            `<p>${dcfData.valuation_philosophy.summary}</p>` +
+            `<p class="dcf-verdict">Verdict: at NZ$${price} vs a probability-weighted intrinsic value of NZ$${wiv}, NZK screens as roughly fairly valued for its risk &mdash; the DCF's own conclusion, not a buy or sell signal.</p>`;
+    }
+
+    renderHeaderValuation();
+    renderDCFInputs();
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    updateDCFDisplay();
+    switchScenario('base');
+}
+
+function renderHeaderValuation() {
+    const el = document.getElementById('headerValuation');
+    if (!el) return;
+    const pw = dcfData.probability_weighted || {};
+    const wiv = pw.weighted_iv;
+    const price = dcfData.current_price;
+    if (wiv == null || price == null) return;
+
+    const ratio = wiv / price;
+    if (ratio > 20 || ratio < 0.05) return;
+    const up = (wiv - price) / price * 100;
+    const cls = up >= 0 ? 'positive' : 'negative';
+    const sign = up >= 0 ? '+' : '';
+    el.innerHTML =
+        `<div class="hv-item"><span class="hv-label">Prob-Weighted IV</span><span class="hv-value">${fmtIV(wiv)}</span></div>
+        <div class="hv-item"><span class="hv-label">Current Price</span><span class="hv-value">${fmtIV(price)}</span></div>
+        <div class="hv-item"><span class="hv-label">Upside</span><span class="hv-value ${cls}">${sign}${up.toFixed(0)}%</span></div>`;
+    el.style.display = 'flex';
+}
+
+function renderDCFInputs() {
+    const inputs = dcfData.inputs;
+    const currency = inputs.currency || '$';
+    const units = inputs.units === 'millions' ? 'M' : inputs.units === 'billions' ? 'B' : '';
+
+    const formatNum = (n) => {
+        if (Math.abs(n) >= 1000) return currency + (n/1000).toFixed(1) + 'B';
+        return currency + n.toFixed(2) + units;
+    };
+
+    document.getElementById('baseFCF').textContent = formatNum(inputs.last_fcf);
+    const sbcEl = document.getElementById('sbcBreakdown');
+    if (sbcEl) {
+        if (inputs.sbc_source === 'unavailable') {
+            sbcEl.innerHTML = '<span style="color:#fdcb6e">&#9888; SBC not disclosed &mdash; FCF unadjusted, IV overstated</span>';
+        } else if (inputs.sbc != null) {
+            const sbcAmt = inputs.sbc_incl_equity_taxes != null ? inputs.sbc_incl_equity_taxes : inputs.sbc;
+            let parts = `${formatNum(inputs.reported_fcf)} reported − ${formatNum(sbcAmt)} SBC`;
+            if (inputs.interest_income) parts += ` − ${formatNum(inputs.interest_income)} interest`;
+            if (inputs.lease_principal_payments) parts += ` − ${formatNum(inputs.lease_principal_payments)} lease principal`;
+            sbcEl.textContent = parts;
+        } else {
+            sbcEl.textContent = 'Starting point for projections';
+        }
+    }
+
+    const shares = inputs.shares_outstanding;
+    document.getElementById('sharesOut').textContent = shares >= 1000 ? (shares/1000).toFixed(2) + 'B' : shares.toFixed(1) + 'M';
+
+    const dilEl = document.getElementById('dilutionNote');
+    if (dilEl) {
+        const g = inputs.annual_share_growth_pct;
+        dilEl.textContent = (g > 0)
+            ? `+${g.toFixed(1)}%/yr from non-SBC issuance`
+            : 'Flat — SBC expensed in cash flows';
+    }
+
+    const netDebt = inputs.net_debt;
+    const netDebtEl = document.getElementById('netDebt');
+    netDebtEl.textContent = (netDebt < 0 ? '-' : '') + formatNum(Math.abs(netDebt));
+    if (netDebt < 0) netDebtEl.style.color = '#00d4aa';
+
+    renderFCFProjections();
+}
+
+function renderFCFProjections() {
+    const startGrowth = parseFloat(document.getElementById('growthSlider')?.value || dcfData.historical_growth.selected_growth_rate);
+    const baseFCF = dcfData.inputs.last_fcf;
+    const currency = dcfData.inputs.currency || '$';
+
+    const formatFCF = (n) => {
+        if (Math.abs(n) >= 1000) return currency + (n/1000).toFixed(1) + 'B';
+        return currency + n.toFixed(2) + 'M';
+    };
+
+    const endGrowth = 10;
+    const growthRates = [];
+    for (let i = 0; i < 5; i++) {
+        const rate = startGrowth > endGrowth
+            ? startGrowth - (startGrowth - endGrowth) * (i / 4)
+            : startGrowth;
+        growthRates.push(rate);
+    }
+
+    let fcf = baseFCF;
+    const fcfValues = [baseFCF];
+    for (let i = 0; i < 5; i++) {
+        fcf = fcf * (1 + growthRates[i] / 100);
+        fcfValues.push(fcf);
+    }
+
+    let html = `
+        <div class="fcf-projection-item header">Base</div>
+        <div class="fcf-projection-item header">Year 1</div>
+        <div class="fcf-projection-item header">Year 2</div>
+        <div class="fcf-projection-item header">Year 3</div>
+        <div class="fcf-projection-item header">Year 4</div>
+        <div class="fcf-projection-item header">Year 5</div>
+    `;
+    html += `<div class="fcf-projection-item"><div class="fcf-value">${formatFCF(fcfValues[0])}</div><div class="growth-rate">-</div></div>`;
+    for (let i = 1; i <= 5; i++) {
+        html += `<div class="fcf-projection-item"><div class="fcf-value">${formatFCF(fcfValues[i])}</div><div class="growth-rate">+${growthRates[i-1].toFixed(0)}%</div></div>`;
+    }
+    document.getElementById('fcfProjectionTable').innerHTML = html;
+}
+
+function calculateDCF(startGrowth, wacc, terminalGrowth) {
+    const years = 5;
+    const hurdle = 0.15;
+    const fcf = dcfData.inputs.last_fcf;
+    let pvFCF = 0;
+    let pvFCFHurdle = 0;
+    let projectedFCF = fcf;
+
+    const endGrowth = 10;
+    for (let i = 0; i < years; i++) {
+        const yearGrowth = startGrowth > endGrowth
+            ? startGrowth - (startGrowth - endGrowth) * (i / 4)
+            : startGrowth;
+        projectedFCF *= (1 + yearGrowth / 100);
+        pvFCF += projectedFCF / Math.pow(1 + wacc/100, i + 1);
+        pvFCFHurdle += projectedFCF / Math.pow(1 + hurdle, i + 1);
+    }
+
+    const terminalFCF = projectedFCF * (1 + terminalGrowth/100);
+    const terminalValue = terminalFCF / (wacc/100 - terminalGrowth/100);
+    const pvTerminal = terminalValue / Math.pow(1 + wacc/100, years);
+
+    const enterpriseValue = pvFCF + pvTerminal;
+    const equityValue = enterpriseValue - dcfData.inputs.net_debt;
+
+    const exitShares = (dcfData.inputs.projected_shares && dcfData.inputs.projected_shares.length === years)
+        ? dcfData.inputs.projected_shares[years - 1]
+        : dcfData.inputs.shares_outstanding * Math.pow(1 + (dcfData.inputs.annual_share_growth_pct || 0) / 100, years);
+
+    const iv = equityValue / exitShares;
+
+    const entryPrice = (pvFCFHurdle + terminalValue / Math.pow(1 + hurdle, years)
+                        - dcfData.inputs.net_debt) / exitShares;
+
+    return { iv: iv, entryPrice: entryPrice, pvFCF: pvFCF, pvTerminal: pvTerminal, enterpriseValue: enterpriseValue };
+}
+
+function weightedIV(growth, wacc, terminal) {
+    const pw = dcfData.probability_weighted || {};
+    const stored = pw.weighted_iv;
+    if (stored == null || !isWeightedLive()) return stored;
+
+    const a = dcfData.assumptions;
+    const bg = dcfData.historical_growth.selected_growth_rate;
+    const bw = a.base.wacc, bt = a.base.terminal_growth;
+    if (growth === bg && wacc === bw && terminal === bt) return stored;
+
+    const at = (g, k, t) => {
+        const w = pw.weights;
+        const startOf = (sc) => (a[sc] && Array.isArray(a[sc].growth_rates) && a[sc].growth_rates.length)
+            ? a[sc].growth_rates[0] : bg;
+        let sum = 0;
+        for (const sc of ['bull', 'base', 'bear']) {
+            const sg = (sc === 'base' ? bg : startOf(sc)) + (g - bg);
+            const sk = (a[sc].wacc != null ? a[sc].wacc : bw) + (k - bw);
+            const st = (a[sc].terminal_growth != null ? a[sc].terminal_growth : bt) + (t - bt);
+            sum += w[sc] * calculateDCF(sg, Math.max(sk, st + 0.5), st).iv;
+        }
+        return sum;
+    };
+
+    const ref = at(bg, bw, bt);
+    if (!ref || !isFinite(ref)) return stored;
+    const now = at(growth, wacc, terminal);
+    if (!now || !isFinite(now)) return stored;
+    return stored * (now / ref);
+}
+
+function isWeightedLive() {
+    const pw = dcfData.probability_weighted || {};
+    const w = pw.weights;
+    const a = dcfData.assumptions;
+    if (!w || !a || !a.base || !a.bull || !a.bear) return false;
+    if (!dcfData.inputs || dcfData.inputs.last_fcf == null) return false;
+    if (!dcfData.historical_growth || dcfData.historical_growth.selected_growth_rate == null) return false;
+    const total = (w.bull || 0) + (w.base || 0) + (w.bear || 0);
+    if (Math.abs(total - 1) > 0.001) return false;
+    return true;
+}
+
+window.updateDCFDisplay = function() {
+    const growth = parseFloat(document.getElementById('growthSlider').value);
+    const wacc = parseFloat(document.getElementById('waccSlider').value);
+    const terminal = parseFloat(document.getElementById('terminalSlider').value);
+
+    document.getElementById('growthValue').textContent = growth + '%';
+    document.getElementById('waccValue').textContent = wacc + '%';
+    document.getElementById('terminalValue').textContent = terminal + '%';
+
+    renderFCFProjections();
+
+    const result = calculateDCF(growth, wacc, terminal);
+
+    document.getElementById('dcfIV').textContent = fmtIV(result.iv);
+    document.getElementById('dcfEntry').textContent = fmtIV(result.entryPrice);
+
+    const upside = ((result.iv - dcfData.current_price) / dcfData.current_price * 100);
+    const upsideEl = document.getElementById('dcfUpside');
+    upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(0) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+    upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+    const wiv = weightedIV(growth, wacc, terminal);
+    document.getElementById('dcfWeighted').textContent = fmtIV(wiv);
+    const wUpEl = document.getElementById('dcfWeightedUpside');
+    if (wUpEl) {
+        const wUp = (wiv - dcfData.current_price) / dcfData.current_price * 100;
+        wUpEl.textContent = (wUp >= 0 ? '+' : '') + wUp.toFixed(0) + '% ' + (wUp >= 0 ? 'upside' : 'downside');
+        wUpEl.className = 'dcf-change ' + (wUp >= 0 ? 'positive' : 'negative');
+    }
+
+    const grid = document.getElementById('assumptionGrid');
+    if (grid) {
+        grid.innerHTML = `
+            <div class="assumption-item"><div class="label">Growth Rate</div><div class="value">${growth}%</div></div>
+            <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc}%</div></div>
+            <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${terminal}%</div></div>
+            <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color: #00d4aa;">${fmtIV(result.iv)}</div></div>
+            <div class="assumption-item"><div class="label">Entry Price</div><div class="value" style="color: #00d4aa;">${fmtIV(result.entryPrice)}</div></div>
+        `;
+    }
+};
+
+window.switchScenario = function(scenario) {
+    currentScenario = scenario;
+
+    document.querySelectorAll('.scenario-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.scenario === scenario);
+    });
+
+    const assumptions = dcfData.assumptions[scenario];
+    const valuation = dcfData.valuation[scenario];
+
+    document.getElementById('scenarioNarrative').textContent = assumptions.narrative || '';
+
+    renderFCFProjections();
+
+    document.getElementById('growthSlider').value = assumptions.growth_rates[0];
+    document.getElementById('waccSlider').value = assumptions.wacc;
+    document.getElementById('terminalSlider').value = assumptions.terminal_growth;
+
+    const grid = document.getElementById('assumptionGrid');
+    grid.innerHTML = `
+        <div class="assumption-item"><div class="label">Year 1 Growth</div><div class="value">${assumptions.growth_rates[0]}%</div></div>
+        <div class="assumption-item"><div class="label">Year 10 Growth</div><div class="value">${assumptions.growth_rates[9]}%</div></div>
+        <div class="assumption-item"><div class="label">Mid-Cycle EBITDA Margin</div><div class="value">${assumptions.ebitda_margin_path[assumptions.ebitda_margin_path.length-1]}%</div></div>
+        <div class="assumption-item"><div class="label">WACC</div><div class="value">${assumptions.wacc}%</div></div>
+        <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${assumptions.terminal_growth}%</div></div>
+        <div class="assumption-item"><div class="label">Intrinsic Value (model)</div><div class="value" style="color: #00d4aa;">${fmtIV(valuation.intrinsic_value)}</div></div>
+    `;
+
+    updateDCFDisplay();
+};
+
+function renderHistoricalGrowth() {
+    const growth = dcfData.historical_growth;
+    const selectedSource = growth.growth_rate_source;
+    const grid = document.getElementById('growthGrid');
+
+    const metrics = [
+        { key: 'revenue_3yr_cagr', label: 'Revenue 3Y' },
+        { key: 'revenue_5yr_cagr', label: 'Revenue 5Y' },
+        { key: 'eps_3yr_cagr', label: 'EPS 3Y' },
+        { key: 'eps_5yr_cagr', label: 'EPS 5Y' },
+        { key: 'equity_3yr_cagr', label: 'Equity 3Y' },
+        { key: 'equity_5yr_cagr', label: 'Equity 5Y' },
+        { key: 'fcf_3yr_cagr', label: 'FCF 3Y' },
+        { key: 'fcf_5yr_cagr', label: 'FCF 5Y' }
+    ];
+
+    grid.innerHTML = metrics.map(m => {
+        const rate = growth[m.key];
+        const isSelected = (m.key === selectedSource);
+        if (rate === null || rate === undefined) {
+            return `<div class="growth-item"><div class="metric">${m.label}</div><div class="rate na">n/a</div></div>`;
+        }
+        const colorClass = rate >= 0 ? 'positive' : 'negative';
+        return `
+            <div class="growth-item ${isSelected ? 'selected' : ''}">
+                <div class="metric">${m.label}</div>
+                <div class="rate ${colorClass}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div>
+            </div>
+        `;
+    }).join('');
+
+    const notesEl = document.getElementById('growthNotes');
+    if (notesEl) {
+        notesEl.textContent = growth.notes || '';
+    }
+}
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const table = document.getElementById('sensitivityMatrix');
+    const currentPrice = dcfData.current_price;
+
+    let html = '<tr><th>WACC \\ Term G</th>';
+    sens.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+    html += '</tr>';
+
+    sens.wacc_range.forEach((wacc, i) => {
+        html += `<tr><th>${wacc}%</th>`;
+        sens.matrix[i].forEach((val, j) => {
+            const isHighlight = wacc === dcfData.assumptions.base.wacc &&
+                               sens.terminal_growth_range[j] === dcfData.assumptions.base.terminal_growth;
+            const colorClass = val >= currentPrice ? 'above-current' : 'below-current';
+            html += `<td class="${isHighlight ? 'highlight' : colorClass}">${fmtIV(val)}</td>`;
+        });
+        html += '</tr>';
+    });
+
+    table.innerHTML = html;
+}
+
+initDCF();
+
+(function() {
+    var growthSlider = document.getElementById('growthSlider');
+    var waccSlider = document.getElementById('waccSlider');
+    var terminalSlider = document.getElementById('terminalSlider');
+
+    if (growthSlider) { growthSlider.oninput = window.updateDCFDisplay; growthSlider.onchange = window.updateDCFDisplay; }
+    if (waccSlider) { waccSlider.oninput = window.updateDCFDisplay; waccSlider.onchange = window.updateDCFDisplay; }
+    if (terminalSlider) { terminalSlider.oninput = window.updateDCFDisplay; terminalSlider.onchange = window.updateDCFDisplay; }
+})();
+</script>
+</body>
+</html>
