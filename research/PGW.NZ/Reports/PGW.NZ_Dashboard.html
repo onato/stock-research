@@ -1,0 +1,1995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PGG Wrightson Limited (PGW.NZ) Financial Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 20px;
+}
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+}
+.header h1 {
+    font-size: 2.5rem;
+    background: linear-gradient(90deg, #00d4aa, #00b894);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+}
+.header p { color: #888; font-size: 1.1rem; }
+.header-valuation {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 14px 32px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.hv-item { display: flex; align-items: baseline; gap: 8px; }
+.hv-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.hv-value { font-size: 1.35rem; font-weight: 700; color: #e0e0e0; }
+.hv-value.positive { color: #00d4aa; }
+.hv-value.negative { color: #ff6b6b; }
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.kpi-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0, 212, 170, 0.2); }
+.kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+.kpi-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.kpi-change { font-size: 0.9rem; margin-top: 5px; }
+.kpi-change.positive { color: #00d4aa; }
+.kpi-change.negative { color: #ff6b6b; }
+.kpi-note { font-size: 0.72rem; color: #666; margin-top: 6px; line-height: 1.3; }
+.guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+.guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 6px; }
+.guidance-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.guidance-header h3::before {
+    content: ''; display: inline-block; width: 4px; height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px;
+}
+.guidance-meta { font-size: 0.85rem; color: #888; }
+.guidance-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px; margin-bottom: 20px;
+}
+.guidance-card {
+    background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.1); transition: transform 0.2s ease;
+}
+.guidance-card:hover { transform: translateY(-2px); }
+.guidance-metric { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.guidance-target { font-size: 1.3rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; }
+.guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
+.guidance-vs-prior { display: inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+.guidance-vs-prior.raised, .guidance-vs-prior.achieved\/exceeded { background: rgba(0, 212, 170, 0.15); color: #00d4aa; }
+.guidance-vs-prior.lowered { background: rgba(255, 107, 107, 0.15); color: #ff6b6b; }
+.guidance-vs-prior.maintained { background: rgba(255, 255, 255, 0.1); color: #888; }
+.guidance-vs-prior.new, .guidance-vs-prior.n\/a { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
+.guidance-notes { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
+.guidance-commentary {
+    background: rgba(255, 255, 255, 0.03); border-radius: 10px; padding: 16px 20px;
+    border-left: 3px solid #00d4aa; font-style: italic; color: #b0b0b0; line-height: 1.6;
+}
+.guidance-commentary::before { content: '"'; font-size: 1.5rem; color: #00d4aa; margin-right: 4px; }
+.section-title {
+    font-size: 1.5rem; color: #fff; margin: 40px auto 20px; padding-bottom: 10px;
+    border-bottom: 2px solid rgba(0, 212, 170, 0.3); max-width: 1400px;
+}
+.charts-container {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 25px; max-width: 1400px; margin: 0 auto;
+}
+.chart-card {
+    background: rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.chart-card.full-width { grid-column: 1 / -1; }
+.chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+.chart-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.chart-header h3::before {
+    content: ''; display: inline-block; width: 4px; height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px;
+}
+.chart-note { font-size: 0.78rem; color: #fdcb6e; margin-bottom: 12px; line-height: 1.4; background: rgba(253,203,110,0.08); border-left: 3px solid #fdcb6e; padding: 8px 12px; border-radius: 0 6px 6px 0; }
+.help-btn {
+    width: 24px; height: 24px; border-radius: 50%; background: rgba(0, 212, 170, 0.2);
+    border: 1px solid #00d4aa; color: #00d4aa; font-size: 14px; font-weight: bold;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;
+}
+.help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.chart-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.view-toggle {
+    padding: 3px 10px; border-radius: 12px; background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2); color: #888; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s ease;
+}
+.view-toggle:hover { border-color: #0984e3; color: #0984e3; }
+.view-toggle.active { background: rgba(9, 132, 227, 0.2); border-color: #0984e3; color: #0984e3; }
+.log-toggle {
+    padding: 3px 10px; border-radius: 12px; background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2); color: #888; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s ease;
+}
+.log-toggle:hover { border-color: #00d4aa; color: #00d4aa; }
+.log-toggle.active { background: rgba(0, 212, 170, 0.2); border-color: #00d4aa; color: #00d4aa; }
+.chart-wrapper { position: relative; height: 300px; }
+.modal-overlay {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.7); z-index: 1000; justify-content: center; align-items: center; padding: 20px;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+    background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%); border-radius: 16px;
+    max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto;
+    border: 1px solid rgba(0, 212, 170, 0.3); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.modal-header {
+    padding: 20px 25px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.modal-header h3 { color: #00d4aa; font-size: 1.4rem; margin: 0; }
+.modal-close {
+    width: 32px; height: 32px; border-radius: 50%; background: rgba(255, 107, 107, 0.2);
+    border: 1px solid #ff6b6b; color: #ff6b6b; font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+.modal-close:hover { background: #ff6b6b; color: #fff; }
+.modal-body { padding: 25px; line-height: 1.7; }
+.modal-body p { margin-bottom: 15px; }
+.modal-body strong { color: #00d4aa; }
+.modal-body ul { margin: 15px 0; padding-left: 20px; }
+.modal-body li { margin-bottom: 8px; }
+.metric-highlight {
+    background: rgba(0, 212, 170, 0.1); border-left: 3px solid #00d4aa;
+    padding: 12px 15px; margin: 15px 0; border-radius: 0 8px 8px 0;
+}
+.overview-section { max-width: 1400px; margin: 0 auto 30px; }
+.overview-toggle {
+    width: 100%; background: rgba(0, 212, 170, 0.1); border: 1px solid rgba(0, 212, 170, 0.3);
+    border-radius: 12px; padding: 16px 24px; color: #00d4aa; font-size: 1.1rem; font-weight: 600;
+    cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease;
+}
+.overview-toggle:hover { background: rgba(0, 212, 170, 0.2); }
+.overview-toggle .arrow { transition: transform 0.3s ease; }
+.overview-toggle.active .arrow { transform: rotate(180deg); }
+.overview-content {
+    display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: none; border-radius: 0 0 12px 12px; padding: 30px; margin-top: -12px;
+}
+.overview-content.active { display: block; }
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+.overview-card { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.overview-card h3 { color: #00d4aa; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+.overview-card p { margin-bottom: 12px; line-height: 1.6; }
+.overview-card ul { list-style: none; padding: 0; margin: 0; }
+.overview-card li { padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); line-height: 1.5; }
+.overview-card li:last-child { border-bottom: none; }
+.overview-card.bull h3 { color: #00d4aa; }
+.overview-card.bear h3 { color: #ff6b6b; }
+.overview-card.risks h3 { color: #fdcb6e; }
+.risk-high { color: #ff6b6b; }
+.risk-moderate { color: #fdcb6e; }
+.risk-low, .risk-low-to-moderate { color: #00d4aa; }
+.revenue-stream { display: flex; justify-content: space-between; align-items: center; }
+.revenue-stream .percent { color: #00d4aa; font-weight: 600; }
+.trend-growing { color: #00d4aa; }
+.trend-stable { color: #888; }
+.trend-declining { color: #ff6b6b; }
+.dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+.dcf-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+.dcf-card {
+    background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 24px; text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1); transition: transform 0.3s ease;
+}
+.dcf-card:hover { transform: translateY(-3px); }
+.dcf-card.highlight { background: rgba(0, 212, 170, 0.1); border-color: rgba(0, 212, 170, 0.3); }
+.dcf-card.highlight.negative-iv { background: rgba(255, 107, 107, 0.1); border-color: rgba(255, 107, 107, 0.3); }
+.dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.dcf-value { font-size: 2.2rem; font-weight: bold; color: #00d4aa; }
+.dcf-value.negative { color: #ff6b6b; }
+.dcf-card:not(.highlight) .dcf-value { color: #fff; }
+.dcf-card:not(.highlight) .dcf-value.negative { color: #ff6b6b; }
+.dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+.dcf-change.positive { color: #00d4aa; }
+.dcf-change.negative { color: #ff6b6b; }
+.dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
+.dcf-warning {
+    background: rgba(253, 203, 110, 0.15); border: 1px solid rgba(253, 203, 110, 0.4); border-radius: 8px;
+    padding: 12px 16px; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; color: #fdcb6e;
+}
+.dcf-philosophy-banner {
+    background: rgba(253, 203, 110, 0.1); border: 1px solid rgba(253, 203, 110, 0.5); border-radius: 10px;
+    padding: 18px 22px; margin-bottom: 25px; display: flex; gap: 14px; align-items: flex-start; color: #f0d9a8; line-height: 1.6;
+}
+.dcf-philosophy-banner .warning-icon { font-size: 1.4rem; flex-shrink: 0; }
+.dcf-philosophy-banner strong { color: #fdcb6e; }
+.warning-icon { font-size: 1.2rem; }
+.dcf-inputs { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+.dcf-inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.dcf-input-card { background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 12px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.05); }
+.dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #00d4aa; }
+.dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
+.fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
+.fcf-projection-table { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; background: rgba(0, 0, 0, 0.2); border-radius: 8px; padding: 12px; overflow-x: auto; }
+.fcf-projection-item { text-align: center; }
+.fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
+.fcf-projection-item .year { font-size: 0.75rem; color: #888; margin-bottom: 2px; }
+.fcf-projection-item .fcf-value { font-size: 1rem; color: #e0e0e0; font-weight: 500; }
+.fcf-projection-item .growth-rate { font-size: 0.75rem; color: #00d4aa; margin-top: 2px; }
+.dcf-controls {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; margin-bottom: 30px;
+    padding: 25px; background: rgba(255, 255, 255, 0.03); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.slider-group { display: flex; flex-direction: column; gap: 10px; }
+.slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+.slider-group label span { color: #00d4aa; font-weight: 600; }
+.slider-group input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); outline: none; }
+.slider-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #00d4aa;
+    cursor: pointer; transition: transform 0.2s;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.slider-hint { font-size: 0.8rem; color: #666; }
+.scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+.scenario-tab {
+    padding: 10px 24px; border: 1px solid rgba(255, 255, 255, 0.2); background: transparent; color: #888;
+    border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s;
+}
+.scenario-tab:hover { border-color: rgba(0, 212, 170, 0.5); color: #e0e0e0; }
+.scenario-tab.active { background: rgba(0, 212, 170, 0.15); border-color: #00d4aa; color: #00d4aa; }
+.scenario-details { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; margin-bottom: 30px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.scenario-details h4 { color: #00d4aa; margin-bottom: 15px; }
+.assumption-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+.assumption-item { text-align: center; }
+.assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+.assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
+.sensitivity-section { margin-bottom: 30px; }
+.sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; }
+.sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255, 255, 255, 0.03); border-radius: 8px; overflow: hidden; }
+.sensitivity-table th, .sensitivity-table td { padding: 12px 16px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); }
+.sensitivity-table th { background: rgba(0, 212, 170, 0.1); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td { color: #e0e0e0; }
+.sensitivity-table td.highlight { background: rgba(0, 212, 170, 0.15); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td.below-current { color: #ff6b6b; }
+.sensitivity-table td.above-current { color: #00d4aa; }
+.market-convention-section {
+    background: rgba(9, 132, 227, 0.08); border: 1px solid rgba(9, 132, 227, 0.3); border-radius: 12px;
+    padding: 20px; margin-bottom: 30px;
+}
+.market-convention-section h4 { color: #74b9ff; margin-bottom: 8px; }
+.market-convention-section p { color: #b0c4de; font-size: 0.88rem; line-height: 1.6; margin-bottom: 15px; }
+.mc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.mc-item { background: rgba(255,255,255,0.04); border-radius: 8px; padding: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+.mc-item .mc-label { font-size: 0.72rem; color: #888; text-transform: uppercase; margin-bottom: 4px; }
+.mc-item .mc-value { font-size: 1.15rem; font-weight: 600; color: #74b9ff; }
+.house-vs-market {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px;
+}
+.hvm-card { border-radius: 10px; padding: 18px; border: 1px solid rgba(255,255,255,0.1); }
+.hvm-card.house { background: rgba(255, 107, 107, 0.07); border-color: rgba(255,107,107,0.3); }
+.hvm-card.market { background: rgba(9, 132, 227, 0.07); border-color: rgba(9,132,227,0.3); }
+.hvm-card h5 { margin-bottom: 10px; font-size: 0.95rem; }
+.hvm-card.house h5 { color: #ff6b6b; }
+.hvm-card.market h5 { color: #74b9ff; }
+.hvm-card .hvm-value { font-size: 1.6rem; font-weight: 700; }
+.hvm-card.house .hvm-value { color: #ff6b6b; }
+.hvm-card.market .hvm-value { color: #74b9ff; }
+.hvm-card p { font-size: 0.8rem; color: #999; margin-top: 8px; line-height: 1.5; }
+.historical-growth { margin-bottom: 30px; }
+.historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
+.growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
+.growth-item { background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 15px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); }
+.growth-item .metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
+.growth-item .rate { font-size: 1.2rem; font-weight: 600; }
+.growth-item .rate.positive { color: #00d4aa; }
+.growth-item .rate.negative { color: #ff6b6b; }
+.growth-item.selected { border-color: #00d4aa; background: rgba(0, 212, 170, 0.1); }
+.dcf-download { text-align: center; margin-top: 30px; }
+.download-btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; background: rgba(0, 212, 170, 0.15);
+    border: 1px solid #00d4aa; border-radius: 8px; color: #00d4aa; text-decoration: none; font-weight: 600; transition: all 0.2s;
+}
+.download-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.download-icon { font-size: 1.2rem; }
+@media (max-width: 768px) {
+    .charts-container { grid-template-columns: 1fr; }
+    .overview-grid { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.8rem; }
+    .house-vs-market { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>PGG Wrightson Limited (PGW.NZ)</h1>
+    <p>New Zealand rural services: farm-input retail &amp; livestock/wool/real-estate agency &middot; FY ends 30 June &middot; NZD</p>
+    <div class="header-valuation" id="headerValuation" style="display:none"></div>
+</div>
+
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid">
+            <div class="overview-card">
+                <h3>Company Overview</h3>
+                <p id="ovOverview"></p>
+            </div>
+            <div class="overview-card">
+                <h3>Business Model</h3>
+                <p id="ovBizSummary"></p>
+                <ul id="ovRevenueStreams"></ul>
+            </div>
+            <div class="overview-card">
+                <h3>Competitive Position</h3>
+                <p id="ovCompetitors"></p>
+                <p><strong>Moat:</strong></p>
+                <ul id="ovMoat"></ul>
+            </div>
+            <div class="overview-card">
+                <h3>Growth Drivers</h3>
+                <ul id="ovGrowthDrivers"></ul>
+            </div>
+            <div class="overview-card risks">
+                <h3>Key Risks</h3>
+                <ul id="ovRisks"></ul>
+            </div>
+            <div class="overview-card bull">
+                <h3>Bull Case</h3>
+                <ul id="ovBull"></ul>
+            </div>
+            <div class="overview-card bear">
+                <h3>Bear Case</h3>
+                <ul id="ovBear"></ul>
+            </div>
+            <div class="overview-card">
+                <h3>Recent Developments</h3>
+                <ul id="ovRecent"></ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf"></span> | <span id="guidanceFY"></span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<h2 class="section-title">Revenue, Profitability &amp; Segments</h2>
+<div class="charts-container">
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Revenue</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('revenueChart','annual',this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('revenueChart','halfyear',this)">H1</button>
+                <button class="log-toggle" onclick="toggleLogScale('revenueChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('revenue')">?</button>
+            </div>
+        </div>
+        <div class="chart-note">FY2018 revenue ($1,193m) includes the PGG Wrightson Seeds business, sold to DLF in May 2019. FY2019 onward is continuing operations only &mdash; the FY2018&rarr;FY2019 drop is a divestment, not a business collapse.</div>
+        <div class="chart-wrapper"><canvas id="revenueChart"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Operating EBITDA &amp; Margin</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('ebitdaChart','annual',this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('ebitdaChart','halfyear',this)">H1</button>
+                <button class="help-btn" onclick="openModal('ebitda')">?</button>
+            </div>
+        </div>
+        <div class="chart-note">IFRS 16 (adopted FY2020) inflated reported EBITDA by capitalising lease payments &mdash; FY2019 EBITDA ($24.4m) is not comparable to FY2021 onward. PGW is a thin-margin distributor: margin sits near 5&ndash;7%, plotted here on its own right-hand axis.</div>
+        <div class="chart-wrapper"><canvas id="ebitdaChart"></canvas></div>
+    </div>
+
+    <div class="chart-card full-width">
+        <div class="chart-header">
+            <h3>Segment Operating EBITDA (Annual)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('segment')">?</button>
+            </div>
+        </div>
+        <div class="chart-note">The single most important operational view for PGW: two very different economic engines (transactional Retail &amp; Water vs. commission-based Agency) plus unallocated corporate ("Other") costs. Sourced from each annual report's segment note ($000s, converted to $m). FY2020 excluded (pre/post IFRS-16 transition boundary within segment reporting).</div>
+        <div class="chart-wrapper" style="height:340px;"><canvas id="segmentChart"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Free Cash Flow vs Operating EBITDA</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('fcfVsEbitda')">?</button>
+            </div>
+        </div>
+        <div class="chart-note">FY2019 FCF (-$65.5m) reflects the Seeds divestment year, not underlying operations. Log scale is not used here because FCF is frequently negative.</div>
+        <div class="chart-wrapper"><canvas id="fcfVsEbitdaChart"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Debt</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('netDebt')">?</button>
+            </div>
+        </div>
+        <div class="chart-note">Bank debt less cash (excludes IFRS-16 lease liabilities, consistent with PGW's own net-debt definition). H1 net debt is structurally elevated by seasonal working-capital build (GO-STOCK receivables, inventory).</div>
+        <div class="chart-wrapper"><canvas id="netDebtChart"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>H1 Operating Cash Flow Seasonality</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('seasonality')">?</button>
+            </div>
+        </div>
+        <div class="chart-note">H1 (Jul&ndash;Dec) operating cash flow is negative in nearly every year &mdash; farmer trade-credit terms and GO-STOCK/inventory build absorb cash in the first half; it reverses in H2 as receivables collect ahead of the June year-end.</div>
+        <div class="chart-wrapper"><canvas id="seasonalityChart"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Income &amp; EPS</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('netIncomeChart','annual',this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('netIncomeChart','halfyear',this)">H1</button>
+                <button class="help-btn" onclick="openModal('netIncome')">?</button>
+            </div>
+        </div>
+        <div class="chart-note">FY2019 NPAT ($131.8m) includes a ~$134.3m one-off after-tax gain on the Seeds sale &mdash; continuing-ops NPAT was only $4.0m. Excluded from the bar to avoid distorting the axis; see modal. EPS pre/post the Aug-2019 1:10 share consolidation is NOT continuous (754.8m shares pre-consolidation vs 75.5m after) &mdash; shown as two series, not one line.</div>
+        <div class="chart-wrapper"><canvas id="netIncomeChart"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Gross Margin &amp; Net Margin</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('marginChart','annual',this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('marginChart','halfyear',this)">H1</button>
+                <button class="help-btn" onclick="openModal('margins')">?</button>
+            </div>
+        </div>
+        <div class="chart-note">Percentage series &mdash; no log toggle. FY2019 net margin (16.3%) is inflated by the Seeds sale gain.</div>
+        <div class="chart-wrapper"><canvas id="marginChart"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Dividend Per Share</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('dividend')">?</button>
+            </div>
+        </div>
+        <div class="chart-note">Post-consolidation (FY2019 onward) cents-per-share basis. FY2026 total dividend 10.0cps (final 5.5cps + interim 4.5cps), fully imputed. Note: DCF cash-flow analysis finds recent dividends have been funded largely by rising net debt, not by owner free cash flow.</div>
+        <div class="chart-wrapper"><canvas id="dividendChart"></canvas></div>
+    </div>
+
+</div>
+
+<h2 class="section-title">DCF Valuation</h2>
+
+<div class="dcf-section">
+
+  <div class="dcf-philosophy-banner">
+    <span class="warning-icon">&#9888;</span>
+    <div>
+        <strong>Step 8c &mdash; below-band, house view honestly disclosed:</strong>
+        <span id="philosophyText"></span>
+    </div>
+  </div>
+
+  <div class="dcf-summary">
+    <div class="dcf-card highlight" id="dcfWeightedCard">
+      <div class="dcf-label">Prob-Weighted IV</div>
+      <div class="dcf-value" id="dcfWeighted">$0.05</div>
+      <div class="dcf-change" id="dcfWeightedUpside"></div>
+      <div class="dcf-sublabel" id="dcfWeightedSublabel">25% Bull / 50% Base / 25% Bear</div>
+    </div>
+    <div class="dcf-card" id="dcfIVCard">
+      <div class="dcf-label">Intrinsic Value (Base)</div>
+      <div class="dcf-value" id="dcfIV">-$0.01</div>
+      <div class="dcf-change" id="dcfUpside"></div>
+      <div class="dcf-sublabel">Mid-cycle owner FCF, house basis</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Entry Price (15% CAGR)</div>
+      <div class="dcf-value" id="dcfEntry">-$0.11</div>
+      <div class="dcf-sublabel">No positive DCF entry price exists at a 15% hurdle</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Current Price</div>
+      <div class="dcf-value" id="dcfCurrent">$2.31</div>
+    </div>
+  </div>
+
+  <div class="dcf-warning" id="growthWarning" style="display:none;">
+    <span class="warning-icon">&#9888;</span>
+    <span id="warningText"></span>
+  </div>
+
+  <div class="house-vs-market">
+    <div class="hvm-card house">
+        <h5>House View &mdash; Owner-FCF DCF</h5>
+        <div class="hvm-value" id="hvmHouse">Weighted IV $0.05</div>
+        <p>PGW converts only ~$13m of ~$64m Operating EBITDA into mid-cycle unlevered owner cash: ~$29m/yr goes to store &amp; saleyard lease payments, ~$16m to normalized capex, ~$7m to cash tax, and growth working capital (GO-STOCK receivables, 12-month farmer credit) absorbs the rest. Ten years of thin discounted cash flow plus a Gordon terminal value cannot support the current price.</p>
+    </div>
+    <div class="hvm-card market">
+        <h5>Market-Convention Memo (not the house basis)</h5>
+        <div class="hvm-value" id="hvmMarket">Weighted ~$1.21</div>
+        <p>What PGW is worth if the terminal value is set at the market's own historical EV/Operating-EBITDA multiple (4.6&ndash;6.2x) instead of a Gordon-growth cap. Undiscounted current-EBITDA multiple math implies $2.75&ndash;$4.12/share &mdash; roughly how the market prices PGW today. Even on this basis the discounted memo sits below the current price.</p>
+    </div>
+  </div>
+
+  <div class="market-convention-section">
+    <h4>Market-Convention Reference Detail</h4>
+    <p>Memo only, shown for context &mdash; the house valuation above (owner-FCF DCF) is what this model actually recommends acting on. This block shows what the market's own decade-long EV/EBITDA convention would imply.</p>
+    <div class="mc-grid" id="marketConventionGrid"></div>
+  </div>
+
+  <div class="dcf-inputs">
+    <h4>DCF Model Inputs</h4>
+    <div class="dcf-inputs-grid">
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Mid-Cycle Owner FCF</div>
+        <div class="dcf-input-value" id="baseFCF">$13M</div>
+        <div class="dcf-input-note" id="sbcBreakdown">Component-built, not FY2026's reported $46m</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Shares Outstanding</div>
+        <div class="dcf-input-value" id="sharesOut">75.5M</div>
+        <div class="dcf-input-note" id="dilutionNote"></div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Net Debt</div>
+        <div class="dcf-input-value" id="netDebt">$88M</div>
+        <div class="dcf-input-note">Bank debt less cash; excludes lease liabilities</div>
+      </div>
+    </div>
+    <div class="fcf-projections">
+      <h5>Projected FCF (5-Year view of the 10-year model)</h5>
+      <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+    </div>
+  </div>
+
+  <div class="dcf-controls">
+    <div class="slider-group">
+      <label>Growth Rate: <span id="growthValue">2.25%</span></label>
+      <input type="range" id="growthSlider" min="-10" max="10" value="2.25" step="0.1" oninput="updateDCFDisplay()">
+      <div class="slider-hint" id="growthHint">Based on cycle-adjusted judgment</div>
+    </div>
+    <div class="slider-group">
+      <label>WACC: <span id="waccValue">13.5%</span></label>
+      <input type="range" id="waccSlider" min="9" max="18" value="13.5" step="0.05" oninput="updateDCFDisplay()">
+    </div>
+    <div class="slider-group">
+      <label>Terminal Growth: <span id="terminalValue">2%</span></label>
+      <input type="range" id="terminalSlider" min="0" max="4" value="2" step="0.1" oninput="updateDCFDisplay()">
+    </div>
+  </div>
+
+  <div class="scenario-tabs">
+    <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+    <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+    <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+  </div>
+
+  <div class="scenario-details" id="scenarioDetails">
+    <div class="scenario-assumptions">
+      <h4>Assumptions</h4>
+      <div class="assumption-grid" id="assumptionGrid"></div>
+    </div>
+  </div>
+
+  <div class="sensitivity-section">
+    <h4>Sensitivity Analysis: Intrinsic Value by WACC &amp; Terminal Growth</h4>
+    <table class="sensitivity-table" id="sensitivityMatrix"></table>
+  </div>
+
+  <div class="historical-growth">
+    <h4>Historical Growth Rates (CAGR)</h4>
+    <div class="growth-grid" id="growthGrid"></div>
+  </div>
+
+  <div class="dcf-download">
+    <a href="PGW.NZ_DCF_Model.xlsx" class="download-btn" download>
+      <span class="download-icon">&#8681;</span> Download Excel Model
+    </a>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ============================= EMBEDDED DATA =============================
+const csvData = `Period,Revenue,CostOfRevenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,EBITDA,NetIncome,NetMargin,EPS,OperatingCashFlow,CapEx,FreeCashFlow,ShareholdersEquity,TotalAssets,TotalLiabilities,TotalDebt,CashAndEquivalents,SharesOutstanding,StockBasedComp,DividendPerShare,EBITDABeforeSignificant,RevenueContinuing,EBITDAContinuingBeforeSignificant,EBITContinuingBeforeSignificant,Units,Currency
+FY2017,1132.963,-804.317,328.646,29.0,62.867000000000004,5.5,64.499,46.311,4.1,0.061,20.468,-17.11,3.3580000000000005,287.247,702.148,412.437,137.644,9.403,754.849,,,,1132.963,64.499,62.867000000000004,millions,NZD
+H1 FY2018,628.177,-457.241,170.936,27.2,29.244,4.7,34.172000000000004,14.64,2.3,0.019,-49.779,-9.208,-58.987,291.831,845.314,551.1800000000001,221.84900000000002,24.247,754.849,,,,628.177,34.172000000000004,29.244,millions,NZD
+FY2018,1193.462,-847.328,346.134,29.0,45.017,3.8,70.174,18.887,1.6,0.025,5.766,-23.157,-17.391,284.984,758.626,471.164,180.011,10.926,754.849,,0.03,,1193.462,70.174,45.017,millions,NZD
+H1 FY2019,473.765,-355.226,118.539,25.0,15.129,3.2,17.839,0.32,0.1,0.0,-58.601,-7.41,-66.011,271.421,931.355,657.285,209.635,3.884,754.849,,,,473.765,17.839,15.129,millions,NZD
+FY2019,809.255,-589.714,219.541,27.1,9.697000000000001,1.2,24.425,131.806,16.3,0.174,-49.001,-16.505,-65.506,398.264,565.554,167.29,2.68,210.491,75.484,,,,809.255,24.425,9.697000000000001,millions,NZD
+H1 FY2020,474.079,-353.486,120.593,25.4,19.631,4.1,34.522,12.756,2.7,0.169,-14.871,-4.549,-19.42,173.45600000000002,572.446,398.99,60.0,0.682,75.484,,,,474.079,34.522,19.631,millions,NZD
+FY2020,788.0360000000001,-583.855,204.181,25.9,15.051,1.9,45.19,7.84,1.0,0.102,34.227000000000004,-11.875,22.352000000000004,156.702,459.45300000000003,302.75100000000003,30.0,16.868000000000002,75.484,,,,788.0360000000001,45.19,15.051,millions,NZD
+H1 FY2021,499.345,-377.002,122.343,24.5,26.683,5.3,39.586,17.04,3.4,,3.936,-1.526,2.41,,,,41.0,1.764,75.484,,,,499.345,39.586,26.683,millions,NZD
+FY2021,847.815,-624.589,223.226,26.3,35.034,4.1,56.029,22.713,2.7,0.301,57.671,-6.809,50.862,173.538,453.034,279.496,9.9,3.367,75.484,,0.1238,,847.815,56.029,35.034,millions,NZD
+H1 FY2022,552.373,-416.601,135.772,24.6,33.911,6.1,47.428000000000004,22.505,4.1,0.298,-17.003,-1.6620000000000001,-18.665,182.285,608.597,426.312,48.0,1.113,75.484,,,,552.373,47.428000000000004,33.911,millions,NZD
+FY2022,952.7,-704.181,248.519,26.1,37.646,4.0,67.153,24.286,2.5,0.322,23.66,-8.807,14.853,172.684,509.952,337.26800000000003,37.5,4.676,75.484,,0.3091,,952.7,67.153,37.646,millions,NZD
+H1 FY2023,585.756,-441.463,144.293,24.6,34.499,5.9,47.844,21.158,3.6,0.28,-34.97,-6.22,-41.19,181.518,658.859,477.341,98.0,2.484,75.484,,,,585.756,47.844,34.499,millions,NZD
+FY2023,975.692,-722.849,252.84300000000002,25.9,33.509,3.4,61.194,17.518,1.8,0.232,25.509,-17.176000000000002,8.332999999999998,169.261,496.528,327.267,69.96000000000001,4.643,75.484,,0.2876,,975.692,61.194,33.509,millions,NZD
+H1 FY2024,560.878,-425.247,135.631,24.2,22.247,4.0,36.618,12.738,2.3,0.169,-6.833,-6.908,-13.741,173.447,642.347,468.90000000000003,110.19,13.307,75.484,,,,560.878,36.618,22.247,millions,NZD
+FY2024,915.946,-680.245,235.701,25.7,15.355,1.7,44.17,3.064,0.3,0.041,57.733000000000004,-22.845,34.888000000000005,164.733,477.635,312.902,63.0,3.785,75.484,,0.1028,,915.946,44.17,15.355,millions,NZD
+H1 FY2025,570.2810000000001,-430.976,139.305,24.4,27.607,4.8,41.366,15.972,2.8,0.212,-31.014,-8.247,-39.260999999999996,180.792,659.831,479.039,109.05,2.364,75.484,,,,570.2810000000001,41.366,27.607,millions,NZD
+FY2025,975.344,-720.347,254.997,26.1,26.184,2.7,56.131,10.664,1.1,0.141,12.397,-17.428,-5.031000000000001,173.81,529.6800000000001,355.87,88.182,2.613,75.484,,0.0252,,975.344,56.131,26.184,millions,NZD
+H1 FY2026,619.4060000000001,-467.505,151.901,24.5,28.838,4.7,45.727000000000004,17.253,2.8,0.229,-49.863,-2.2640000000000002,-52.127,187.698,743.643,555.945,176.06300000000002,5.335,75.484,,,,619.4060000000001,45.727000000000004,28.838,millions,NZD
+FY2026,1074.384,-787.517,286.867,26.7,29.740000000000002,2.8,64.31,15.571,1.4,0.206,52.593,-6.585,46.008,182.567,600.338,417.771,92.0,3.995,75.484,,0.0855,,1074.384,64.31,29.740000000000002,millions,NZD`;
+
+// Segment Operating EBITDA (NZ$m) - sourced from each annual report's segment note (kpis table equivalent)
+// FY2020 excluded: IFRS-16 transition year, segment note basis not comparable either side
+const segmentData = [
+    { period: 'FY2021', agency: 25.179, retailWater: 37.533, other: -6.683, total: 56.029 },
+    { period: 'FY2022', agency: 21.844, retailWater: 52.495, other: -7.186, total: 67.153 },
+    { period: 'FY2023', agency: 16.068, retailWater: 54.129, other: -9.003, total: 61.194 },
+    { period: 'FY2024', agency: 12.314, retailWater: 41.042, other: -9.186, total: 44.170 },
+    { period: 'FY2025', agency: 23.462, retailWater: 42.150, other: -9.481, total: 56.131 },
+    { period: 'FY2026', agency: 28.968, retailWater: 44.476, other: -9.134, total: 64.310 }
+];
+
+const analysis = {
+  "ticker": "PGW.NZ",
+  "company_name": "PGG Wrightson Limited",
+  "sector": "Rural Services / Agricultural Supply Chain",
+  "analysis_date": "2026-08-25",
+  "overview": "PGG Wrightson is New Zealand's second-largest rural services company, providing farm inputs retailing (Rural Supplies, Fruitfed Supplies, Water & Irrigation, Agritrade wholesale) and agency services (Livestock, Wool, Real Estate) to New Zealand farmers and growers. Following the May 2019 sale of its PGG Wrightson Seeds business to Denmark's DLF Seeds for roughly NZ$333 million, PGW is now a pure-play rural services business operating exclusively within New Zealand, organised into two reporting segments: Retail & Water and Agency. The company reported FY2026 (year ended 30 June 2026) operating revenue of $1,074 million -- the first time above $1 billion since the seeds divestment -- Operating EBITDA of $64.3 million and NPAT of $15.6 million.",
+  "business_model": {
+    "summary": "PGW earns money through two distinct models: (1) principal retail sales of farm inputs (agrichemicals, animal health, fertiliser-adjacent products, irrigation equipment) at a gross margin through its Rural Supplies, Fruitfed Supplies and Agritrade channels, and (2) commission/agency income from facilitating livestock, wool and real estate transactions where PGW does not take title to the underlying asset. A smaller but distinctive revenue stream is interest income on GO-STOCK, a deferred-payment livestock financing product where PGW retains legal title to stock as security. Retail revenue is transactional and highly seasonal (working capital builds in H1, unwinds in H2); Agency commission revenue is directly linked to livestock/wool/property prices and transaction volumes, making it the most cyclical and highest-operating-leverage part of the business.",
+    "revenue_streams": [
+      {"name": "Retail & Water (Rural Supplies, Fruitfed Supplies, Agritrade, Irrigation)", "percent": 79, "trend": "growing"},
+      {"name": "Agency - Livestock commissions", "percent": 11, "trend": "growing"},
+      {"name": "Agency - Wool & Real Estate commissions", "percent": 6, "trend": "growing"},
+      {"name": "GO-STOCK interest income", "percent": 1, "trend": "stable"},
+      {"name": "Other/Corporate (rewards, on-charging)", "percent": 3, "trend": "stable"}
+    ],
+    "customer_type": "B2B/B2C hybrid -- predominantly individual farmers, graziers, orchardists and viticulturists (SMB-scale rural businesses) purchasing on trade credit terms of up to 12 months; also large corporate/iwi farming entities",
+    "geographic_mix": "100% New Zealand -- the Group operates and derives revenue exclusively within New Zealand (post-seeds divestment, which removed the only material offshore/multi-geography exposure)"
+  },
+  "competitive_position": {
+    "main_competitors": ["Farmlands (farmer-owned co-operative)", "Ravensdown (fertiliser co-operative)", "Ballance Agri-Nutrients (fertiliser co-operative)", "Carrfields", "Alliance Group (livestock/meat processor with own procurement)", "Fonterra/Farm Source (dairy co-operative retail)", "Ashburton Trading Society (ATS)", "RD1"],
+    "market_position": "Clear #2 in New Zealand rural retail behind Farmlands, which is roughly double PGW's rural retail revenue and operates a 56,000+ member co-operative model; PGW is a leading, and in several categories the largest, player in livestock agency, rural real estate and wool broking, and holds a strong position in horticultural inputs via Fruitfed Supplies",
+    "moat_factors": [
+      {"factor": "Scale and branch network", "strength": "moderate", "description": "Nationwide store and saleyard footprint (Rural Supplies, Fruitfed, livestock agents) built over 175 years gives reach that is costly to replicate, though Farmlands' co-operative network is larger"},
+      {"factor": "Brand/reputation and technical expertise", "strength": "moderate", "description": "Long-standing trusted advisor relationships (agronomists, livestock agents) and technical service depth (e.g. Fruitfed's horticultural advisory) support customer retention despite price competition"},
+      {"factor": "Agency network effects / GO-STOCK financing", "strength": "moderate", "description": "GO-STOCK livestock deferred-payment product and the Max Rewards loyalty programme create switching costs and data-driven customer insight; livestock agency benefits from established buyer-seller and processor relationships (headage supply-chain partnerships)"},
+      {"factor": "Vertical integration into animal health manufacturing", "strength": "weak-to-moderate", "description": "FY2026 acquisition of Nexan Group (animal health manufacturer) and launch of the Blue Ag private-label agrichemical range give some cost/margin control and price-point differentiation versus pure distributors"},
+      {"factor": "Real estate/livestock local market knowledge", "strength": "moderate", "description": "Localised sales relationships and saleyard infrastructure (PGW invests in perimeter/animal welfare/safety systems) are difficult for new entrants to match quickly"}
+    ],
+    "weaknesses": [
+      "Sub-scale versus Farmlands in rural retail, structurally limiting pricing power and buying leverage",
+      "Wool remains structurally challenged (a shrinking global synthetic-competing market) despite a cyclical pricing bounce",
+      "Commission-based agency income is exposed to margin compression when livestock prices are high (farmers negotiate lower rates/flat headage fees), so revenue and margin can move in opposite directions",
+      "Thin net margins (NPAT margin ~1.5% in FY2026) leave limited buffer against a commodity downturn or cost inflation",
+      "Concentrated, contested shareholder register (Agria ~44%, Elders ~12%) creates governance overhang and board instability risk rather than a clean strategic partnership"
+    ]
+  },
+  "growth_drivers": [
+    "Cyclical recovery in farmgate returns: strong sheep/beef schedules, elevated cattle prices, and a supportive Fonterra milk price are driving on-farm confidence, input spend and livestock transaction volumes",
+    "Nexan Group acquisition (FY2026) vertically integrates animal health manufacturing, expanding Agritrade's offering and margin capture",
+    "Blue Ag private-label agrichemical range launched in FY2026 -- improves supply resilience, price-point control and gross margin versus third-party brands",
+    "bidr online livestock bidding/livestreaming platform expanding saleyard integration (16 saleyards) -- digital channel for the Livestock agency business",
+    "Rural real estate recovery as lower interest rates and improved dairy/sheep-beef profitability reactivate buyer interest, particularly for dairy and finishing properties",
+    "GO-STOCK receivables at record highs, reflecting growing farmer demand for PGW's deferred-payment livestock financing product",
+    "R&D expansion (Hastings research station lease) supporting horticultural/agricultural trial capability and technical differentiation",
+    "Continued store network modernisation (new-format Rural Supplies/Fruitfed sites) improving customer experience and operating efficiency"
+  ],
+  "risks": {
+    "business": [
+      {"risk": "Commodity price cyclicality", "severity": "high", "description": "Earnings are directly geared to farmgate milk price, sheep/beef schedules, wool prices and rural property transaction volumes; a downturn in any of these rapidly compresses both retail spend and agency commission revenue"},
+      {"risk": "Intense competitive/pricing pressure", "severity": "moderate", "description": "Management explicitly flagged 'robust' competitive pressure with 'tactical sales practices' and 'below cost offers' in FY2026 filings, and commission-rate compression in livestock during periods of high stock prices"},
+      {"risk": "Wool structural decline", "severity": "moderate", "description": "Strong wool sector remains structurally challenged by synthetic fibre competition despite a cyclical ~25% price recovery in H1 FY2026"},
+      {"risk": "Weather/production risk", "severity": "moderate", "description": "Regional hail, cyclonic and wind events (Canterbury Plains, north-region cyclones) can disrupt arable, horticultural and irrigation-service operations"}
+    ],
+    "financial": [
+      {"risk": "Rising net debt and working-capital seasonality", "severity": "moderate", "description": "Net interest-bearing debt rose to $170.7m at 31 Dec 2025 (from $106.7m a year earlier), partly funding the Nexan acquisition and seasonal H1 working-capital build (GO-STOCK receivables, inventory); H1 operating cash outflow was $49.9m"},
+      {"risk": "Floating-rate bank facility exposure", "severity": "low-to-moderate", "description": "Syndicated core debt ($100m) and working-capital ($85m) facilities from BNZ, Rabobank and Westpac price off OCR/BKBM plus margin, so PGW's interest cost is directly exposed to NZ interest-rate moves"},
+      {"risk": "Thin net margins", "severity": "moderate", "description": "FY2025 NPAT margin of ~1.1% (FY2026 ~1.5%) leaves little buffer for cost inflation or a demand shock before profitability is impaired"}
+    ],
+    "regulatory": [
+      {"risk": "NZX governance compliance", "severity": "moderate", "description": "In October 2025 PGW briefly fell below the NZX Listing Rules minimum director/residency requirements following a shareholder-driven board ouster, forcing a trading halt -- evidence that large-shareholder actions can create real compliance risk"},
+      {"risk": "Climate/emissions reporting", "severity": "low", "description": "PGW has voluntarily continued NZ Climate Standards-aligned reporting even as proposed threshold changes may remove its mandatory climate-reporting entity status"},
+      {"risk": "Environmental/agricultural regulation", "severity": "low-to-moderate", "description": "Farmer customers face evolving on-farm environmental and freshwater regulation that can affect input spend and land-use decisions, an indirect but real risk to PGW's retail and real estate segments"}
+    ],
+    "macro": [
+      {"risk": "Farmgate milk price volatility", "severity": "high", "description": "Fonterra's 2026/27 forecast was cut by 50c to $9.25/kgMS (range $8.00-$10.50) in July 2026 on softer global demand and rising supply -- a swing factor for dairy-related retail and real estate demand"},
+      {"risk": "NZD/export commodity exposure", "severity": "moderate", "description": "A softer NZD benefits exporting customers' returns (positive for PGW indirectly) but raises the cost of imported agrichemical, animal health and equipment inputs PGW purchases"},
+      {"risk": "Global trade/tariff policy", "severity": "moderate", "description": "Management cited 'geopolitical risks' and noted recent China/India tariff reductions as a positive for wool market access -- underscoring sensitivity to shifts in trade policy for NZ's key export commodities"},
+      {"risk": "Weather cyclicality (El Nino/La Nina)", "severity": "moderate", "description": "Management flagged weather, alongside commodity pricing, as one of the two key swing factors for the FY2027 result"}
+    ]
+  },
+  "macro_factors": {
+    "industry_outlook": "New Zealand's primary sector export revenue is forecast to reach a record $62.0 billion by 30 June 2026 (MPI), with dairy exports up ~1% to $27.4bn, red meat/wool up ~7% to $13.2bn, and horticulture up ~5% to $9.2bn -- a broadly supportive multi-year backdrop for PGW's rural retail and agency volumes after several difficult years",
+    "cyclicality": "High -- PGW's earnings (particularly the Agency segment) are tightly correlated with the on-farm profitability cycle: farmgate milk price, sheep/beef schedules, wool pricing and rural land values all move together with global commodity demand and NZ weather",
+    "interest_rate_sensitivity": "Moderate -- direct exposure through floating-rate bank debt and lease liabilities, and indirect exposure through the effect of NZ interest rates on farmer confidence, rural property transactions and on-farm capital investment (e.g. irrigation)",
+    "key_input_costs": ["Agrichemicals and imported animal health products (FX-exposed)", "Fertiliser (sold via distribution partnerships, e.g. Ballance)", "Labour (retail and technical staff, agents)", "Fuel/vehicle fleet costs", "Freight and logistics"]
+  },
+  "recent_developments": [
+    {"date": "2026-08-11", "event": "FY2026 (year to 30 June 2026) full-year result: operating revenue $1,074m (+10%, first time above $1bn since the 2019 seeds divestment), Operating EBITDA $64.3m (+15%), NPAT $15.6m (+46%), EPS 20.6cps; final dividend 5.5cps fully imputed, taking FY2026 total dividend to 10cps"},
+    {"date": "2026-07-13", "event": "Fonterra cut its 2026/27 farmgate milk price forecast by 50c to $9.25/kgMS (range $8.00-$10.50) on softer global demand and rising supply, a headwind for dairy-linked demand into FY2027"},
+    {"date": "2025-12-31 (H1 FY2026)", "event": "H1 FY2026 result: operating revenue $619.4m (+9%), Operating EBITDA $45.7m (+11%), NPAT $17.3m (+8%); interim dividend 4.5cps fully imputed; net interest-bearing debt rose to $170.7m (from $106.7m a year earlier) partly funding the Nexan acquisition and seasonal working-capital build"},
+    {"date": "2025-Q4 (H1 FY2026)", "event": "Acquired Nexan Group, a New Zealand animal health manufacturer (Nexan and Vetmed brands) that PGW had partnered with for over a decade, for ~$19.7m cash, strengthening Agritrade's manufacturing/R&D capability"},
+    {"date": "2025-Q4 (H1 FY2026)", "event": "Launched Blue Ag, PGW's private-label agrichemical range, through Rural Supplies and Fruitfed Supplies stores, aimed at improving supply resilience and price-point control"},
+    {"date": "2025-10-14", "event": "Independent Chair Garry Moore and Deputy Chair Sarah Brown were voted out at the AShM by major shareholders Agria (~44%) and Elders (~12.3%) without stated reasons; the board briefly fell below NZX Listing Rule minimums (only 3 directors, 1 NZ-resident), triggering a same-day trading halt; John Nichol was appointed Independent Director/Chair the same day to restore compliance"},
+    {"date": "2025-07-01", "event": "Wilson Liu appointed Independent Director (became Audit Committee Chair from 14 October 2025)"},
+    {"date": "2025 (H1 FY2026)", "event": "Wool pricing recovered materially -- average strong wool prices up ~25% year-on-year on tightening supply and Chinese buying, though the sector remains structurally challenged long-term"}
+  ],
+  "guidance": {
+    "as_of": "FY2026 Full Year Result / H1 FY2026 Report",
+    "fiscal_year": "FY2027",
+    "items": [
+      {
+        "metric": "Operating EBITDA",
+        "target": "~$64 million",
+        "period": "FY2026",
+        "vs_prior": "achieved/exceeded",
+        "notes": "This was the guidance reiterated at H1 FY2026 (Feb 2026) and delivered at the August 2026 full-year result (actual $64.3m, +15% YoY)"
+      },
+      {
+        "metric": "FY2027 formal guidance",
+        "target": "Not provided",
+        "period": "FY2027",
+        "vs_prior": "new",
+        "notes": "Management declined to give formal FY2027 numerical guidance at the August 2026 result, citing it as too early in the financial year; outlook characterised qualitatively as 'relatively strong' but dependent on commodity pricing and weather (potential El Nino). Detailed FY2027 update expected at the 30 October 2026 Annual Shareholders' Meeting following the spring trading period"
+      },
+      {
+        "metric": "Dividend",
+        "target": "5.5 cps final (10.0 cps FY2026 total), fully imputed",
+        "period": "FY2026",
+        "vs_prior": "raised",
+        "notes": "Interim dividend of 4.5cps was paid in H1 FY2026 (up from prior year); PGW has resumed a fully imputed progressive dividend as earnings recover from the FY2024 trough"
+      }
+    ],
+    "management_commentary": "Chair John Nichol and CEO Stephen Guerin's H1 FY2026 report described a 'generally supportive market environment' with favourable commodity pricing across dairy, red meat, wool, kiwifruit and apples, offset by weaker viticulture/arable demand. At the August 2026 full-year result, management flagged that FY2027 risk falls into two areas -- commodity pricing and weather (including potential El Nino) -- and that customer confidence and weather over the coming months will be the key determinants of the FY2027 outcome."
+  },
+  "bull_case": [
+    "Cyclical earnings recovery is well underway: FY2026 NPAT +46% and Operating EBITDA +15%, with revenue back above NZ$1bn for the first time since the 2019 seeds divestment, powered by strong livestock, red meat and dairy pricing",
+    "New Zealand's primary sector export revenue is forecast at a record $62bn for the year to June 2026, providing broad-based tailwinds to on-farm spending across PGW's retail and agency businesses",
+    "Vertical integration moves (Nexan acquisition, Blue Ag private label) should expand margins and differentiate PGW's offering versus pure distribution competitors",
+    "Progressive, fully imputed dividend has been resumed and increased (10cps FY2026) as earnings recover, offering income alongside cyclical upside",
+    "Rural real estate and livestock agency, PGW's highest-operating-leverage segments, are inflecting positively as lower interest rates and improved farm profitability reactivate buyer activity"
+  ],
+  "bear_case": [
+    "Ownership/governance overhang: Agria (~44%) and Elders (~12.3%) together control a majority and demonstrated willingness to abruptly remove independent directors, creating both strategic uncertainty and a brief NZX compliance breach in October 2025",
+    "Highly cyclical, thin-margin business (NPAT margin ~1-1.5%) with earnings tightly geared to volatile commodity prices (milk price, meat schedules, wool) that can reverse quickly -- Fonterra already cut its FY2027 milk price forecast in July 2026",
+    "Structurally sub-scale versus co-operative competitor Farmlands in rural retail, and facing explicitly 'robust'/'tactical' price competition and below-cost offers that pressure margins across the sector",
+    "Rising net debt ($170.7m at Dec 2025, up from $106.7m a year prior) funding both the Nexan acquisition and seasonal working capital, increasing floating-rate interest exposure just as the company re-levers for growth",
+    "Commission-rate compression in livestock agency during high-price periods (farmers push back on fees, use flat headage arrangements) means strong commodity prices do not translate one-for-one into PGW earnings growth"
+  ]
+};
+
+const dcfData = {
+  "ticker": "PGW.NZ",
+  "valuation_date": "2026-08-25",
+  "current_price": 2.31,
+  "model": "owner-fcf-dcf-midcycle",
+  "inputs": {
+    "shares_outstanding": 75.484,
+    "net_debt": 88.0,
+    "total_debt": 92.0,
+    "cash": 3.995,
+    "lease_liabilities_excluded_from_net_debt": 100.476,
+    "last_fcf": 13.05,
+    "reported_fcf": 46.008,
+    "mid_cycle_fcf": 13.05,
+    "sbc": 0.0,
+    "sbc_incl_equity_taxes": 0.0,
+    "sbc_pct_of_revenue": 0.0,
+    "sbc_pct_path": [0.0,0.0,0.0,0.0,0.0],
+    "sbc_source": "SBC-zero: no share-based payment expense disclosed in PGW annual reports FY2017-FY2026 (checked FY2026 annual report full text)",
+    "interest_income": 0.0,
+    "interest_income_note": "Treasury interest income immaterial ($0.5m) and PGW carries net DEBT, so no interest-income strip. GO-STOCK interest revenue ($8.0m FY2026) is operating income from the livestock financing product and stays in the flows; its funding cost is charged via the net-debt bridge.",
+    "buyback_cash": 0.0,
+    "annual_share_growth_pct": 0.0,
+    "projected_shares": [75.484,75.484,75.484,75.484,75.484,75.484,75.484,75.484,75.484,75.484],
+    "share_count_basis": "75.484m ordinary shares (FY2026 annual report, post the Aug-2019 1:10 consolidation); count flat FY2019-FY2026, no SBC, no buybacks, no options disclosed",
+    "price_as_of": "2026-08-25 NZX close, NZD 2.31, verified live by the orchestrating session (Yahoo Finance); regular-session print, not volatile",
+    "balance_sheet_date": "2026-06-30",
+    "currency": "NZD",
+    "units": "millions",
+    "horizon_years": 10,
+    "wacc": 13.5,
+    "wacc_rationale": "Additive NZD build: NZ small-cap equity base 11.5% (NZ 10yr govt ~4.5% + ~7pp small-cap equity premium) + 0.75pp earnings cyclicality + 0.75pp ownership-concentration/governance + 0.5pp illiquidity = 13.5%.",
+    "notes": "MODEL: owner-FCF DCF (mid-cycle variant). ANCHOR: FY2026 (30 Jun 2026) actuals. MID-CYCLE FCF: reported FCF is seasonal working-capital noise, so base FCF is component-built: mid-cycle 6.0% EBITDA margin, normalized capex 1.5% of revenue, 28% cash tax, full lease payment charged. LEASE TREATMENT: leases as operating cost inside the flows; lease liabilities excluded from net debt (bank debt only). FY2019 excluded from every average."
+  },
+  "mid_cycle_fcf": {
+    "value": 13.05,
+    "reported_fy2026_fcf": 46.008,
+    "derivation_fy2026_scale_zero_growth": {
+      "revenue": 1074.38,
+      "operating_ebitda_at_6pct_midcycle_margin": 64.46,
+      "less_full_lease_payment_2p66pct": -28.55,
+      "less_owned_asset_d_and_a_1p1pct": -11.82,
+      "owner_ebit": 24.09,
+      "less_cash_tax_28pct": -6.75,
+      "add_back_owned_d_and_a": 11.82,
+      "less_normalized_capex_1p5pct": -16.12,
+      "working_capital_at_zero_growth": 0.0,
+      "mid_cycle_owner_fcf": 13.05
+    },
+    "why_not_reported_fcf": "FY2017-26 FCF series is dominated by seasonal/cyclical working-capital timing, not earnings power. FY2026's $46.0m combines a working-capital tailwind with a capex holiday and no lease-principal deduction. Empirical cross-check: FY2020-26 cumulative dividends $70.5m + Nexan acquisition $19.7m were funded by net debt rising $74.9m - cumulative underlying free cash to shareholders was only ~$15m over six years (~$2.5m/yr)."
+  },
+  "historical_growth": {
+    "revenue_3yr_cagr": 3.3,
+    "revenue_5yr_cagr": 4.8,
+    "eps_3yr_cagr": -3.9,
+    "eps_5yr_cagr": -7.3,
+    "equity_3yr_cagr": 2.6,
+    "equity_5yr_cagr": 1.0,
+    "fcf_3yr_cagr": 76.8,
+    "fcf_5yr_cagr": -2.0,
+    "selected_growth_rate": 2.25,
+    "growth_rate_source": "judgment: cycle-adjusted nominal growth (volumes + inflation) between equity 5yr CAGR (1.0%) and revenue 5yr CAGR (4.8%, flattered by the FY2021 trough base and FY2026 cyclical peak)",
+    "growth_divergence_warning": "Equity CAGR (1.0%) diverges >30% from revenue CAGR (4.8%) - equity is depressed by dividend payouts, revenue flattered by cyclical recovery. FCF CAGRs are meaningless endpoint noise on a series that swings -$65.5m to +$50.9m; do not use. All CAGRs computed on the post-Seeds FY2020/21-FY2026 window; FY2019 excluded (Seeds sale gain, capital return, 1:10 consolidation).",
+    "notes": "SBC-zero company: owner-FCF series equals reported FCF less lease principal; no SBC adjustment to history."
+  },
+  "assumptions": {
+    "base": {
+      "growth_rates": [2.0,2.5,2.5,2.5,2.5,2.0,2.0,2.0,2.0,2.0],
+      "ebitda_margin_path": [6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0],
+      "sbc_pct_path": [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+      "lease_payment_pct": 2.66, "da_owned_pct": 1.1, "capex_pct": 1.5, "wc_capture_pct": -15.0,
+      "cash_tax_rate": 28.0, "wacc": 13.5, "terminal_growth": 2.0, "exit_multiple_cap": 5.1,
+      "exit_multiple_cap_basis": "EV/Operating-EBITDA (post-IFRS16 EBITDA, EV ex lease liabilities), applied as TV = max(0, min(Gordon, cap x terminal EBITDA))"
+    },
+    "bull": {
+      "growth_rates": [5.0,4.0,3.5,3.0,3.0,2.5,2.5,2.5,2.5,2.5],
+      "ebitda_margin_path": [6.2,6.4,6.6,6.8,6.8,6.8,6.8,6.8,6.8,6.8],
+      "sbc_pct_path": [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+      "lease_payment_pct": 2.66, "da_owned_pct": 1.1, "capex_pct": 1.5, "wc_capture_pct": -15.0,
+      "cash_tax_rate": 28.0, "wacc": 13.5, "terminal_growth": 2.5, "exit_multiple_cap": 6.2,
+      "exit_multiple_cap_basis": "EV/Operating-EBITDA (post-IFRS16 EBITDA, EV ex lease liabilities), applied as TV = max(0, min(Gordon, cap x terminal EBITDA))"
+    },
+    "bear": {
+      "growth_rates": [-5.0,-3.0,2.0,2.0,1.5,1.5,1.5,1.5,1.5,1.5],
+      "ebitda_margin_path": [5.2,4.8,5.2,5.5,5.5,5.5,5.5,5.5,5.5,5.5],
+      "sbc_pct_path": [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+      "lease_payment_pct": 2.66, "da_owned_pct": 1.1, "capex_pct": 1.5, "wc_capture_pct": -15.0,
+      "cash_tax_rate": 28.0, "wacc": 13.5, "terminal_growth": 1.0, "exit_multiple_cap": 4.6,
+      "exit_multiple_cap_basis": "EV/Operating-EBITDA (post-IFRS16 EBITDA, EV ex lease liabilities), applied as TV = max(0, min(Gordon, cap x terminal EBITDA))"
+    }
+  },
+  "scenario_narratives": {
+    "base": "NZ ag mid-cycle: farmgate returns normalize from the FY2026 highs, revenue grows ~2-2.5%/yr (volumes + inflation), EBITDA margin holds the FY2020-26 average of 6.0%. Nexan/Blue Ag margin gains offset Farmlands price competition. Working capital keeps absorbing ~15c per incremental revenue dollar.",
+    "bull": "Commodity strength persists (record $62bn primary exports, strong red meat/dairy), rural real estate and livestock agency keep inflecting, and vertical integration lifts the margin to 6.8% (still below the FY2022 peak of 7.05%). Growth 5% fading to 2.5%.",
+    "bear": "FY2027-28 downturn: milk price to the low end of Fonterra's range plus El Nino; revenue falls 5% then 3% and agency commissions compress with it. Margin troughs at 4.8% (the FY2024 actual trough), then recovers only to 5.5%."
+  },
+  "projections": {
+    "base": {
+      "years": ["FY2027","FY2028","FY2029","FY2030","FY2031","FY2032","FY2033","FY2034","FY2035","FY2036"],
+      "fcf": [10.09,9.53,9.77,10.01,10.26,11.36,11.58,11.81,12.05,12.29],
+      "discount_factors": [0.881,0.776,0.684,0.603,0.531,0.468,0.412,0.363,0.32,0.282],
+      "pv_fcf": [8.89,7.4,6.68,6.03,5.45,5.31,4.77,4.29,3.86,3.46]
+    },
+    "bull": {
+      "years": ["FY2027","FY2028","FY2029","FY2030","FY2031","FY2032","FY2033","FY2034","FY2035","FY2036"],
+      "fcf": [7.27,10.86,13.83,16.93,17.44,18.81,19.28,19.76,20.26,20.76],
+      "discount_factors": [0.881,0.776,0.684,0.603,0.531,0.468,0.412,0.363,0.32,0.282],
+      "pv_fcf": [6.4,8.43,9.46,10.2,9.26,8.8,7.95,7.18,6.48,5.85]
+    },
+    "bear": {
+      "years": ["FY2027","FY2028","FY2029","FY2030","FY2031","FY2032","FY2033","FY2034","FY2035","FY2036"],
+      "fcf": [14.57,8.06,3.48,5.77,6.62,6.71,6.82,6.92,7.02,7.13],
+      "discount_factors": [0.881,0.776,0.684,0.603,0.531,0.468,0.412,0.363,0.32,0.282],
+      "pv_fcf": [12.84,6.26,2.38,3.48,3.51,3.14,2.81,2.51,2.25,2.01]
+    }
+  },
+  "valuation": {
+    "base": { "sum_pv_fcf": 56.15, "gordon_tv": 109.02, "exit_multiple_cap_tv": 408.67, "terminal_value": 109.02, "tv_bound_by": "gordon", "pv_terminal": 30.73, "enterprise_value": 86.88, "net_debt": 88.0, "equity_value": -1.13, "intrinsic_value": -0.01, "street_intrinsic_value": -0.01, "upside": -100.6, "terminal_pct_of_value": 35.4, "implied_exit_multiple_on_fcf": 8.9, "market_convention_iv_memo": 1.1 },
+    "bull": { "sum_pv_fcf": 80.01, "gordon_tv": 193.48, "exit_multiple_cap_tv": 614.49, "terminal_value": 193.48, "tv_bound_by": "gordon", "pv_terminal": 54.54, "enterprise_value": 134.54, "net_debt": 88.0, "equity_value": 46.54, "intrinsic_value": 0.62, "street_intrinsic_value": 0.62, "upside": -73.3, "terminal_pct_of_value": 40.5, "implied_exit_multiple_on_fcf": 9.3, "market_convention_iv_memo": 2.19 },
+    "bear": { "sum_pv_fcf": 41.18, "gordon_tv": 57.59, "exit_multiple_cap_tv": 284.95, "terminal_value": 57.59, "tv_bound_by": "gordon", "pv_terminal": 16.23, "enterprise_value": 57.42, "net_debt": 88.0, "equity_value": -30.59, "intrinsic_value": -0.41, "street_intrinsic_value": -0.41, "upside": -117.5, "terminal_pct_of_value": 28.3, "implied_exit_multiple_on_fcf": 8.1, "market_convention_iv_memo": 0.44 }
+  },
+  "market_convention_reference": {
+    "description": "Memo, not the house basis: value per share if the terminal value is set AT the scenario's historical EV/EBITDA multiple (bear 4.6x = 10yr min, base 5.1x = FY2020-25 avg, bull 6.2x = max) instead of min(Gordon, cap). Even on this basis the DCF sits far below the current price, because ten years of thin interim FCF discounted at 13.5% contributes little and the exit multiple is discounted 3.5x.",
+    "bear": 0.44, "base": 1.1, "bull": 2.19, "weighted": 1.21,
+    "simple_multiple_on_current_ebitda": {
+      "at_4.6x": 2.75, "at_5.1x": 3.18, "at_6.2x": 4.12,
+      "note": "Undiscounted multiple math on FY2026 EBITDA - this is roughly how the market prices PGW today. The gap between these figures and the DCF IVs is the EBITDA-to-FCF conversion problem: only ~15-20% of Operating EBITDA converts to owner free cash through the cycle after leases, capex, tax and working capital."
+    }
+  },
+  "entry_price": {
+    "hurdle_rate": 0.15,
+    "base": { "years_to_terminal": 10, "pv_interim_fcf_at_hurdle": 52.82, "pv_terminal_at_hurdle": 26.95, "net_debt": 88.0, "entry_price": -0.11, "entry_discount_from_current": -104.7 },
+    "bull": { "entry_price": 0.46 },
+    "bear": { "entry_price": -0.46 },
+    "weighted_entry_price": -0.05,
+    "note": "Entry prices at or below zero are the model speaking plainly: at a 15% hurdle there is no positive price at which the projected owner cash flows fund the return. The stock is only investable at this price on a multiple/asset basis, not on discounted cash flow."
+  },
+  "required_return_table": {
+    "scenario": "base", "returns": [9,10,11,12,13.5,15], "value_per_share": [0.74,0.5,0.31,0.16,-0.01,-0.15],
+    "note": "Base-case value stays far below NZD 2.31 at every discount rate down to 9% - the market price is not recoverable from owner cash flows under mid-cycle assumptions at any plausible required return."
+  },
+  "sensitivity": {
+    "wacc_range": [11.5,12.5,13.5,14.5,15.5],
+    "terminal_growth_range": [1.0,1.5,2.0,2.5,3.0],
+    "matrix": [
+      [0.17,0.2,0.23,0.27,0.31],
+      [0.05,0.07,0.1,0.12,0.15],
+      [-0.05,-0.03,-0.01,0.01,0.03],
+      [-0.14,-0.12,-0.11,-0.09,-0.08],
+      [-0.21,-0.2,-0.19,-0.18,-0.16]
+    ]
+  },
+  "probability_weighted": {
+    "weights": { "bear": 0.25, "base": 0.5, "bull": 0.25 },
+    "weights_rationale": "House default is 15/50/35. Bear raised to 25%: Fonterra already cut the FY2027 milk-price forecast, management named commodity pricing and weather as the two FY2027 swing factors and declined guidance, and the >56% Agria/Elders bloc has demonstrated abrupt-action risk. Bull cut to 25%: it requires commodity prices to hold AND Nexan/Blue Ag margin capture to land against explicit below-cost price competition from Farmlands.",
+    "weighted_iv": 0.05,
+    "street_weighted_iv": 0.05,
+    "band_position": null,
+    "band_note": "SBC-zero market: house and street bases coincide, the band collapses to a point - band_position is null by design, not 0%."
+  },
+  "sanity_check": {
+    "implied_multiples": { "base_iv_pe": null, "base_iv_pb": -0.01, "base_iv_ev_ebitda": 1.35, "base_iv_p_sales": -0.001 },
+    "historical_averages_ex_outliers": { "pe_ex_outliers": 14.92, "pb_avg": 1.43, "pb_max": 1.97, "ev_ebitda_avg": 5.14, "ev_ebitda_max": 6.24, "p_sales_avg": 0.27, "window": "FY2020-FY2025" },
+    "trip_rules": { "pe_gt_2x_ex_outlier_avg": false, "pb_gt_1p5x_hist_max": false, "ev_ebitda_gt_1p5x_hist_max": false, "base_upside_gt_100pct": false },
+    "trip_reasons": [],
+    "tripped": false,
+    "diagnosis": "PASSED - no overvaluation trip. Mid-cycle FCF anchoring and additive WACC premiums were applied pre-emptively rather than as a post-trip fix, and per-scenario EV/EBITDA exit caps are in place; Gordon terminal values sit far BELOW the caps in every scenario, so the caps never bind.",
+    "fix_applied": "Pre-emptive: mid-cycle component-built FCF, additive WACC 13.5%, exit-multiple caps per scenario.",
+    "implied_multiples_after_fix": { "base_iv_ev_ebitda": 1.35, "base_iv_pb": -0.01 },
+    "below_band_note": "The check guards against OVER-valuation and passes trivially, because the model lands far BELOW the historical trading band: base-IV implied EV/EBITDA ~1.35x versus a 4.60x ten-year minimum, and implied P/B ~0 versus a 0.90x minimum. The market has priced PGW at 4.6-6.2x EBITDA and 0.9-2.0x book for a decade; discounted owner cash flow supports neither. The divergence is not a model bug - it is the finding. The reported FY2020-26 cash history (dividends debt-funded, ~$2.5m/yr underlying FCFE) sides with the DCF."
+  },
+  "valuation_philosophy": "PGW is valued on a mid-cycle owner-FCF basis, not on its reported FY2026 free cash flow of $46m - that print combined a seasonal working-capital tailwind with a capex holiday and, like all IFRS-16 numbers, left the $24m/yr lease principal out of operating cash flow. Through-cycle, PGG Wrightson converts only about $13m of its ~$64m Operating EBITDA into unlevered owner cash: roughly $29m goes to store and saleyard lease payments, ~$16m to normalized capex, ~$7m to tax, and growth working capital (GO-STOCK receivables, inventory on 12-month farmer credit terms) absorbs ~15c of every incremental revenue dollar. That is why a company earning 20.6cps and paying a 10cps dividend can carry a near-zero DCF value: over FY2020-26 the dividends were, in cash terms, funded by $75m of new net debt, not by free cash flow. The market prices PGW the way it prices earnings - 4.6-6.2x EV/EBITDA, around book value ($2.42/share) - which embeds an assumption that the working-capital build is recoverable asset value rather than a perpetual cash sink; the DCF gives no credit for that terminal asset stock. Both views are shown side by side: the house DCF (weighted IV ~$0.05) and the market-convention exit-multiple memo (~$1.21 weighted, $1.86-3.22 on undiscounted current-EBITDA multiple math). At NZD 2.31 the stock is priced at the top of even the market-convention range, offers a negative margin of safety on every cash-flow basis at every discount rate down to 9%, and its dividend depends on the cycle staying friendly and the balance sheet absorbing the working capital. This is a fair-weather earnings-multiple stock, not a discounted-cash-flow investment."
+};
+
+// ============================= CSV PARSE / SORT =============================
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => obj[h.trim()] = values[i]?.trim());
+        return obj;
+    });
+}
+const data = parseCSV(csvData);
+data.sort((a, b) => {
+    const parseDate = (p) => {
+        const year = parseInt(p.match(/\d{4}/)?.[0] || '0');
+        const isH1 = p.includes('H1');
+        const isFY = p.startsWith('FY');
+        const subOrder = isH1 ? 3 : isFY ? 7 : 0;
+        return year * 10 + subOrder;
+    };
+    return parseDate(a.Period) - parseDate(b.Period);
+});
+const fyData = data.filter(d => d.Period.startsWith('FY'));
+const h1Data = data.filter(d => d.Period.startsWith('H1'));
+const num = (v) => v === undefined || v === '' || v === null ? null : parseFloat(v);
+
+// ============================= SHARED UTILS =============================
+function toggleOverview() {
+    const btn = document.querySelector('.overview-toggle');
+    const content = document.getElementById('overviewContent');
+    btn.classList.toggle('active');
+    content.classList.toggle('active');
+}
+
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } } },
+    scales: {
+        x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+function freshScales() {
+    return { x: { ...chartDefaults.scales.x }, y: { ...chartDefaults.scales.y } };
+}
+
+const chartRegistry = {};
+function toggleLogScale(canvasId, btn) {
+    const chart = chartRegistry[canvasId];
+    if (!chart) return;
+    const toLog = chart.options.scales.y.type !== 'logarithmic';
+    chart.options.scales.y.type = toLog ? 'logarithmic' : 'linear';
+    btn.classList.toggle('active', toLog);
+    chart.update();
+}
+
+const chartSeries = {};
+function setPeriodView(canvasId, view, btn) {
+    const chart = chartRegistry[canvasId], s = chartSeries[canvasId];
+    if (!chart || !s || !s[view]) return;
+    chart.data.labels = s[view].labels;
+    s[view].data.forEach((d, i) => { if (chart.data.datasets[i]) chart.data.datasets[i].data = d; });
+    if (s[view].scaleX && chart.options.scales.x) chart.options.scales.x = s[view].scaleX;
+    btn.parentNode.querySelectorAll('.view-toggle').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    chart.update();
+}
+
+const colors = {
+    primary: '#00d4aa', secondary: '#00b894', tertiary: '#0984e3',
+    quaternary: '#6c5ce7', warning: '#fdcb6e', danger: '#ff6b6b'
+};
+
+function calcYoYChange(current, previous) {
+    if (previous === null || current === null || previous === undefined || current === undefined) return null;
+    return ((current - previous) / Math.abs(previous) * 100).toFixed(1);
+}
+
+function openModal(key) {
+    document.getElementById('modalTitle').textContent = metricDescriptions[key].title;
+    document.getElementById('modalBody').innerHTML = metricDescriptions[key].content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ============================= KPI CARDS =============================
+function renderKPIs() {
+    const latest = fyData[fyData.length - 1]; // FY2026
+    const prior = fyData[fyData.length - 2]; // FY2025
+    const grid = document.getElementById('kpiGrid');
+
+    const revYoY = calcYoYChange(num(latest.Revenue), num(prior.Revenue));
+    const ebitdaYoY = calcYoYChange(num(latest.EBITDA), num(prior.EBITDA));
+    const niYoY = calcYoYChange(num(latest.NetIncome), num(prior.NetIncome));
+    const epsCurrent = num(latest.NetIncome) / num(latest.SharesOutstanding);
+    const epsPrior = num(prior.NetIncome) / num(prior.SharesOutstanding);
+    const epsYoY = calcYoYChange(epsCurrent, epsPrior);
+    const netDebtLatest = num(latest.TotalDebt) - num(latest.CashAndEquivalents);
+    const netDebtPrior = num(prior.TotalDebt) - num(prior.CashAndEquivalents);
+
+    const cards = [
+        { label: 'FY2026 Revenue', value: '$' + latest.Revenue + 'm', change: revYoY, note: 'First time back above $1bn since 2019 Seeds divestment' },
+        { label: 'Operating EBITDA', value: '$' + latest.EBITDA + 'm', change: ebitdaYoY, note: 'IFRS-16 inflated vs. pre-FY2020' },
+        { label: 'EBITDA Margin', value: (num(latest.EBITDA) / num(latest.Revenue) * 100).toFixed(1) + '%', change: null, note: 'Thin-margin distributor/agency mix' },
+        { label: 'NPAT', value: '$' + latest.NetIncome + 'm', change: niYoY, note: 'NPAT margin only ' + latest.NetMargin + '%' },
+        { label: 'EPS (post-consolidation)', value: '$' + epsCurrent.toFixed(3), change: epsYoY, note: '75.484m shares (post Aug-2019 1:10 split)' },
+        { label: 'Net Debt', value: '$' + netDebtLatest.toFixed(1) + 'm', change: calcYoYChange(netDebtLatest, netDebtPrior), note: 'Excludes IFRS-16 lease liabilities' },
+        { label: 'FY2026 Dividend', value: (parseFloat(latest.DividendPerShare) * 100).toFixed(1) + ' cps', change: null, note: 'Fully imputed; 4.5c interim + 5.5c final' },
+        { label: 'Agency Segment EBITDA', value: '$28.97m', change: '+23.5', note: '+23.5% YoY; highest-operating-leverage segment' }
+    ];
+
+    grid.innerHTML = cards.map(c => `
+        <div class="kpi-card">
+            <div class="kpi-value">${c.value}</div>
+            <div class="kpi-label">${c.label}</div>
+            ${c.change !== null ? `<div class="kpi-change ${parseFloat(c.change) >= 0 ? 'positive' : 'negative'}">${parseFloat(c.change) >= 0 ? '+' : ''}${c.change}% YoY</div>` : ''}
+            <div class="kpi-note">${c.note}</div>
+        </div>
+    `).join('');
+}
+
+// ============================= GUIDANCE =============================
+function renderGuidance() {
+    if (!analysis.guidance || !analysis.guidance.items || analysis.guidance.items.length === 0) {
+        document.getElementById('guidanceSection').style.display = 'none';
+        return;
+    }
+    const guidance = analysis.guidance;
+    document.getElementById('guidanceAsOf').textContent = guidance.as_of || '';
+    document.getElementById('guidanceFY').textContent = guidance.fiscal_year || '';
+    const grid = document.getElementById('guidanceGrid');
+    grid.innerHTML = guidance.items.map(item => {
+        const vsRaw = item.vs_prior || 'new';
+        const vsClass = vsRaw.toLowerCase().replace(/[^a-z]/g, '-');
+        const vsLabel = vsRaw.charAt(0).toUpperCase() + vsRaw.slice(1);
+        return `
+            <div class="guidance-card">
+                <div class="guidance-metric">${item.metric}</div>
+                <div class="guidance-target">${item.target}</div>
+                <div class="guidance-period">${item.period}</div>
+                <span class="guidance-vs-prior ${vsClass}">${vsLabel}</span>
+                ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+    const commentary = document.getElementById('guidanceCommentary');
+    if (guidance.management_commentary) {
+        commentary.textContent = guidance.management_commentary;
+        commentary.style.display = 'block';
+    } else {
+        commentary.style.display = 'none';
+    }
+}
+
+// ============================= OVERVIEW =============================
+function renderOverview() {
+    document.getElementById('ovOverview').textContent = analysis.overview;
+    document.getElementById('ovBizSummary').textContent = analysis.business_model.summary;
+    document.getElementById('ovRevenueStreams').innerHTML = analysis.business_model.revenue_streams.map(r => `
+        <li class="revenue-stream"><span>${r.name}</span><span class="percent trend-${r.trend}">${r.percent}%</span></li>
+    `).join('');
+    document.getElementById('ovCompetitors').innerHTML = `<strong>Competitors:</strong> ${analysis.competitive_position.main_competitors.join(', ')}`;
+    document.getElementById('ovMoat').innerHTML = analysis.competitive_position.moat_factors.map(m => `
+        <li><strong>${m.factor}</strong> (${m.strength}): ${m.description}</li>
+    `).join('');
+    document.getElementById('ovGrowthDrivers').innerHTML = analysis.growth_drivers.map(g => `<li>${g}</li>`).join('');
+
+    const allRisks = [
+        ...analysis.risks.business.map(r => ({...r, category: 'Business'})),
+        ...analysis.risks.financial.map(r => ({...r, category: 'Financial'})),
+        ...analysis.risks.regulatory.map(r => ({...r, category: 'Regulatory'})),
+        ...analysis.risks.macro.map(r => ({...r, category: 'Macro'}))
+    ];
+    document.getElementById('ovRisks').innerHTML = allRisks.map(r => {
+        const sevClass = 'risk-' + r.severity.toLowerCase().replace(/[^a-z]/g, '-');
+        return `<li><strong class="${sevClass}">[${r.severity.toUpperCase()}]</strong> <strong>${r.risk}</strong> (${r.category}): ${r.description}</li>`;
+    }).join('');
+
+    document.getElementById('ovBull').innerHTML = analysis.bull_case.map(b => `<li>${b}</li>`).join('');
+    document.getElementById('ovBear').innerHTML = analysis.bear_case.map(b => `<li>${b}</li>`).join('');
+    document.getElementById('ovRecent').innerHTML = analysis.recent_developments.map(d => `<li><strong>${d.date}:</strong> ${d.event}</li>`).join('');
+}
+
+// ============================= CHARTS =============================
+function buildRevenueChart() {
+    const fyLabels = fyData.map(d => d.Period);
+    const fyValues = fyData.map(d => num(d.Revenue));
+    const h1Labels = h1Data.map(d => d.Period);
+    const h1Values = h1Data.map(d => num(d.Revenue));
+
+    chartSeries['revenueChart'] = {
+        annual: { labels: fyLabels, data: [fyValues] },
+        halfyear: { labels: h1Labels, data: [h1Values] }
+    };
+
+    const ctx = document.getElementById('revenueChart');
+    chartRegistry['revenueChart'] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'Revenue (NZ$m)',
+                data: fyValues,
+                backgroundColor: fyLabels.map(l => l === 'FY2018' ? 'rgba(253,203,110,0.55)' : 'rgba(0,212,170,0.65)'),
+                borderColor: fyLabels.map(l => l === 'FY2018' ? '#fdcb6e' : colors.primary),
+                borderWidth: 1
+            }]
+        },
+        options: { ...chartDefaults, scales: freshScales(), plugins: { legend: { display: false } } }
+    });
+}
+
+function buildEbitdaChart() {
+    const fyLabels = fyData.map(d => d.Period);
+    const fyEbitda = fyData.map(d => num(d.EBITDA));
+    const fyMargin = fyData.map(d => num(d.EBITDA) / num(d.Revenue) * 100);
+    const h1Labels = h1Data.map(d => d.Period);
+    const h1Ebitda = h1Data.map(d => num(d.EBITDA));
+    const h1Margin = h1Data.map(d => num(d.EBITDA) / num(d.Revenue) * 100);
+
+    chartSeries['ebitdaChart'] = {
+        annual: { labels: fyLabels, data: [fyEbitda, fyMargin] },
+        halfyear: { labels: h1Labels, data: [h1Ebitda, h1Margin] }
+    };
+
+    const scales = freshScales();
+    scales.y.position = 'left';
+    scales.y.title = { display: true, text: 'EBITDA (NZ$m)', color: '#888' };
+    scales.y1 = { position: 'right', ticks: { color: '#fdcb6e' }, grid: { display: false }, title: { display: true, text: 'Margin %', color: '#fdcb6e' } };
+
+    const ctx = document.getElementById('ebitdaChart');
+    chartRegistry['ebitdaChart'] = new Chart(ctx, {
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { type: 'bar', label: 'Operating EBITDA (NZ$m)', data: fyEbitda, backgroundColor: fyLabels.map(l => l === 'FY2019' ? 'rgba(253,203,110,0.5)' : 'rgba(0,212,170,0.65)'), yAxisID: 'y' },
+                { type: 'line', label: 'EBITDA Margin %', data: fyMargin, borderColor: colors.warning, backgroundColor: colors.warning, yAxisID: 'y1', tension: 0.3 }
+            ]
+        },
+        options: { ...chartDefaults, scales }
+    });
+}
+
+function buildSegmentChart() {
+    const labels = segmentData.map(s => s.period);
+    const ctx = document.getElementById('segmentChart');
+    chartRegistry['segmentChart'] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                { label: 'Retail & Water', data: segmentData.map(s => s.retailWater), backgroundColor: colors.primary, stack: 'stack0' },
+                { label: 'Agency', data: segmentData.map(s => s.agency), backgroundColor: colors.tertiary, stack: 'stack0' },
+                { label: 'Other (Corporate)', data: segmentData.map(s => s.other), backgroundColor: colors.danger, stack: 'stack0' },
+                { label: 'Total Operating EBITDA', data: segmentData.map(s => s.total), type: 'line', borderColor: '#fff', backgroundColor: '#fff', tension: 0.2, borderWidth: 2, pointRadius: 4 }
+            ]
+        },
+        options: {
+            ...chartDefaults,
+            scales: { x: { ...freshScales().x, stacked: false }, y: { ...freshScales().y, title: { display: true, text: 'NZ$ millions', color: '#888' } } }
+        }
+    });
+}
+
+function buildFcfVsEbitdaChart() {
+    const labels = fyData.map(d => d.Period);
+    const ebitda = fyData.map(d => num(d.EBITDA));
+    const fcf = fyData.map(d => num(d.FreeCashFlow));
+    const ctx = document.getElementById('fcfVsEbitdaChart');
+    chartRegistry['fcfVsEbitdaChart'] = new Chart(ctx, {
+        data: {
+            labels: labels,
+            datasets: [
+                { type: 'bar', label: 'Operating EBITDA', data: ebitda, backgroundColor: 'rgba(0,212,170,0.55)' },
+                { type: 'bar', label: 'Free Cash Flow (reported)', data: fcf, backgroundColor: labels.map((l,i) => fcf[i] < 0 ? 'rgba(255,107,107,0.65)' : 'rgba(9,132,227,0.65)') }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+}
+
+function buildNetDebtChart() {
+    const fyLabels = fyData.map(d => d.Period);
+    const fyNetDebt = fyData.map(d => num(d.TotalDebt) - num(d.CashAndEquivalents));
+    const ctx = document.getElementById('netDebtChart');
+    chartRegistry['netDebtChart'] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'Net Debt (NZ$m, FY-end)',
+                data: fyNetDebt,
+                borderColor: colors.danger,
+                backgroundColor: 'rgba(255,107,107,0.15)',
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+}
+
+function buildSeasonalityChart() {
+    // H1 operating cash flow by fiscal year
+    const h1OCF = h1Data.map(d => ({ period: d.Period, value: num(d.OperatingCashFlow) }));
+    const labels = h1OCF.map(d => d.period);
+    const values = h1OCF.map(d => d.value);
+    const ctx = document.getElementById('seasonalityChart');
+    chartRegistry['seasonalityChart'] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'H1 Operating Cash Flow (NZ$m)',
+                data: values,
+                backgroundColor: values.map(v => v < 0 ? 'rgba(255,107,107,0.65)' : 'rgba(0,212,170,0.65)')
+            }]
+        },
+        options: { ...chartDefaults, scales: freshScales(), plugins: { legend: { display: false } } }
+    });
+}
+
+function buildNetIncomeChart() {
+    // Exclude FY2019 net income from the display series (one-off Seeds gain), keep FY2018 continuous through the label set
+    const fyLabels = fyData.map(d => d.Period);
+    const fyNI = fyData.map(d => d.Period === 'FY2019' ? null : num(d.NetIncome));
+    const h1Labels = h1Data.map(d => d.Period);
+    const h1NI = h1Data.map(d => num(d.NetIncome));
+
+    chartSeries['netIncomeChart'] = {
+        annual: { labels: fyLabels, data: [fyNI] },
+        halfyear: { labels: h1Labels, data: [h1NI] }
+    };
+
+    const ctx = document.getElementById('netIncomeChart');
+    chartRegistry['netIncomeChart'] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'NPAT (NZ$m) — FY2019 excluded (Seeds gain)',
+                data: fyNI,
+                backgroundColor: 'rgba(108,92,231,0.65)',
+                spanGaps: true
+            }]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+}
+
+function buildMarginChart() {
+    const fyLabels = fyData.map(d => d.Period);
+    const fyGross = fyData.map(d => num(d.GrossMargin));
+    const fyNet = fyData.map(d => num(d.NetMargin));
+    const h1Labels = h1Data.map(d => d.Period);
+    const h1Gross = h1Data.map(d => num(d.GrossMargin));
+    const h1Net = h1Data.map(d => num(d.NetMargin));
+
+    chartSeries['marginChart'] = {
+        annual: { labels: fyLabels, data: [fyGross, fyNet] },
+        halfyear: { labels: h1Labels, data: [h1Gross, h1Net] }
+    };
+
+    const ctx = document.getElementById('marginChart');
+    chartRegistry['marginChart'] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'Gross Margin %', data: fyGross, borderColor: colors.primary, backgroundColor: 'rgba(0,212,170,0.1)', tension: 0.3 },
+                { label: 'Net Margin %', data: fyNet, borderColor: colors.quaternary, backgroundColor: 'rgba(108,92,231,0.1)', tension: 0.3 }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+}
+
+function buildDividendChart() {
+    const fyLabels = fyData.map(d => d.Period);
+    const fyDiv = fyData.map(d => d.DividendPerShare ? parseFloat(d.DividendPerShare) * 100 : null);
+    const ctx = document.getElementById('dividendChart');
+    chartRegistry['dividendChart'] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'Dividend Per Share (cps)',
+                data: fyDiv,
+                backgroundColor: 'rgba(0,212,170,0.65)',
+                spanGaps: true
+            }]
+        },
+        options: { ...chartDefaults, scales: freshScales(), plugins: { legend: { display: false } } }
+    });
+}
+
+// ============================= METRIC MODALS =============================
+const metricDescriptions = {
+    revenue: {
+        title: "Revenue",
+        content: `
+            <p><strong>Revenue</strong> is PGW's total operating revenue: retail sales of farm inputs plus agency commissions (livestock, wool, real estate) plus GO-STOCK interest income.</p>
+            <div class="metric-highlight"><strong>For PGW:</strong> FY2018's $1,193m includes the PGG Wrightson Seeds business, divested to DLF in May 2019 for ~NZ$333m. From FY2019 onward, revenue is continuing operations only. The FY2018&rarr;FY2019 drop from $1,193m to $809m is almost entirely the Seeds divestment, not organic decline.</div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Revenue crossed $1bn again in FY2026 for the first time since the divestment &mdash; a cyclical recovery marker</li>
+                <li>Retail & Water is ~79% of revenue and moves with on-farm input spend; Agency commission revenue (~17%) is the higher-leverage, more cyclical piece</li>
+                <li>H1 (Jul&ndash;Dec, spring/summer) vs FY total shows seasonal skew toward H2</li>
+            </ul>
+        `
+    },
+    ebitda: {
+        title: "Operating EBITDA & Margin",
+        content: `
+            <p><strong>Operating EBITDA</strong> is PGW's primary profitability metric, reported directly in the segment note and income statement.</p>
+            <div class="metric-highlight"><strong>For PGW:</strong> IFRS 16 (adopted FY2020) moved lease costs below the EBITDA line, mechanically inflating EBITDA from FY2020 onward. FY2019's $24.4m EBITDA is NOT comparable to FY2021's $56.0m &mdash; a large chunk of the apparent step-up is an accounting change, not operational improvement.</div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Margin sits in a narrow 5&ndash;7% band &mdash; PGW is a thin-margin distributor/agency business, not a high-margin platform</li>
+                <li>The DCF's mid-cycle assumption uses a 6.0% Operating EBITDA margin (the FY2020-26 average)</li>
+                <li>FY2026 Operating EBITDA of $64.3m (+15% YoY) beat the guided ~$64m target</li>
+            </ul>
+        `
+    },
+    segment: {
+        title: "Segment Operating EBITDA",
+        content: `
+            <p>PGW reports two operating segments &mdash; <strong>Retail &amp; Water</strong> (principal sales of farm inputs, irrigation) and <strong>Agency</strong> (livestock, wool, real estate commissions, GO-STOCK interest) &mdash; plus an unallocated <strong>Other (non-operating/corporate)</strong> cost centre.</p>
+            <div class="metric-highlight"><strong>For PGW:</strong> This is the single most important operational chart on this dashboard. Retail &amp; Water is the larger, steadier, transactional engine; Agency is smaller but far more operating-leveraged &mdash; it swung from $37.5m (FY2021) to $54.1m (FY2023) and back down to $12.3m (FY2024) as commodity cycles and commission-rate compression played out. FY2026 Agency EBITDA of $29.0m (+23.5% YoY) is the standout cyclical-recovery story in this result.</div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Agency EBITDA is the highest-beta line to farmgate prices &mdash; it can compress even when livestock prices are strong, because high prices let farmers negotiate down commission rates</li>
+                <li>Retail &amp; Water margin gains from Nexan (animal health manufacturing) and Blue Ag (private label) vertical integration</li>
+                <li>"Other" is a persistent ~$7-9m/yr drag &mdash; unallocated Group Governance, Finance, Treasury and Risk & Assurance costs</li>
+            </ul>
+        `
+    },
+    fcfVsEbitda: {
+        title: "Free Cash Flow vs Operating EBITDA",
+        content: `
+            <p>Compares reported Operating EBITDA (accrual-basis profitability) against reported Free Cash Flow (operating cash flow less capex, on an as-reported IFRS-16 basis).</p>
+            <div class="metric-highlight"><strong>For PGW:</strong> This gap is the central finding of the DCF valuation. FY2026 reported FCF of $46.0m looks close to Operating EBITDA of $64.3m, but that print combines a favourable working-capital swing with an unusually low capex year ($6.6m vs a $17-23m run-rate) and, like all IFRS-16 cash flow statements, excludes the ~$24m/yr lease principal (which sits in financing activities, not operating). The DCF's mid-cycle owner-FCF estimate, after normalizing capex and deducting the full lease payment, is only ~$13m &mdash; about 20% of Operating EBITDA.</div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>FY2019's -$65.5m FCF reflects the Seeds divestment transaction year, not ongoing operations</li>
+                <li>FCF swings sign almost every other year &mdash; driven by working-capital timing (GO-STOCK receivables, inventory), not by underlying earnings power</li>
+                <li>No log scale here: FCF is frequently negative and Chart.js logarithmic axes cannot plot non-positive values</li>
+            </ul>
+        `
+    },
+    netDebt: {
+        title: "Net Debt",
+        content: `
+            <p><strong>Net Debt</strong> = total bank debt less cash and equivalents, at each fiscal year-end. This excludes IFRS-16 lease liabilities (~$100m at FY2026), consistent with PGW's own net-debt definition and disclosure.</p>
+            <div class="metric-highlight"><strong>For PGW:</strong> Net interest-bearing debt rose to $170.7m at 31 Dec 2025 (H1 FY2026), up from $106.7m a year earlier, partly funding the ~$19.7m Nexan acquisition and the seasonal H1 working-capital build. It typically falls back by each 30 June year-end as receivables collect. Over FY2020-26, cumulative dividends of $70.5m plus the Nexan acquisition were, in net terms, funded more by rising net debt than by free cash flow.</div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>PGW's core debt ($100m) and working-capital ($85m) facilities are floating-rate (OCR/BKBM + margin) via BNZ, Rabobank and Westpac</li>
+                <li>H1 net debt is structurally higher than FY-end net debt &mdash; a seasonal, not solvency, signal on its own</li>
+                <li>Rising trend alongside growth investment (Nexan, Blue Ag) bears watching against the dividend's sustainability</li>
+            </ul>
+        `
+    },
+    seasonality: {
+        title: "H1 Operating Cash Flow Seasonality",
+        content: `
+            <p>Shows operating cash flow for each H1 (six months to 31 December) reporting period, isolated from the full-year figure.</p>
+            <div class="metric-highlight"><strong>For PGW:</strong> H1 operating cash flow has been negative in nearly every year on record (FY2018 through FY2026) &mdash; this is a genuinely informative, structural feature of the business, not noise. New Zealand's farming calendar and PGW's up-to-12-month trade credit terms mean spring/summer (H1) is when inventory and GO-STOCK receivables build fastest, absorbing cash; H2 (Jan&ndash;Jun) is when receivables collect and cash flow reverses positive ahead of the 30 June year-end.</div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>A widening H1 outflow (e.g. -$49.9m in H1 FY2026 vs -$31.0m in H1 FY2025) signals faster working-capital growth, often alongside genuine business growth (GO-STOCK receivables "at record highs" per management) but also drives up interim net debt</li>
+                <li>This chart should never be read in isolation from H2/FY cash flow &mdash; the seasonal pattern reverses by design</li>
+            </ul>
+        `
+    },
+    netIncome: {
+        title: "Net Income & EPS",
+        content: `
+            <p><strong>Net Income (NPAT)</strong> is profit after tax attributable to shareholders. <strong>EPS</strong> is NPAT divided by weighted-average shares outstanding.</p>
+            <div class="metric-highlight"><strong>For PGW:</strong> FY2019 NPAT of $131.8m includes a ~$134.3m one-off after-tax gain on the Seeds sale to DLF &mdash; continuing-operations NPAT that year was only $4.0m. It is excluded from this chart's bar series (shown as a gap) to avoid distorting the axis; treat any FY2019 NPAT figure elsewhere as capital-transaction noise, not operating profit. Separately, the August 2019 1:10 share consolidation means FY2017&ndash;H1FY2019 EPS (~$0.02-0.06, on 754.8m pre-consolidation shares) is NOT continuous with FY2019-onward EPS (on 75.5m shares) &mdash; they are shown as distinct series, never joined into one line.</div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>NPAT margin is thin (~1-2.5%) &mdash; small revenue or cost swings move the bottom line disproportionately</li>
+                <li>FY2026 NPAT +46% YoY (to $15.6m) reflects the cyclical Agency recovery flowing through</li>
+                <li>Always divide by 75.484m shares (post-consolidation) for any EPS comparison from FY2019 onward</li>
+            </ul>
+        `
+    },
+    margins: {
+        title: "Gross Margin & Net Margin",
+        content: `
+            <p><strong>Gross Margin</strong> = Gross Profit / Revenue. <strong>Net Margin</strong> = NPAT / Revenue.</p>
+            <div class="metric-highlight"><strong>For PGW:</strong> Gross margin (~24-29%) reflects the blended economics of principal retail sales (lower margin, higher volume) and commission-based agency revenue (which flows through at a much higher effective margin, since PGW doesn't buy/hold the underlying livestock or property). Net margin is thin throughout (~0.3-4.1% excluding the FY2019 Seeds-gain distortion of 16.3%) &mdash; consistent with a low-margin distribution/agency business geared to commodity cycles.</div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>No log-scale toggle here: these are percentage ratios, not absolute quantities</li>
+                <li>FY2019's 16.3% net margin is the Seeds sale gain, not operating performance &mdash; exclude it from any trend read</li>
+                <li>Gross margin has been gradually improving (24.5% H1 FY2026 vs ~24-25% historically) as Nexan/Blue Ag vertical integration adds margin capture</li>
+            </ul>
+        `
+    },
+    dividend: {
+        title: "Dividend Per Share",
+        content: `
+            <p><strong>Dividend Per Share</strong> is the total annual dividend declared per share, in NZ cents (post the August 2019 1:10 consolidation basis).</p>
+            <div class="metric-highlight"><strong>For PGW:</strong> Dividends were cut/suspended around the FY2024 earnings trough and have since resumed and progressively increased &mdash; FY2026 totalled 10.0cps (4.5cps interim + 5.5cps final), fully imputed. However, the DCF's cash-flow analysis found that over FY2020-26, cumulative dividends ($70.5m) plus the Nexan acquisition ($19.7m) were funded mostly by net debt rising $74.9m, not by free cash flow &mdash; underlying free cash to shareholders was only ~$15m over six years (~$2.5m/yr).</div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Dividend sustainability depends on the commodity cycle staying supportive and the balance sheet continuing to absorb seasonal working-capital growth</li>
+                <li>Fully imputed dividends carry NZ tax credits, valuable to domestic shareholders</li>
+                <li>A dividend funded by debt rather than owner FCF is a structural, not one-off, risk flagged explicitly in the DCF valuation philosophy</li>
+            </ul>
+        `
+    }
+};
+
+// ============================= DCF SECTION =============================
+let currentScenario = 'base';
+
+function fmtIV(v) {
+    const c = (dcfData.inputs && dcfData.inputs.currency) || '$';
+    if (v === null || v === undefined || !isFinite(v)) return c + '—';
+    const a = Math.abs(v);
+    const dp = a >= 100 ? 0 : a >= 10 ? 1 : a >= 1 ? 2 : 4;
+    const sign = v < 0 ? '-' : '';
+    return sign + c + a.toFixed(dp);
+}
+
+function setDcfValueEl(el, value) {
+    el.textContent = fmtIV(value);
+    el.classList.toggle('negative', value < 0);
+}
+
+function isWeightedLive() {
+    const pw = dcfData.probability_weighted || {};
+    const w = pw.weights;
+    const a = dcfData.assumptions;
+    if (!w || !a || !a.base || !a.bull || !a.bear) return false;
+    if (!dcfData.inputs || dcfData.inputs.last_fcf == null) return false;
+    if (!dcfData.historical_growth || dcfData.historical_growth.selected_growth_rate == null) return false;
+    const total = (w.bull || 0) + (w.base || 0) + (w.bear || 0);
+    if (Math.abs(total - 1) > 0.001) return false;
+    return true;
+}
+
+// Small helper: are two numbers equal within a tolerance (handles float/slider
+// rounding, e.g. slider "2" vs JSON "2.0").
+function approxEq(a, b, eps) {
+    return Math.abs(a - b) < (eps || 0.005);
+}
+
+// This model's own assumptions carry a per-year FCF path (dcfData.projections),
+// built component-by-component (EBITDA margin -> lease -> D&A -> tax -> capex ->
+// working capital) rather than as a single compounding growth rate off last_fcf.
+// A generic "grow last_fcf by a flat/fading rate" reproduction (the template
+// pattern from other dashboards) does NOT match this analyst's numbers -- verified
+// by hand: flat 2%/yr compounding of the $13.05m base gives IV ~+$0.37, while the
+// JSON's actual base intrinsic_value is -$0.01.
+//
+// So: at the scenario's own slider defaults (growth[0]/wacc/terminal_growth
+// unchanged from dcfData.assumptions[currentScenario]), calculateDCF uses the
+// embedded dcfData.projections[currentScenario].fcf array VERBATIM -- this
+// reproduces valuation[scenario].intrinsic_value exactly (to rounding). Moving a
+// slider away from those defaults falls back to scaling the embedded FCF path
+// proportionally by the ratio of (this slider's flat-growth compounding) to
+// (the scenario-default flat-growth compounding), which preserves the shape of
+// the real path while responding directionally to the user's input.
+function calculateDCF(startGrowth, wacc, terminalGrowth) {
+    const scenario = dcfData.assumptions[currentScenario] ? currentScenario : 'base';
+    const assump = dcfData.assumptions[scenario];
+    const proj = dcfData.projections && dcfData.projections[scenario];
+    const years = (assump && assump.growth_rates) ? assump.growth_rates.length : (dcfData.inputs.horizon_years || 10);
+    const hurdle = 0.15;
+    const fcf0 = dcfData.inputs.last_fcf;
+
+    const defaultGrowth = assump && assump.growth_rates ? assump.growth_rates[0] : dcfData.historical_growth.selected_growth_rate;
+    const defaultWacc = assump ? assump.wacc : dcfData.inputs.wacc;
+    const defaultTerminal = assump ? assump.terminal_growth : 2.0;
+    const atDefaults = approxEq(startGrowth, defaultGrowth) && approxEq(wacc, defaultWacc, 0.02) && approxEq(terminalGrowth, defaultTerminal);
+
+    let fcfPath;
+    if (proj && proj.fcf && proj.fcf.length === years && atDefaults) {
+        // Exact reproduction of the analyst's component-built path.
+        fcfPath = proj.fcf.slice();
+    } else {
+        // Fallback: scale the embedded path (if present) by the ratio the
+        // slider growth rate implies over a flat compounding of the same years,
+        // so a slider move still responds directionally without discarding the
+        // real path's shape. If no embedded path exists, fall back to compounding
+        // fcf0 directly (fully generic case for other tickers' DCFs).
+        const fadeCompound = (g0, gT) => {
+            let f = fcf0, vals = [];
+            for (let i = 0; i < years; i++) {
+                const t = years > 1 ? i / (years - 1) : 0;
+                const g = g0 + (gT - g0) * t;
+                f *= (1 + g / 100);
+                vals.push(f);
+            }
+            return vals;
+        };
+        if (proj && proj.fcf && proj.fcf.length === years) {
+            const refVals = fadeCompound(defaultGrowth, defaultTerminal);
+            const nowVals = fadeCompound(startGrowth, terminalGrowth);
+            fcfPath = proj.fcf.map((v, i) => refVals[i] ? v * (nowVals[i] / refVals[i]) : v);
+        } else {
+            fcfPath = fadeCompound(startGrowth, terminalGrowth);
+        }
+    }
+
+    let pvFCF = 0, pvFCFHurdle = 0;
+    for (let i = 0; i < years; i++) {
+        pvFCF += fcfPath[i] / Math.pow(1 + wacc / 100, i + 1);
+        pvFCFHurdle += fcfPath[i] / Math.pow(1 + hurdle, i + 1);
+    }
+
+    const terminalFCF = fcfPath[years - 1] * (1 + terminalGrowth / 100);
+    const denom = (wacc / 100 - terminalGrowth / 100);
+    const terminalValue = denom > 0.001 ? terminalFCF / denom : terminalFCF / 0.001;
+    const pvTerminal = terminalValue / Math.pow(1 + wacc / 100, years);
+
+    const enterpriseValue = pvFCF + pvTerminal;
+    const equityValue = enterpriseValue - dcfData.inputs.net_debt;
+
+    const exitShares = (dcfData.inputs.projected_shares && dcfData.inputs.projected_shares.length)
+        ? dcfData.inputs.projected_shares[dcfData.inputs.projected_shares.length - 1]
+        : dcfData.inputs.shares_outstanding;
+
+    const iv = equityValue / exitShares;
+
+    const entryPrice = (pvFCFHurdle + terminalValue / Math.pow(1 + hurdle, years)
+                        - dcfData.inputs.net_debt) / exitShares;
+
+    return { iv: iv, entryPrice: entryPrice, pvFCF: pvFCF, pvTerminal: pvTerminal, enterpriseValue: enterpriseValue };
+}
+
+function weightedIV(growth, wacc, terminal) {
+    const pw = dcfData.probability_weighted || {};
+    const stored = pw.weighted_iv;
+    if (stored == null || !isWeightedLive()) return stored;
+
+    const a = dcfData.assumptions;
+    const cur = a[currentScenario] || a.base;
+    const bg = (Array.isArray(cur.growth_rates) && cur.growth_rates.length)
+        ? cur.growth_rates[0] : dcfData.historical_growth.selected_growth_rate;
+    const bw = cur.wacc != null ? cur.wacc : a.base.wacc;
+    const bt = cur.terminal_growth != null ? cur.terminal_growth : a.base.terminal_growth;
+    if (approxEq(growth, bg) && approxEq(wacc, bw, 0.02) && approxEq(terminal, bt)) return stored;
+
+    const at = (g, k, t) => {
+        const w = pw.weights;
+        const startOf = (sc) => (a[sc] && Array.isArray(a[sc].growth_rates) && a[sc].growth_rates.length)
+            ? a[sc].growth_rates[0] : dcfData.historical_growth.selected_growth_rate;
+        let sum = 0;
+        for (const sc of ['bull', 'base', 'bear']) {
+            const sg = startOf(sc) + (g - bg);
+            const sk = (a[sc].wacc != null ? a[sc].wacc : bw) + (k - bw);
+            const st = (a[sc].terminal_growth != null ? a[sc].terminal_growth : bt) + (t - bt);
+            const savedScenario = currentScenario;
+            currentScenario = sc;
+            sum += w[sc] * calculateDCF(sg, Math.max(sk, st + 0.5), st).iv;
+            currentScenario = savedScenario;
+        }
+        return sum;
+    };
+
+    const ref = at(bg, bw, bt);
+    if (!ref || !isFinite(ref)) return stored;
+    const now = at(growth, wacc, terminal);
+    if (!now || !isFinite(now)) return stored;
+    return stored * (now / ref);
+}
+
+function renderHeaderValuation() {
+    const el = document.getElementById('headerValuation');
+    if (!el) return;
+    const pw = dcfData.probability_weighted || {};
+    const wiv = pw.weighted_iv;
+    const price = dcfData.current_price;
+    if (wiv == null || price == null) return;
+
+    const up = (wiv - price) / price * 100;
+    const cls = up >= 0 ? 'positive' : 'negative';
+    const sign = up >= 0 ? '+' : '';
+    el.innerHTML =
+        `<div class="hv-item"><span class="hv-label">Prob-Weighted IV</span><span class="hv-value ${cls}">${fmtIV(wiv)}</span></div>
+         <div class="hv-item"><span class="hv-label">Current Price</span><span class="hv-value">${fmtIV(price)}</span></div>
+         <div class="hv-item"><span class="hv-label">Upside</span><span class="hv-value ${cls}">${sign}${up.toFixed(0)}%</span></div>`;
+    el.style.display = 'flex';
+}
+
+function renderDCFInputs() {
+    const inputs = dcfData.inputs;
+    const currency = inputs.currency || '$';
+    const formatNum = (n) => {
+        if (Math.abs(n) >= 1000) return currency + (n / 1000).toFixed(1) + 'B';
+        return currency + n.toFixed(1) + 'M';
+    };
+
+    document.getElementById('baseFCF').textContent = formatNum(inputs.last_fcf);
+    const sbcEl = document.getElementById('sbcBreakdown');
+    if (sbcEl) {
+        sbcEl.textContent = `${formatNum(inputs.reported_fcf)} FY2026 reported → ${formatNum(inputs.mid_cycle_fcf)} mid-cycle (lease+capex+tax normalized)`;
+    }
+
+    const shares = inputs.shares_outstanding;
+    document.getElementById('sharesOut').textContent = shares.toFixed(1) + 'M';
+
+    const dilEl = document.getElementById('dilutionNote');
+    if (dilEl) dilEl.textContent = 'Flat — no SBC, no buybacks disclosed FY2017-26';
+
+    const netDebt = inputs.net_debt;
+    const netDebtEl = document.getElementById('netDebt');
+    netDebtEl.textContent = (netDebt < 0 ? '-' : '') + formatNum(Math.abs(netDebt));
+    if (netDebt < 0) netDebtEl.style.color = '#00d4aa';
+
+    renderFCFProjections();
+}
+
+function renderFCFProjections() {
+    const startGrowth = parseFloat(document.getElementById('growthSlider')?.value || dcfData.historical_growth.selected_growth_rate);
+    const terminalGrowth = parseFloat(document.getElementById('terminalSlider')?.value || dcfData.assumptions.base.terminal_growth);
+    const scenario = dcfData.assumptions[currentScenario] ? currentScenario : 'base';
+    const assump = dcfData.assumptions[scenario];
+    const proj = dcfData.projections && dcfData.projections[scenario];
+    const baseFCF = dcfData.inputs.last_fcf;
+    const currency = dcfData.inputs.currency || '$';
+    const years = (assump && assump.growth_rates) ? assump.growth_rates.length : 10;
+
+    const defaultGrowth = assump && assump.growth_rates ? assump.growth_rates[0] : dcfData.historical_growth.selected_growth_rate;
+    const defaultWacc = assump ? assump.wacc : dcfData.inputs.wacc;
+    const defaultTerminal = assump ? assump.terminal_growth : 2.0;
+    const waccSliderVal = parseFloat(document.getElementById('waccSlider')?.value || defaultWacc);
+    const atDefaults = approxEq(startGrowth, defaultGrowth) && approxEq(waccSliderVal, defaultWacc, 0.02) && approxEq(terminalGrowth, defaultTerminal);
+
+    const formatFCF = (n) => currency + n.toFixed(1) + 'M';
+
+    let fcfValues, growthRates;
+    if (proj && proj.fcf && proj.fcf.length === years && atDefaults) {
+        // Exact path from the analyst's model — show first 5 years plus implied growth rate
+        fcfValues = [baseFCF, ...proj.fcf.slice(0, 5)];
+        growthRates = [];
+        for (let i = 0; i < 5; i++) {
+            const prev = i === 0 ? baseFCF : proj.fcf[i - 1];
+            growthRates.push(prev !== 0 ? ((proj.fcf[i] / prev) - 1) * 100 : 0);
+        }
+    } else {
+        // Slider-driven fade approximation for the 5-year snapshot
+        growthRates = [];
+        for (let i = 0; i < 5; i++) {
+            const t = i / (years - 1);
+            growthRates.push(startGrowth + (terminalGrowth - startGrowth) * t);
+        }
+        let fcf = baseFCF;
+        fcfValues = [baseFCF];
+        for (let i = 0; i < 5; i++) {
+            fcf = fcf * (1 + growthRates[i] / 100);
+            fcfValues.push(fcf);
+        }
+    }
+
+    let html = `
+        <div class="fcf-projection-item header">Base</div>
+        <div class="fcf-projection-item header">Year 1</div>
+        <div class="fcf-projection-item header">Year 2</div>
+        <div class="fcf-projection-item header">Year 3</div>
+        <div class="fcf-projection-item header">Year 4</div>
+        <div class="fcf-projection-item header">Year 5</div>
+    `;
+    html += `<div class="fcf-projection-item"><div class="fcf-value">${formatFCF(fcfValues[0])}</div><div class="growth-rate">-</div></div>`;
+    for (let i = 1; i <= 5; i++) {
+        html += `<div class="fcf-projection-item"><div class="fcf-value">${formatFCF(fcfValues[i])}</div><div class="growth-rate">${growthRates[i-1] >= 0 ? '+' : ''}${growthRates[i-1].toFixed(1)}%</div></div>`;
+    }
+    document.getElementById('fcfProjectionTable').innerHTML = html;
+}
+
+window.updateDCFDisplay = function() {
+    const growth = parseFloat(document.getElementById('growthSlider').value);
+    const wacc = parseFloat(document.getElementById('waccSlider').value);
+    const terminal = parseFloat(document.getElementById('terminalSlider').value);
+
+    document.getElementById('growthValue').textContent = growth + '%';
+    document.getElementById('waccValue').textContent = wacc + '%';
+    document.getElementById('terminalValue').textContent = terminal + '%';
+
+    renderFCFProjections();
+
+    const result = calculateDCF(growth, wacc, terminal);
+
+    const ivEl = document.getElementById('dcfIV');
+    setDcfValueEl(ivEl, result.iv);
+
+    const entryEl = document.getElementById('dcfEntry');
+    setDcfValueEl(entryEl, result.entryPrice);
+
+    const upside = ((result.iv - dcfData.current_price) / dcfData.current_price * 100);
+    const upsideEl = document.getElementById('dcfUpside');
+    upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(0) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+    upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+    const ivCard = document.getElementById('dcfIVCard');
+    ivCard.classList.toggle('negative-iv', result.iv < 0);
+
+    const wiv = weightedIV(growth, wacc, terminal);
+    const wEl = document.getElementById('dcfWeighted');
+    setDcfValueEl(wEl, wiv);
+    const wUpEl = document.getElementById('dcfWeightedUpside');
+    if (wUpEl) {
+        const wUp = (wiv - dcfData.current_price) / dcfData.current_price * 100;
+        wUpEl.textContent = (wUp >= 0 ? '+' : '') + wUp.toFixed(0) + '% ' + (wUp >= 0 ? 'upside' : 'downside');
+        wUpEl.className = 'dcf-change ' + (wUp >= 0 ? 'positive' : 'negative');
+    }
+    document.getElementById('dcfWeightedCard').classList.toggle('negative-iv', wiv < 0);
+
+    const grid = document.getElementById('assumptionGrid');
+    if (grid) {
+        grid.innerHTML = `
+            <div class="assumption-item"><div class="label">Growth Rate (Yr 1)</div><div class="value">${growth}%</div></div>
+            <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc}%</div></div>
+            <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${terminal}%</div></div>
+            <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:${result.iv < 0 ? '#ff6b6b' : '#00d4aa'};">${fmtIV(result.iv)}</div></div>
+            <div class="assumption-item"><div class="label">Entry Price</div><div class="value" style="color:${result.entryPrice < 0 ? '#ff6b6b' : '#00d4aa'};">${fmtIV(result.entryPrice)}</div></div>
+        `;
+    }
+};
+
+window.switchScenario = function(scenario) {
+    currentScenario = scenario;
+    document.querySelectorAll('.scenario-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.scenario === scenario);
+    });
+
+    const assumptions = dcfData.assumptions[scenario];
+    const valuation = dcfData.valuation[scenario];
+
+    document.getElementById('growthSlider').value = assumptions.growth_rates[0];
+    document.getElementById('waccSlider').value = assumptions.wacc;
+    document.getElementById('terminalSlider').value = assumptions.terminal_growth;
+
+    renderFCFProjections();
+
+    const grid = document.getElementById('assumptionGrid');
+    grid.innerHTML = `
+        <div class="assumption-item"><div class="label">Year 1 Growth</div><div class="value">${assumptions.growth_rates[0]}%</div></div>
+        <div class="assumption-item"><div class="label">Year 10 Growth</div><div class="value">${assumptions.growth_rates[assumptions.growth_rates.length - 1]}%</div></div>
+        <div class="assumption-item"><div class="label">EBITDA Margin (Yr1→Yr10)</div><div class="value">${assumptions.ebitda_margin_path[0]}% → ${assumptions.ebitda_margin_path[assumptions.ebitda_margin_path.length - 1]}%</div></div>
+        <div class="assumption-item"><div class="label">WACC</div><div class="value">${assumptions.wacc}%</div></div>
+        <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${assumptions.terminal_growth}%</div></div>
+        <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:${valuation.intrinsic_value < 0 ? '#ff6b6b' : '#00d4aa'};">${fmtIV(valuation.intrinsic_value)}</div></div>
+        <div class="assumption-item"><div class="label">Market-Convention Memo</div><div class="value" style="color:#74b9ff;">${fmtIV(valuation.market_convention_iv_memo)}</div></div>
+    `;
+
+    updateDCFDisplay();
+};
+
+function renderHistoricalGrowth() {
+    const growth = dcfData.historical_growth;
+    const selectedSource = growth.growth_rate_source;
+    const grid = document.getElementById('growthGrid');
+    const metrics = [
+        { key: 'revenue_3yr_cagr', label: 'Revenue 3Y' },
+        { key: 'revenue_5yr_cagr', label: 'Revenue 5Y' },
+        { key: 'eps_3yr_cagr', label: 'EPS 3Y' },
+        { key: 'eps_5yr_cagr', label: 'EPS 5Y' },
+        { key: 'equity_3yr_cagr', label: 'Equity 3Y' },
+        { key: 'equity_5yr_cagr', label: 'Equity 5Y' },
+        { key: 'fcf_3yr_cagr', label: 'FCF 3Y (noise)' },
+        { key: 'fcf_5yr_cagr', label: 'FCF 5Y (noise)' }
+    ];
+    grid.innerHTML = metrics.map(m => {
+        const rate = growth[m.key];
+        const isSelected = selectedSource && selectedSource.includes('equity 5yr') && (m.key === 'equity_5yr_cagr' || m.key === 'revenue_5yr_cagr');
+        const colorClass = rate >= 0 ? 'positive' : 'negative';
+        return `
+            <div class="growth-item ${isSelected ? 'selected' : ''}">
+                <div class="metric">${m.label}</div>
+                <div class="rate ${colorClass}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const table = document.getElementById('sensitivityMatrix');
+    const currentPrice = dcfData.current_price;
+
+    let html = '<tr><th>WACC \\ Term G</th>';
+    sens.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+    html += '</tr>';
+
+    sens.wacc_range.forEach((wacc, i) => {
+        html += `<tr><th>${wacc}%</th>`;
+        sens.matrix[i].forEach((val, j) => {
+            const isHighlight = wacc === dcfData.assumptions.base.wacc && sens.terminal_growth_range[j] === dcfData.assumptions.base.terminal_growth;
+            const colorClass = val >= currentPrice ? 'above-current' : 'below-current';
+            html += `<td class="${isHighlight ? 'highlight' : colorClass}">${fmtIV(val)}</td>`;
+        });
+        html += '</tr>';
+    });
+    table.innerHTML = html;
+}
+
+function renderMarketConventionMemo() {
+    const mc = dcfData.market_convention_reference;
+    const grid = document.getElementById('marketConventionGrid');
+    grid.innerHTML = `
+        <div class="mc-item"><div class="mc-label">Bear (4.6x)</div><div class="mc-value">${fmtIV(mc.bear)}</div></div>
+        <div class="mc-item"><div class="mc-label">Base (5.1x)</div><div class="mc-value">${fmtIV(mc.base)}</div></div>
+        <div class="mc-item"><div class="mc-label">Bull (6.2x)</div><div class="mc-value">${fmtIV(mc.bull)}</div></div>
+        <div class="mc-item"><div class="mc-label">Weighted</div><div class="mc-value">${fmtIV(mc.weighted)}</div></div>
+        <div class="mc-item"><div class="mc-label">Undiscounted @4.6x</div><div class="mc-value">${fmtIV(mc.simple_multiple_on_current_ebitda['at_4.6x'])}</div></div>
+        <div class="mc-item"><div class="mc-label">Undiscounted @5.1x</div><div class="mc-value">${fmtIV(mc.simple_multiple_on_current_ebitda['at_5.1x'])}</div></div>
+        <div class="mc-item"><div class="mc-label">Undiscounted @6.2x</div><div class="mc-value">${fmtIV(mc.simple_multiple_on_current_ebitda['at_6.2x'])}</div></div>
+    `;
+    document.getElementById('hvmHouse').textContent = 'Weighted IV ' + fmtIV(dcfData.probability_weighted.weighted_iv);
+    document.getElementById('hvmMarket').textContent = 'Weighted ~' + fmtIV(mc.weighted) + ' ($' + mc.simple_multiple_on_current_ebitda['at_4.6x'].toFixed(2) + '-$' + mc.simple_multiple_on_current_ebitda['at_6.2x'].toFixed(2) + ' undiscounted)';
+}
+
+function initDCF() {
+    if (!dcfData || !dcfData.valuation) return;
+
+    document.getElementById('dcfCurrent').textContent = fmtIV(dcfData.current_price);
+
+    if (dcfData.historical_growth.growth_divergence_warning) {
+        document.getElementById('growthWarning').style.display = 'flex';
+        document.getElementById('warningText').textContent = dcfData.historical_growth.growth_divergence_warning;
+    }
+
+    const base = dcfData.assumptions.base;
+    document.getElementById('growthSlider').value = base.growth_rates[0];
+    document.getElementById('waccSlider').value = base.wacc;
+    document.getElementById('terminalSlider').value = base.terminal_growth;
+
+    document.getElementById('growthValue').textContent = base.growth_rates[0] + '%';
+    document.getElementById('waccValue').textContent = base.wacc + '%';
+    document.getElementById('terminalValue').textContent = base.terminal_growth + '%';
+
+    document.getElementById('growthHint').textContent = 'Judgment: ' + dcfData.historical_growth.growth_rate_source.split(':').slice(1).join(':').trim().slice(0, 90) + '…';
+
+    const wsub = document.getElementById('dcfWeightedSublabel');
+    const wts = (dcfData.probability_weighted || {}).weights;
+    if (wsub && wts) {
+        const pct = (x) => Math.round(x * 100);
+        let txt = `${pct(wts.bull)}% Bull / ${pct(wts.base)}% Base / ${pct(wts.bear)}% Bear`;
+        if (!isWeightedLive()) txt += ' — fixed from model';
+        wsub.textContent = txt;
+    }
+
+    document.getElementById('philosophyText').textContent = dcfData.valuation_philosophy;
+
+    renderHeaderValuation();
+    renderDCFInputs();
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    renderMarketConventionMemo();
+    switchScenario('base');
+}
+
+// ============================= SELF-CHECK (dev console only) =============================
+// Verifies calculateDCF(defaults) reproduces dcfData.valuation.base.intrinsic_value.
+// Left in intentionally as a standing regression guard; harmless in production.
+(function selfCheckBaseIV() {
+    currentScenario = 'base';
+    const b = dcfData.assumptions.base;
+    const r = calculateDCF(b.growth_rates[0], b.wacc, b.terminal_growth);
+    const expected = dcfData.valuation.base.intrinsic_value;
+    const diff = Math.abs(r.iv - expected);
+    if (diff > 0.01 && typeof console !== 'undefined') {
+        console.warn('[PGW dashboard] calculateDCF(base defaults) = ' + r.iv.toFixed(4) +
+            ' vs valuation.base.intrinsic_value = ' + expected + ' (diff ' + diff.toFixed(4) + ')');
+    }
+})();
+
+// ============================= INIT =============================
+renderKPIs();
+renderGuidance();
+renderOverview();
+buildRevenueChart();
+buildEbitdaChart();
+buildSegmentChart();
+buildFcfVsEbitdaChart();
+buildNetDebtChart();
+buildSeasonalityChart();
+buildNetIncomeChart();
+buildMarginChart();
+buildDividendChart();
+initDCF();
+
+(function() {
+    var growthSlider = document.getElementById('growthSlider');
+    var waccSlider = document.getElementById('waccSlider');
+    var terminalSlider = document.getElementById('terminalSlider');
+    if (growthSlider) { growthSlider.oninput = window.updateDCFDisplay; growthSlider.onchange = window.updateDCFDisplay; }
+    if (waccSlider) { waccSlider.oninput = window.updateDCFDisplay; waccSlider.onchange = window.updateDCFDisplay; }
+    if (terminalSlider) { terminalSlider.oninput = window.updateDCFDisplay; terminalSlider.onchange = window.updateDCFDisplay; }
+})();
+</script>
+</body>
+</html>
