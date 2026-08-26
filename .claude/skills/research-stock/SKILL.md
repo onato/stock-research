@@ -3,6 +3,9 @@ name: research-stock
 description: Downloads financial reports from company IR website, extracts data, and creates a CSV-backed HTML dashboard for stock research
 allowed-tools: Bash, Read, Write, Edit, WebFetch, WebSearch, Glob, Grep, Task
 argument-hint: "[TICKER]"
+# Orchestration is mkdir/ls/spawn work; Fable here cost $3.89 of a $13 TPW.AX run.
+# Matches BATCH_MODEL in scripts/lib.sh; valuation stays on fable via dcf-analyst.md.
+model: claude-opus-5
 ---
 
 # Stock Research Workflow
@@ -51,6 +54,19 @@ Common patterns:
 - For international tickers (e.g., SEK.NZ, WISE.L), search for the company name
 
 ## Step 2: Download Financial Reports
+
+**ASX tickers (`.AX`) — run the deterministic fetcher first, no agent:**
+```bash
+make fetch-asx TICKER=$ARGUMENTS YEARS=2016-$(date +%Y)
+```
+It walks the ASX per-year announcement listings, picks the Appendix 4E / annual
+report and the Appendix 4D / half-yearly accounts for each fiscal label, follows the
+terms interstitial to the real PDF, and saves them already named
+(`{T}_Annual_FY2025.pdf`, `{T}_HalfYear_H1-FY2026.pdf`, fiscal label from
+`info.json`'s year-end). It skips files that exist. Only spawn the ir-scraper
+afterwards for what it could not find (investor presentations, a report the company
+filed under an unusual title) — on TPW.AX the scraper burned 31 turns doing by hand
+what this does in one call.
 
 **If PDFs already exist:** Check the IR website for any NEW reports (quarters/years) published since last download. Only download missing reports.
 

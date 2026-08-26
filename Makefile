@@ -27,7 +27,7 @@ LEADERBOARD ?= 15   # rows shown by `make screen`
 
 .DEFAULT_GOAL := help
 .PHONY: help run digest status screen integrity missing prune-stubs standardize-scale research facts evals evals-all \
-        cost gaps exchange-eval facts-xbrl adjudicate screen-metrics check-currency ledger ledger-backfill queue-prune \
+        cost gaps exchange-eval facts-xbrl adjudicate fetch-asx dcf-context dashboard screen-metrics check-currency ledger ledger-backfill queue-prune \
         screen-fundamentals backfill-units canonical-iv sync-portfolio \
         test test-country lint coverage typecheck
 
@@ -135,6 +135,14 @@ research: ## Research one ticker with live progress (TICKER=AGL.NZ)
 	@test -n "$(TICKER)" || { echo "usage: make research TICKER=AGL.NZ" >&2; exit 2; }
 	@$(SCRIPTS)/run_local.sh $(TICKER)
 
+fetch-asx: ## Download ASX annual/half-year reports deterministically (TICKER=TPW.AX YEARS=2016-2026 [DRY=1])
+	@test -n "$(TICKER)" || { echo "usage: make fetch-asx TICKER=TPW.AX YEARS=2016-2026 [DRY=1]" >&2; exit 2; }
+	$(PY) $(SCRIPTS)/fetch_asx.py $(TICKER) --years $(or $(YEARS),2016-2026) $(if $(DRY),--dry-run,)
+
+dcf-context: ## Print the DCF agent's inputs for one ticker: price, history pivot, KPIs, component lines (no model)
+	@test -n "$(TICKER)" || { echo "usage: make dcf-context TICKER=TPW.AX" >&2; exit 2; }
+	$(PY) $(SCRIPTS)/dcf_context.py $(TICKER)
+
 facts: ## Rebuild the DuckDB facts table for one ticker (fast, no model)
 	@test -n "$(TICKER)" || { echo "usage: make facts TICKER=AGL.NZ" >&2; exit 2; }
 	$(PY) $(SCRIPTS)/build_facts.py $(TICKER) --show
@@ -146,6 +154,10 @@ adjudicate: ## Pre-resolve facts into Reports/{T}_Worksheet.md (no model; CHECK=
 facts-xbrl: ## Structured extraction for a US filer via SEC XBRL (TICKER=PYPL)
 	@test -n "$(TICKER)" || { echo "usage: make facts-xbrl TICKER=PYPL" >&2; exit 2; }
 	$(PY) $(SCRIPTS)/build_facts_xbrl.py $(TICKER) --show
+
+dashboard: ## Render Reports/{T}_Dashboard.html from its DashboardSpec.json (no model)
+	@test -n "$(TICKER)" || { echo "usage: make dashboard TICKER=AGL.NZ" >&2; exit 2; }
+	$(PY) $(SCRIPTS)/build_dashboard.py $(TICKER)
 
 evals: ## Tier-1 eval for one ticker (TICKER=AGL.NZ)
 	@test -n "$(TICKER)" || { echo "usage: make evals TICKER=AGL.NZ" >&2; exit 2; }
