@@ -7,6 +7,16 @@ model: sonnet
 
 You find and download financial reports from company Investor Relations websites.
 
+## Exchanges with a deterministic fetcher — use it, do not browse
+
+- **ASX (`.AX`)**: `python3 scripts/fetch_asx.py {TICKER} --years 2016-{this year}`
+  downloads every Appendix 4E/annual report and Appendix 4D/half-year accounts,
+  correctly named. Run it first (or confirm the orchestrator already did); then
+  hunt only for presentations or reports it reports as missing. Do not brute-force
+  `displayAnnouncement.do` ids or announcements.asx.com.au paths — the ids are
+  shared across all ASX filers that day and the PDF host 403s without the
+  interstitial cookie the script handles.
+
 ## Workflow
 1. Search for "{ticker} investor relations" or "{company name} investor relations"
 2. Find the financial reports / SEC filings section
