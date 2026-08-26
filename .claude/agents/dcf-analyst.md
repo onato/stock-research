@@ -47,6 +47,19 @@ valuation and obvious the moment you try to explain a change in one.
 
 ## Step 1: Gather Historical Data
 
+**Run `make dcf-context TICKER={TICKER}` first** and read its output before anything
+else. It prints in one call what used to take half the turns of a build: the live
+Yahoo price with timestamp and 52-week range, the ticker's memory line (the model
+decision, if one exists), the full `metrics_normalized` history pivot, the `kpis`
+table, and the owner-FCF component lines (interest income, lease principal and
+interest, SBC, buybacks, D&A, capex, tax paid, diluted shares, dividends, NCI) with
+`file:line` pointers into the annual filings. The numbers are still your call — the
+lines are pointers, in the filing's own units — but do not re-grep for them and do not
+re-fetch the price unless the printed one is stale or after-hours.
+
+Read `.claude/skills/dcf-methods/SKILL.md` and the routed reference file **once each**;
+on TPW.AX the reference was `cat`-ed twice (36k chars each time).
+
 ### Fetch Current Stock Price
 
 Before anything else, fetch the live market price from Yahoo Finance to use as `current_price` in the DCF JSON:
