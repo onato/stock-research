@@ -1,0 +1,2141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Port of Tauranga (POT.NZ) Financial Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 20px;
+}
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+}
+.header h1 {
+    font-size: 2.5rem;
+    background: linear-gradient(90deg, #00d4aa, #00b894);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+}
+.header p { color: #888; font-size: 1.1rem; }
+.header-valuation {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 14px 32px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.hv-item { display: flex; align-items: baseline; gap: 8px; }
+.hv-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.hv-value { font-size: 1.35rem; font-weight: 700; color: #e0e0e0; }
+.hv-value.positive { color: #00d4aa; }
+.hv-value.negative { color: #ff6b6b; }
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.kpi-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0, 212, 170, 0.2); }
+.kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+.kpi-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.kpi-change { font-size: 0.9rem; margin-top: 5px; }
+.kpi-change.positive { color: #00d4aa; }
+.kpi-change.negative { color: #ff6b6b; }
+.kpi-note { font-size: 0.72rem; color: #fdcb6e; margin-top: 6px; line-height: 1.3; }
+.guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+.guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 8px; }
+.guidance-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.guidance-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px; }
+.guidance-meta { font-size: 0.85rem; color: #888; }
+.guidance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.guidance-card { background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 18px; border: 1px solid rgba(255, 255, 255, 0.1); transition: transform 0.2s ease; }
+.guidance-card:hover { transform: translateY(-2px); }
+.guidance-metric { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.guidance-target { font-size: 1.4rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; }
+.guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
+.guidance-vs-prior { display: inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+.guidance-vs-prior.raised { background: rgba(0, 212, 170, 0.15); color: #00d4aa; }
+.guidance-vs-prior.lowered { background: rgba(255, 107, 107, 0.15); color: #ff6b6b; }
+.guidance-vs-prior.maintained { background: rgba(255, 255, 255, 0.1); color: #888; }
+.guidance-vs-prior.new { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
+.guidance-notes { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
+.guidance-commentary { background: rgba(255, 255, 255, 0.03); border-radius: 10px; padding: 16px 20px; border-left: 3px solid #00d4aa; font-style: italic; color: #b0b0b0; line-height: 1.6; }
+.guidance-commentary::before { content: '"'; font-size: 1.5rem; color: #00d4aa; margin-right: 4px; }
+.section-title { font-size: 1.5rem; color: #fff; margin: 40px auto 20px; padding-bottom: 10px; border-bottom: 2px solid rgba(0, 212, 170, 0.3); max-width: 1400px; }
+.charts-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 25px; max-width: 1400px; margin: 0 auto; }
+.chart-card { background: rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 25px; border: 1px solid rgba(255, 255, 255, 0.1); }
+.chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.chart-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.chart-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px; }
+.help-btn {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: rgba(0, 212, 170, 0.2); border: 1px solid #00d4aa; color: #00d4aa;
+    font-size: 14px; font-weight: bold; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;
+}
+.help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.chart-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.view-toggle {
+    padding: 3px 10px; border-radius: 12px; background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2); color: #888; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s ease;
+}
+.view-toggle:hover { border-color: #0984e3; color: #0984e3; }
+.view-toggle.active { background: rgba(9, 132, 227, 0.2); border-color: #0984e3; color: #0984e3; }
+.log-toggle {
+    padding: 3px 10px; border-radius: 12px; background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2); color: #888; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s ease;
+}
+.log-toggle:hover { border-color: #00d4aa; color: #00d4aa; }
+.log-toggle.active { background: rgba(0, 212, 170, 0.2); border-color: #00d4aa; color: #00d4aa; }
+.chart-wrapper { position: relative; height: 300px; }
+.modal-overlay {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.7); z-index: 1000; justify-content: center; align-items: center; padding: 20px;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+    background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%);
+    border-radius: 16px; max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto;
+    border: 1px solid rgba(0, 212, 170, 0.3); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.modal-header { padding: 20px 25px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); display: flex; justify-content: space-between; align-items: center; }
+.modal-header h3 { color: #00d4aa; font-size: 1.4rem; margin: 0; }
+.modal-close {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(255, 107, 107, 0.2); border: 1px solid #ff6b6b; color: #ff6b6b;
+    font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.modal-close:hover { background: #ff6b6b; color: #fff; }
+.modal-body { padding: 25px; line-height: 1.7; }
+.modal-body p { margin-bottom: 15px; }
+.modal-body strong { color: #00d4aa; }
+.modal-body ul { margin: 15px 0; padding-left: 20px; }
+.modal-body li { margin-bottom: 8px; }
+.metric-highlight { background: rgba(0, 212, 170, 0.1); border-left: 3px solid #00d4aa; padding: 12px 15px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+.overview-section { max-width: 1400px; margin: 0 auto 30px; }
+.overview-toggle {
+    width: 100%; background: rgba(0, 212, 170, 0.1); border: 1px solid rgba(0, 212, 170, 0.3);
+    border-radius: 12px; padding: 16px 24px; color: #00d4aa; font-size: 1.1rem; font-weight: 600;
+    cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease;
+}
+.overview-toggle:hover { background: rgba(0, 212, 170, 0.2); }
+.overview-toggle .arrow { transition: transform 0.3s ease; }
+.overview-toggle.active .arrow { transform: rotate(180deg); }
+.overview-content {
+    display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: none; border-radius: 0 0 12px 12px; padding: 30px; margin-top: -12px;
+}
+.overview-content.active { display: block; }
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+.overview-card { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.overview-card h3 { color: #00d4aa; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+.overview-card p { margin-bottom: 12px; line-height: 1.6; }
+.overview-card ul { list-style: none; padding: 0; margin: 0; }
+.overview-card li { padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); line-height: 1.5; }
+.overview-card li:last-child { border-bottom: none; }
+.overview-card.bull h3 { color: #00d4aa; }
+.overview-card.bear h3 { color: #ff6b6b; }
+.overview-card.risks h3 { color: #fdcb6e; }
+.risk-high { color: #ff6b6b; }
+.risk-moderate { color: #fdcb6e; }
+.risk-low { color: #00d4aa; }
+.revenue-stream { display: flex; justify-content: space-between; align-items: center; }
+.revenue-stream .percent { color: #00d4aa; font-weight: 600; }
+.trend-growing { color: #00d4aa; }
+.trend-stable { color: #888; }
+.trend-declining { color: #ff6b6b; }
+.consent-banner {
+    max-width: 1400px; margin: 0 auto 25px; background: rgba(255, 107, 107, 0.1);
+    border: 1px solid rgba(255, 107, 107, 0.35); border-radius: 12px; padding: 18px 22px;
+    color: #ffb0b0; line-height: 1.6;
+}
+.consent-banner strong { color: #ff6b6b; }
+.dcf-warning-banner {
+    max-width: 1400px; margin: 0 auto 25px; background: rgba(253, 203, 110, 0.12);
+    border: 1px solid rgba(253, 203, 110, 0.4); border-radius: 12px; padding: 20px 24px;
+    color: #ffe6a3; line-height: 1.7;
+}
+.dcf-warning-banner h4 { color: #fdcb6e; margin-bottom: 10px; font-size: 1.05rem; }
+.dcf-warning-banner .ladder {
+    display: flex; flex-wrap: wrap; gap: 10px 24px; margin: 14px 0; padding: 12px 0;
+    border-top: 1px solid rgba(253, 203, 110, 0.25); border-bottom: 1px solid rgba(253, 203, 110, 0.25);
+}
+.dcf-warning-banner .ladder-item { text-align: center; }
+.dcf-warning-banner .ladder-item .l-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: #cbb27a; }
+.dcf-warning-banner .ladder-item .l-value { font-size: 1.25rem; font-weight: 700; color: #fdcb6e; }
+.dcf-warning-banner ul { margin: 10px 0 0 20px; }
+.dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+.dcf-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+.dcf-card {
+    background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 24px; text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1); transition: transform 0.3s ease;
+}
+.dcf-card:hover { transform: translateY(-3px); }
+.dcf-card.highlight { background: rgba(0, 212, 170, 0.1); border-color: rgba(0, 212, 170, 0.3); }
+.dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.dcf-value { font-size: 2.2rem; font-weight: bold; color: #00d4aa; }
+.dcf-card:not(.highlight) .dcf-value { color: #fff; }
+.dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+.dcf-change.positive { color: #00d4aa; }
+.dcf-change.negative { color: #ff6b6b; }
+.dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
+.dcf-warning { background: rgba(253, 203, 110, 0.15); border: 1px solid rgba(253, 203, 110, 0.4); border-radius: 8px; padding: 12px 16px; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; color: #fdcb6e; }
+.warning-icon { font-size: 1.2rem; }
+.dcf-inputs { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+.dcf-inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.dcf-input-card { background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 12px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.05); }
+.dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #00d4aa; }
+.dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
+.fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
+.fcf-projection-table { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; background: rgba(0, 0, 0, 0.2); border-radius: 8px; padding: 12px; }
+.fcf-projection-item { text-align: center; }
+.fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
+.fcf-projection-item .year { font-size: 0.75rem; color: #888; margin-bottom: 2px; }
+.fcf-projection-item .fcf-value { font-size: 1rem; color: #e0e0e0; font-weight: 500; }
+.fcf-projection-item .growth-rate { font-size: 0.75rem; color: #00d4aa; margin-top: 2px; }
+.dcf-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; margin-bottom: 30px; padding: 25px; background: rgba(255, 255, 255, 0.03); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.slider-group { display: flex; flex-direction: column; gap: 10px; }
+.slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+.slider-group label span { color: #00d4aa; font-weight: 600; }
+.slider-group input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); outline: none; }
+.slider-group input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #00d4aa; cursor: pointer; transition: transform 0.2s; }
+.slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.slider-hint { font-size: 0.8rem; color: #666; }
+.scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+.scenario-tab { padding: 10px 24px; border: 1px solid rgba(255, 255, 255, 0.2); background: transparent; color: #888; border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s; }
+.scenario-tab:hover { border-color: rgba(0, 212, 170, 0.5); color: #e0e0e0; }
+.scenario-tab.active { background: rgba(0, 212, 170, 0.15); border-color: #00d4aa; color: #00d4aa; }
+.scenario-details { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; margin-bottom: 30px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.scenario-details h4 { color: #00d4aa; margin-bottom: 15px; }
+.assumption-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+.assumption-item { text-align: center; }
+.assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+.assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
+.sensitivity-section { margin-bottom: 30px; }
+.sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; }
+.sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255, 255, 255, 0.03); border-radius: 8px; overflow: hidden; }
+.sensitivity-table th, .sensitivity-table td { padding: 12px 16px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); }
+.sensitivity-table th { background: rgba(0, 212, 170, 0.1); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td { color: #e0e0e0; }
+.sensitivity-table td.highlight { background: rgba(0, 212, 170, 0.15); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td.below-current { color: #ff6b6b; }
+.sensitivity-table td.above-current { color: #00d4aa; }
+.historical-growth { margin-bottom: 30px; }
+.historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
+.growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
+.growth-item { background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 15px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); }
+.growth-item .metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
+.growth-item .rate { font-size: 1.2rem; font-weight: 600; }
+.growth-item .rate.positive { color: #00d4aa; }
+.growth-item .rate.negative { color: #ff6b6b; }
+.growth-item.selected { border-color: #00d4aa; background: rgba(0, 212, 170, 0.1); }
+.dcf-download { text-align: center; margin-top: 30px; }
+.download-btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px;
+    background: rgba(0, 212, 170, 0.15); border: 1px solid #00d4aa; border-radius: 8px;
+    color: #00d4aa; text-decoration: none; font-weight: 600; transition: all 0.2s;
+}
+.download-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.download-icon { font-size: 1.2rem; }
+@media (max-width: 768px) {
+    .charts-container { grid-template-columns: 1fr; }
+    .overview-grid { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.8rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Port of Tauranga Limited (POT.NZ)</h1>
+    <p>New Zealand's largest deep-water container &amp; multi-cargo port monopoly &middot; FY end 30 June &middot; NZD millions</p>
+    <div class="header-valuation" id="headerValuation" style="display:none"></div>
+</div>
+
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid">
+            <div class="overview-card">
+                <h3>Company Overview</h3>
+                <p id="ovCompanyOverview"></p>
+            </div>
+            <div class="overview-card">
+                <h3>Business Model</h3>
+                <p id="ovBusinessSummary"></p>
+                <ul id="ovRevenueStreams"></ul>
+            </div>
+            <div class="overview-card">
+                <h3>Competitive Position</h3>
+                <p id="ovCompetitors"></p>
+                <p><strong>Moat:</strong></p>
+                <ul id="ovMoat"></ul>
+            </div>
+            <div class="overview-card">
+                <h3>Growth Drivers</h3>
+                <ul id="ovGrowthDrivers"></ul>
+            </div>
+            <div class="overview-card risks">
+                <h3>Key Risks</h3>
+                <ul id="ovRisks"></ul>
+            </div>
+            <div class="overview-card bull">
+                <h3>Bull Case</h3>
+                <ul id="ovBullCase"></ul>
+            </div>
+            <div class="overview-card bear">
+                <h3>Bear Case</h3>
+                <ul id="ovBearCase"></ul>
+            </div>
+            <div class="overview-card">
+                <h3>Recent Developments</h3>
+                <ul id="ovRecentDev"></ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="consent-banner">
+    <strong>Stella Passage consent risk &mdash; the single biggest swing factor.</strong>
+    POT's core growth project (385m Sulphur Point berth extension + 315m Mount Maunganui wharf extension, automated
+    stacking cranes, dredging) requires Fast-track Approvals Act consent. The original application was
+    <strong>struck down by the High Court in August 2025</strong> (judicial review brought by Ng&#257;ti Kuku Hapu Trust
+    on a Schedule&nbsp;2 drafting/scope technicality). Parliament passed a Fast-track Approvals Amendment Act in
+    December&nbsp;2025 to fix the error, and POT re-lodged a fresh application in January&nbsp;2026 &mdash; but
+    iwi/hap&#363; cultural-impact objections remain unresolved and a further legal challenge or negotiation impasse is
+    a live possibility, not a tail risk. This is why the DCF carries a <strong>25% bear-case weight</strong> (lifted
+    from a 15% house default) &mdash; a repeat blockage has already happened once and could shelve the capacity
+    expansion for the decade.
+</div>
+
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf">H1 FY2026 Result (Feb 2026)</span> | <span id="guidanceFY">FY2026</span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<h2 class="section-title">Financial Performance</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Revenue</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('revenueChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('revenue')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="revenueChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>EBITDA &amp; EBITDA Margin</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('ebitdaChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('ebitda')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="ebitdaChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Operating Income &amp; Margin</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('opIncomeChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('opincome')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="opIncomeChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Income: Reported vs Underlying</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('netIncomeChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('netincome')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="netIncomeChart"></canvas></div>
+    </div>
+</div>
+
+<h2 class="section-title">Capex Cycle &amp; Cash Generation</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Operating Cash Flow vs CapEx</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('ocfcapex')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="ocfCapexChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Free Cash Flow</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('fcfChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('fcf')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="fcfChart"></canvas></div>
+    </div>
+</div>
+
+<h2 class="section-title">Balance Sheet &amp; Capital Structure</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Total Debt &amp; Gearing</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('debt')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="debtChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shareholders' Equity &amp; Book Value / Share</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('equityChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('equity')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="equityChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Earnings Per Share</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('eps')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="epsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Dividend Per Share</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('dps')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="dpsChart"></canvas></div>
+    </div>
+</div>
+
+<h2 class="section-title">Port Operations</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Container Volumes (TEU)</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('teuChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('teu')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="teuChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Total Trade Volume (Cargo Tonnes)</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('tonnesChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('tonnes')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="tonnesChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Container Crane Rate (Productivity)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('cranerate')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="craneChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Ship Visits</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('shipChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('shipvisits')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="shipChart"></canvas></div>
+    </div>
+</div>
+
+<h2 class="section-title">DCF Valuation</h2>
+
+<div class="dcf-warning-banner">
+    <h4>&#9888; Sanity check TRIPPED &mdash; the gap is a market-pricing phenomenon, not a modelling error</h4>
+    <p>The house owner-FCF DCF returns a base intrinsic value of <strong>NZ$4.14</strong> (probability-weighted
+    <strong>NZ$4.15</strong>) against a market price of <strong>NZ$8.115</strong> &mdash; roughly <strong>&minus;49%</strong>.
+    The multiples implied at that IV (P/E 22.4x, P/B 1.24x, EV/EBITDA 14.0x) sit <em>below</em> POT's own 10-year
+    trading <em>minimums</em> (31.4x, 1.47x, 18.0x respectively) &mdash; so this is not a component error in the
+    model (base year is correctly mid-cycled on underlying NPAT, capex is normalized, WACC 7.75% sits at the low end
+    of the sanctioned range with no illiquidity premium, risk is charged once via scenario weights). The gap reflects
+    a documented <strong>monopoly / council-controlled-float scarcity premium</strong> &mdash; the same class of
+    finding as AIA.NZ (house IV $1.90 vs $8.76 market price). The market prices POT at a ~5.5&ndash;6% forward IRR
+    because the 54% Bay of Plenty Regional Council stake restricts free float and income/passive demand is captive
+    to what remains.</p>
+    <div class="ladder">
+        <div class="ladder-item"><div class="l-label">House Base IV</div><div class="l-value">NZ$4.14</div></div>
+        <div class="ladder-item"><div class="l-label">Market-Multiple Reference</div><div class="l-value">NZ$7.17</div></div>
+        <div class="ladder-item"><div class="l-label">Current Price</div><div class="l-value">NZ$8.12</div></div>
+    </div>
+    <p>The <strong>market-multiple reference value of NZ$7.17</strong> answers a different question &mdash; "what if
+    the market keeps paying what it has always paid": it exits Year-10 core EBITDA at POT's own 10-year median
+    22.8x EV/EBITDA (vs. the house Gordon terminal value's implied exit of just 11.2x) rather than the house's
+    WACC-derived terminal value. It is a re-rate-persists memo, <strong>not the house valuation basis</strong> &mdash;
+    the house IV of NZ$4.14 remains the number this model is built on and the number that should anchor position
+    sizing.</p>
+    <ul>
+        <li><strong>Cross-checks:</strong> Jarden NZ$7.00 (underweight) sits close to the market-multiple reference;
+        Forsyth Barr NZ$9.40 (neutral, "relatively expensive") assumes current multiples persist and then some.</li>
+        <li>Implied required return at the current NZ$8.115 price is ~5.5&ndash;6%, below the model's own 7.75% WACC
+        &mdash; the market is pricing this monopoly infrastructure asset at bond-plus returns.</li>
+    </ul>
+</div>
+
+<div class="dcf-section">
+    <div class="dcf-summary">
+        <div class="dcf-card highlight">
+            <div class="dcf-label">Prob-Weighted IV</div>
+            <div class="dcf-value" id="dcfWeighted">$4.15</div>
+            <div class="dcf-change" id="dcfWeightedUpside"></div>
+            <div class="dcf-sublabel" id="dcfWeightedSublabel">25% Bull / 50% Base / 25% Bear</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Intrinsic Value (Base)</div>
+            <div class="dcf-value" id="dcfIV">$4.14</div>
+            <div class="dcf-change" id="dcfUpside">-49% downside</div>
+            <div class="dcf-sublabel">Owner FCF &mdash; core EBITDA ex equity-accounted investee earnings</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Entry Price (15% CAGR)</div>
+            <div class="dcf-value" id="dcfEntry">$2.29</div>
+            <div class="dcf-sublabel">Buy below for a 15% annual return (incl. interim FCF)</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Current Price</div>
+            <div class="dcf-value" id="dcfCurrent">$8.12</div>
+        </div>
+    </div>
+
+    <div class="dcf-warning" id="growthWarning" style="display: none;">
+        <span class="warning-icon">&#9888;</span>
+        <span id="warningText"></span>
+    </div>
+
+    <div class="dcf-inputs">
+        <h4>DCF Model Inputs</h4>
+        <div class="dcf-inputs-grid">
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Base FCF (normalized)</div>
+                <div class="dcf-input-value" id="baseFCF">$127M</div>
+                <div class="dcf-input-note" id="sbcBreakdown">Starting point for projections</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Shares Outstanding</div>
+                <div class="dcf-input-value" id="sharesOut">680.9M</div>
+                <div class="dcf-input-note" id="dilutionNote"></div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Net Debt</div>
+                <div class="dcf-input-value" id="netDebt">$207.7M</div>
+                <div class="dcf-input-note">incl. leases, net of equity-accounted investments</div>
+            </div>
+        </div>
+        <div class="fcf-projections">
+            <h5>Projected FCF (10-Year, first 6 shown)</h5>
+            <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+        </div>
+    </div>
+
+    <div class="dcf-controls">
+        <div class="slider-group">
+            <label>Growth Rate: <span id="growthValue">8%</span></label>
+            <input type="range" id="growthSlider" min="0" max="15" value="8" step="0.1" oninput="updateDCFDisplay()">
+            <div class="slider-hint" id="growthHint">Based on blended revenue path</div>
+        </div>
+        <div class="slider-group">
+            <label>WACC: <span id="waccValue">7.75%</span></label>
+            <input type="range" id="waccSlider" min="6" max="10" value="7.75" step="0.05" oninput="updateDCFDisplay()">
+        </div>
+        <div class="slider-group">
+            <label>Terminal Growth: <span id="terminalValue">2.25%</span></label>
+            <input type="range" id="terminalSlider" min="0" max="4" value="2.25" step="0.05" oninput="updateDCFDisplay()">
+        </div>
+    </div>
+
+    <div class="scenario-tabs">
+        <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+        <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+        <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+    </div>
+
+    <div class="scenario-details" id="scenarioDetails">
+        <h4>Assumptions</h4>
+        <div class="assumption-grid" id="assumptionGrid"></div>
+    </div>
+
+    <div class="sensitivity-section">
+        <h4>Sensitivity Analysis: Intrinsic Value by WACC &amp; Terminal Growth</h4>
+        <table class="sensitivity-table" id="sensitivityMatrix"></table>
+    </div>
+
+    <div class="historical-growth">
+        <h4>Historical Growth Rates (CAGR)</h4>
+        <div class="growth-grid" id="growthGrid"></div>
+    </div>
+
+    <div class="dcf-download">
+        <a href="POT.NZ_DCF_Model.xlsx" class="download-btn" download>
+            <span class="download-icon">&#8681;</span> Download Excel Model
+        </a>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ============================= EMBEDDED DATA =============================
+const csvData = `Period,Revenue,CostOfRevenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,EBITDA,NetIncome,NetMargin,EPS,OperatingCashFlow,CapEx,FreeCashFlow,ShareholdersEquity,TotalAssets,TotalLiabilities,TotalDebt,CashAndEquivalents,SharesOutstanding,StockBasedComp,DividendPerShare,EBITDABeforeSignificant,RevenueContinuing,EBITDAContinuingBeforeSignificant,EBITContinuingBeforeSignificant,Units,Currency
+FY2016,245.521,,,,105.991,43.2,143.18,77.314,31.5,0.115,88.069,-58.863,29.206,885.684,1322.367,436.683,320.2,11.58,680.5812,2.443,,,,,,millions,NZD
+H1 FY2017,125.328,,,,56.087,44.8,68.227,41.858,33.4,0.062,43.096,,,861.102,1356.453,495.351,390.276,8.699,680.5812,3.38,,,,,,millions,NZD
+FY2017,255.882,,,,114.123,44.6,152.385,83.441,32.6,0.124,98.185,-65.269,32.916,931.943,1422.6,490.657,380.363,5.184,680.5812,3.868,,,,,,millions,NZD
+FY2018,283.726,,,,129.272,45.6,169.236,94.273,33.2,0.139,99.431,-17.399,82.032,1121.98,1657.031,535.051,405.356,5.836,680.6315,2.047,,,,,,millions,NZD
+FY2019,313.263,,,,145.086,46.3,181.27,100.577,32.1,0.15,112.189,-41.125,71.064,1165.885,1748.861,582.976,446.213,3.903,680.7978,4.085,,,,,,millions,NZD
+FY2020,301.985,,,,132.656,43.9,165.198,88.679,29.4,0.134,117.137,-38.239,78.898,1195.184,1848.79,653.606,488.458,8.565,680.771,4.513,,,,,,millions,NZD
+FY2021,338.281,,,,140.798,41.6,189.917,102.375,30.3,0.152,99.682,-22.267,77.415,1396.968,2081.27,684.302,485.0,7.886,680.7755,2.412,,,,,,millions,NZD
+H1 FY2022,186.03,,,,78.364,42.1,97.403,56.341,30.3,0.084,71.11,-8.13,62.98,1413.388,2072.98,659.592,475.0,15.163,680.7755,3.016,,,,,,millions,NZD
+FY2022,375.288,,,,154.975,41.3,204.663,111.317,29.7,0.165,145.249,-21.345,123.904,2074.438,2743.526,669.088,442.472,7.272,680.7879,4.204,,,,,,millions,NZD
+H1 FY2023,211.924,,,,88.039,41.5,107.715,62.725,29.6,0.093,58.967,-18.386,40.581,2089.92,2799.282,709.362,489.221,30.744,680.7879,4.679,,,,,,millions,NZD
+FY2023,420.929,,,,169.918,40.4,219.081,117.136,27.8,0.174,144.572,-44.84,99.732,2133.716,2824.269,690.553,450.775,8.506,680.8447,5.387,,,,,,millions,NZD
+H1 FY2024,200.011,,,,71.654,35.8,93.741,47.241,23.6,0.07,56.54,-21.771,34.769,2116.903,2831.502,714.599,488.901,20.366,680.8447,0.852,,,,,,millions,NZD
+FY2024,417.375,,,,155.618,37.3,203.739,90.849,21.8,0.135,135.837,-42.612,93.225,2183.157,2900.158,717.001,462.962,18.728,680.8059,1.654,,,,,,millions,NZD
+H1 FY2025,224.998,,,,89.34,39.7,111.099,60.198,26.8,0.089,73.555,-16.331,57.224,2179.117,2896.012,716.895,467.374,17.032,680.8059,1.016,,,,,,millions,NZD
+FY2025,464.675,,,,182.94,39.4,234.504,173.373,37.3,0.257,171.981,-28.135,143.846,2273.771,3001.49,727.719,467.884,8.975,680.9094,2.326,,,,,,millions,NZD
+H1 FY2026,244.128,,,,99.532,40.8,122.376,70.214,28.8,0.104,77.792,-25.162,52.63,2279.671,3026.579,746.908,498.707,27.475,680.9094,3.003,,,,,,millions,NZD
+`;
+
+const analysisData = {
+  "ticker": "POT.NZ",
+  "company_name": "Port of Tauranga Limited",
+  "sector": "Marine Ports & Infrastructure",
+  "analysis_date": "2026-08-26",
+  "company_overview": "Port of Tauranga is New Zealand's largest port by cargo volume, operating deep-water container, bulk and multi-cargo terminals at Mount Maunganui/Tauranga on the North Island's Bay of Plenty coast, plus inland freight hubs (MetroPort Auckland, Ruakura, Rolleston) and a stake in Timaru Container Terminal. It handles roughly 25 million tonnes of cargo and around 1.2 million TEU of containers annually, servicing New Zealand's dairy, kiwifruit, forestry/log, and import supply chains. The company is majority-owned (~54%) by Quayside Securities, the investment vehicle of the Bay of Plenty Regional Council, making it an unusual quasi-public infrastructure monopoly with a captive controlling shareholder.",
+  "business_model": {
+    "summary": "Port of Tauranga earns revenue from three reported segments: Port Operations (container terminal, multi-cargo and marine services - the large majority of revenue), Property Services (rental income from port-related land and buildings) and Logistics Services (contracted terminal operations and logistics via QM Logistics). Revenue is a mix of per-container/per-tonne handling and stevedoring charges, wharfage, marine pilotage/towage fees, and property rental, supplemented by equity-accounted earnings from joint ventures (Northport Group, formerly also including a direct Northport stake sold in FY2025) and Coda/PrimePort Timaru interests.",
+    "revenue_streams": [
+      {"name": "Container terminal revenue", "percent": 60, "trend": "growing"},
+      {"name": "Multi-cargo revenue", "percent": 18, "trend": "stable"},
+      {"name": "Marine services revenue", "percent": 11, "trend": "stable"},
+      {"name": "Property/rental revenue", "percent": 10, "trend": "growing"},
+      {"name": "Logistics services (QM Logistics)", "percent": 1, "trend": "growing"}
+    ],
+    "customer_type": "B2B - shipping lines, exporters (Zespri/kiwifruit marketers, Fonterra and dairy exporters, forestry companies), importers and freight forwarders; essential infrastructure with no retail/consumer exposure",
+    "geographic_mix": "100% New Zealand-domiciled operations (Bay of Plenty core port plus Auckland, Waikato/Ruakura and Canterbury/Rolleston inland hubs, and a South Island interest via Timaru); revenue is NZD-denominated even though volumes are driven by export demand from Asia, Europe and North America"
+  },
+  "competitive_position": {
+    "main_competitors": [
+      "Ports of Auckland (POAL) - council-owned, NZ's main import gateway",
+      "Northport/Marsden Point (Northland) - now part-owned by POT itself via the Northport Group consortium",
+      "Lyttelton Port Company (South Island)",
+      "Napier Port (NPH.NZ)",
+      "PrimePort Timaru / South Port New Zealand",
+      "Coastal shipping and road/rail alternatives for domestic freight"
+    ],
+    "market_position": "Largest NZ port by total cargo tonnage and the dominant container port, handling roughly 40% of national container trade; only NZ port currently able to berth the largest container vessels calling the country",
+    "moat_factors": [
+      {"factor": "Regulatory/consenting barriers to entry", "strength": "strong", "description": "Deep-water berths, dredging rights and resource consents take years and face iwi/environmental opposition (Stella Passage saga), making new large-scale competing capacity extremely difficult to build"},
+      {"factor": "Scale and vessel-size capability", "strength": "strong", "description": "Only port able to handle the largest vessels calling New Zealand, giving it an anchor role in shipping-line network design as carriers deploy bigger ships"},
+      {"factor": "Inland freight hub network", "strength": "moderate", "description": "MetroPort Auckland, Ruakura and Rolleston extend the port's effective catchment inland, competing directly for cargo that would otherwise use Ports of Auckland or Lyttelton, though this depends on KiwiRail rail capacity and cost"},
+      {"factor": "Captive/monopoly-like regional infrastructure", "strength": "moderate", "description": "High switching costs for exporters embedded in existing supply chains (Zespri, Fonterra), though large shippers retain some ability to shift cargo to competing ports over time"},
+      {"factor": "Council ownership/political backing", "strength": "moderate", "description": "Majority Bay of Plenty Regional Council ownership provides patient capital and community backing for expansion, but also constrains capital structure flexibility and take-private optionality"}
+    ],
+    "weaknesses": [
+      "Container volumes have not recovered to the FY2022 peak (~1.24m TEU), showing demand cyclicality and share pressure from Auckland's own capacity additions",
+      "Heavy dependence on a small number of commodity export categories (dairy, kiwifruit, forestry logs) subject to global price and weather cycles",
+      "Capital-intensive expansion (Stella Passage berth extension, dredging, cranes, new tug) is running into sustained legal/regulatory and iwi opposition, creating execution and timing risk",
+      "Reliance on KiwiRail for inland connectivity (MetroPort, Ruakura, and the proposed Marsden Point rail spur) that POT does not control",
+      "Regulated/monitored entity under Commerce Commission oversight of pricing given market power, capping the extent of price increases"
+    ]
+  },
+  "key_risks": {
+    "business": [
+      {"risk": "Container volume stagnation", "severity": "moderate", "description": "TEU volumes remain below the FY2022 peak; shipping alliance reshuffles (Gemini Cooperation, restructured Ocean Alliance/Premier Alliance) are changing vessel rotations and port-call patterns across Oceania, with uncertain net effect on Tauranga call frequency"},
+      {"risk": "Commodity export exposure", "severity": "moderate", "description": "Log exports have been structurally weak on soft China demand; dairy and kiwifruit volumes are seasonal and weather/production dependent (H1 FY2026 saw a later-than-usual dairy season start and softer log demand)"},
+      {"risk": "Customer concentration in agri-exporters", "severity": "moderate", "description": "Zespri (kiwifruit) and Fonterra/dairy exporters represent an outsized share of export tonnage; any shock to these industries flows directly to port volumes"},
+      {"risk": "Competition from Ports of Auckland and Northport expansion", "severity": "moderate", "description": "POAL's own terminal upgrades and the government-backed push to develop Northport/Marsden Point as a deep-water alternative could erode Tauranga's long-run import/export share, even though POT now holds an equity stake in the Northport Group"}
+    ],
+    "financial": [
+      {"risk": "Capex supercycle funding", "severity": "moderate", "description": "Stella Passage berth extension, dredging stage two, automated stacking cranes and a new hybrid tug represent a multi-year, multi-hundred-million-dollar capital programme; gearing (16.8% at FY2025) has capacity to rise as spending accelerates"},
+      {"risk": "Interest rate exposure on debt", "severity": "low", "description": "Net debt of ~NZ$459m at FY2025 and NZ$498.7m gross borrowings at Dec-2025 is modest relative to a NZ$2.28bn equity base and carries an S&P A-/Stable rating, but refinancing costs are sensitive to NZ interest rates"},
+      {"risk": "One-off/non-recurring gains distort reported earnings", "severity": "low", "description": "FY2025 reported NPAT of $173.4m included a ~$49.2m one-off gain on disposal of equity-accounted investees; underlying NPAT of $126.0m is the cleaner run-rate figure"}
+    ],
+    "regulatory": [
+      {"risk": "Stella Passage fast-track consent litigation", "severity": "high", "description": "The original Fast-track Approvals Act application was halted by a High Court judicial review (Ngati Kuku Hapu Trust) in Aug-2025 on a scope/schedule-drafting technicality; Parliament passed a Fast-track Approvals Amendment Act in Dec-2025 to fix the error and POT re-lodged in Jan-2026, but unresolved iwi/hapu cultural-impact objections mean further delay or a fresh legal challenge remains possible"},
+      {"risk": "Environmental/dredging consent conditions", "severity": "moderate", "description": "Capital dredging in Te Awanui Tauranga Harbour and ongoing stormwater/discharge management at Mount Maunganui wharves carry compliance risk; the port states it is currently fully consent-compliant but is under continuous-improvement pressure on water/air quality"},
+      {"risk": "Port pricing scrutiny", "severity": "low", "description": "As NZ's dominant port with market power, POT's pricing is subject to periodic government/Commerce Commission and Cabinet-level scrutiny (e.g. via port productivity/market studies), constraining the extent to which price increases can be used to offset volume softness"},
+      {"risk": "Climate/decarbonisation obligations", "severity": "low", "description": "Climate-related disclosure reporting (CRD) requirements and emissions-reduction commitments (e.g. hybrid tug, electrification of cargo-handling equipment) add compliance cost, though POT frames these as also driving efficiency gains"}
+    ],
+    "macro": [
+      {"risk": "Global shipping-alliance restructuring", "severity": "moderate", "description": "The Feb-2025 alliance rejig (Gemini Cooperation of Maersk/Hapag-Lloyd; MSC operating independently; THE Alliance reduced to three members as Premier Alliance) has altered global vessel rotations and increased congestion/berthing-time variability at hub ports; Oceania's position at the end of long-haul strings makes NZ ports price-takers on service frequency decisions made overseas"},
+      {"risk": "NZ export commodity price cycle", "severity": "moderate", "description": "Dairy, kiwifruit and log prices are set in volatile global markets (particularly China for logs); a downturn in the NZ export economy directly reduces port tonnage and revenue"},
+      {"risk": "KiwiRail dependency", "severity": "moderate", "description": "Inland hub economics (MetroPort, Ruakura, prospective Marsden Point rail spur) depend on state-owned KiwiRail's capacity, pricing and reliability, which POT does not control; a redesigned MetroPort commercial model took effect Dec-2025 partly in response to this dependency"},
+      {"risk": "NZD/foreign exchange indirect exposure", "severity": "low", "description": "POT's revenue and costs are NZD-denominated, but underlying export competitiveness (and therefore volume) is sensitive to NZD strength against USD/RMB/EUR"}
+    ]
+  },
+  "growth_drivers": [
+    "Stella Passage development: staged 385m Sulphur Point container berth extension and 315m Mount Maunganui wharf extension, plus reclamation and dredging, to add container and multi-cargo capacity once fast-track consent is secured",
+    "Automated stacking crane investment alongside the new berth to lift terminal productivity (crane rate +3.5%, ship rate +12.7% YoY already achieved in H1 FY2026 through operational improvements)",
+    "New larger hybrid rotortug (ordered from UZMAR, Turkiye, delivery mid-2027) to service larger vessels expected as shipping lines deploy bigger ships post-alliance-reshuffle",
+    "Inland freight hub expansion - Ruakura Inland Port container volumes up 22% in H1 FY2026; Rolleston (South Island) and a redesigned MetroPort Auckland commercial model (effective Dec-2025) with increased KiwiRail rail capacity from Feb-2026",
+    "Equity stake in the enlarged Northport Group (Bay of Plenty/Northland/Tupu Tonu consortium) following the 2025 Marsden Maritime Holdings buyout and delisting, positioning POT to benefit from any future Northland deep-water port and Marsden Point rail development without full capital risk",
+    "Continued growth in high-value refrigerated (reefer) container trade tied to kiwifruit (record FY2025 season, +30.9%) and dairy exports",
+    "Pricing/tariff increases layered onto volume growth to lift returns on invested capital, as flagged by management and noted by sell-side research"
+  ],
+  "recent_developments": [
+    {"date": "2026-02", "event": "H1 FY2026 results: Group NPAT up 16.6% to $70.2m on revenue of $244.1m (+8.5%); container volumes +2.6% to 607,114 TEU; subsidiary/JV earnings up 27.3%; management raised FY2026 underlying NPAT guidance to $142m-$152m"},
+    {"date": "2026-02", "event": "Interim dividend declared at 8.0 cents per share"},
+    {"date": "2026-01-20", "event": "Lodged a fresh Fast-track Approvals Act application for the Stella Passage berth-extension project after Parliament passed the Fast-track Approvals Amendment Act (Dec-2025) fixing the Schedule 2 drafting error that had triggered the earlier judicial-review setback"},
+    {"date": "2026-01", "event": "Landslides at Mount Maunganui and Welcome Bay caused community disruption near the port; company donated to the Western Bay Emergency Response Fund"},
+    {"date": "2025-12-01", "event": "Redesigned MetroPort Auckland commercial/business model implemented, with KiwiRail providing increased MetroPort rail capacity from Feb-2026"},
+    {"date": "2025-08-27", "event": "High Court upheld a judicial review brought by Ngati Kuku Hapu Trust, ruling the EPA should not have accepted the original Stella Passage fast-track application because the project as built did not match its Schedule 2 description - halting progress to an expert panel"},
+    {"date": "2025 (FY2025 results, released Aug-2025)", "event": "FY2025: operating revenue $464.7m, EBITDA $234.5m, reported NPAT $173.4m (incl. ~$49.2m one-off gain on disposal of equity-accounted investees), underlying NPAT $126.0m; final dividend 9.7cps, full-year dividend 16.7cps; total equity $2.27bn; net debt $458.9m; gearing 16.8%; S&P A-/Stable affirmed"},
+    {"date": "2025 (H1 FY2025 calendar year)", "event": "Consortium (Northland Regional Council 43%, Port of Tauranga 50%, Tupu Tonu/Ngapuhi Investment Fund 7%) completed the Marsden Maritime Holdings buyout via Scheme of Arrangement; MMH delisted from NZX and became a subsidiary of the new Northport Group; Port of Tauranga sold its prior direct 50% stake in Northport as part of the restructuring, generating the ~$49.2m one-off gain, and a search is under way for a new Northport Group CEO. Northport separately obtained resource consent for a ~12-hectare reclamation, 250m wharf extension and associated dredging project; timing depends on freight demand and progress of the government/KiwiRail-led Marsden Point rail spur (circa $700m allocated)"},
+    {"date": "2026-02", "event": "Signed agreement with UZMAR Shipyards (Turkiye) to build New Zealand's first hybrid advanced rotortug, delivery mid-2027, to handle larger vessels and reduce diesel reliance"},
+    {"date": "2025-2026", "event": "Sell-side split: Forsyth Barr downgraded from outperform to neutral while lifting its 12-month target to NZ$9.40 (calling the stock 'relatively expensive' after a re-rating); Jarden raised its target to NZ$7.00 but maintained an underweight/negative stance; consensus rating broadly Hold with a consensus target near NZ$8"}
+  ],
+  "bull_case": [
+    "Quasi-monopoly, irreplaceable deep-water infrastructure asset with the only NZ berths able to handle the largest container ships, in an industry with very high regulatory/consenting barriers to new competing capacity",
+    "H1 FY2026 momentum (NPAT +16.6%, guidance raised to $142m-$152m underlying NPAT for FY2026) shows margin recovery from productivity gains, a repriced MetroPort model and cost discipline on rail",
+    "Multi-year capacity expansion pipeline (Stella Passage berths, automated cranes, new hybrid tug, Ruakura/Rolleston inland hubs) sets up structurally higher volumes and returns on invested capital once consented and built",
+    "Conservative balance sheet (16.8% gearing, S&P A-/Stable) gives ample headroom to fund the capex programme without shareholder dilution",
+    "Northport Group equity stake provides indirect exposure to a future Northland deep-water alternative/complement without bearing full development capital risk, while majority Bay of Plenty Regional Council ownership provides patient, long-term-oriented capital support"
+  ],
+  "bear_case": [
+    "Stella Passage expansion faces genuine, unresolved legal and cultural/iwi opposition; even with the legislative fix, further judicial review or negotiation impasse could delay the core growth project for years",
+    "Container volumes still below the FY2022 peak, exposing the thesis to a soft NZ export-commodity cycle (weak log demand, dairy/kiwifruit seasonality) and share loss to Ports of Auckland's own capacity investments",
+    "Global shipping-alliance restructuring (Gemini, reshuffled Ocean/Premier Alliances) is outside POT's control and could reduce call frequency or reshape network hubs away from Tauranga",
+    "Reported earnings quality is muddied by one-off gains (the ~$49.2m FY2025 Northport disposal gain); underlying NPAT growth is more modest than headline reported NPAT growth suggests",
+    "Analyst sentiment has turned more cautious after a strong re-rating - Forsyth Barr downgraded to neutral calling shares 'relatively expensive,' and Jarden remains at underweight - suggesting limited further multiple expansion from current levels"
+  ],
+  "management_assessment": "Management under CEO Leonard Sampson and Chair Julia Hoare has executed a disciplined operating turnaround (crane/ship productivity gains, MetroPort repricing) while progressing a genuinely difficult, multi-year regulatory campaign to secure Stella Passage consent, including adapting quickly to the 2025 High Court setback by working with government to fix the underlying legislation and re-lodging within months. The FY2025 Northport restructuring (converting a 50% direct stake into a consortium-held Northport Group interest alongside Bay of Plenty and Northland regional councils, plus Tupu Tonu) was a complex, multi-party transaction executed cleanly and crystallised a sizeable one-off gain. Guidance has been raised mid-year (FY2026 underlying NPAT to $142m-$152m) rather than cut, a positive credibility signal, though investors should watch for continuity risk given the pending search for a new Northport Group CEO and the inherent tension between an ambitious capex programme and the 54% Bay of Plenty Regional Council controlling shareholder's own return/dividend expectations.",
+  "industry_context": "New Zealand port infrastructure is a small number of regional, largely council-controlled monopolies (Tauranga, Auckland, Napier, Lyttelton, Otago, South Port, Northport) serving an export-led, commodity-heavy economy (dairy, meat, forestry, horticulture) with no realistic prospect of a new greenfield deep-water competitor given consenting costs and timeframes. The sector is moderately cyclical, tracking global demand for NZ's agricultural and forestry exports and general trade volumes, but structurally defensive relative to typical industrials given high switching costs and long-term shipping-line/exporter relationships. Global container shipping itself is undergoing a rare alliance-structure reset (the Feb-2025 Gemini Cooperation, MSC operating alone, and THE Alliance's reduction to a three-member Premier Alliance), which is reshaping vessel rotations, port-call patterns and congestion globally; Oceania ports sit at the periphery of these networks and are price-takers on service-level decisions made by global carriers. NZ government policy (Fast-track Approvals Act, Northland rail investment) is currently supportive of port and freight-corridor expansion, but iwi/Treaty-of-Waitangi cultural-impact considerations remain a live and sometimes decisive constraint on major coastal/harbour infrastructure projects nationwide.",
+  "key_metrics_to_watch": [
+    "Container volumes (TEU) versus the FY2022 peak (~1.24m TEU) - recovery trajectory signals underlying trade health",
+    "Underlying Group NPAT versus guidance ($142m-$152m for FY2026) and any further in-year revisions",
+    "Progress of the Stella Passage fast-track consent application (expert panel appointment/decision timeline) and any fresh judicial review risk",
+    "Log export volumes and China demand as the most cyclically exposed cargo category",
+    "Net crane rate and net ship rate (productivity KPIs) as leading indicators of terminal efficiency gains feeding through to margin",
+    "Gearing/net debt trend as the Stella Passage and dredging capex programme ramps",
+    "Ruakura and MetroPort inland-hub volume growth as a proxy for network/catchment expansion success",
+    "Dividend per share and payout ratio relative to underlying NPAT, given the majority council shareholder's reliance on port dividends",
+    "Northport Group developments (new CEO appointment, Marsden Point rail spur progress, any future capital calls on POT's stake)"
+  ]
+};
+
+const dcfData = {
+ "ticker": "POT.NZ",
+ "valuation_date": "2026-08-26",
+ "current_price": 8.115,
+ "model": "owner-fcf-dcf",
+ "horizon_years": 10,
+ "inputs": {
+  "shares_outstanding": 680.909,
+  "net_debt": 207.73,
+  "net_debt_components": {
+   "borrowings": 498.707,
+   "lease_liabilities": 58.727,
+   "cash": 27.475,
+   "less_equity_accounted_investments_and_advances": 322.23,
+   "net_debt_gross_incl_leases": 529.96
+  },
+  "last_fcf": 127.0,
+  "reported_fcf": 143.846,
+  "sbc": 0.0,
+  "sbc_incl_equity_taxes": 0.0,
+  "sbc_pct_of_revenue": 0.0,
+  "sbc_pct_path": [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+  "interest_income": 0.0,
+  "sbc_source": "SBC-zero market: POT is an NZX filer with no material share-based payment (small employee share scheme only, <NZ$1m). SBC rows kept explicit at 0% per house rule; house and street bases coincide.",
+  "buyback_cash": 0.636,
+  "annual_share_growth_pct": 0.0,
+  "projected_shares": [680.909,680.909,680.909,680.909,680.909,680.909,680.909,680.909,680.909,680.909],
+  "share_count_basis": "680.909m ordinary shares, flat for a decade; no buyback programme (the ~NZ$0.6-0.8m/yr 'repurchases' are employee-scheme housekeeping), no dilution",
+  "price_as_of": "2026-08-26 NZX close 8.115 (verified market data supplied by orchestrator; regular close, not volatile)",
+  "balance_sheet_date": "2025-12-31 (H1 FY2026 interim)",
+  "currency": "NZD",
+  "units": "millions",
+  "notes": "MODEL: owner-FCF DCF (operating company), 10-year component build, per dcf-methods routing -- POT is a capital-intensive monopoly port operator, not a REIT/bank/LIC. Section 7 adaptations applied: (1) NZD WACC 7.75% built from NZ 10yr govt ~4.4% + 5.0% ERP at beta ~0.75, ~10% debt weight at ~3.8% after-tax -- NO small-cap illiquidity premium (NZX-50 large cap, A-/Stable, monopoly asset). (2) Leases treatment A: NZ$58.7m lease liabilities included in net debt, lease principal (~NZ$1m/yr, immaterial) NOT deducted from flows. (3) No NCI. (4) Matching-asset rule: share of profit from equity-accounted investees (FY2025 NZ$6.2m -- Northport Group NGL, Coda, PrimePort) is EXCLUDED from the flows (core EBITDA = revenue - opex = 228.4 in FY2025, 49.2% margin, vs reported EBITDA 234.5 which includes the EAI share), and the matching assets (investments NZ$284.1m + advances NZ$38.1m = NZ$322.2m at Dec-2025 carrying value, NGL marked to fair value Jun-2025) are added in the bridge. This also avoids extrapolating a historical associate line whose composition changed with the FY2025 Northport disposal. (5) Risk charged once: Stella Passage consent risk lives in the scenario weights (bear 25%), WACC is a clean single rate across scenarios. FY2025 BASE-YEAR ADJUSTMENTS: reported NPAT 173.4 includes the one-off NZ$49.245m gain on disposal of equity-accounted investees -- underlying NPAT 126.0 used throughout; reported FY2025 FCF 143.8 is flattered by consent-blocked Stella Passage capex (28.1 vs ~NZ$40-45m mid-cycle) -- last_fcf 127.0 = OCF 172.0 less normalized capex 45.0. Interest income (NZ$0.7m) immaterial and POT is a net-debt company -- no strip. CAPEX SUPERCYCLE modelled explicitly: base case consent granted FY2027, capex steps up 90/140/140/100/70 over FY2027-31 before settling at 8.5% of revenue."
+ },
+ "historical_growth": {
+  "revenue_3yr_cagr": 7.38,
+  "revenue_5yr_cagr": 9.0,
+  "eps_3yr_cagr": 3.91,
+  "eps_5yr_cagr": 7.28,
+  "equity_3yr_cagr": 3.1,
+  "equity_5yr_cagr": 13.72,
+  "fcf_3yr_cagr": 5.1,
+  "fcf_5yr_cagr": 12.75,
+  "selected_growth_rate": 5.0,
+  "growth_rate_source": "blended revenue path: FY2026 +8% (guidance-anchored, H1 +8.5% actual), decelerating to 2.5% by year 10; 10yr revenue CAGR is 7.3%",
+  "growth_divergence_warning": "equity_5yr_cagr 13.7% diverges >30% from revenue (9.0%) and underlying-EPS (7.3%) CAGRs -- driven by the FY2022 port-land revaluation (equity jumped 1,397 to 2,074), not retained earnings; equity CAGR rejected as the growth anchor. EPS CAGRs computed on UNDERLYING NPAT (kpis.UnderlyingNetProfit), stripping the FY2025 NZ$49.2m disposal gain. FCF CAGRs are capex-timing noise (consent-blocked capex trough in FY2025) -- not used.",
+  "notes": "SBC is zero for this NZX filer, so owner-FCF and reported-FCF series coincide; the FCF CAGR distortion here is capex phasing, not SBC."
+ },
+ "assumptions": {
+  "base": {
+   "growth_rates": [8.0,5.5,5.0,4.5,4.5,4.5,4.0,3.5,3.0,2.5],
+   "ebitda_margin_path": [50.0,50.5,50.8,51.2,51.5,51.8,52.0,52.0,52.0,52.0],
+   "sbc_pct_path": [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+   "da_pct": 9.4,
+   "capex_pct_path": [10.0,17.0,25.2,24.1,16.5,11.0,8.5,8.5,8.5,8.5],
+   "wc_capture_pct": -5,
+   "cash_tax_rate_path": [28.0,28.0,28.0,28.0,28.0,28.0,28.0,28.0,28.0,28.0],
+   "wacc": 7.75,
+   "terminal_growth": 2.25,
+   "terminal_cap_multiple": 20
+  },
+  "bull": {
+   "growth_rates": [9.0,7.0,6.5,6.0,6.0,5.5,5.0,4.5,4.0,3.0],
+   "ebitda_margin_path": [50.2,51.0,51.6,52.2,52.7,53.1,53.5,53.5,53.5,53.5],
+   "sbc_pct_path": [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+   "da_pct": 9.4,
+   "capex_pct_path": [10.9,18.5,26.0,24.5,17.0,11.0,8.5,8.5,8.5,8.5],
+   "wc_capture_pct": -5,
+   "cash_tax_rate_path": [28.0,28.0,28.0,28.0,28.0,28.0,28.0,28.0,28.0,28.0],
+   "wacc": 7.75,
+   "terminal_growth": 2.5,
+   "terminal_cap_multiple": 20
+  },
+  "bear": {
+   "growth_rates": [6.5,3.0,2.5,2.5,2.5,2.5,2.5,2.0,2.0,2.0],
+   "ebitda_margin_path": [49.8,49.5,49.3,49.2,49.0,49.0,49.0,49.0,49.0,49.0],
+   "sbc_pct_path": [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+   "da_pct": 9.4,
+   "capex_pct_path": [10.1,10.8,9.6,9.3,9.1,9.2,9.2,9.2,9.2,9.2],
+   "wc_capture_pct": -5,
+   "cash_tax_rate_path": [28.0,28.0,28.0,28.0,28.0,28.0,28.0,28.0,28.0,28.0],
+   "wacc": 7.75,
+   "terminal_growth": 2.0,
+   "terminal_cap_multiple": 20
+  }
+ },
+ "projections": {
+  "base": {
+   "years": ["FY2026","FY2027","FY2028","FY2029","FY2030","FY2031","FY2032","FY2033","FY2034","FY2035"],
+   "revenue": [501.8,529.5,555.9,580.9,607.1,634.4,659.8,682.9,703.4,720.9],
+   "adj_ebitda": [250.9,267.4,282.4,297.4,312.6,328.6,343.1,355.1,365.7,374.9],
+   "sbc": [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+   "d_and_a": [47.2,49.8,52.3,54.6,57.1,59.6,62.0,64.2,66.1,67.8],
+   "cash_tax_rate": [28.0,28.0,28.0,28.0,28.0,28.0,28.0,28.0,28.0,28.0],
+   "capex": [50.2,90.0,140.1,140.0,100.2,69.8,56.1,58.0,59.8,61.3],
+   "working_capital": [-1.9,-1.4,-1.3,-1.3,-1.3,-1.4,-1.3,-1.2,-1.0,-0.9],
+   "fcf": [141.8,115.1,76.6,88.2,139.6,182.2,207.0,214.4,221.0,226.7],
+   "owner_fcf_margin": [28.3,21.7,13.8,15.2,23.0,28.7,31.4,31.4,31.4,31.5],
+   "discount_factors": [0.9281,0.8613,0.7994,0.7419,0.6885,0.639,0.593,0.5504,0.5108,0.4741],
+   "pv_fcf": [131.6,99.1,61.2,65.4,96.1,116.4,122.8,118.0,112.9,107.5]
+  },
+  "bull": {
+   "years": ["FY2026","FY2027","FY2028","FY2029","FY2030","FY2031","FY2032","FY2033","FY2034","FY2035"],
+   "revenue": [506.5,542.0,577.2,611.8,648.5,684.2,718.4,750.7,780.8,804.2],
+   "adj_ebitda": [254.3,276.4,297.8,319.4,341.8,363.3,384.3,401.6,417.7,430.2],
+   "sbc": [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+   "d_and_a": [47.6,50.9,54.3,57.5,61.0,64.3,67.5,70.6,73.4,75.6],
+   "cash_tax_rate": [28.0,28.0,28.0,28.0,28.0,28.0,28.0,28.0,28.0,28.0],
+   "capex": [55.2,100.3,150.1,149.9,110.2,75.3,61.1,63.8,66.4,68.4],
+   "working_capital": [-2.1,-1.8,-1.8,-1.7,-1.8,-1.8,-1.7,-1.6,-1.5,-1.2],
+   "fcf": [139.1,111.2,77.8,94.4,151.1,202.5,232.9,243.5,253.4,261.4],
+   "owner_fcf_margin": [27.5,20.5,13.5,15.4,23.3,29.6,32.4,32.4,32.5,32.5],
+   "discount_factors": [0.9281,0.8613,0.7994,0.7419,0.6885,0.639,0.593,0.5504,0.5108,0.4741],
+   "pv_fcf": [129.1,95.8,62.2,70.0,104.0,129.4,138.1,134.0,129.4,123.9]
+  },
+  "bear": {
+   "years": ["FY2026","FY2027","FY2028","FY2029","FY2030","FY2031","FY2032","FY2033","FY2034","FY2035"],
+   "revenue": [494.9,509.7,522.5,535.5,548.9,562.6,576.7,588.2,600.0,612.0],
+   "adj_ebitda": [246.4,252.3,257.6,263.5,269.0,275.7,282.6,288.2,294.0,299.9],
+   "sbc": [0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+   "d_and_a": [46.5,47.9,49.1,50.3,51.6,52.9,54.2,55.3,56.4,57.5],
+   "cash_tax_rate": [28.0,28.0,28.0,28.0,28.0,28.0,28.0,28.0,28.0,28.0],
+   "capex": [50.0,55.1,50.2,49.8,50.0,51.8,53.1,54.1,55.2,56.3],
+   "working_capital": [-1.5,-0.7,-0.6,-0.7,-0.7,-0.7,-0.7,-0.6,-0.6,-0.6],
+   "fcf": [139.0,139.3,148.4,153.3,157.5,160.9,164.9,168.3,171.7,175.1],
+   "owner_fcf_margin": [28.1,27.3,28.4,28.6,28.7,28.6,28.6,28.6,28.6,28.6],
+   "discount_factors": [0.9281,0.8613,0.7994,0.7419,0.6885,0.639,0.593,0.5504,0.5108,0.4741],
+   "pv_fcf": [129.0,120.0,118.6,113.8,108.4,102.8,97.8,92.6,87.7,83.0]
+  }
+ },
+ "valuation": {
+  "base": {
+   "sum_pv_fcf": 1031.06,
+   "terminal_value": 4215.22,
+   "terminal_value_bound_by": "gordon",
+   "pv_terminal": 1998.24,
+   "enterprise_value_core": 3029.3,
+   "add_equity_accounted_investments": 322.23,
+   "less_net_debt_incl_leases": 529.96,
+   "equity_value": 2821.57,
+   "intrinsic_value": 4.144,
+   "street_intrinsic_value": 4.144,
+   "upside": -48.94,
+   "terminal_pct_of_value": 65.96,
+   "implied_exit_multiple": 18.59,
+   "implied_exit_ev_ebitda": 11.24
+  },
+  "bull": {
+   "sum_pv_fcf": 1116.06,
+   "terminal_value": 5103.67,
+   "terminal_value_bound_by": "gordon",
+   "pv_terminal": 2419.41,
+   "enterprise_value_core": 3535.47,
+   "add_equity_accounted_investments": 322.23,
+   "less_net_debt_incl_leases": 529.96,
+   "equity_value": 3327.74,
+   "intrinsic_value": 4.887,
+   "street_intrinsic_value": 4.887,
+   "upside": -39.78,
+   "terminal_pct_of_value": 68.43,
+   "implied_exit_multiple": 19.52,
+   "implied_exit_ev_ebitda": 11.86
+  },
+  "bear": {
+   "sum_pv_fcf": 1053.7,
+   "terminal_value": 3106.46,
+   "terminal_value_bound_by": "gordon",
+   "pv_terminal": 1472.63,
+   "enterprise_value_core": 2526.33,
+   "add_equity_accounted_investments": 322.23,
+   "less_net_debt_incl_leases": 529.96,
+   "equity_value": 2318.6,
+   "intrinsic_value": 3.405,
+   "street_intrinsic_value": 3.405,
+   "upside": -58.04,
+   "terminal_pct_of_value": 58.29,
+   "implied_exit_multiple": 17.74,
+   "implied_exit_ev_ebitda": 10.36
+  }
+ },
+ "scenario_narratives": {
+  "base": "Stella Passage fast-track consent granted during FY2027 (re-lodged Jan-2026 under the amended Act); berth extension + automated cranes built FY2027-2031 with capex peaking ~NZ$140m/yr, suppressing FCF mid-decade before capacity lifts volumes. Revenue +8% FY2026 (guidance: underlying NPAT 142-152) decelerating to 2.5%; core EBITDA margin recovers 49.2% to 52% on crane/ship-rate productivity, MetroPort repricing and tariff increases. Terminal growth 2.25% (NZ long-run nominal GDP).",
+  "bull": "Consent clears cleanly and early; container volumes push past the FY2022 peak (1.24m TEU) as bigger ships consolidate calls at the only NZ port that can berth them; Ruakura/Rolleston inland hubs scale and MetroPort economics improve further; margin reaches 53.5%. Faster, larger build (capex peaks NZ$150m). Terminal growth 2.5%.",
+  "bear": "Consent blocked again by fresh judicial review or iwi negotiation impasse -- Stella Passage shelved for the decade; NZ export-commodity cycle stays soft (weak China log demand, dairy/kiwifruit seasonality) and alliance restructuring trims Tauranga call frequency; margin stalls ~49%; capex is maintenance-only (~9%/rev) so near-term FCF actually exceeds base, but there is no capacity-driven growth and terminal value is materially lower. Terminal growth 2.0%."
+ },
+ "entry_price": {
+  "hurdle_rate": 0.15,
+  "base": {
+   "years_to_terminal": 10,
+   "pv_interim_fcf_at_hurdle": 726.06,
+   "pv_terminal_at_hurdle": 1041.94,
+   "net_debt": 207.73,
+   "entry_price": 2.291,
+   "entry_discount_from_current": -71.76
+  },
+  "bull": { "entry_price": 2.688 },
+  "bear": { "entry_price": 1.951 },
+  "weighted_entry_price": 2.306,
+  "note": "TV at exit is the scenario's WACC-based Gordon value (fair price a buyer pays in FY2035); only the discounting to today uses the 15% hurdle. A 15% NZD IRR on a ~7.75%-WACC monopoly infrastructure asset requires an entry near NZ$2.31 -- less than a third of today's price; the hurdle is essentially unattainable in this name."
+ },
+ "required_return_table": {
+  "scenario": "base",
+  "returns": [7.75,9,10,11,12,15],
+  "value_per_share": [4.14,3.73,3.43,3.16,2.91,2.29],
+  "note": "Implied required return at the current NZ$8.115 price is ~5.5-6% -- below the 7.75% WACC. The market prices POT at bond-plus returns."
+ },
+ "sensitivity": {
+  "wacc_range": [6.75,7.25,7.75,8.25,8.75],
+  "terminal_growth_range": [1.25,1.75,2.25,2.75,3.25],
+  "matrix": [
+   [4.48,4.76,4.76,4.76,4.76],
+   [4.04,4.31,4.56,4.56,4.56],
+   [3.67,3.89,4.14,4.37,4.37],
+   [3.35,3.53,3.74,3.99,4.18],
+   [3.08,3.22,3.4,3.6,3.83]
+  ],
+  "note": "Full model rebuilt at each (WACC, g) pair; 20x terminal cap binds in the low-WACC/high-g corners (the flat cells)."
+ },
+ "probability_weighted": {
+  "weights": { "bear": 0.25, "base": 0.5, "bull": 0.25 },
+  "weights_rationale": "Bear lifted from the 15% house default to 25% because the Stella Passage consent has ALREADY been struck down once (High Court, Aug-2025) and iwi/hapu cultural-impact objections remain unresolved -- a repeat blockage is a live, demonstrated path. Bull trimmed to 25% because it needs three things to go right at once: fast consent, volume recovery past the FY2022 peak, and margin expansion to 53.5%. Consent risk is charged HERE, not in the WACC (risk charged once).",
+  "weighted_iv": 4.145,
+  "street_weighted_iv": 4.145,
+  "band_position": null,
+  "band_note": "SBC-zero market: house and street bases coincide, the accounting-regime band collapses to a point, so band_position is null rather than a degenerate 0%."
+ },
+ "sanity_check": {
+  "ran": true,
+  "passed": false,
+  "implied_multiples": { "pe_on_fy2025_underlying": 22.39, "pe_on_fy2026_guidance_mid": 19.19, "pb": 1.24, "ev_ebitda_on_fy2025": 14.04 },
+  "historical_multiples_10yr": {
+   "pe_by_year": {"2017":36.3,"2018":36.8,"2019":42.9,"2020":59.1,"2021":46.0,"2022":37.7,"2023":36.1,"2024":31.4,"2025":37.0},
+   "pe_min": 31.4, "pe_median": 37.0, "pe_max": 59.1,
+   "pb_by_year": {"2017":3.25,"2018":3.1,"2019":3.7,"2020":4.39,"2021":3.43,"2022":2.04,"2023":1.99,"2024":1.47,"2025":2.05},
+   "pb_min": 1.47, "pb_median": 3.1, "pb_max": 4.39,
+   "ev_ebitda_by_year": {"2017":22.3,"2018":22.9,"2019":26.3,"2020":34.6,"2021":27.7,"2022":22.8,"2023":21.4,"2024":18.0,"2025":21.8},
+   "ev_ebitda_min": 18.0, "ev_ebitda_median": 22.8, "ev_ebitda_max": 34.6,
+   "basis": "FY-end (June) closing prices supplied by orchestrator x 680.909m shares; underlying NPAT for FY2021-25 (kpis.UnderlyingNetProfit), reported NPAT before; company net-debt convention (borrowings - cash); CSV FY EBITDA (includes EAI share). P/E and EV/EBITDA are SBC-unadjusted AND SBC-adjusted simultaneously -- SBC is zero for POT, so the two bases coincide by identity."
+  },
+  "trip_reasons": [
+   "implied P/E 22.4x is below the 10yr MINIMUM of 31.4x (median 37.0x)",
+   "implied P/B 1.24x is below the 10yr minimum of 1.47x (post-revaluation median ~2.0x)",
+   "implied EV/EBITDA 14.0x is below the 10yr minimum of 18.0x (median 22.8x)"
+  ],
+  "trip_direction": "conservative -- IV implies multiples below POT's own historical trading floor, not above its ceiling",
+  "diagnosis": "Auto-diagnosis found no component error: the base year is mid-cycled correctly (underlying NPAT 126.0 not reported 173.4; capex normalized), the margin path is anchored to actuals, tax is statutory 28%, WACC 7.75% is at the LOW end of the sanctioned 7.5-9.0% range with no illiquidity premium, and risk is charged once. The gap is a market-pricing phenomenon, not a modelling one: POT has traded at 31-59x earnings and 18-35x EV/EBITDA for a decade because it is an irreplaceable monopoly with a 54% council holder restricting float and index/income demand concentrated in the free float -- a documented scarcity premium, the same finding as AIA.NZ (house IV $1.90 vs $8.76). At NZ$8.115 the market accepts a ~5.5-6% forward IRR; any defensible NZD discount rate in 7.5-9.0% produces an IV far below the price. Cross-check: Jarden NZ$7.00 (underweight) sits near the market-multiple reference below; Forsyth Barr NZ$9.40 (neutral, 'relatively expensive') assumes current multiples persist.",
+  "fix_applied": "Per 8c.4/8c.5, no forced change to the house IV (the trip is conservative-direction and diagnosable). Two disciplines applied instead: (1) a supplementary MARKET-MULTIPLE REFERENCE VALUE published below -- exit at POT's own 10yr median EV/EBITDA of 22.8x on Y10 core EBITDA gives NZ$7.17/share, so the gap house 4.14 -> reference 7.17 -> price 8.12 prices the scarcity-premium re-rate assumption explicitly instead of burying it in a terminal assumption; (2) the house Gordon TV's implied exit EV/EBITDA (11.2x base) is disclosed per scenario so the reader can see the house model assumes roughly HALF POT's historical trading multiple at exit.",
+  "market_multiple_reference": {
+   "exit_ev_ebitda": 22.8,
+   "reference_iv": 7.17,
+   "house_implied_exit_ev_ebitda": 11.24,
+   "note": "Reference value = base-case explicit FCF + terminal at the 10yr median trading multiple, all at 7.75% WACC. It answers 'what if the market keeps paying what it has always paid' -- a re-rate-persists memo, NOT the house basis."
+  },
+  "note": "Multiples computed on POT's own history per instruction (monopoly + council float restriction make generic industrial benchmarks inapplicable). Adjusted and unadjusted multiples coincide because SBC is zero."
+ },
+ "valuation_philosophy": "Port of Tauranga is the highest-quality infrastructure asset on the NZX -- a genuine monopoly with the only berths in New Zealand able to take the largest container ships, an A-/Stable balance sheet at 17% gearing, and a demonstrated ability to reprice (MetroPort) and to sweat assets (crane rate +3.5%, ship rate +12.7%). The valuation problem is not the business, it is the price of the business. On component-built owner FCF -- underlying NPAT of ~NZ$147m guided for FY2026, a Stella Passage capex supercycle that will absorb most free cash flow for FY2027-31, and a 52% mature core EBITDA margin -- the equity is worth ~NZ$4.14/share at a 7.75% NZD WACC, and even the bull case (NZ$4.89) sits 40% below the NZ$8.12 market price. The market instead prices POT at 37x underlying earnings and 22x EV/EBITDA, a ~5.5-6% forward IRR, because the 54% Bay of Plenty Regional Council stake restricts float and income/passive demand is captive -- the same scarcity premium documented on AIA.NZ. Holding POT's own decade-median exit multiple (the market-multiple reference) gets to NZ$7.17, almost exactly Jarden's NZ$7.00 underweight target; today's NZ$8.12, at the very top of the decade range, additionally requires that premium to widen. This is an income-and-modest-growth name (~85% payout, ~2.2% yield) whose current price embeds bond-like required returns plus a successful, on-time Stella Passage build; it offers no margin of safety against either the discount rate normalising or the consent stalling again.",
+ "reasonableness_cross_check": {
+  "forsyth_barr_target": 9.4,
+  "forsyth_barr_stance": "neutral, 'relatively expensive'",
+  "jarden_target": 7.0,
+  "jarden_stance": "underweight",
+  "note": "Cross-check only, not an input. House base 4.14 is below both because sell-side targets capitalize at prevailing market multiples; the market-multiple reference value 7.17 reconciles almost exactly to Jarden."
+ },
+ "fy2026_guidance": {
+  "underlying_npat_range": [142,152],
+  "status": "raised at H1 FY2026 result (H1 NPAT 70.2, +16.6%)"
+ }
+};
+
+// Port operational KPIs, sourced from annual/interim report highlight pages
+// (Financial and Operational Five Year Summary sections; H1 FY2026 interim highlights)
+const kpiData = {
+    annual: {
+        years: ["FY2021","FY2022","FY2023","FY2024","FY2025"],
+        teu_m: [1.20, 1.24, 1.18, 1.15, 1.208252],
+        tonnes_m: [25.7, 25.6, 24.7, 23.6, 25.307],
+        craneRate: [29.7, 32.1, 27.9, 30.1, 29.4],
+        shipVisits: [1307, 1369, 1432, 1427, 1442],
+        reportedNPAT: [102.375, 111.317, 117.136, 90.849, 173.373],
+        underlyingNPAT: [null, null, null, 102.7, 126.0]
+    },
+    h1: {
+        periods: ["H1 FY2022","H1 FY2023","H1 FY2024","H1 FY2025","H1 FY2026"],
+        teu_m: [null, null, null, null, 0.607114],
+        tonnes_m: [null, null, null, null, 12.6],
+        reportedNPAT: [56.341, 62.725, 47.241, 60.198, 70.214]
+    }
+};
+
+// ============================= PARSE CSV =============================
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => obj[h.trim()] = values[i]?.trim());
+        return obj;
+    });
+}
+
+const data = parseCSV(csvData);
+
+function parsePeriodKey(p) {
+    const year = parseInt(p.match(/\d{4}/)?.[0] || '0');
+    const isH1 = p.includes('H1');
+    const isFY = p.startsWith('FY');
+    const subOrder = isH1 ? 1 : isFY ? 7 : 0;
+    return year * 10 + subOrder;
+}
+data.sort((a, b) => parsePeriodKey(a.Period) - parsePeriodKey(b.Period));
+
+// FY-only rows for annual time series (never mix half-years into the same series)
+const fyData = data.filter(d => d.Period.startsWith('FY'));
+const h1Data = data.filter(d => d.Period.startsWith('H1'));
+
+function num(v) { return v === undefined || v === '' ? null : parseFloat(v); }
+
+// ============================= HELPERS =============================
+function toggleOverview() {
+    const btn = document.querySelector('.overview-toggle');
+    const content = document.getElementById('overviewContent');
+    btn.classList.toggle('active');
+    content.classList.toggle('active');
+}
+
+function fmtM(v, dp) {
+    if (v === null || v === undefined || isNaN(v)) return 'N/A';
+    dp = dp === undefined ? 1 : dp;
+    return '$' + v.toFixed(dp) + 'M';
+}
+function fmtPct(v, dp) {
+    if (v === null || v === undefined || isNaN(v)) return 'N/A';
+    dp = dp === undefined ? 1 : dp;
+    return v.toFixed(dp) + '%';
+}
+function calcYoYChange(current, previous) {
+    if (!previous || !current) return null;
+    return ((parseFloat(current) - parseFloat(previous)) / Math.abs(parseFloat(previous)) * 100).toFixed(1);
+}
+
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } } },
+    scales: {
+        x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+function freshScales() {
+    return { x: { ...chartDefaults.scales.x }, y: { ...chartDefaults.scales.y } };
+}
+
+const colors = {
+    primary: '#00d4aa',
+    secondary: '#00b894',
+    tertiary: '#0984e3',
+    quaternary: '#6c5ce7',
+    warning: '#fdcb6e',
+    danger: '#ff6b6b'
+};
+
+const chartRegistry = {};
+function toggleLogScale(canvasId, btn) {
+    const chart = chartRegistry[canvasId];
+    if (!chart) return;
+    const toLog = chart.options.scales.y.type !== 'logarithmic';
+    chart.options.scales.y.type = toLog ? 'logarithmic' : 'linear';
+    btn.classList.toggle('active', toLog);
+    chart.update();
+}
+
+function openModal(key) {
+    document.getElementById('modalTitle').textContent = metricDescriptions[key].title;
+    document.getElementById('modalBody').innerHTML = metricDescriptions[key].content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ============================= KPI CARDS =============================
+function renderKPICards() {
+    const latestFY = fyData[fyData.length - 1]; // FY2025
+    const prevFY = fyData[fyData.length - 2];    // FY2024
+    const latestH1 = h1Data[h1Data.length - 1];  // H1 FY2026
+
+    const revenue = num(latestFY.Revenue);
+    const revenuePrev = num(prevFY.Revenue);
+    const ebitda = num(latestFY.EBITDA);
+    const ebitdaPrev = num(prevFY.EBITDA);
+    const ebitdaMargin = (ebitda / revenue * 100);
+    const reportedNI = num(latestFY.NetIncome);
+    const underlyingNI = 126.0;
+    const dps = num(latestFY.DividendPerShare);
+    const dpsPrev = num(prevFY.DividendPerShare);
+    const totalDebt = num(latestFY.TotalDebt);
+    const cash = num(latestFY.CashAndEquivalents);
+    const equity = num(latestFY.ShareholdersEquity);
+    const netDebt = totalDebt - cash;
+    const gearing = (netDebt / (netDebt + equity) * 100);
+    const bvps = equity / num(latestFY.SharesOutstanding);
+    const fcf = num(latestFY.FreeCashFlow);
+
+    const kpis = [
+        {
+            label: 'Revenue (FY2025)',
+            value: fmtM(revenue, 1),
+            change: calcYoYChange(revenue, revenuePrev),
+            note: null
+        },
+        {
+            label: 'EBITDA Margin (FY2025)',
+            value: fmtPct(ebitdaMargin, 1),
+            change: calcYoYChange(ebitda, ebitdaPrev),
+            changeLabel: 'EBITDA YoY',
+            note: null
+        },
+        {
+            label: 'Net Income: Reported',
+            value: fmtM(reportedNI, 1),
+            change: calcYoYChange(reportedNI, num(prevFY.NetIncome)),
+            note: 'Includes one-off NZ$49.2m gain on disposal of equity-accounted investees (Northport restructuring). Not comparable YoY.'
+        },
+        {
+            label: 'Net Income: Underlying',
+            value: fmtM(underlyingNI, 1),
+            change: calcYoYChange(underlyingNI, 102.7),
+            note: 'Like-for-like run-rate NPAT, strips the one-off Northport gain. FY2026 guidance: $142-152M.'
+        },
+        {
+            label: 'Free Cash Flow (FY2025)',
+            value: fmtM(fcf, 1),
+            change: null,
+            note: 'FY2025 capex was consent-blocked (Stella Passage stalled) - FCF is flattered, not run-rate. Mid-cycle capex ~$45M/yr normalizes this lower.'
+        },
+        {
+            label: 'Net Debt / Gearing',
+            value: fmtM(netDebt, 1) + ' / ' + fmtPct(gearing, 1),
+            change: null,
+            note: 'Low gearing for infrastructure (A-/Stable) - headroom for the Stella Passage capex supercycle.'
+        },
+        {
+            label: 'Book Value / Share',
+            value: '$' + bvps.toFixed(2),
+            change: null,
+            note: null
+        },
+        {
+            label: 'Dividend / Share (FY2025)',
+            value: fmtM(dps, 3).replace('$','') + 'c',
+            change: calcYoYChange(dps, dpsPrev),
+            note: null
+        },
+        {
+            label: 'Container Volumes (FY2025)',
+            value: '1,208,252 TEU',
+            change: '+5.1',
+            note: 'Still below the FY2022 peak of ~1.24M TEU.'
+        },
+        {
+            label: 'Total Trade (FY2025)',
+            value: '25,307k tonnes',
+            change: '+7.0',
+            note: null
+        },
+        {
+            label: 'Net Crane Rate (FY2025)',
+            value: '29.4 moves/hr',
+            change: '-2.3',
+            note: 'H1 FY2026 net crane rate +3.5% YoY on operational improvements.'
+        },
+        {
+            label: 'H1 FY2026 NPAT',
+            value: '$70.2M',
+            change: '+16.6',
+            note: 'Revenue +8.5% to $244.1M; container volumes +2.6% to 607,114 TEU.'
+        }
+    ];
+
+    const grid = document.getElementById('kpiGrid');
+    grid.innerHTML = kpis.map(k => {
+        const changeHtml = k.change !== null
+            ? `<div class="kpi-change ${parseFloat(k.change) >= 0 ? 'positive' : 'negative'}">${parseFloat(k.change) >= 0 ? '+' : ''}${k.change}% ${k.changeLabel || 'YoY'}</div>`
+            : '';
+        const noteHtml = k.note ? `<div class="kpi-note">${k.note}</div>` : '';
+        return `
+            <div class="kpi-card">
+                <div class="kpi-value">${k.value}</div>
+                <div class="kpi-label">${k.label}</div>
+                ${changeHtml}
+                ${noteHtml}
+            </div>
+        `;
+    }).join('');
+}
+
+// ============================= GUIDANCE =============================
+function renderGuidance() {
+    const guidanceItems = [
+        {
+            metric: 'Underlying Group NPAT',
+            target: '$142M - $152M',
+            period: 'FY2026 (full year)',
+            vs_prior: 'raised',
+            notes: 'Raised at the H1 FY2026 result (Feb 2026) on strong H1 momentum: NPAT +16.6% to $70.2M, revenue +8.5%.'
+        },
+        {
+            metric: 'Interim Dividend',
+            target: '8.0 cents/share',
+            period: 'H1 FY2026',
+            vs_prior: null,
+            notes: 'Declared with H1 FY2026 result, February 2026.'
+        },
+        {
+            metric: 'Stella Passage Consent',
+            target: 'Fast-track re-application lodged Jan 2026',
+            period: 'Expert panel decision pending',
+            vs_prior: null,
+            notes: 'Following the Aug-2025 High Court judicial-review setback, Parliament passed a Fast-track Approvals Amendment Act (Dec-2025) to fix the drafting error. Iwi/hapū objections remain unresolved.'
+        }
+    ];
+
+    document.getElementById('guidanceAsOf').textContent = 'H1 FY2026 Result (Feb 2026)';
+    document.getElementById('guidanceFY').textContent = 'FY2026';
+
+    const grid = document.getElementById('guidanceGrid');
+    grid.innerHTML = guidanceItems.map(item => {
+        const vsClass = item.vs_prior ? item.vs_prior.toLowerCase() : 'new';
+        const vsLabel = item.vs_prior ? item.vs_prior.charAt(0).toUpperCase() + item.vs_prior.slice(1) : 'New';
+        return `
+            <div class="guidance-card">
+                <div class="guidance-metric">${item.metric}</div>
+                <div class="guidance-target">${item.target}</div>
+                <div class="guidance-period">${item.period}</div>
+                ${item.vs_prior ? `<span class="guidance-vs-prior ${vsClass}">${vsLabel}</span>` : ''}
+                ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+
+    document.getElementById('guidanceCommentary').textContent =
+        "Port of Tauranga performed strongly in the first half of the financial year. Resilient trade volumes, increased revenue and lower rail costs resulted in improved profits for the six month period ended 31 December 2025. Our relentless customer focus continues to drive service and productivity improvements. Our net crane rate and ship rate increased 3.5% and 12.7% respectively, compared to the same period last year, without any compromise on safety.";
+}
+
+// ============================= INVESTMENT OVERVIEW =============================
+function renderOverview() {
+    document.getElementById('ovCompanyOverview').textContent = analysisData.overview || analysisData.company_overview;
+
+    document.getElementById('ovBusinessSummary').textContent = analysisData.business_model.summary;
+    document.getElementById('ovRevenueStreams').innerHTML = analysisData.business_model.revenue_streams.map(rs => `
+        <li class="revenue-stream">
+            <span>${rs.name} <em class="trend-${rs.trend}">(${rs.trend})</em></span>
+            <span class="percent">${rs.percent}%</span>
+        </li>
+    `).join('');
+
+    document.getElementById('ovCompetitors').innerHTML = '<strong>Competitors:</strong> ' + analysisData.competitive_position.main_competitors.join('; ');
+    document.getElementById('ovMoat').innerHTML = analysisData.competitive_position.moat_factors.map(m => `
+        <li><strong>${m.factor}</strong> (${m.strength}): ${m.description}</li>
+    `).join('');
+
+    document.getElementById('ovGrowthDrivers').innerHTML = analysisData.growth_drivers.map(g => `<li>${g}</li>`).join('');
+
+    const allRisks = [
+        ...analysisData.key_risks.business.map(r => ({...r, category: 'Business'})),
+        ...analysisData.key_risks.financial.map(r => ({...r, category: 'Financial'})),
+        ...analysisData.key_risks.regulatory.map(r => ({...r, category: 'Regulatory'})),
+        ...analysisData.key_risks.macro.map(r => ({...r, category: 'Macro'}))
+    ];
+    document.getElementById('ovRisks').innerHTML = allRisks.map(r => `
+        <li><span class="risk-${r.severity}">&#9679;</span> <strong>[${r.category}] ${r.risk}</strong> (${r.severity}): ${r.description}</li>
+    `).join('');
+
+    document.getElementById('ovBullCase').innerHTML = analysisData.bull_case.map(b => `<li>${b}</li>`).join('');
+    document.getElementById('ovBearCase').innerHTML = analysisData.bear_case.map(b => `<li>${b}</li>`).join('');
+
+    document.getElementById('ovRecentDev').innerHTML = analysisData.recent_developments.map(d => `
+        <li><strong>${d.date}:</strong> ${d.event}</li>
+    `).join('');
+}
+
+// ============================= METRIC MODAL DESCRIPTIONS =============================
+const metricDescriptions = {
+    revenue: {
+        title: "Revenue",
+        content: `
+            <p><strong>Revenue</strong> is Port of Tauranga's total income from container terminal handling and stevedoring, multi-cargo (bulk/log/dairy) handling, marine services (pilotage, towage), property rental, and logistics services (QM Logistics).</p>
+            <div class="metric-highlight">
+                <strong>For POT:</strong> ~60% of revenue is container-terminal-driven (per-TEU handling charges), 18% multi-cargo, 11% marine services, 10% property, 1% logistics. Revenue is a function of volume (TEU/tonnes) &times; per-unit tariffs, which are periodically repriced (e.g. the Dec-2025 MetroPort redesign) subject to Commerce Commission scrutiny given POT's market power.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Container volume growth vs. the FY2022 peak (~1.24M TEU) - revenue growth without volume recovery implies price-led growth, which has regulatory limits</li>
+                <li>Whether revenue growth (guidance +8% FY2026) outpaces or lags cargo tonnage growth - a gap signals tariff increases doing the work</li>
+                <li>H1 vs FY split - half-year filings should never be summed with FY totals</li>
+            </ul>
+        `
+    },
+    ebitda: {
+        title: "EBITDA & EBITDA Margin",
+        content: `
+            <p><strong>EBITDA</strong> (Earnings Before Interest, Tax, Depreciation & Amortisation) as reported in POT's accounts includes the share of profit from equity-accounted investees (Northport Group, Coda, PrimePort Timaru).</p>
+            <div class="metric-highlight">
+                <strong>For POT:</strong> The DCF model strips equity-accounted investee earnings out of "core EBITDA" (49.2% margin in FY2025) because those earnings are backed by a separate balance-sheet asset (the ~$322M investment carrying value) that is added back in the valuation bridge rather than capitalised twice. The CSV/chart EBITDA figure is the reported (unstripped) number, consistent with how POT itself discloses it.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Margin trajectory: FY2024 margin dipped to 37.3% on softer volumes and rail costs; FY2025 recovered to 39.4% and management targets a mature ~52% core EBITDA margin as productivity gains, MetroPort repricing and tariff increases compound</li>
+                <li>A capital-intensive monopoly should show margin expansion from operating leverage as volumes recover, not just from price increases</li>
+            </ul>
+        `
+    },
+    opincome: {
+        title: "Operating Income & Margin",
+        content: `
+            <p><strong>Operating Income</strong> (EBIT) is earnings after depreciation and amortisation but before interest and tax - the clean measure of underlying operating profitability before capital-structure and one-off effects.</p>
+            <div class="metric-highlight">
+                <strong>For POT:</strong> Operating margin has drifted down from ~46% (FY2019) to ~37-39% (FY2024-25) as depreciation has risen with the asset base (Stella Passage dredging, cranes, wharves) ahead of revenue - a classic capital-intensive infrastructure pattern where the asset build precedes the volume/revenue payoff.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Whether operating margin stabilises or continues drifting down as the capex supercycle (FY2027-31) adds depreciation before Stella Passage capacity translates into volume/revenue</li>
+            </ul>
+        `
+    },
+    netincome: {
+        title: "Net Income: Reported vs Underlying",
+        content: `
+            <p><strong>Net Income (NPAT)</strong> is bottom-line profit after tax, interest, and all one-off items.</p>
+            <div class="metric-highlight">
+                <strong>Critical for POT FY2025:</strong> Reported NPAT of $173.4M includes a one-off ~NZ$49.2m gain on disposal of equity-accounted investees, crystallised when POT's direct 50% Northport stake was restructured into the new consortium-held Northport Group (alongside Northland Regional Council and Tupu Tonu) as part of the Marsden Maritime Holdings buyout. <strong>Underlying NPAT was $126.0M</strong> - the comparable run-rate figure. Reading the reported FY2024-&gt;FY2025 NPAT jump ($90.8M &rarr; $173.4M, +91%) as organic operating improvement is false; the underlying-basis growth ($102.7M FY2024 comparable* &rarr; $126.0M FY2025) is +22.7%, still strong but far more modest.
+                <br><span style="font-size:0.8rem;color:#888;">*FY2024 underlying NPAT of $102.7M excludes an $11.9m one-off deferred tax expense that year.</span></p>
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Always use underlying NPAT (or the FY2026 guidance range of $142-152M) for YoY comparisons and multiples, never the headline reported figure in a year with disposal gains</li>
+            </ul>
+        `
+    },
+    ocfcapex: {
+        title: "Operating Cash Flow vs CapEx",
+        content: `
+            <p><strong>Operating Cash Flow (OCF)</strong> is cash generated from core operations; <strong>CapEx</strong> (shown as a negative outflow in the underlying data) is investment in property, plant, dredging, cranes and vessels.</p>
+            <div class="metric-highlight">
+                <strong>For POT:</strong> This pair is the central story of the business right now. FY2025 capex of just $28.1M was artificially low because the Stella Passage berth-extension project was consent-blocked (the High Court struck down the fast-track application in Aug-2025) - normal mid-cycle capex runs closer to $40-45M/yr, and the DCF models a supercycle of $90M-$140M/yr for FY2027-2031 once consent is secured, before settling back near 8.5% of revenue. The gap between OCF and CapEx (i.e. free cash flow) will compress sharply mid-decade as the berth extension is built.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>CapEx re-acceleration once Stella Passage consent clears - this is the leading indicator that the capex supercycle (and the associated FCF trough) has begun</li>
+                <li>OCF/CapEx ratio compressing towards or below 1x during the peak build years is expected and does not signal distress given POT's low starting gearing</li>
+            </ul>
+        `
+    },
+    fcf: {
+        title: "Free Cash Flow",
+        content: `
+            <p><strong>Free Cash Flow (FCF)</strong> = Operating Cash Flow &minus; CapEx. It is the cash actually available to fund dividends, debt paydown or further investment after maintaining and growing the asset base.</p>
+            <div class="metric-highlight">
+                <strong>For POT:</strong> Reported FY2025 FCF of $143.8M is flattered by the consent-blocked, abnormally low $28.1M of capex that year. The DCF model normalizes this to $127.0M (OCF $172.0M less normalized capex of $45.0M) as the base-year starting point, precisely because using the reported figure would understate the capex intensity that resumes once Stella Passage clears. Expect reported FCF to fall, potentially sharply, once the berth-extension build ramps in FY2027-31.</p>
+            </div>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Do not extrapolate FY2025's FCF margin forward - it is a trough-capex, not a trough-earnings, artefact</li>
+                <li>A FCF dip through FY2027-2031 is the expected and correct pattern for a monopoly infrastructure asset investing through a capacity cycle, not a red flag by itself</li>
+            </ul>
+        `
+    },
+    debt: {
+        title: "Total Debt & Gearing",
+        content: `
+            <p><strong>Total Debt</strong> is borrowings plus lease liabilities; <strong>Gearing</strong> (net debt / (net debt + equity)) measures leverage relative to the capital base.</p>
+            <div class="metric-highlight">
+                <strong>For POT:</strong> Gearing of 16.8% at FY2025 (net debt ~$459M against $2.27bn equity, S&amp;P A-/Stable) is deliberately low for an infrastructure asset - it exists to preserve headroom for the multi-hundred-million-dollar Stella Passage/dredging/crane/tug capex programme without needing an equity raise. This is normal and prudent for a monopoly utility-like asset with a captive, patient council shareholder (54% Bay of Plenty Regional Council via Quayside Securities) that prefers dividend stability over aggressive leverage.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Gearing trend as Stella Passage capex accelerates FY2027-31 - a rise toward 25-30% would still be conservative for the sector but signals the capex cycle is genuinely underway</li>
+                <li>S&amp;P rating maintenance (A-/Stable) as a signal that the capital programme is being funded prudently</li>
+            </ul>
+        `
+    },
+    equity: {
+        title: "Shareholders' Equity & Book Value / Share",
+        content: `
+            <p><strong>Shareholders' Equity</strong> is total assets less total liabilities; <strong>Book Value per Share</strong> divides this by shares outstanding.</p>
+            <div class="metric-highlight">
+                <strong>For POT:</strong> Equity jumped from $1.40bn (FY2021) to $2.07bn (FY2022) primarily due to a port-land revaluation, not retained earnings - this is why the DCF explicitly rejects the resulting 13.7% 5-year equity CAGR as a growth proxy (it diverges &gt;30% from the 9.0% revenue CAGR and 7.3% underlying-EPS CAGR). Land, buildings, wharves and harbour improvements are periodically revalued to fair value under NZ IFRS, creating step-changes in book value unrelated to operating performance.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Do not read equity growth as a proxy for organic value creation - revaluations dominate the historical trend</li>
+                <li>P/B of 1.24x implied by the house DCF sits below POT's own 10-year minimum of 1.47x (post-revaluation median ~3.1x), part of the documented scarcity-premium gap</li>
+            </ul>
+        `
+    },
+    eps: {
+        title: "Earnings Per Share",
+        content: `
+            <p><strong>EPS</strong> is net income divided by weighted average shares outstanding.</p>
+            <div class="metric-highlight">
+                <strong>For POT:</strong> Shares outstanding are essentially flat (~680.9M for a decade) - there is no buyback programme and no material dilution (the small ~$0.6-0.8M/yr "repurchases" are employee-share-scheme housekeeping). This means EPS growth tracks net income growth almost exactly. FY2025 reported EPS of $0.257 is inflated by the one-off Northport disposal gain; use underlying NPAT ($126.0M / 680.9M shares &asymp; $0.185) for a comparable run-rate EPS.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Underlying EPS growth (5yr CAGR 7.28%) rather than reported EPS growth in years with disposal gains or tax one-offs</li>
+            </ul>
+        `
+    },
+    dps: {
+        title: "Dividend Per Share",
+        content: `
+            <p><strong>Dividend Per Share (DPS)</strong> is the total ordinary dividend declared per share for the period.</p>
+            <div class="metric-highlight">
+                <strong>For POT:</strong> FY2025 total ordinary dividend was 16.7 cents (final 9.7c + interim 7.0c), up from 14.7c in FY2024. The majority shareholder, Quayside Securities (Bay of Plenty Regional Council's investment vehicle, ~54%), relies on POT dividends as a significant funding source for regional council activities - this creates persistent pressure to maintain or grow the payout (historically ~85% of underlying NPAT) even while funding the Stella Passage capex programme, a genuine tension flagged in the qualitative analysis.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Payout ratio relative to underlying (not reported) NPAT as the true sustainability gauge</li>
+                <li>Any dividend reinvestment plan or scrip election activated to conserve cash during the capex peak years</li>
+            </ul>
+        `
+    },
+    teu: {
+        title: "Container Volumes (TEU)",
+        content: `
+            <p><strong>TEU (Twenty-foot Equivalent Unit)</strong> is the standard industry measure of container throughput - one 20-foot shipping container equals one TEU, a 40-foot container equals two TEU. It is the single most important operating KPI for a container port because container cargo carries the highest handling revenue per tonne.</p>
+            <div class="metric-highlight">
+                <strong>For POT:</strong> FY2025 volumes were 1,208,252 TEU (+5.1% YoY), still below the FY2022 peak of ~1.24M TEU - management and analysts watch this recovery closely as the clearest signal of underlying NZ trade health and POT's competitive position versus Ports of Auckland. H1 FY2026 volumes were 607,114 TEU, +2.6% YoY, continuing the gradual recovery.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Recovery trajectory versus the FY2022 peak - this is explicitly flagged as a key metric to watch in the qualitative analysis</li>
+                <li>Reefer (refrigerated) container mix, tied to kiwifruit (record FY2025 season +30.9%) and dairy exports, which carry higher yields than dry containers</li>
+                <li>Impact of global shipping-alliance restructuring (Gemini Cooperation, Premier Alliance) on vessel call frequency at Tauranga</li>
+            </ul>
+        `
+    },
+    tonnes: {
+        title: "Total Trade Volume (Cargo Tonnes)",
+        content: `
+            <p><strong>Total trade tonnage</strong> covers all cargo through the port - containerised, bulk (logs, fertiliser), and break-bulk - measured in millions of tonnes across imports and exports.</p>
+            <div class="metric-highlight">
+                <strong>For POT:</strong> FY2025 total trade was 25.307 million tonnes (+7.0% YoY), with exports (16.4Mt, +3.6%) roughly double imports (8.9Mt, +13.9%). This is a broader volume measure than TEU because it captures non-containerised bulk cargo (logs, dairy in bulk form) that is a large share of POT's multi-cargo segment (18% of revenue) but does not move in containers.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Log export volumes specifically - flagged as the most cyclically exposed cargo category given soft China demand</li>
+                <li>Import growth as a proxy for NZ domestic consumer demand and economic activity</li>
+            </ul>
+        `
+    },
+    cranerate: {
+        title: "Container Crane Rate (Productivity)",
+        content: `
+            <p><strong>Net crane rate</strong> (moves per hour) measures how many container lifts each crane completes per operating hour - the core terminal productivity metric for a container port, directly affecting how many vessels can be serviced per berth-day and therefore effective capacity without new infrastructure.</p>
+            <div class="metric-highlight">
+                <strong>For POT:</strong> Crane rate has been volatile - 29.7 (FY2021), 32.1 (FY2022 peak), 27.9 (FY2023 trough), 30.1 (FY2024), 29.4 (FY2025) - but H1 FY2026 showed +3.5% YoY net crane rate improvement and +12.7% net ship rate improvement, which management attributes to operational discipline (not yet the automated stacking cranes, which are part of the future Stella Passage build). This productivity gain is a leading indicator of margin recovery ahead of any new capacity coming online.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Sustained improvement (not just a soft-volume-year artefact) as evidence that management can extract more capacity from existing berths while Stella Passage consent is contested</li>
+                <li>Eventual step-change from automated stacking cranes once installed alongside the new berth</li>
+            </ul>
+        `
+    },
+    shipvisits: {
+        title: "Ship Visits",
+        content: `
+            <p><strong>Ship visits</strong> counts the number of vessel calls at the port in the period - a volume/frequency metric distinct from cargo tonnage or TEU, reflecting how shipping lines schedule calls at Tauranga within their network.</p>
+            <div class="metric-highlight">
+                <strong>For POT:</strong> Ship visits have grown steadily even through the TEU dip - 1,307 (FY2021) to 1,442 (FY2025) - suggesting smaller or more frequent calls rather than fewer, bigger ships in some periods. This is sensitive to global shipping-alliance restructuring (the Feb-2025 Gemini Cooperation, MSC operating independently, reshuffled Ocean/Premier Alliances), which is reshaping vessel rotations across Oceania in ways outside POT's control.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Whether alliance restructuring increases or decreases call frequency at Tauranga specifically, versus other NZ ports</li>
+                <li>Average vessel size per call (not shown directly here) as bigger ships are the rationale for the new hybrid tug and Stella Passage capacity</li>
+            </ul>
+        `
+    }
+};
+
+// ============================= CHARTS =============================
+function buildCharts() {
+    const fyLabels = fyData.map(d => d.Period);
+
+    // Revenue
+    const revenueChart = new Chart(document.getElementById('revenueChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{
+                label: 'Revenue (NZ$M)',
+                data: fyData.map(d => num(d.Revenue)),
+                backgroundColor: colors.primary
+            }]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['revenueChart'] = revenueChart;
+
+    // EBITDA & margin
+    const ebitdaChart = new Chart(document.getElementById('ebitdaChart'), {
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { type: 'bar', label: 'EBITDA (NZ$M)', data: fyData.map(d => num(d.EBITDA)), backgroundColor: colors.secondary, yAxisID: 'y' },
+                { type: 'line', label: 'EBITDA Margin (%)', data: fyData.map(d => num(d.EBITDA) / num(d.Revenue) * 100), borderColor: colors.warning, backgroundColor: colors.warning, yAxisID: 'y1', tension: 0.3 }
+            ]
+        },
+        options: {
+            ...chartDefaults,
+            scales: {
+                x: { ...chartDefaults.scales.x },
+                y: { ...chartDefaults.scales.y, position: 'left', title: { display: true, text: 'NZ$M', color: '#888' } },
+                y1: { position: 'right', ticks: { color: '#888' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Margin %', color: '#888' } }
+            }
+        }
+    });
+    chartRegistry['ebitdaChart'] = ebitdaChart;
+
+    // Operating income & margin
+    const opIncomeChart = new Chart(document.getElementById('opIncomeChart'), {
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { type: 'bar', label: 'Operating Income (NZ$M)', data: fyData.map(d => num(d.OperatingIncome)), backgroundColor: colors.tertiary, yAxisID: 'y' },
+                { type: 'line', label: 'Operating Margin (%)', data: fyData.map(d => num(d.OperatingMargin)), borderColor: colors.warning, backgroundColor: colors.warning, yAxisID: 'y1', tension: 0.3 }
+            ]
+        },
+        options: {
+            ...chartDefaults,
+            scales: {
+                x: { ...chartDefaults.scales.x },
+                y: { ...chartDefaults.scales.y, position: 'left', title: { display: true, text: 'NZ$M', color: '#888' } },
+                y1: { position: 'right', ticks: { color: '#888' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Margin %', color: '#888' } }
+            }
+        }
+    });
+    chartRegistry['opIncomeChart'] = opIncomeChart;
+
+    // Net income reported vs underlying
+    const underlyingByFY = { 'FY2024': 102.7, 'FY2025': 126.0 };
+    const netIncomeChart = new Chart(document.getElementById('netIncomeChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'Net Income (Reported)', data: fyData.map(d => num(d.NetIncome)), backgroundColor: colors.primary },
+                { label: 'Net Income (Underlying)', data: fyLabels.map(l => underlyingByFY[l] !== undefined ? underlyingByFY[l] : null), backgroundColor: colors.warning }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['netIncomeChart'] = netIncomeChart;
+
+    // OCF vs CapEx (CapEx negative, so no log toggle)
+    const ocfCapexChart = new Chart(document.getElementById('ocfCapexChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { label: 'Operating Cash Flow', data: fyData.map(d => num(d.OperatingCashFlow)), backgroundColor: colors.primary },
+                { label: 'CapEx', data: fyData.map(d => num(d.CapEx)), backgroundColor: colors.danger }
+            ]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['ocfCapexChart'] = ocfCapexChart;
+
+    // FCF
+    const fcfChart = new Chart(document.getElementById('fcfChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{ label: 'Free Cash Flow (NZ$M)', data: fyData.map(d => num(d.FreeCashFlow)), backgroundColor: colors.secondary }]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['fcfChart'] = fcfChart;
+
+    // Debt & gearing
+    const debtChart = new Chart(document.getElementById('debtChart'), {
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { type: 'bar', label: 'Total Debt (NZ$M)', data: fyData.map(d => num(d.TotalDebt)), backgroundColor: colors.danger, yAxisID: 'y' },
+                { type: 'line', label: 'Gearing (%)', data: fyData.map(d => {
+                    const nd = num(d.TotalDebt) - num(d.CashAndEquivalents);
+                    const eq = num(d.ShareholdersEquity);
+                    return nd / (nd + eq) * 100;
+                }), borderColor: colors.warning, backgroundColor: colors.warning, yAxisID: 'y1', tension: 0.3 }
+            ]
+        },
+        options: {
+            ...chartDefaults,
+            scales: {
+                x: { ...chartDefaults.scales.x },
+                y: { ...chartDefaults.scales.y, position: 'left', title: { display: true, text: 'NZ$M', color: '#888' } },
+                y1: { position: 'right', ticks: { color: '#888' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Gearing %', color: '#888' } }
+            }
+        }
+    });
+    chartRegistry['debtChart'] = debtChart;
+
+    // Equity & BVPS
+    const equityChart = new Chart(document.getElementById('equityChart'), {
+        data: {
+            labels: fyLabels,
+            datasets: [
+                { type: 'bar', label: "Shareholders' Equity (NZ$M)", data: fyData.map(d => num(d.ShareholdersEquity)), backgroundColor: colors.quaternary, yAxisID: 'y' },
+                { type: 'line', label: 'Book Value / Share ($)', data: fyData.map(d => num(d.ShareholdersEquity) / num(d.SharesOutstanding)), borderColor: colors.primary, backgroundColor: colors.primary, yAxisID: 'y1', tension: 0.3 }
+            ]
+        },
+        options: {
+            ...chartDefaults,
+            scales: {
+                x: { ...chartDefaults.scales.x },
+                y: { ...chartDefaults.scales.y, position: 'left', title: { display: true, text: 'NZ$M', color: '#888' } },
+                y1: { position: 'right', ticks: { color: '#888' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'BVPS ($)', color: '#888' } }
+            }
+        }
+    });
+    chartRegistry['equityChart'] = equityChart;
+
+    // EPS
+    const epsChart = new Chart(document.getElementById('epsChart'), {
+        type: 'line',
+        data: {
+            labels: fyLabels,
+            datasets: [{ label: 'EPS ($)', data: fyData.map(d => num(d.EPS)), borderColor: colors.primary, backgroundColor: 'rgba(0,212,170,0.15)', fill: true, tension: 0.3 }]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['epsChart'] = epsChart;
+
+    // DPS
+    const dpsChart = new Chart(document.getElementById('dpsChart'), {
+        type: 'bar',
+        data: {
+            labels: fyLabels,
+            datasets: [{ label: 'Dividend / Share (cents)', data: fyData.map(d => num(d.DividendPerShare)), backgroundColor: colors.tertiary }]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['dpsChart'] = dpsChart;
+
+    // TEU (annual, port KPI)
+    const teuChart = new Chart(document.getElementById('teuChart'), {
+        type: 'bar',
+        data: {
+            labels: kpiData.annual.years,
+            datasets: [{ label: 'Container Volumes (M TEU)', data: kpiData.annual.teu_m, backgroundColor: colors.primary }]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['teuChart'] = teuChart;
+
+    // Total trade tonnes
+    const tonnesChart = new Chart(document.getElementById('tonnesChart'), {
+        type: 'bar',
+        data: {
+            labels: kpiData.annual.years,
+            datasets: [{ label: 'Total Trade (M tonnes)', data: kpiData.annual.tonnes_m, backgroundColor: colors.secondary }]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['tonnesChart'] = tonnesChart;
+
+    // Crane rate (productivity %, no log toggle)
+    const craneChart = new Chart(document.getElementById('craneChart'), {
+        type: 'line',
+        data: {
+            labels: kpiData.annual.years,
+            datasets: [{ label: 'Net Crane Rate (moves/hr)', data: kpiData.annual.craneRate, borderColor: colors.warning, backgroundColor: 'rgba(253,203,110,0.15)', fill: true, tension: 0.3 }]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['craneChart'] = craneChart;
+
+    // Ship visits
+    const shipChart = new Chart(document.getElementById('shipChart'), {
+        type: 'bar',
+        data: {
+            labels: kpiData.annual.years,
+            datasets: [{ label: 'Ship Visits', data: kpiData.annual.shipVisits, backgroundColor: colors.quaternary }]
+        },
+        options: { ...chartDefaults, scales: freshScales() }
+    });
+    chartRegistry['shipChart'] = shipChart;
+}
+
+// ============================= DCF SECTION =============================
+let currentScenario = 'base';
+
+function fmtIV(v) {
+    const c = (dcfData.inputs && dcfData.inputs.currency === 'NZD') ? '$' : '$';
+    const a = Math.abs(v);
+    const dp = a >= 100 ? 0 : a >= 10 ? 1 : a >= 1 ? 2 : 4;
+    return c + v.toFixed(dp);
+}
+
+function renderHeaderValuation() {
+    const el = document.getElementById('headerValuation');
+    if (!el) return;
+    const pw = dcfData.probability_weighted || {};
+    const wiv = pw.weighted_iv;
+    const price = dcfData.current_price;
+    if (wiv == null || price == null) return;
+
+    const ratio = wiv / price;
+    if (ratio > 20 || ratio < 0.05) return;
+    const up = (wiv - price) / price * 100;
+    const cls = up >= 0 ? 'positive' : 'negative';
+    const sign = up >= 0 ? '+' : '';
+    el.innerHTML =
+        `<div class="hv-item">
+            <span class="hv-label">Prob-Weighted IV</span>
+            <span class="hv-value">${fmtIV(wiv)}</span>
+        </div>
+        <div class="hv-item">
+            <span class="hv-label">Current Price</span>
+            <span class="hv-value">${fmtIV(price)}</span>
+        </div>
+        <div class="hv-item">
+            <span class="hv-label">Upside</span>
+            <span class="hv-value ${cls}">${sign}${up.toFixed(0)}%</span>
+        </div>`;
+    el.style.display = 'flex';
+}
+
+function renderDCFInputs() {
+    const inputs = dcfData.inputs;
+    const currency = '$';
+
+    const formatNum = (n) => {
+        if (Math.abs(n) >= 1000) return currency + (n/1000).toFixed(2) + 'B';
+        return currency + n.toFixed(1) + 'M';
+    };
+
+    document.getElementById('baseFCF').textContent = formatNum(inputs.last_fcf);
+    const sbcEl = document.getElementById('sbcBreakdown');
+    if (sbcEl) {
+        sbcEl.textContent = `${formatNum(inputs.reported_fcf)} reported FCF -> ${formatNum(inputs.last_fcf)} normalized (mid-cycle capex; FY2025 capex was consent-blocked)`;
+    }
+
+    const shares = inputs.shares_outstanding;
+    document.getElementById('sharesOut').textContent = shares.toFixed(1) + 'M';
+
+    const dilEl = document.getElementById('dilutionNote');
+    if (dilEl) {
+        dilEl.textContent = 'Flat for a decade - no buyback programme, no dilution';
+    }
+
+    const netDebt = inputs.net_debt;
+    const netDebtEl = document.getElementById('netDebt');
+    netDebtEl.textContent = formatNum(netDebt);
+
+    renderFCFProjections();
+}
+
+function renderFCFProjections() {
+    const scenario = dcfData.projections[currentScenario] || dcfData.projections.base;
+    const currency = '$';
+
+    const formatFCF = (n) => {
+        if (Math.abs(n) >= 1000) return currency + (n/1000).toFixed(2) + 'B';
+        return currency + n.toFixed(0) + 'M';
+    };
+
+    // Show base FCF plus first 5 projected years (of the 10-year model)
+    const baseFCF = dcfData.inputs.last_fcf;
+    const years = scenario.years.slice(0, 5);
+    const fcfVals = scenario.fcf.slice(0, 5);
+
+    let html = `
+        <div class="fcf-projection-item header">Base</div>
+        ${years.map(y => `<div class="fcf-projection-item header">${y}</div>`).join('')}
+    `;
+
+    html += `<div class="fcf-projection-item">
+        <div class="fcf-value">${formatFCF(baseFCF)}</div>
+        <div class="growth-rate">-</div>
+    </div>`;
+
+    let prev = baseFCF;
+    fcfVals.forEach(v => {
+        const growth = prev !== 0 ? ((v - prev) / Math.abs(prev) * 100) : 0;
+        html += `<div class="fcf-projection-item">
+            <div class="fcf-value">${formatFCF(v)}</div>
+            <div class="growth-rate">${growth >= 0 ? '+' : ''}${growth.toFixed(0)}%</div>
+        </div>`;
+        prev = v;
+    });
+
+    document.getElementById('fcfProjectionTable').innerHTML = html;
+}
+
+// Reproduce the house 10-year component-built DCF as closely as possible using
+// the scenario's own explicit revenue/EBITDA/capex/D&A/tax paths (NOT a generic
+// 5-year Gordon toy model) so that calculateDCF(defaults) matches valuation.base.
+function calculateDCF(growth, wacc, terminal, scenarioKey) {
+    scenarioKey = scenarioKey || currentScenario;
+    const a = dcfData.assumptions[scenarioKey] || dcfData.assumptions.base;
+    const proj = dcfData.projections[scenarioKey] || dcfData.projections.base;
+    const years = 10;
+
+    // Base year revenue implied by the FIRST projected year and its stated growth rate.
+    const y1Growth = a.growth_rates[0];
+    const baseRevenue = proj.revenue[0] / (1 + y1Growth / 100);
+
+    // Rebuild revenue path using the (possibly slider-adjusted) growth rate for year 1,
+    // then the scenario's own subsequent growth rates scaled by the same delta.
+    const growthDelta = growth - y1Growth;
+    const revenue = [];
+    let rev = baseRevenue;
+    for (let i = 0; i < years; i++) {
+        const g = a.growth_rates[i] + growthDelta;
+        rev = rev * (1 + g / 100);
+        revenue.push(rev);
+    }
+
+    let pvFCF = 0;
+    let pvFCFHurdle = 0;
+    const hurdle = 0.15;
+    let lastFCF = 0;
+
+    for (let i = 0; i < years; i++) {
+        const ebitdaMargin = a.ebitda_margin_path[i] / 100;
+        const ebitda = revenue[i] * ebitdaMargin;
+        const da = revenue[i] * (a.da_pct / 100);
+        const ebit = ebitda - da;
+        const tax = ebit * (a.cash_tax_rate_path[i] / 100);
+        const nopat = ebit - tax;
+        const capex = revenue[i] * (a.capex_pct_path[i] / 100);
+        const fcf = nopat + da - capex + (proj.working_capital[i] || 0);
+        lastFCF = fcf;
+        const df = 1 / Math.pow(1 + wacc / 100, i + 1);
+        pvFCF += fcf * df;
+        pvFCFHurdle += fcf / Math.pow(1 + hurdle, i + 1);
+    }
+
+    // Terminal value (Gordon growth on final year FCF), capped by the 20x multiple rule
+    const terminalFCF = lastFCF * (1 + terminal / 100);
+    let terminalValue = terminalFCF / (wacc / 100 - terminal / 100);
+    const ebitdaFinal = revenue[years - 1] * (a.ebitda_margin_path[years - 1] / 100);
+    const capMultiple = a.terminal_cap_multiple || 20;
+    const cappedTV = ebitdaFinal * capMultiple;
+    if (terminalValue > cappedTV) terminalValue = cappedTV;
+
+    const pvTerminal = terminalValue / Math.pow(1 + wacc / 100, years);
+    const enterpriseValueCore = pvFCF + pvTerminal;
+    const equityAccountedInvestments = dcfData.inputs.net_debt_components.less_equity_accounted_investments_and_advances;
+    const netDebtInclLeases = dcfData.inputs.net_debt_components.net_debt_gross_incl_leases;
+    const equityValue = enterpriseValueCore + equityAccountedInvestments - netDebtInclLeases;
+    const shares = dcfData.inputs.shares_outstanding;
+    const iv = equityValue / shares;
+
+    const pvTerminalHurdle = terminalValue / Math.pow(1 + hurdle, years);
+    const entryPrice = (pvFCFHurdle + pvTerminalHurdle + equityAccountedInvestments - netDebtInclLeases) / shares;
+
+    return { iv: iv, entryPrice: entryPrice, pvFCF: pvFCF, pvTerminal: pvTerminal, enterpriseValue: enterpriseValueCore };
+}
+
+function weightedIV(growth, wacc, terminal) {
+    const pw = dcfData.probability_weighted || {};
+    const stored = pw.weighted_iv;
+    if (stored == null) return stored;
+
+    const a = dcfData.assumptions;
+    const cur = a[currentScenario] || a.base;
+    const bg = cur.growth_rates[0];
+    const bw = cur.wacc;
+    const bt = cur.terminal_growth;
+    if (growth === bg && wacc === bw && terminal === bt) return stored;
+
+    const w = pw.weights;
+    let sum = 0;
+    for (const sc of ['bull', 'base', 'bear']) {
+        const scDefaults = a[sc];
+        const sg = scDefaults.growth_rates[0] + (growth - bg);
+        const sk = scDefaults.wacc + (wacc - bw);
+        const st = scDefaults.terminal_growth + (terminal - bt);
+        const safeWacc = Math.max(sk, st + 0.5);
+        sum += w[sc] * calculateDCF(sg, safeWacc, st, sc).iv;
+    }
+    return sum;
+}
+
+window.updateDCFDisplay = function() {
+    const growth = parseFloat(document.getElementById('growthSlider').value);
+    const wacc = parseFloat(document.getElementById('waccSlider').value);
+    const terminal = parseFloat(document.getElementById('terminalSlider').value);
+
+    document.getElementById('growthValue').textContent = growth + '%';
+    document.getElementById('waccValue').textContent = wacc + '%';
+    document.getElementById('terminalValue').textContent = terminal + '%';
+
+    renderFCFProjections();
+
+    const result = calculateDCF(growth, wacc, terminal, currentScenario);
+
+    document.getElementById('dcfIV').textContent = '$' + result.iv.toFixed(2);
+    document.getElementById('dcfEntry').textContent = '$' + result.entryPrice.toFixed(2);
+
+    const upside = ((result.iv - dcfData.current_price) / dcfData.current_price * 100);
+    const upsideEl = document.getElementById('dcfUpside');
+    upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(0) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+    upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+    const wiv = weightedIV(growth, wacc, terminal);
+    document.getElementById('dcfWeighted').textContent = fmtIV(wiv);
+    const wUpEl = document.getElementById('dcfWeightedUpside');
+    if (wUpEl) {
+        const wUp = (wiv - dcfData.current_price) / dcfData.current_price * 100;
+        wUpEl.textContent = (wUp >= 0 ? '+' : '') + wUp.toFixed(0) + '% ' + (wUp >= 0 ? 'upside' : 'downside');
+        wUpEl.className = 'dcf-change ' + (wUp >= 0 ? 'positive' : 'negative');
+    }
+
+    const grid = document.getElementById('assumptionGrid');
+    if (grid) {
+        grid.innerHTML = `
+            <div class="assumption-item"><div class="label">Growth Rate (Yr1)</div><div class="value">${growth}%</div></div>
+            <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc}%</div></div>
+            <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${terminal}%</div></div>
+            <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa;">$${result.iv.toFixed(2)}</div></div>
+            <div class="assumption-item"><div class="label">Entry Price</div><div class="value" style="color:#00d4aa;">$${result.entryPrice.toFixed(2)}</div></div>
+        `;
+    }
+};
+
+window.switchScenario = function(scenario) {
+    currentScenario = scenario;
+
+    document.querySelectorAll('.scenario-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.scenario === scenario);
+    });
+
+    const assumptions = dcfData.assumptions[scenario];
+    const valuation = dcfData.valuation[scenario];
+
+    renderFCFProjections();
+
+    document.getElementById('growthSlider').value = assumptions.growth_rates[0];
+    document.getElementById('waccSlider').value = assumptions.wacc;
+    document.getElementById('terminalSlider').value = assumptions.terminal_growth;
+
+    const grid = document.getElementById('assumptionGrid');
+    grid.innerHTML = `
+        <div class="assumption-item"><div class="label">Year 1 Growth</div><div class="value">${assumptions.growth_rates[0]}%</div></div>
+        <div class="assumption-item"><div class="label">Year 10 Growth</div><div class="value">${assumptions.growth_rates[9]}%</div></div>
+        <div class="assumption-item"><div class="label">Peak EBITDA Margin</div><div class="value">${Math.max(...assumptions.ebitda_margin_path)}%</div></div>
+        <div class="assumption-item"><div class="label">WACC</div><div class="value">${assumptions.wacc}%</div></div>
+        <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${assumptions.terminal_growth}%</div></div>
+        <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa;">$${valuation.intrinsic_value.toFixed(2)}</div></div>
+    `;
+
+    updateDCFDisplay();
+};
+
+function renderHistoricalGrowth() {
+    const growth = dcfData.historical_growth;
+    const grid = document.getElementById('growthGrid');
+
+    const metrics = [
+        { key: 'revenue_3yr_cagr', label: 'Revenue 3Y' },
+        { key: 'revenue_5yr_cagr', label: 'Revenue 5Y' },
+        { key: 'eps_3yr_cagr', label: 'Underlying EPS 3Y' },
+        { key: 'eps_5yr_cagr', label: 'Underlying EPS 5Y' },
+        { key: 'equity_3yr_cagr', label: 'Equity 3Y' },
+        { key: 'equity_5yr_cagr', label: 'Equity 5Y*' },
+        { key: 'fcf_3yr_cagr', label: 'FCF 3Y*' },
+        { key: 'fcf_5yr_cagr', label: 'FCF 5Y*' }
+    ];
+
+    grid.innerHTML = metrics.map(m => {
+        const rate = growth[m.key];
+        const colorClass = rate >= 0 ? 'positive' : 'negative';
+        return `
+            <div class="growth-item">
+                <div class="metric">${m.label}</div>
+                <div class="rate ${colorClass}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div>
+            </div>
+        `;
+    }).join('') + `<div class="growth-item selected"><div class="metric">Selected Growth Anchor</div><div class="rate positive">${growth.selected_growth_rate.toFixed(1)}%</div></div>`;
+
+    document.getElementById('growthWarning').style.display = 'flex';
+    document.getElementById('warningText').textContent = growth.growth_divergence_warning;
+}
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const table = document.getElementById('sensitivityMatrix');
+    const currentPrice = dcfData.current_price;
+
+    let html = '<tr><th>WACC \\ Term G</th>';
+    sens.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+    html += '</tr>';
+
+    sens.wacc_range.forEach((wacc, i) => {
+        html += `<tr><th>${wacc}%</th>`;
+        sens.matrix[i].forEach((val, j) => {
+            const isHighlight = wacc === dcfData.assumptions.base.wacc &&
+                               sens.terminal_growth_range[j] === dcfData.assumptions.base.terminal_growth;
+            const colorClass = val >= currentPrice ? 'above-current' : 'below-current';
+            html += `<td class="${isHighlight ? 'highlight' : colorClass}">$${val.toFixed(2)}</td>`;
+        });
+        html += '</tr>';
+    });
+
+    table.innerHTML = html;
+}
+
+function initDCF() {
+    document.getElementById('dcfCurrent').textContent = '$' + dcfData.current_price.toFixed(2);
+
+    const base = dcfData.assumptions.base;
+    document.getElementById('growthSlider').value = base.growth_rates[0];
+    document.getElementById('waccSlider').value = base.wacc;
+    document.getElementById('terminalSlider').value = base.terminal_growth;
+
+    document.getElementById('growthValue').textContent = base.growth_rates[0] + '%';
+    document.getElementById('waccValue').textContent = base.wacc + '%';
+    document.getElementById('terminalValue').textContent = base.terminal_growth + '%';
+
+    document.getElementById('growthHint').textContent = 'Year-1 growth: ' + dcfData.historical_growth.growth_rate_source;
+
+    const wsub = document.getElementById('dcfWeightedSublabel');
+    const wts = (dcfData.probability_weighted || {}).weights;
+    if (wsub && wts) {
+        const pct = (x) => Math.round(x * 100);
+        wsub.textContent = `${pct(wts.bull)}% Bull / ${pct(wts.base)}% Base / ${pct(wts.bear)}% Bear`;
+    }
+
+    renderHeaderValuation();
+    renderDCFInputs();
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    updateDCFDisplay();
+    switchScenario('base');
+}
+
+// ============================= INIT =============================
+renderKPICards();
+renderGuidance();
+renderOverview();
+buildCharts();
+initDCF();
+
+(function() {
+    var growthSlider = document.getElementById('growthSlider');
+    var waccSlider = document.getElementById('waccSlider');
+    var terminalSlider = document.getElementById('terminalSlider');
+
+    if (growthSlider) { growthSlider.oninput = window.updateDCFDisplay; growthSlider.onchange = window.updateDCFDisplay; }
+    if (waccSlider) { waccSlider.oninput = window.updateDCFDisplay; waccSlider.onchange = window.updateDCFDisplay; }
+    if (terminalSlider) { terminalSlider.oninput = window.updateDCFDisplay; terminalSlider.onchange = window.updateDCFDisplay; }
+})();
+</script>
+</body>
+</html>
