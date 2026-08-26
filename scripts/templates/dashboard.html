@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@@COMPANY@@ (@@TICKER@@) Financial Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 20px;
+}
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+}
+.header h1 {
+    font-size: 2.5rem;
+    background: linear-gradient(90deg, #00d4aa, #00b894);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+}
+.header p {
+    color: #888;
+    font-size: 1.1rem;
+}
+/* Headline valuation chip — fills the wide, otherwise-empty header strip so the
+   number the reader should act on is visible without scrolling to the DCF. */
+.header-valuation {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 14px 32px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.hv-item {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+.hv-label {
+    font-size: 0.75rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.hv-value {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #e0e0e0;
+}
+.hv-value.positive { color: #00d4aa; }
+.hv-value.negative { color: #ff6b6b; }
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.kpi-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.kpi-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 212, 170, 0.2);
+}
+.kpi-value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #00d4aa;
+    margin-bottom: 5px;
+}
+.kpi-label {
+    font-size: 0.85rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.kpi-change {
+    font-size: 0.9rem;
+    margin-top: 5px;
+}
+.kpi-change.positive { color: #00d4aa; }
+.kpi-change.negative { color: #ff6b6b; }
+/* Guidance Section */
+.guidance-section {
+    max-width: 1400px;
+    margin: 0 auto 30px;
+}
+.guidance-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+.guidance-header h3 {
+    color: #fff;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.guidance-header h3::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894);
+    border-radius: 2px;
+}
+.guidance-meta {
+    font-size: 0.85rem;
+    color: #888;
+}
+.guidance-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+.guidance-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.2s ease;
+}
+.guidance-card:hover {
+    transform: translateY(-2px);
+}
+.guidance-metric {
+    font-size: 0.8rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+.guidance-target {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: #00d4aa;
+    margin-bottom: 6px;
+}
+.guidance-period {
+    font-size: 0.85rem;
+    color: #e0e0e0;
+    margin-bottom: 8px;
+}
+.guidance-vs-prior {
+    display: inline-block;
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+.guidance-vs-prior.raised {
+    background: rgba(0, 212, 170, 0.15);
+    color: #00d4aa;
+}
+.guidance-vs-prior.lowered {
+    background: rgba(255, 107, 107, 0.15);
+    color: #ff6b6b;
+}
+.guidance-vs-prior.maintained {
+    background: rgba(255, 255, 255, 0.1);
+    color: #888;
+}
+.guidance-vs-prior.new {
+    background: rgba(99, 102, 241, 0.15);
+    color: #818cf8;
+}
+.guidance-notes {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 8px;
+    line-height: 1.4;
+}
+.guidance-commentary {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    padding: 16px 20px;
+    border-left: 3px solid #00d4aa;
+    font-style: italic;
+    color: #b0b0b0;
+    line-height: 1.6;
+}
+.guidance-commentary::before {
+    content: '"';
+    font-size: 1.5rem;
+    color: #00d4aa;
+    margin-right: 4px;
+}
+.section-title {
+    font-size: 1.5rem;
+    color: #fff;
+    margin: 40px auto 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid rgba(0, 212, 170, 0.3);
+    max-width: 1400px;
+}
+.charts-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 25px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+.chart-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    padding: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+.chart-header h3 {
+    color: #fff;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.chart-header h3::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894);
+    border-radius: 2px;
+}
+.help-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(0, 212, 170, 0.2);
+    border: 1px solid #00d4aa;
+    color: #00d4aa;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+.help-btn:hover {
+    background: #00d4aa;
+    color: #1a1a2e;
+}
+.chart-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.view-toggle {
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #888;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.view-toggle:hover {
+    border-color: #0984e3;
+    color: #0984e3;
+}
+.view-toggle.active {
+    background: rgba(9, 132, 227, 0.2);
+    border-color: #0984e3;
+    color: #0984e3;
+}
+.log-toggle {
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #888;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.log-toggle:hover {
+    border-color: #00d4aa;
+    color: #00d4aa;
+}
+.log-toggle.active {
+    background: rgba(0, 212, 170, 0.2);
+    border-color: #00d4aa;
+    color: #00d4aa;
+}
+.chart-wrapper {
+    position: relative;
+    height: 300px;
+}
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+    background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%);
+    border-radius: 16px;
+    max-width: 600px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    border: 1px solid rgba(0, 212, 170, 0.3);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.modal-header {
+    padding: 20px 25px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.modal-header h3 {
+    color: #00d4aa;
+    font-size: 1.4rem;
+    margin: 0;
+}
+.modal-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 107, 107, 0.2);
+    border: 1px solid #ff6b6b;
+    color: #ff6b6b;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.modal-close:hover {
+    background: #ff6b6b;
+    color: #fff;
+}
+.modal-body {
+    padding: 25px;
+    line-height: 1.7;
+}
+.modal-body p { margin-bottom: 15px; }
+.modal-body strong { color: #00d4aa; }
+.modal-body ul { margin: 15px 0; padding-left: 20px; }
+.modal-body li { margin-bottom: 8px; }
+.metric-highlight {
+    background: rgba(0, 212, 170, 0.1);
+    border-left: 3px solid #00d4aa;
+    padding: 12px 15px;
+    margin: 15px 0;
+    border-radius: 0 8px 8px 0;
+}
+/* Investment Overview Section */
+.overview-section {
+    max-width: 1400px;
+    margin: 0 auto 30px;
+}
+.overview-toggle {
+    width: 100%;
+    background: rgba(0, 212, 170, 0.1);
+    border: 1px solid rgba(0, 212, 170, 0.3);
+    border-radius: 12px;
+    padding: 16px 24px;
+    color: #00d4aa;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s ease;
+}
+.overview-toggle:hover {
+    background: rgba(0, 212, 170, 0.2);
+}
+.overview-toggle .arrow {
+    transition: transform 0.3s ease;
+}
+.overview-toggle.active .arrow {
+    transform: rotate(180deg);
+}
+.overview-content {
+    display: none;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    padding: 30px;
+    margin-top: -12px;
+}
+.overview-content.active {
+    display: block;
+}
+.overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 25px;
+}
+.overview-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.overview-card h3 {
+    color: #00d4aa;
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.overview-card p {
+    margin-bottom: 12px;
+    line-height: 1.6;
+}
+.overview-card ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.overview-card li {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    line-height: 1.5;
+}
+.overview-card li:last-child {
+    border-bottom: none;
+}
+.overview-card.bull h3 { color: #00d4aa; }
+.overview-card.bear h3 { color: #ff6b6b; }
+.overview-card.risks h3 { color: #fdcb6e; }
+.risk-high { color: #ff6b6b; }
+.risk-moderate { color: #fdcb6e; }
+.risk-low { color: #00d4aa; }
+.revenue-stream {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.revenue-stream .percent {
+    color: #00d4aa;
+    font-weight: 600;
+}
+.trend-growing { color: #00d4aa; }
+.trend-stable { color: #888; }
+.trend-declining { color: #ff6b6b; }
+
+@media (max-width: 768px) {
+    .charts-container { grid-template-columns: 1fr; }
+    .overview-grid { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.8rem; }
+}
+/* DCF Valuation Section */
+.dcf-section {
+    max-width: 1400px;
+    margin: 0 auto 40px;
+}
+.dcf-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+.dcf-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease;
+}
+.dcf-card:hover {
+    transform: translateY(-3px);
+}
+.dcf-card.highlight {
+    background: rgba(0, 212, 170, 0.1);
+    border-color: rgba(0, 212, 170, 0.3);
+}
+.dcf-label {
+    font-size: 0.85rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+}
+.dcf-value {
+    font-size: 2.2rem;
+    font-weight: bold;
+    color: #00d4aa;
+}
+.dcf-card:not(.highlight) .dcf-value {
+    color: #fff;
+}
+.dcf-change {
+    font-size: 1rem;
+    margin-top: 8px;
+    font-weight: 600;
+}
+.dcf-change.positive { color: #00d4aa; }
+.dcf-change.negative { color: #ff6b6b; }
+.dcf-sublabel {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 8px;
+}
+.dcf-warning {
+    background: rgba(253, 203, 110, 0.15);
+    border: 1px solid rgba(253, 203, 110, 0.4);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 25px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #fdcb6e;
+}
+.warning-icon {
+    font-size: 1.2rem;
+}
+/* DCF Inputs Display */
+.dcf-inputs {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.dcf-inputs h4 {
+    color: #e0e0e0;
+    margin-bottom: 15px;
+    font-size: 1rem;
+}
+.dcf-inputs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+.dcf-input-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.dcf-input-label {
+    font-size: 0.75rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+.dcf-input-value {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #00d4aa;
+}
+.dcf-input-note {
+    font-size: 0.7rem;
+    color: #666;
+    margin-top: 4px;
+}
+.fcf-projections h5 {
+    color: #b0b0b0;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+}
+.fcf-projection-table {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 12px;
+}
+.fcf-projection-item {
+    text-align: center;
+}
+.fcf-projection-item.header {
+    font-size: 0.75rem;
+    color: #888;
+    font-weight: 600;
+}
+.fcf-projection-item .year {
+    font-size: 0.75rem;
+    color: #888;
+    margin-bottom: 2px;
+}
+.fcf-projection-item .fcf-value {
+    font-size: 1rem;
+    color: #e0e0e0;
+    font-weight: 500;
+}
+.fcf-projection-item .growth-rate {
+    font-size: 0.75rem;
+    color: #00d4aa;
+    margin-top: 2px;
+}
+.dcf-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 25px;
+    margin-bottom: 30px;
+    padding: 25px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.slider-group label {
+    font-size: 0.95rem;
+    color: #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+}
+.slider-group label span {
+    color: #00d4aa;
+    font-weight: 600;
+}
+.slider-group input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #00d4aa;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+.slider-hint {
+    font-size: 0.8rem;
+    color: #666;
+}
+.scenario-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+.scenario-tab {
+    padding: 10px 24px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: transparent;
+    color: #888;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+}
+.scenario-tab:hover {
+    border-color: rgba(0, 212, 170, 0.5);
+    color: #e0e0e0;
+}
+.scenario-tab.active {
+    background: rgba(0, 212, 170, 0.15);
+    border-color: #00d4aa;
+    color: #00d4aa;
+}
+.scenario-details {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.scenario-details h4 {
+    color: #00d4aa;
+    margin-bottom: 15px;
+}
+.assumption-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+}
+.assumption-item {
+    text-align: center;
+}
+.assumption-item .label {
+    font-size: 0.8rem;
+    color: #888;
+    margin-bottom: 4px;
+}
+.assumption-item .value {
+    font-size: 1.1rem;
+    color: #e0e0e0;
+    font-weight: 500;
+}
+.sensitivity-section {
+    margin-bottom: 30px;
+}
+.sensitivity-section h4 {
+    color: #e0e0e0;
+    margin-bottom: 15px;
+}
+.sensitivity-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.sensitivity-table th,
+.sensitivity-table td {
+    padding: 12px 16px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.sensitivity-table th {
+    background: rgba(0, 212, 170, 0.1);
+    color: #00d4aa;
+    font-weight: 600;
+}
+.sensitivity-table td {
+    color: #e0e0e0;
+}
+.sensitivity-table td.highlight {
+    background: rgba(0, 212, 170, 0.15);
+    color: #00d4aa;
+    font-weight: 600;
+}
+.sensitivity-table td.below-current {
+    color: #ff6b6b;
+}
+.sensitivity-table td.above-current {
+    color: #00d4aa;
+}
+.historical-growth {
+    margin-bottom: 30px;
+}
+.historical-growth h4 {
+    color: #e0e0e0;
+    margin-bottom: 15px;
+}
+.growth-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 15px;
+}
+.growth-item {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.growth-item .metric {
+    font-size: 0.8rem;
+    color: #888;
+    margin-bottom: 6px;
+}
+.growth-item .rate {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+.growth-item .rate.positive { color: #00d4aa; }
+.growth-item .rate.negative { color: #ff6b6b; }
+.growth-item.selected {
+    border-color: #00d4aa;
+    background: rgba(0, 212, 170, 0.1);
+}
+.dcf-download {
+    text-align: center;
+    margin-top: 30px;
+}
+.download-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 28px;
+    background: rgba(0, 212, 170, 0.15);
+    border: 1px solid #00d4aa;
+    border-radius: 8px;
+    color: #00d4aa;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+.download-btn:hover {
+    background: #00d4aa;
+    color: #1a1a2e;
+}
+.download-icon {
+    font-size: 1.2rem;
+}
+/* Additions beyond the original agent template */
+.section-subtitle { font-size: 0.9rem; color: #888; max-width: 1400px; margin: -12px auto 20px; }
+.kpi-note { font-size: 0.75rem; color: #666; margin-top: 6px; line-height: 1.3; }
+.chart-annotation {
+    font-size: 0.75rem; color: #fdcb6e; background: rgba(253, 203, 110, 0.08);
+    border-left: 2px solid #fdcb6e; padding: 6px 10px; margin-top: 10px; border-radius: 0 6px 6px 0;
+}
+.dcf-philosophy {
+    background: rgba(255, 255, 255, 0.03); border-left: 3px solid #00d4aa; border-radius: 0 10px 10px 0;
+    padding: 16px 20px; margin-bottom: 25px; font-size: 0.92rem; line-height: 1.7; color: #b0b0b0;
+}
+.dcf-philosophy strong { color: #00d4aa; }
+.scenario-narrative { font-size: 0.9rem; color: #b0b0b0; line-height: 1.6; margin-bottom: 18px; }
+.dcf-banner {
+    max-width: 1400px; margin: 0 auto 25px; background: rgba(255, 107, 107, 0.12);
+    border: 1px solid rgba(255, 107, 107, 0.4); border-radius: 8px; padding: 12px 16px; color: #ff6b6b;
+}
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>@@COMPANY_HTML@@ (@@TICKER@@)</h1>
+    <p>@@DESCRIPTOR@@</p>
+    <div class="header-valuation" id="headerValuation" style="display:none"></div>
+</div>
+
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid" id="overviewGrid"></div>
+    </div>
+</div>
+
+<div class="kpi-grid" id="kpiGrid">
+@@KPI_CARDS@@
+</div>
+
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf">-</span> | <span id="guidanceFY">-</span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+@@SECTIONS@@
+
+@@DCF_SECTION@@
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// EMBEDDED DATA (generated by scripts/build_dashboard.py -- do not hand-edit;
+// edit the Spec JSON / CSV / Analysis / DCF and rebuild)
+// ============================================================
+const csvData = `@@CSV@@`;
+
+const analysis = @@ANALYSIS_JSON@@;
+
+const dcfData = @@DCF_JSON@@;
+
+// Numbers the DCF cards must show at each scenario's own defaults. The
+// interactive model below is a generic 5-year Gordon toy; it scales these
+// anchors by the ratio it implies, it never replaces them.
+const dcfAnchors = @@DCF_ANCHORS@@;
+
+// Chart configuration from the Spec, and the series pre-computed from the CSV.
+const chartSpecs = @@CHART_SPECS@@;
+const chartData = @@CHART_DATA@@;
+
+const metricDescriptions = @@METRIC_DESCRIPTIONS@@;
+
+// ============================================================
+// OVERVIEW & GUIDANCE
+// ============================================================
+function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function renderGuidance() {
+    const g = analysis.guidance;
+    const section = document.getElementById('guidanceSection');
+    if (!g || !g.items || g.items.length === 0) { section.style.display = 'none'; return; }
+    document.getElementById('guidanceAsOf').textContent = g.as_of || '';
+    document.getElementById('guidanceFY').textContent = g.fiscal_year || '';
+    document.getElementById('guidanceGrid').innerHTML = g.items.map(item => {
+        const vp = item.vs_prior ? String(item.vs_prior) : '';
+        const vsClass = vp ? (vp.toLowerCase().replace(/[^a-z]/g, '') || 'na') : 'new';
+        const vsLabel = vp ? (vp === 'n/a' ? 'N/A' : vp.charAt(0).toUpperCase() + vp.slice(1)) : 'New';
+        return `<div class="guidance-card">
+            <div class="guidance-metric">${esc(item.metric)}</div>
+            <div class="guidance-target">${esc(item.target)}</div>
+            <div class="guidance-period">${esc(item.period)}</div>
+            <span class="guidance-vs-prior ${vsClass}">${esc(vsLabel)}</span>
+            ${item.notes ? `<div class="guidance-notes">${esc(item.notes)}</div>` : ''}
+        </div>`;
+    }).join('');
+    const c = document.getElementById('guidanceCommentary');
+    if (g.management_commentary) { c.textContent = g.management_commentary; c.style.display = 'block'; }
+    else { c.style.display = 'none'; }
+}
+
+function renderOverview() {
+    const bm = analysis.business_model || {};
+    const cp = analysis.competitive_position || {};
+    const risks = analysis.risks || {};
+    const cats = { business: 'Business', financial: 'Financial', regulatory: 'Regulatory', macro: 'Macro', execution: 'Execution' };
+    const allRisks = [];
+    for (const k of Object.keys(risks)) {
+        (risks[k] || []).forEach(r => allRisks.push({ ...r, cat: cats[k] || k }));
+    }
+    const sevClass = s => s === 'high' ? 'risk-high' : s === 'moderate' || s === 'medium' ? 'risk-moderate' : 'risk-low';
+    const trendClass = t => /grow/i.test(t || '') ? 'trend-growing' : /declin/i.test(t || '') ? 'trend-declining' : 'trend-stable';
+    const list = xs => (xs || []).map(x => `<li>${esc(x)}</li>`).join('');
+    document.getElementById('overviewGrid').innerHTML = `
+        <div class="overview-card"><h3>Company Overview</h3><p>${esc(analysis.overview)}</p></div>
+        <div class="overview-card"><h3>Business Model</h3><p>${esc(bm.summary)}</p>
+            <ul>${(bm.revenue_streams || []).map(r => `<li class="revenue-stream"><span>${esc(r.name)} <span class="${trendClass(r.trend)}">(${esc(r.trend)})</span></span><span class="percent">${r.percent != null ? esc(r.percent) + '%' : ''}</span></li>`).join('')}</ul></div>
+        <div class="overview-card"><h3>Competitive Position</h3>
+            <p><strong>Competitors:</strong> ${esc((cp.main_competitors || []).join(', '))}</p>
+            ${cp.market_position ? `<p>${esc(cp.market_position)}</p>` : ''}
+            <p><strong>Moat factors:</strong></p>
+            <ul>${(cp.moat_factors || []).map(m => `<li><strong>${esc(m.factor)}</strong> (${esc(m.strength)}) &mdash; ${esc(m.description)}</li>`).join('')}</ul></div>
+        <div class="overview-card"><h3>Growth Drivers</h3><ul>${list(analysis.growth_drivers)}</ul></div>
+        <div class="overview-card risks"><h3>Key Risks</h3>
+            <ul>${allRisks.map(r => `<li><span class="${sevClass(r.severity)}">&#9679; ${esc(String(r.severity || '').toUpperCase())}</span> [${esc(r.cat)}] <strong>${esc(r.risk)}</strong> &mdash; ${esc(r.description)}</li>`).join('')}</ul></div>
+        <div class="overview-card bull"><h3>Bull Case</h3><ul>${list(analysis.bull_case)}</ul></div>
+        <div class="overview-card bear"><h3>Bear Case</h3><ul>${list(analysis.bear_case)}</ul></div>
+        <div class="overview-card"><h3>Recent Developments</h3>
+            <ul>${(analysis.recent_developments || []).map(d => `<li><strong>${esc(d.date)}:</strong> ${esc(d.event)}</li>`).join('')}</ul></div>`;
+}
+
+function toggleOverview() {
+    document.querySelector('.overview-toggle').classList.toggle('active');
+    document.getElementById('overviewContent').classList.toggle('active');
+}
+
+// ============================================================
+// CHARTS
+// ============================================================
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } } },
+    scales: {
+        x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+// Every chart gets its OWN scales object so a log toggle changes only that chart.
+function freshScales() {
+    return { x: { ...chartDefaults.scales.x }, y: { ...chartDefaults.scales.y } };
+}
+const colors = {
+    primary: '#00d4aa', secondary: '#00b894', tertiary: '#0984e3',
+    quaternary: '#6c5ce7', warning: '#fdcb6e', danger: '#ff6b6b'
+};
+const palette = [colors.primary, colors.warning, colors.tertiary, colors.quaternary, colors.danger, colors.secondary];
+
+const chartRegistry = {};
+const chartSeries = {};
+
+// A brighter 2px grid line before each Q1 so a fiscal year reads as one group.
+function scaleXFor(labels, kind) {
+    const x = { ...chartDefaults.scales.x };
+    if (kind === 'quarterly') {
+        x.grid = {
+            color: ctx => (labels[ctx.index] || '').startsWith('Q1') ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.05)',
+            lineWidth: ctx => (labels[ctx.index] || '').startsWith('Q1') ? 2 : 1
+        };
+    }
+    return x;
+}
+
+function toggleLogScale(canvasId, btn) {
+    const chart = chartRegistry[canvasId];
+    if (!chart) return;
+    const toLog = chart.options.scales.y.type !== 'logarithmic';
+    chart.options.scales.y.type = toLog ? 'logarithmic' : 'linear';
+    btn.classList.toggle('active', toLog);
+    chart.update();
+}
+
+function setPeriodView(canvasId, view, btn) {
+    const chart = chartRegistry[canvasId], s = chartSeries[canvasId];
+    if (!chart || !s || !s[view]) return;
+    chart.data.labels = s[view].labels;
+    s[view].data.forEach((d, i) => { if (chart.data.datasets[i]) chart.data.datasets[i].data = d; });
+    if (chart.options.scales.x) chart.options.scales.x = s[view].scaleX;
+    btn.parentNode.querySelectorAll('.view-toggle').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    chart.update();
+}
+
+function buildChart(spec) {
+    const cd = chartData[spec.id];
+    const el = document.getElementById(spec.id);
+    if (!cd || !el) return;
+    const annual = cd.annual;
+    const hasY1 = spec.series.some(s => s.axis === 'y1');
+    const datasets = spec.series.map((s, i) => {
+        const color = colors[s.color] || palette[i % palette.length];
+        const kind = s.kind || spec.type || 'bar';
+        const ds = { type: kind, label: s.label, data: annual.data[i], yAxisID: s.axis || 'y', spanGaps: true };
+        if (kind === 'bar') { ds.backgroundColor = color; ds.borderRadius = 4; }
+        else {
+            ds.borderColor = color; ds.backgroundColor = spec.fill ? color.replace(')', ',0.15)').replace('rgb', 'rgba') : color;
+            ds.tension = 0.3; ds.fill = !!spec.fill;
+        }
+        return ds;
+    });
+    const scales = freshScales();
+    scales.x = scaleXFor(annual.labels, 'annual');
+    if (spec.y_title) scales.y.title = { display: true, text: spec.y_title, color: '#888' };
+    if (hasY1) {
+        scales.y.position = 'left';
+        scales.y1 = { position: 'right', ticks: { color: '#888' }, grid: { display: false } };
+        if (spec.y1_title) scales.y1.title = { display: true, text: spec.y1_title, color: '#888' };
+    }
+    const chart = new Chart(el.getContext('2d'), {
+        data: { labels: annual.labels, datasets: datasets },
+        options: { ...chartDefaults, scales: scales }
+    });
+    chartRegistry[spec.id] = chart;
+    chartSeries[spec.id] = { annual: { labels: annual.labels, data: annual.data, scaleX: scales.x } };
+    if (cd.interim) {
+        chartSeries[spec.id].interim = {
+            labels: cd.interim.labels, data: cd.interim.data, scaleX: scaleXFor(cd.interim.labels, cd.interim.kind)
+        };
+    }
+}
+
+function initCharts() { chartSpecs.forEach(buildChart); }
+
+// ============================================================
+// MODALS
+// ============================================================
+function openModal(key) {
+    const m = metricDescriptions[key];
+    if (!m) return;
+    document.getElementById('modalTitle').textContent = m.title;
+    document.getElementById('modalBody').innerHTML = m.content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ============================================================
+// DCF VALUATION
+// ============================================================
+let currentScenario = 'base';
+
+function fmtIV(v) {
+    const c = (dcfData && dcfData.inputs && dcfData.inputs.currency) || '$';
+    if (v == null || !isFinite(v)) return '-';
+    const a = Math.abs(v);
+    const dp = a >= 100 ? 0 : a >= 10 ? 1 : a >= 1 ? 2 : 4;
+    return c + v.toFixed(dp);
+}
+
+function scenarioDefaults(sc) {
+    const a = dcfData.assumptions;
+    const cur = a[sc] || a.base;
+    const growth = (Array.isArray(cur.growth_rates) && cur.growth_rates.length)
+        ? cur.growth_rates[0] : dcfData.historical_growth.selected_growth_rate;
+    return {
+        growth: growth,
+        wacc: cur.wacc != null ? cur.wacc : a.base.wacc,
+        terminal: cur.terminal_growth != null ? cur.terminal_growth : a.base.terminal_growth
+    };
+}
+
+// Generic 5-year Gordon model driven by the sliders. It does NOT reproduce
+// the analyst's component-built DCF (measured: within +/-5% of the JSON on 13
+// of 41 dashboards), so every displayed number is an anchor from the JSON
+// scaled by the ratio this model implies between the current sliders and the
+// scenario's defaults. At defaults the page shows the JSON exactly.
+function calculateDCF(startGrowth, wacc, terminalGrowth) {
+    const years = 5;
+    const hurdle = 0.15;
+    const inputs = dcfData.inputs;
+    let pvFCF = 0, pvFCFHurdle = 0, projectedFCF = inputs.last_fcf;
+    const endGrowth = 10;
+    for (let i = 0; i < years; i++) {
+        const yearGrowth = startGrowth > endGrowth ? startGrowth - (startGrowth - endGrowth) * (i / 4) : startGrowth;
+        projectedFCF *= (1 + yearGrowth / 100);
+        pvFCF += projectedFCF / Math.pow(1 + wacc / 100, i + 1);
+        pvFCFHurdle += projectedFCF / Math.pow(1 + hurdle, i + 1);
+    }
+    const spread = Math.max(wacc / 100 - terminalGrowth / 100, 0.005);
+    const terminalValue = projectedFCF * (1 + terminalGrowth / 100) / spread;
+    const pvTerminal = terminalValue / Math.pow(1 + wacc / 100, years);
+    const enterpriseValue = pvFCF + pvTerminal;
+    const equityValue = enterpriseValue - (inputs.net_debt || 0);
+    const exitShares = (inputs.projected_shares && inputs.projected_shares.length >= years)
+        ? inputs.projected_shares[years - 1]
+        : inputs.shares_outstanding * Math.pow(1 + (inputs.annual_share_growth_pct || 0) / 100, years);
+    const iv = equityValue / exitShares;
+    const entryPrice = (pvFCFHurdle + terminalValue / Math.pow(1 + hurdle, years) - (inputs.net_debt || 0)) / exitShares;
+    return { iv: iv, entryPrice: entryPrice, pvFCF: pvFCF, pvTerminal: pvTerminal, enterpriseValue: enterpriseValue };
+}
+
+function canScale() {
+    const i = dcfData.inputs || {};
+    return i.last_fcf != null && (i.shares_outstanding != null || (i.projected_shares && i.projected_shares.length));
+}
+
+// Anchor the selected scenario's stored number (iv | entry) and scale it by
+// the toy model's ratio when the sliders leave that scenario's defaults.
+function anchored(field, growth, wacc, terminal) {
+    const stored = (dcfAnchors[currentScenario] || {})[field];
+    const d = scenarioDefaults(currentScenario);
+    const atDefaults = growth === d.growth && wacc === d.wacc && terminal === d.terminal;
+    if (stored != null && atDefaults) return stored;
+    if (!canScale()) return stored;
+    const key = field === 'iv' ? 'iv' : 'entryPrice';
+    const now = calculateDCF(growth, wacc, terminal)[key];
+    if (stored == null) return now;
+    const ref = calculateDCF(d.growth, d.wacc, d.terminal)[key];
+    if (!ref || !isFinite(ref) || !isFinite(now)) return stored;
+    return stored * (now / ref);
+}
+
+function isWeightedLive() {
+    const pw = dcfData.probability_weighted || {};
+    const w = pw.weights, a = dcfData.assumptions;
+    if (!w || !a || !a.base || !a.bull || !a.bear) return false;
+    if (!canScale()) return false;
+    const total = (w.bull || 0) + (w.base || 0) + (w.bear || 0);
+    return Math.abs(total - 1) <= 0.001;
+}
+
+// Probability-weighted IV: the stored weighted_iv at the selected scenario's
+// defaults (so a tab click never moves it), scaled by re-weighting all three
+// scenarios with the user's slider deltas applied to each.
+function weightedIV(growth, wacc, terminal) {
+    const pw = dcfData.probability_weighted || {};
+    const stored = pw.weighted_iv;
+    if (stored == null || !isWeightedLive()) return stored;
+    const d = scenarioDefaults(currentScenario);
+    if (growth === d.growth && wacc === d.wacc && terminal === d.terminal) return stored;
+    const w = pw.weights;
+    const at = (g, k, t) => {
+        let sum = 0;
+        for (const sc of ['bull', 'base', 'bear']) {
+            const sd = scenarioDefaults(sc);
+            const sg = sd.growth + (g - d.growth), sk = sd.wacc + (k - d.wacc), st = sd.terminal + (t - d.terminal);
+            sum += w[sc] * calculateDCF(sg, Math.max(sk, st + 0.5), st).iv;
+        }
+        return sum;
+    };
+    const ref = at(d.growth, d.wacc, d.terminal);
+    if (!ref || !isFinite(ref)) return stored;
+    const now = at(growth, wacc, terminal);
+    if (!now || !isFinite(now)) return stored;
+    return stored * (now / ref);
+}
+
+function renderHeaderValuation() {
+    const el = document.getElementById('headerValuation');
+    if (!el) return;
+    const pw = dcfData.probability_weighted || {};
+    const wiv = pw.weighted_iv, price = dcfData.current_price;
+    if (wiv == null || price == null) return;
+    // A price must be denominated like the IV that divides it (WISE.L: GBp
+    // quote vs USD model). Suppress the chip rather than print -98%.
+    const ratio = wiv / price;
+    if (ratio > 20 || ratio < 0.05) return;
+    const up = (wiv - price) / price * 100;
+    const cls = up >= 0 ? 'positive' : 'negative', sign = up >= 0 ? '+' : '';
+    el.innerHTML = `<div class="hv-item"><span class="hv-label">Prob-Weighted IV</span><span class="hv-value">${fmtIV(wiv)}</span></div>
+        <div class="hv-item"><span class="hv-label">Current Price</span><span class="hv-value">${fmtIV(price)}</span></div>
+        <div class="hv-item"><span class="hv-label">Upside</span><span class="hv-value ${cls}">${sign}${up.toFixed(0)}%</span></div>`;
+    el.style.display = 'flex';
+}
+
+function formatMoney(n) {
+    const inputs = dcfData.inputs || {};
+    const currency = inputs.currency || '$';
+    const units = inputs.units === 'millions' ? 'M' : inputs.units === 'billions' ? 'B' : '';
+    if (n == null || !isFinite(n)) return '-';
+    if (Math.abs(n) >= 1000 && inputs.units === 'millions') return currency + (n / 1000).toFixed(1) + 'B';
+    return currency + n.toFixed(1) + units;
+}
+
+function renderDCFInputs() {
+    const inputs = dcfData.inputs || {};
+    document.getElementById('baseFCF').textContent = formatMoney(inputs.last_fcf);
+    const sbcEl = document.getElementById('sbcBreakdown');
+    if (inputs.sbc_source === 'unavailable') {
+        sbcEl.innerHTML = '<span style="color:#fdcb6e">&#9888; SBC not disclosed &mdash; FCF unadjusted, IV overstated</span>';
+    } else if (inputs.sbc != null && inputs.reported_fcf != null) {
+        const sbcAmt = inputs.sbc_incl_equity_taxes != null ? inputs.sbc_incl_equity_taxes : inputs.sbc;
+        let parts = `${formatMoney(inputs.reported_fcf)} reported − ${formatMoney(sbcAmt)} SBC`;
+        if (inputs.interest_income) parts += ` − ${formatMoney(inputs.interest_income)} interest`;
+        if (inputs.lease_principal_paid) parts += ` − ${formatMoney(inputs.lease_principal_paid)} leases`;
+        sbcEl.textContent = parts;
+    } else {
+        sbcEl.textContent = 'Starting point for projections';
+    }
+    const shares = inputs.shares_outstanding;
+    document.getElementById('sharesOut').textContent = shares == null ? '-'
+        : shares >= 1000 ? (shares / 1000).toFixed(2) + 'B' : shares.toFixed(1) + 'M';
+    const g = inputs.annual_share_growth_pct;
+    document.getElementById('dilutionNote').textContent = (g > 0)
+        ? `+${g.toFixed(1)}%/yr from non-SBC issuance` : 'Flat — SBC expensed in cash flows';
+    const netDebt = inputs.net_debt;
+    const ndEl = document.getElementById('netDebt');
+    ndEl.textContent = netDebt == null ? '-' : (netDebt < 0 ? '-' : '') + formatMoney(Math.abs(netDebt));
+    if (netDebt < 0) ndEl.style.color = '#00d4aa';
+    renderFCFProjections();
+}
+
+// The analyst's own projection when present; otherwise the toy model's path.
+function renderFCFProjections() {
+    const table = document.getElementById('fcfProjectionTable');
+    const proj = dcfData.projections && dcfData.projections[currentScenario];
+    let values = null, years = [];
+    if (proj && Array.isArray(proj.owner_fcf || proj.fcf)) {
+        values = proj.owner_fcf || proj.fcf;
+        years = Array.isArray(proj.years) ? proj.years : values.map((_, i) => 'Yr ' + (i + 1));
+    } else if (proj && Array.isArray(proj)) {
+        values = proj.map(p => p.owner_fcf != null ? p.owner_fcf : p.fcf);
+        years = proj.map((p, i) => p.year || p.fiscal_year || ('Yr ' + (i + 1)));
+    }
+    if (!values || !values.length) {
+        const startGrowth = parseFloat(document.getElementById('growthSlider').value);
+        let fcf = dcfData.inputs.last_fcf;
+        values = [];
+        for (let i = 0; i < 5; i++) {
+            const rate = startGrowth > 10 ? startGrowth - (startGrowth - 10) * (i / 4) : startGrowth;
+            fcf = fcf * (1 + rate / 100);
+            values.push(fcf);
+            years.push('Year ' + (i + 1));
+        }
+    }
+    const base = dcfData.inputs.last_fcf;
+    const cols = [['Base', base, null]].concat(values.map((v, i) => [years[i], v, i === 0 ? base : values[i - 1]]));
+    table.style.gridTemplateColumns = `repeat(${cols.length}, 1fr)`;
+    let html = cols.map(c => `<div class="fcf-projection-item header">${esc(c[0])}</div>`).join('');
+    html += cols.map(c => {
+        const g = (c[2] != null && c[2] !== 0 && c[1] != null) ? ((c[1] - c[2]) / Math.abs(c[2]) * 100) : null;
+        return `<div class="fcf-projection-item"><div class="fcf-value">${formatMoney(c[1])}</div>
+            <div class="growth-rate">${g == null ? '-' : (g >= 0 ? '+' : '') + g.toFixed(0) + '%'}</div></div>`;
+    }).join('');
+    table.innerHTML = html;
+}
+
+function sliderValues() {
+    return {
+        growth: parseFloat(document.getElementById('growthSlider').value),
+        wacc: parseFloat(document.getElementById('waccSlider').value),
+        terminal: parseFloat(document.getElementById('terminalSlider').value)
+    };
+}
+
+window.updateDCFDisplay = function() {
+    const s = sliderValues();
+    document.getElementById('growthValue').textContent = s.growth + '%';
+    document.getElementById('waccValue').textContent = s.wacc + '%';
+    document.getElementById('terminalValue').textContent = s.terminal + '%';
+    renderFCFProjections();
+
+    const iv = anchored('iv', s.growth, s.wacc, s.terminal);
+    const entry = anchored('entry', s.growth, s.wacc, s.terminal);
+    const price = dcfData.current_price;
+    document.getElementById('dcfIV').textContent = fmtIV(iv);
+    document.getElementById('dcfEntry').textContent = fmtIV(entry);
+    const upEl = document.getElementById('dcfUpside');
+    if (iv != null && price) {
+        const up = (iv - price) / price * 100;
+        upEl.textContent = (up >= 0 ? '+' : '') + up.toFixed(0) + '% ' + (up >= 0 ? 'upside' : 'downside');
+        upEl.className = 'dcf-change ' + (up >= 0 ? 'positive' : 'negative');
+    }
+    const wiv = weightedIV(s.growth, s.wacc, s.terminal);
+    document.getElementById('dcfWeighted').textContent = fmtIV(wiv);
+    const wUpEl = document.getElementById('dcfWeightedUpside');
+    if (wiv != null && price) {
+        const wUp = (wiv - price) / price * 100;
+        wUpEl.textContent = (wUp >= 0 ? '+' : '') + wUp.toFixed(0) + '% ' + (wUp >= 0 ? 'upside' : 'downside');
+        wUpEl.className = 'dcf-change ' + (wUp >= 0 ? 'positive' : 'negative');
+    }
+    renderAssumptions(s, iv, entry);
+};
+
+function renderAssumptions(s, iv, entry) {
+    const a = dcfData.assumptions[currentScenario] || {};
+    const items = [['Year 1 Growth', s.growth + '%']];
+    if (Array.isArray(a.growth_rates) && a.growth_rates.length > 1) {
+        items.push([`Year ${a.growth_rates.length} Growth`, a.growth_rates[a.growth_rates.length - 1] + '%']);
+    }
+    for (const k of Object.keys(a)) {
+        if (/margin/.test(k) && Array.isArray(a[k]) && a[k].length) {
+            items.push([k.replace(/_/g, ' ').replace(/ path$/, '') + ' (Y1 → end)', a[k][0] + '% → ' + a[k][a[k].length - 1] + '%']);
+            break;
+        }
+        if (/margin/.test(k) && typeof a[k] === 'number') { items.push([k.replace(/_/g, ' '), a[k] + '%']); break; }
+    }
+    items.push(['WACC', s.wacc + '%'], ['Terminal Growth', s.terminal + '%']);
+    if (a.terminal_cap_multiple) items.push(['Terminal cap', a.terminal_cap_multiple + 'x']);
+    items.push(['Intrinsic Value', fmtIV(iv)], ['Entry Price', fmtIV(entry)]);
+    document.getElementById('assumptionGrid').innerHTML = items.map(([l, v], i) =>
+        `<div class="assumption-item"><div class="label">${esc(l)}</div><div class="value"${i >= items.length - 2 ? ' style="color:#00d4aa"' : ''}>${esc(v)}</div></div>`).join('');
+}
+
+window.switchScenario = function(scenario) {
+    currentScenario = scenario;
+    document.querySelectorAll('.scenario-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.scenario === scenario);
+    });
+    const d = scenarioDefaults(scenario);
+    document.getElementById('growthSlider').value = d.growth;
+    document.getElementById('waccSlider').value = d.wacc;
+    document.getElementById('terminalSlider').value = d.terminal;
+    const nar = document.getElementById('scenarioNarrative');
+    const narratives = dcfData.scenario_narratives || {};
+    const text = narratives[scenario];
+    nar.textContent = typeof text === 'string' ? text : (text && text.summary) || '';
+    updateDCFDisplay();
+};
+
+function renderHistoricalGrowth() {
+    const growth = dcfData.historical_growth || {};
+    const selected = growth.growth_rate_source;
+    const keys = Object.keys(growth).filter(k => /cagr/.test(k) && typeof growth[k] === 'number');
+    document.getElementById('growthGrid').innerHTML = keys.map(k => {
+        const rate = growth[k];
+        const label = k.replace(/_cagr$/, '').replace(/_(\d+)yr/, ' $1Y').replace(/_/g, ' ');
+        return `<div class="growth-item ${k === selected ? 'selected' : ''}">
+            <div class="metric">${esc(label)}</div>
+            <div class="rate ${rate >= 0 ? 'positive' : 'negative'}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div></div>`;
+    }).join('');
+}
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const table = document.getElementById('sensitivityMatrix');
+    if (!sens || !Array.isArray(sens.matrix) || !sens.wacc_range || !sens.terminal_growth_range) {
+        table.innerHTML = '<tr><td>No sensitivity grid in the DCF JSON</td></tr>';
+        return;
+    }
+    const price = dcfData.current_price;
+    const base = dcfData.assumptions.base;
+    let html = '<tr><th>WACC \\ Term G</th>' + sens.terminal_growth_range.map(tg => `<th>${tg}%</th>`).join('') + '</tr>';
+    sens.wacc_range.forEach((wacc, i) => {
+        html += `<tr><th>${wacc}%</th>`;
+        (sens.matrix[i] || []).forEach((val, j) => {
+            const hl = wacc === base.wacc && sens.terminal_growth_range[j] === base.terminal_growth;
+            const cls = hl ? 'highlight' : (val >= price ? 'above-current' : 'below-current');
+            html += `<td class="${cls}">${fmtIV(val)}</td>`;
+        });
+        html += '</tr>';
+    });
+    table.innerHTML = html;
+}
+
+function initDCF() {
+    if (!dcfData || !dcfData.valuation || !dcfData.assumptions) return;
+    document.getElementById('dcfCurrent').textContent = fmtIV(dcfData.current_price);
+    const phil = document.getElementById('dcfPhilosophy');
+    if (dcfData.valuation_philosophy) phil.innerHTML = `<strong>Valuation philosophy:</strong> ${esc(dcfData.valuation_philosophy)}`;
+    else phil.style.display = 'none';
+    const hg = dcfData.historical_growth || {};
+    if (hg.growth_divergence_warning) {
+        document.getElementById('growthWarning').style.display = 'flex';
+        document.getElementById('warningText').textContent = hg.growth_divergence_warning;
+    }
+    const wsub = document.getElementById('dcfWeightedSublabel');
+    const wts = (dcfData.probability_weighted || {}).weights;
+    if (wts) {
+        const pct = x => Math.round((x || 0) * 100);
+        let txt = `${pct(wts.bull)}% Bull / ${pct(wts.base)}% Base / ${pct(wts.bear)}% Bear`;
+        if (!isWeightedLive()) txt += ' — fixed from model';
+        wsub.textContent = txt;
+    }
+    renderHeaderValuation();
+    renderDCFInputs();
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    switchScenario('base');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+renderGuidance();
+renderOverview();
+initCharts();
+initDCF();
+</script>
+</body>
+</html>
