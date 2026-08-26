@@ -1129,12 +1129,127 @@ function scenarioDefaults(sc) {
     };
 }
 
-// Generic 5-year Gordon model driven by the sliders. It does NOT reproduce
-// the analyst's component-built DCF (measured: within +/-5% of the JSON on 13
-// of 41 dashboards), so every displayed number is an anchor from the JSON
-// scaled by the ratio this model implies between the current sliders and the
-// scenario's defaults. At defaults the page shows the JSON exactly.
-function calculateDCF(startGrowth, wacc, terminalGrowth) {
+// ---- Valuation engine --------------------------------------------------
+// Reproduces the analyst's model from `assumptions[scenario]` so the sliders
+// recompute real numbers. Three families, detected from the fields present:
+//   component  : revenue path x (ebitda margin - sbc - lease - D&A) -> tax ->
+//                + D&A - capex + wc capture on revenue change   (owner-fcf.md s2)
+//   fcf-margin : revenue path x fcf margin path
+//   fcf-growth : last_fcf compounded along the growth path
+// Each is validated at the scenario's own defaults against
+// valuation[scenario].intrinsic_value; a family that cannot reproduce the
+// JSON within ENGINE_TOL is not trusted and the page falls back to the
+// generic scaler below. Displayed numbers are always the JSON's own at
+// defaults; the engine supplies the ratio when the sliders move.
+const ENGINE_TOL = 0.015;
+const dcfEngineStatus = {};
+
+function asPath(v, n, fallback) {
+    if (Array.isArray(v) && v.length) {
+        const out = v.slice(0, n).map(Number);
+        while (out.length < n) out.push(out[out.length - 1]);
+        return out;
+    }
+    if (typeof v === 'number') return Array(n).fill(v);
+    return fallback == null ? null : Array(n).fill(fallback);
+}
+function firstOf(a, names) {
+    for (const k of names) if (a[k] != null) return a[k];
+    return null;
+}
+function growthPathOf(a) {
+    const g = firstOf(a, ['growth_rates', 'revenue_growth_pct_path', 'revenue_growth_rates', 'revenue_growth_pct', 'growth_rate']);
+    if (Array.isArray(g) && g.length) return g.map(Number);
+    if (typeof g === 'number') return Array(a.horizon_years || 5).fill(g);
+    return null;
+}
+function baseRevenueOf(sc, g0) {
+    const inputs = dcfData.inputs || {};
+    const proj = (dcfData.projections || {})[sc];
+    if (proj && Array.isArray(proj.revenue) && proj.revenue.length && isFinite(g0)) return proj.revenue[0] / (1 + g0 / 100);
+    for (const k of ['last_revenue', 'revenue', 'base_revenue']) if (inputs[k] != null) return Number(inputs[k]);
+    for (const k of Object.keys(inputs)) if (/^revenue_fy\d{4}$/.test(k)) return Number(inputs[k]);
+    return null;
+}
+function engineFamily(sc) {
+    const a = (dcfData.assumptions || {})[sc];
+    if (!a) return null;
+    const g = growthPathOf(a);
+    if (!g) return null;
+    const hasMargin = firstOf(a, ['ebitda_margin_path', 'ebitda_margin_path_pct', 'ebitda_margin']) != null;
+    if (hasMargin && baseRevenueOf(sc, g[0]) != null) return 'component';
+    if (firstOf(a, ['fcf_margin', 'fcf_margins', 'fcf_margin_path']) != null && baseRevenueOf(sc, g[0]) != null) return 'fcf-margin';
+    if ((dcfData.inputs || {}).last_fcf != null) return 'fcf-growth';
+    return null;
+}
+// Shift the growth path by the slider delta at year 1, tapering to zero by
+// the final year so the long-run rate is untouched.
+function shiftedGrowth(path, startGrowth) {
+    if (startGrowth == null || !isFinite(startGrowth)) return path.slice();
+    const n = path.length, delta = startGrowth - path[0];
+    return path.map((g, i) => i === 0 ? startGrowth : g + delta * Math.max(0, 1 - i / Math.max(1, n - 1)));
+}
+function runEngine(sc, ov) {
+    const family = engineFamily(sc);
+    if (!family) return null;
+    const a = dcfData.assumptions[sc], inputs = dcfData.inputs || {};
+    const wacc = (ov && ov.wacc != null) ? ov.wacc : a.wacc;
+    const tg = (ov && ov.terminal != null) ? ov.terminal : a.terminal_growth;
+    if (wacc == null || tg == null) return null;
+    const growth = shiftedGrowth(growthPathOf(a), ov && ov.growth);
+    const n = growth.length;
+    const fcfs = [];
+    if (family === 'fcf-growth') {
+        let f = Number(inputs.last_fcf);
+        for (let i = 0; i < n; i++) { f *= (1 + growth[i] / 100); fcfs.push(f); }
+    } else {
+        let rev = baseRevenueOf(sc, growth[0]);
+        if (family === 'fcf-margin') {
+            const m = asPath(firstOf(a, ['fcf_margins', 'fcf_margin_path', 'fcf_margin']), n);
+            for (let i = 0; i < n; i++) { rev *= (1 + growth[i] / 100); fcfs.push(rev * m[i] / 100); }
+        } else {
+            const m = asPath(firstOf(a, ['ebitda_margin_path', 'ebitda_margin_path_pct', 'ebitda_margin']), n);
+            const sbc = asPath(firstOf(a, ['sbc_pct_path', 'sbc_pct']), n, 0);
+            const lease = asPath(firstOf(a, ['lease_cost_pct', 'lease_cost_pct_path', 'lease_principal_pct_path', 'lease_principal_pct']), n, 0);
+            const da = asPath(firstOf(a, ['da_pct_path', 'da_pct']), n, 0);
+            const capex = asPath(firstOf(a, ['capex_pct_path', 'capex_pct']), n, 0);
+            const tax = asPath(firstOf(a, ['cash_tax_rate_path', 'cash_tax_rate_path_pct', 'cash_tax_rate', 'tax_rate']), n, 0);
+            const wc = Number(firstOf(a, ['wc_capture_pct']) || 0);
+            for (let i = 0; i < n; i++) {
+                const prev = rev;
+                rev *= (1 + growth[i] / 100);
+                const ebit = rev * (m[i] - sbc[i] - lease[i] - da[i]) / 100;
+                const nopat = ebit - Math.max(0, ebit) * tax[i] / 100;
+                fcfs.push(nopat + rev * da[i] / 100 - rev * capex[i] / 100 + (rev - prev) * wc / 100);
+            }
+        }
+    }
+    const cap = Number(firstOf(a, ['terminal_cap_multiple', 'terminal_fcf_multiple_cap', 'terminal_multiple_cap']) || 20);
+    const last = fcfs[n - 1];
+    const gordon = (wacc - tg) > 0 ? last * (1 + tg / 100) / ((wacc - tg) / 100) : last * cap;
+    const tv = Math.max(0, Math.min(gordon, last * cap));
+    const netDebt = Number(inputs.net_debt || 0);
+    const shares = (inputs.projected_shares && inputs.projected_shares.length >= n)
+        ? Number(inputs.projected_shares[n - 1]) : Number(inputs.shares_outstanding);
+    if (!shares) return null;
+    const pv = (rate) => fcfs.reduce((s, f, i) => s + f / Math.pow(1 + rate / 100, i + 1), 0);
+    const ev = pv(wacc) + tv / Math.pow(1 + wacc / 100, n);
+    const hurdle = ((dcfData.entry_price || {}).hurdle_rate || 0.15) * 100;
+    const entry = (pv(hurdle) + tv / Math.pow(1 + hurdle / 100, n) - netDebt) / shares;
+    return { family: family, iv: (ev - netDebt) / shares, entryPrice: entry, fcfList: fcfs, growthRates: growth };
+}
+function validateEngines() {
+    for (const sc of ['base', 'bull', 'bear']) {
+        const r = runEngine(sc);
+        const target = ((dcfData.valuation || {})[sc] || {}).intrinsic_value;
+        const ok = !!(r && target && isFinite(r.iv) && Math.abs(r.iv - target) <= ENGINE_TOL * Math.abs(target));
+        dcfEngineStatus[sc] = { family: r ? r.family : null, ok: ok, iv: r ? r.iv : null, target: target };
+    }
+}
+
+// Generic 5-year Gordon model: the fallback when no engine family validates
+// (older JSONs without component fields). Only ever used as a ratio.
+function toyDCF(startGrowth, wacc, terminalGrowth) {
     const years = 5;
     const hurdle = 0.15;
     const inputs = dcfData.inputs;
@@ -1154,9 +1269,18 @@ function calculateDCF(startGrowth, wacc, terminalGrowth) {
     const exitShares = (inputs.projected_shares && inputs.projected_shares.length >= years)
         ? inputs.projected_shares[years - 1]
         : inputs.shares_outstanding * Math.pow(1 + (inputs.annual_share_growth_pct || 0) / 100, years);
-    const iv = equityValue / exitShares;
-    const entryPrice = (pvFCFHurdle + terminalValue / Math.pow(1 + hurdle, years) - (inputs.net_debt || 0)) / exitShares;
-    return { iv: iv, entryPrice: entryPrice, pvFCF: pvFCF, pvTerminal: pvTerminal, enterpriseValue: enterpriseValue };
+    return { iv: equityValue / exitShares,
+             entryPrice: (pvFCFHurdle + terminalValue / Math.pow(1 + hurdle, years) - (inputs.net_debt || 0)) / exitShares };
+}
+
+// The model behind the sliders for one scenario: the validated engine, else the toy.
+function calculateDCF(sc, growth, wacc, terminal) {
+    const st = dcfEngineStatus[sc];
+    if (st && st.ok) {
+        const r = runEngine(sc, { growth: growth, wacc: wacc, terminal: terminal });
+        if (r && isFinite(r.iv)) return r;
+    }
+    return toyDCF(growth, wacc, terminal);
 }
 
 function canScale() {
@@ -1165,17 +1289,18 @@ function canScale() {
 }
 
 // Anchor the selected scenario's stored number (iv | entry) and scale it by
-// the toy model's ratio when the sliders leave that scenario's defaults.
+// the model's ratio when the sliders leave that scenario's defaults.
 function anchored(field, growth, wacc, terminal) {
     const stored = (dcfAnchors[currentScenario] || {})[field];
     const d = scenarioDefaults(currentScenario);
     const atDefaults = growth === d.growth && wacc === d.wacc && terminal === d.terminal;
     if (stored != null && atDefaults) return stored;
-    if (!canScale()) return stored;
+    const st = dcfEngineStatus[currentScenario];
+    if (!(st && st.ok) && !canScale()) return stored;
     const key = field === 'iv' ? 'iv' : 'entryPrice';
-    const now = calculateDCF(growth, wacc, terminal)[key];
+    const now = calculateDCF(currentScenario, growth, wacc, terminal)[key];
     if (stored == null) return now;
-    const ref = calculateDCF(d.growth, d.wacc, d.terminal)[key];
+    const ref = calculateDCF(currentScenario, d.growth, d.wacc, d.terminal)[key];
     if (!ref || !isFinite(ref) || !isFinite(now)) return stored;
     return stored * (now / ref);
 }
@@ -1184,7 +1309,8 @@ function isWeightedLive() {
     const pw = dcfData.probability_weighted || {};
     const w = pw.weights, a = dcfData.assumptions;
     if (!w || !a || !a.base || !a.bull || !a.bear) return false;
-    if (!canScale()) return false;
+    const anyEngine = ['base', 'bull', 'bear'].every(sc => dcfEngineStatus[sc] && dcfEngineStatus[sc].ok);
+    if (!anyEngine && !canScale()) return false;
     const total = (w.bull || 0) + (w.base || 0) + (w.bear || 0);
     return Math.abs(total - 1) <= 0.001;
 }
@@ -1204,7 +1330,7 @@ function weightedIV(growth, wacc, terminal) {
         for (const sc of ['bull', 'base', 'bear']) {
             const sd = scenarioDefaults(sc);
             const sg = sd.growth + (g - d.growth), sk = sd.wacc + (k - d.wacc), st = sd.terminal + (t - d.terminal);
-            sum += w[sc] * calculateDCF(sg, Math.max(sk, st + 0.5), st).iv;
+            sum += w[sc] * calculateDCF(sc, sg, Math.max(sk, st + 0.5), st).iv;
         }
         return sum;
     };
@@ -1275,7 +1401,17 @@ function renderFCFProjections() {
     const table = document.getElementById('fcfProjectionTable');
     const proj = dcfData.projections && dcfData.projections[currentScenario];
     let values = null, years = [];
-    if (proj && Array.isArray(proj.owner_fcf || proj.fcf)) {
+    const st = dcfEngineStatus[currentScenario];
+    if (st && st.ok) {
+        const s = sliderValues();
+        const r = runEngine(currentScenario, { growth: s.growth, wacc: s.wacc, terminal: s.terminal });
+        if (r) {
+            values = r.fcfList;
+            years = (proj && Array.isArray(proj.years) && proj.years.length === values.length)
+                ? proj.years : values.map((_, i) => 'Yr ' + (i + 1));
+        }
+    }
+    if (!values && proj && Array.isArray(proj.owner_fcf || proj.fcf)) {
         values = proj.owner_fcf || proj.fcf;
         years = Array.isArray(proj.years) ? proj.years : values.map((_, i) => 'Yr ' + (i + 1));
     } else if (proj && Array.isArray(proj)) {
@@ -1415,6 +1551,14 @@ function renderSensitivityMatrix() {
 
 function initDCF() {
     if (!dcfData || !dcfData.valuation || !dcfData.assumptions) return;
+    validateEngines();
+    const eng = document.getElementById('dcfEngineNote');
+    if (eng) {
+        const okAll = ['base', 'bull', 'bear'].every(sc => dcfEngineStatus[sc].ok);
+        eng.textContent = okAll
+            ? `Sliders re-run the ${dcfEngineStatus.base.family} model from the DCF's own assumptions.`
+            : 'Sliders scale the stored valuation with a generic model — the DCF JSON lacks the fields to rebuild it exactly.';
+    }
     document.getElementById('dcfCurrent').textContent = fmtIV(dcfData.current_price);
     const phil = document.getElementById('dcfPhilosophy');
     if (dcfData.valuation_philosophy) phil.innerHTML = `<strong>Valuation philosophy:</strong> ${esc(dcfData.valuation_philosophy)}`;

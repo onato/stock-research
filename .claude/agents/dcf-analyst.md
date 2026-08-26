@@ -171,6 +171,19 @@ Two things stay true whichever model you use:
 
 ## Step 4: Output JSON
 
+**The dashboard re-runs your model from this JSON.** `scripts/build_dashboard.py`
+rebuilds the valuation in the page's sliders from `assumptions[scenario]` and validates
+it against `valuation[scenario].intrinsic_value` at build time (`slider engine: component
+base:ok bull:ok bear:ok`). For that to work every scenario must carry the component
+fields the engine reads — `growth_rates`, `ebitda_margin_path`, `sbc_pct_path`,
+`da_pct` (or `da_pct_path`), `capex_pct` (or `capex_pct_path`), `wc_capture_pct`,
+`cash_tax_rate_path`, `wacc`, `terminal_growth`, `terminal_cap_multiple` — plus
+`projections[scenario].revenue` so the revenue base is recoverable, and any lease charge
+as `lease_cost_pct`. DUOL, PINS, CPNG and TPW.AX validate exactly; a build that prints
+`FALLBACK` means the numbers in the JSON were not produced by the assumptions you
+recorded — fix the JSON, do not ship it.
+
+
 Write to `./research/{ticker}/Reports/{TICKER}_DCF.json`:
 
 ```json

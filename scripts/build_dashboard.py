@@ -46,7 +46,10 @@ import html
 import io
 import json
 import pathlib
+import re
+import subprocess
 import sys
+import tempfile
 from typing import Any
 
 import dcf_fields as F
@@ -472,6 +475,7 @@ def render_dcf_section(ticker: str, spec: dict[str, Any], dcf: dict[str, Any]) -
 
   <!-- step is fine enough to hold every scenario default exactly; a range
        input snaps to its step and 7.5 became 8 on NPH.NZ with step="1". -->
+  <div class="slider-hint" id="dcfEngineNote" style="max-width:1400px;margin:0 auto 8px"></div>
   <div class="dcf-controls">
     <div class="slider-group">
       <label>Growth Rate (Yr 1): <span id="growthValue">-</span></label>
@@ -601,6 +605,7 @@ switchScenario('base');
 __el('growthSlider').value = String(sliderValues().growth + 5);
 updateDCFDisplay();
 __out.moved = { weighted: __num(__el('dcfWeighted').textContent), iv: __num(__el('dcfIV').textContent) };
+__out.engine = dcfEngineStatus;
 console.log(JSON.stringify(__out));
 """
     return stub + script + probe
@@ -633,7 +638,39 @@ def build(ticker: str, out: pathlib.Path | None = None) -> pathlib.Path:
     else:
         msg += "; no DCF.json -- valuation section omitted"
     print(msg)
+    if dcf:
+        status = engine_status(page)
+        if status:
+            cells = " ".join(f"{sc}:{'ok' if status[sc]['ok'] else 'FALLBACK'}" for sc in ("base", "bull", "bear"))
+            fam = status["base"].get("family") or "none"
+            print(f"slider engine: {fam} {cells}")
+            if not all(status[sc]["ok"] for sc in ("base", "bull", "bear")):
+                print("  !! the DCF JSON's assumptions do not rebuild its valuation; sliders will use the "
+                      "generic scaler. Record growth_rates, ebitda_margin_path, sbc_pct_path, da_pct, "
+                      "capex_pct, wc_capture_pct, cash_tax_rate_path, terminal_cap_multiple and "
+                      "projections.*.revenue so the dashboard can re-run the model.", file=sys.stderr)
     return target
+
+
+def engine_status(page: str) -> dict[str, Any] | None:
+    """Run the page's inline script headlessly and return dcfEngineStatus,
+    or None when node is unavailable."""
+    m = re.search(r"<script>(.*)</script>\s*</body>", page, re.DOTALL)
+    if not m:
+        return None
+    with tempfile.TemporaryDirectory() as d:
+        js = pathlib.Path(d) / "dash.js"
+        js.write_text(node_harness(m.group(1)))
+        try:
+            r = subprocess.run(["node", str(js)], capture_output=True, text=True, check=False, timeout=60)
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+    if r.returncode:
+        return None
+    try:
+        return json.loads(r.stdout.strip().splitlines()[-1]).get("engine")
+    except (json.JSONDecodeError, IndexError):
+        return None
 
 
 def main(argv: list[str]) -> int:

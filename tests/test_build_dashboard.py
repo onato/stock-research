@@ -298,6 +298,46 @@ class TestNode:
         assert out["moved"]["weighted"] != pytest.approx(dcf["probability_weighted"]["weighted_iv"], abs=0.005)
 
 
+class TestValuationEngine:
+    """The sliders re-run the analyst's model when assumptions carry the
+    component fields (TPW.AX: 10-year component build), and fall back to the
+    anchored scaler when they do not (the TEST fixture)."""
+
+    def run(self, html, tmp_path):
+        js = tmp_path / "dash.js"
+        js.write_text(bd.node_harness(inline_script(html)))
+        r = subprocess.run(["node", str(js)], capture_output=True, text=True, check=False)
+        assert r.returncode == 0, r.stderr
+        return json.loads(r.stdout)
+
+    def test_component_model_validates_and_drives_sliders(self, spec, analysis, csv_text, tmp_path):
+        dcf = load("TPW_DCF.json")
+        html = bd.render("TPW.AX", spec, csv_text, analysis, dcf)
+        out = self.run(html, tmp_path)
+        for sc in ("base", "bull", "bear"):
+            assert out["engine"][sc]["family"] == "component"
+            assert out["engine"][sc]["ok"] is True
+            assert out["engine"][sc]["iv"] == pytest.approx(dcf["valuation"][sc]["intrinsic_value"], rel=0.015)
+            assert out[sc]["iv"] == pytest.approx(dcf["valuation"][sc]["intrinsic_value"], abs=0.005)
+        # +5pp year-1 growth on a company with positive later-year owner FCF raises value
+        assert out["moved"]["iv"] > dcf["valuation"]["base"]["intrinsic_value"]
+        assert 'id="dcfEngineNote"' in html      # the note initDCF fills at runtime
+
+    def test_missing_component_fields_fall_back_to_scaler(self, html, dcf, tmp_path):
+        out = self.run(html, tmp_path)
+        assert all(out["engine"][sc]["ok"] is False for sc in ("base", "bull", "bear"))
+        assert out["base"]["iv"] == pytest.approx(dcf["valuation"]["base"]["intrinsic_value"], abs=0.005)
+
+    def test_build_reports_engine_status(self, make_ticker, monkeypatch, capsys):
+        d = make_ticker("TPW.AX")
+        for src, dst in (("TEST_Metrics.csv", "TPW.AX_Metrics.csv"), ("TEST_Analysis.json", "TPW.AX_Analysis.json"),
+                         ("TPW_DCF.json", "TPW.AX_DCF.json"), ("TEST_DashboardSpec.json", "TPW.AX_DashboardSpec.json")):
+            shutil.copy(FIX / src, d / "Reports" / dst)
+        monkeypatch.setattr(bd, "REPO", d.parent.parent)
+        bd.build("TPW.AX")
+        assert "slider engine: component base:ok bull:ok bear:ok" in capsys.readouterr().out
+
+
 class TestBuild:
     def test_build_writes_dashboard_and_reports_iv(self, make_ticker, monkeypatch, capsys):
         d = make_ticker("TEST")
