@@ -54,6 +54,9 @@ def analyse(path: pathlib.Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
                  "model": None, "tools": collections.Counter(), "label": ""})
     reported = None
     turns = 0
+    # Claude Code writes one line per content block, each repeating the
+    # whole message's usage; count a message id once.
+    seen_ids: set[str] = set()
 
     with open(path, errors="replace") as fh:
         events = [line for raw in fh if (line := raw.strip()).startswith("{")]
@@ -72,6 +75,11 @@ def analyse(path: pathlib.Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
 
         pid = ev.get("parent_tool_use_id") or "MAIN"
         msg = ev.get("message", {})
+        mid = msg.get("id")
+        if mid:
+            if mid in seen_ids:
+                continue
+            seen_ids.add(mid)
         u = msg.get("usage") or {}
         a = agents[pid]
         a["msgs"] += 1

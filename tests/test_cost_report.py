@@ -235,3 +235,23 @@ class TestMain:
         bbb = next(line for line in block if "BBB.NZ" in line)
         assert "(new)" in bbb
         assert len(bbb) == len(aaa)
+
+
+class TestDuplicateMessageLines:
+    def test_split_assistant_message_counted_once(self, tmp_path):
+        """Claude Code writes one transcript line per content block, each
+        carrying the whole message's usage. 33 of 49 message ids in a real
+        batch log appeared 2-4 times, inflating the modelled cost ~1.8x."""
+        ev = assistant(usage=USAGE)
+        ev["message"]["id"] = "msg_01"
+        p = write_log(tmp_path / "T.log", [ev, ev, ev, result()])
+        summary, rows = cost_report.analyse(p)
+        assert rows[0]["msgs"] == 1
+        assert summary["read"] == 10_000
+        assert summary["estimated"] == pytest.approx(USAGE_COST)
+
+    def test_messages_without_id_are_not_collapsed(self, tmp_path):
+        p = write_log(tmp_path / "T.log",
+                      [assistant(usage=USAGE), assistant(usage=USAGE)])
+        _, rows = cost_report.analyse(p)
+        assert rows[0]["msgs"] == 2
