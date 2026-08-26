@@ -25,7 +25,7 @@ from dataclasses import dataclass
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
-PREFIX = r"(?:consolidated |group |company |parent |interim |condensed )*"
+PREFIX = r"(?:consolidated |group |company |parent entity |parent |interim |condensed )*"
 STATEMENT_RE = re.compile(
     PREFIX + r"(?:statements? of (?:comprehensive income|profit or loss"
     r"(?: and other comprehensive income)?|profit and loss|financial position|"
@@ -53,6 +53,13 @@ CHAIN_WINDOW = 40       # once one sub-heading is found, later ones may follow a
 YEAR_WINDOW = 10        # lines either side of a caption searched for its year row
 YEAR_RE = re.compile(r"\b(?:19|20)\d{2}\b")
 MULTI_YEAR_TABLE = 4    # a statement shows two years (three if restated); a summary shows five+
+PARENT_WINDOW = 8       # lines above a caption searched for a parent-entity heading
+# AASB/IFRS annual reports carry a "Parent entity information" note that
+# repeats the primary statement captions over company-only figures
+# (TPW.AX FY2026: equity 17,685 vs consolidated 105,634).
+PARENT_RE = re.compile(r"parent entity|parent company|company only", re.IGNORECASE)
+NUMBERED_NOTE_RE = re.compile(r"\d{1,2}[.)]?\s+[A-Za-z]")
+CONSOLIDATED_RE = re.compile(r"(?:consolidated|group)\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -92,6 +99,7 @@ def index_text(text: str) -> list[Section]:
     hits = [(i + 1, *c) for i, ln in enumerate(lines) if (c := classify(ln))]
     out: list[Section] = []
     chained = False
+    parent_ctx = False   # inside a parent-entity note, across page footers
     for n, (start, found, caption) in enumerate(hits):
         kind = found
         end = hits[n + 1][0] - 1 if n + 1 < len(hits) else len(lines)
@@ -102,6 +110,20 @@ def index_text(text: str) -> list[Section]:
         # its first column is 2015). Once one sub-heading is found, the
         # block's later ones follow without needing their own year row.
         near = lines[max(0, start - YEAR_WINDOW):start + YEAR_WINDOW]
+        parent_here = _parent_entity(lines, start, caption)
+        if kind == "statement":
+            if parent_here or (parent_ctx and not CONSOLIDATED_RE.match(caption)):
+                out.append(Section("notes", caption, start, end))
+                parent_ctx, chained = True, False
+                continue
+            parent_ctx = False
+        elif kind == "notes":
+            if parent_here:
+                parent_ctx = True
+            elif NUMBERED_NOTE_RE.match(caption):
+                parent_ctx = False   # the next numbered note ends it
+        else:
+            parent_ctx = False
         prev_len = out[-1].end - out[-1].start + 1 if out else 0
         after_summary = bool(out) and out[-1].kind == "summary"
         if kind == "statement" and (
@@ -113,6 +135,14 @@ def index_text(text: str) -> list[Section]:
             chained = False
         out.append(Section(kind, caption, start, end))
     return out
+
+
+def _parent_entity(lines: list[str], start: int, caption: str) -> bool:
+    """A statement caption headed by a parent-entity note is a note."""
+    if re.match(r"(?:the )?(?:parent|company)\b", caption, re.IGNORECASE) or PARENT_RE.search(caption):
+        return True
+    above = lines[max(0, start - 1 - PARENT_WINDOW):start - 1]
+    return any(PARENT_RE.search(ln) for ln in above)
 
 
 def _many_years(block: list[str], n: int = 3) -> bool:

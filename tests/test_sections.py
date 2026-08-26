@@ -183,3 +183,29 @@ class TestLongSummaryBlocks:
                  "Revenue   43,432,373   35,684,253"]
         kinds = [s.kind for s in sections.index_text("\n".join(body) + "\n")]
         assert kinds == ["summary", "summary", "statement"]
+
+
+class TestParentEntityNote:
+    """AASB annual reports repeat the statement captions inside a
+    'Parent entity information' note over company-only figures. TPW.AX
+    FY2026's worksheet picked equity 17,685 from that note instead of the
+    consolidated 105,634."""
+
+    PARENT = Path(__file__).parent / "fixtures" / "extracted" / "generic" / "parent_entity_note.txt"
+
+    def test_statement_captions_under_parent_note_are_notes(self):
+        secs = sections.index_text(self.PARENT.read_text())
+        captions = {s.caption.lower(): s.kind for s in secs
+                    if s.caption.lower().startswith("statement of")}
+        assert captions == {
+            "statement of profit or loss and other comprehensive income": "notes",
+            "statement of financial position": "notes",
+        }
+
+    def test_parent_prefixed_caption_is_a_note(self):
+        secs = sections.index_text("Parent entity statement of financial position\n"
+                                   "Total assets   89,487   110,434\n")
+        assert [s.kind for s in secs] == ["notes"]
+
+    def test_consolidated_caption_stays_a_statement(self, text):
+        assert any(s.kind == "statement" for s in sections.index_text(text))
