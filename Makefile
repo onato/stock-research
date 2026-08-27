@@ -27,7 +27,7 @@ LEADERBOARD ?= 15   # rows shown by `make screen`
 
 .DEFAULT_GOAL := help
 .PHONY: help run digest status screen integrity missing prune-stubs standardize-scale research facts evals evals-all \
-        cost gaps exchange-eval facts-xbrl adjudicate fetch-asx dcf-context dashboard screen-metrics check-currency ledger ledger-backfill queue-prune \
+        cost gaps exchange-eval facts-xbrl adjudicate fetch-asx dcf-context dashboard kpi-coverage screen-metrics check-currency ledger ledger-backfill queue-prune \
         screen-fundamentals backfill-units canonical-iv sync-portfolio \
         test test-country lint coverage typecheck
 
@@ -158,6 +158,9 @@ facts-xbrl: ## Structured extraction for a US filer via SEC XBRL (TICKER=PYPL)
 dashboard: ## Render Reports/{T}_Dashboard.html from its DashboardSpec.json (no model)
 	@test -n "$(TICKER)" || { echo "usage: make dashboard TICKER=AGL.NZ" >&2; exit 2; }
 	$(PY) $(SCRIPTS)/build_dashboard.py $(TICKER)
+
+kpi-coverage: ## Which stored KPIs reach a dashboard (TICKER=X optional; no model)
+	$(PY) $(SCRIPTS)/kpi_coverage.py $(TICKER)
 
 evals: ## Tier-1 eval for one ticker (TICKER=AGL.NZ)
 	@test -n "$(TICKER)" || { echo "usage: make evals TICKER=AGL.NZ" >&2; exit 2; }

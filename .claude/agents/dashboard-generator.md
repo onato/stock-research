@@ -18,19 +18,54 @@ numbers. Never reproduce any of that.
 
 ## Step 1: Understand the business (Read, briefly)
 
-Read `Reports/{TICKER}_Metrics.csv` (the header row tells you which columns
-exist), `Reports/{TICKER}_Analysis.json` and, if present,
+**Run the export first — this is load-bearing:**
+
+```bash
+python3 scripts/export_csv.py {TICKER}
+```
+
+Whitelisted business KPIs are *promoted* out of the ticker DB's `kpis` table
+into extra CSV columns by that command (schema.PROMOTE_KPIS). Read the header
+row before running it and you will not see them, and you will fall back to
+hardcoded `value` cards -- which is exactly the bug this step exists to
+prevent. The export prints `N promoted from kpis` when it finds any.
+
+Then read `Reports/{TICKER}_Metrics.csv` (the header row tells you which
+columns exist), `Reports/{TICKER}_Analysis.json` and, if present,
 `Reports/{TICKER}_DCF.json`. Skim the *latest* annual filing in `Extracted/`
-only for KPIs management emphasises that are not in the CSV (active customers,
-GMV, take rate, subscribers, ...). Do not read every filing.
+only for KPIs management emphasises that are still not in the CSV. Do not read
+every filing.
 
 Pick 6-8 KPI cards and 6-10 charts that tell this business's story, grouped
-into 2-3 sections. Examples by type (guidance, not rules):
+into 2-3 sections.
+
+**A dashboard that charts only revenue, margins and cash flow has not been
+tailored to the business.** Every ticker gets a section built on its operating
+drivers, not just its financial statements. Required unless the CSV genuinely
+has no such column and the filings disclose none:
 
 - Payments/Fintech: volume, take rate, active customers, revenue per customer
 - SaaS: ARR, subscribers, churn, ARPU, net revenue retention
-- E-commerce: GMV, orders, AOV, repeat rate, fulfilment cost
+- E-commerce: GMV, orders, AOV, repeat rate, CAC, marketing % of revenue
+- Marketplaces: GMV, take rate, buyers, items sold
+- REIT/property: AFFO, NTA per share, occupancy, WALT
+- Banks/lenders: net interest margin, AUM, book value per share
 - Everyone: revenue + YoY, margins, FCF vs net income, cash/net debt, SBC & shares
+
+**Prefer `column` over a literal `value`.** A `value` card is a hardcoded
+string: it shows no trend, and it silently goes stale on the next refresh --
+`"1.33m"` stays `"1.33m"` a year later. Use it only for something genuinely not
+a time series (an audit opinion, a category label), or for a figure whose
+latest fiscal year is missing, and say so in the label ("FY2025, last
+disclosed") rather than implying it is current.
+
+**Never present a derived proxy under the name of the real metric.** If the
+disclosed definition needs an input the dataset lacks, either capture the
+disclosed figure into `kpis` or chart the proxy under its own name -- in the
+series `label`, not only in the help text, because charts get screenshotted
+away from their modals. TPW's CAC is the worked example: a marketing-spend-
+per-net-new-customer proxy was wrong by 1.6-4.0x against the company's own
+disclosed series and implied a 13x cost spike that never happened.
 
 ## Step 2: Write the Spec
 
@@ -77,8 +112,13 @@ Rules the builder enforces (it refuses the Spec otherwise):
   change from the prior FY row; any other string is shown verbatim, coloured by
   `positive` (default true).
 - A series has exactly one of `column`, `derive` (`yoy:<col>` or
-  `ratio:<num>/<den>`, both in %) or `dcf_path` (a `{period: value}` table in
+  `ratio:<num>/<den>`, both in %, or `per:<num>/<den>` for a per-unit
+  quantity with no % scaling) or `dcf_path` (a `{period: value}` table in
   the DCF JSON, e.g. `historical_growth.owner_fcf_history`).
+- `"scale": 1e6` multiplies a series for display. Needed when the operands
+  sit on different scales — money columns are in millions but a customer or
+  order count is a raw integer, so `per:MarketingExpense/ActiveCustomers`
+  is ~0.00004 and every point rounds to zero without it.
 - Mark margin/ratio charts `"percent": true` — they never get a Log button.
   `"log": true` requests one for absolute series; the builder drops it
   automatically when any point is zero or negative.

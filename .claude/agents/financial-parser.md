@@ -60,9 +60,29 @@ You extract financial metrics from SEC filing text and earnings reports, then wr
 ### Company-Specific KPIs
 Look for metrics specific to the company's business model:
 - **Tech/SaaS**: DAU, MAU, ARR, subscribers, churn rate
-- **E-commerce**: GMV, take rate, orders
+- **E-commerce**: GMV, take rate, orders, AOV, active customers, CAC
 - **Financial Services**: AUM, transaction volume, NIM
 - **Retail**: Same-store sales, store count
+
+**The spelling matters.** These land in `kpis`, and only names in
+`schema.PROMOTE_KPIS` are promoted into the Metrics CSV, which is the only
+way a dashboard can chart them (`python3 scripts/schema.py` prints the DDL;
+the vocabulary is in the same file). Write `ActiveCustomers`, `TotalOrders`,
+`MarketingExpense`, `GMV`, `TakeRate`, `ARR`, `MAU` — not a local variant.
+An unrecognised name is stored but never reaches a chart; `make kpi-coverage`
+lists what is unmapped.
+
+Note this section and the `kind = 'kpi'` list further down are different
+things that share one table: those (InterestIncome, CashTaxesPaid, ...) are
+owner-FCF components consumed by the DCF and are deliberately *not* promoted.
+
+**Record disclosed unit economics even when they look derivable.** If the
+company publishes a headline CAC, LTV, AOV or ROI multiple, store it under
+its own name. These are usually defined on inputs that never appear in the
+statements — TPW's CAC divides ~75% of marketing spend (a management
+estimate that moves year to year) by first-time customers, a count published
+only inside a chart image. Recomputing it from what the DB holds was
+measured wrong by 1.6-4.0x. Capture beats derivation.
 
 ## Parsing Strategy: review the worksheet, don't search
 
