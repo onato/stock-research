@@ -34,6 +34,7 @@ Spec contract (validated by `validate_spec`):
   series[]              {label, column | derive | dcf_path, kind?: bar|line,
                          axis?: y|y1, color?}
                         derive: "yoy:<col>" | "ratio:<num>/<den>" (percent)
+                                | "per:<num>/<den>" (per-unit, no % scaling)
   metric_descriptions   {help_key: {title, content(html)}}
   dcf?                  {base_fcf_label?, growth_hint?, current_price_note?,
                          base_sublabel?}
@@ -160,13 +161,20 @@ def derive(rows: list[dict[str, str]], expr: str) -> list[float | None]:
             prev = vals[j] if j is not None else None
             out.append(None if v is None or not prev else (v - prev) / abs(prev) * 100)
         return out
-    if op == "ratio":
+    if op in ("ratio", "per"):
         top, _, bottom = arg.partition("/")
         if not top or not bottom:
-            raise SpecError(f"ratio derive needs num/den: {expr!r}")
+            raise SpecError(f"{op} derive needs num/den: {expr!r}")
+        # `ratio` is a percentage; `per` is a per-unit quantity (marketing
+        # spend per customer, revenue per order), where scaling by 100 would
+        # be meaningless. The units of the two operands differ, so the
+        # spec's y_title carries the label -- keep the arithmetic dumb.
+        scale = 100 if op == "ratio" else 1
         a, b = series(rows, top), series(rows, bottom)
-        return [None if x is None or not y else x / y * 100 for x, y in zip(a, b, strict=True)]
-    raise SpecError(f"unknown derive {expr!r} (use yoy:<col> or ratio:<num>/<den>)")
+        return [None if x is None or not y else x / y * scale
+                for x, y in zip(a, b, strict=True)]
+    raise SpecError(
+        f"unknown derive {expr!r} (use yoy:<col>, ratio:<num>/<den> or per:<num>/<den>)")
 
 
 def dcf_get(dcf: dict[str, Any] | None, path: str) -> Any:
@@ -241,7 +249,7 @@ def validate_spec(spec: dict[str, Any], columns: set[str]) -> None:
                     op, _, arg = s["derive"].partition(":")
                     if op == "yoy":
                         _check_column(arg, columns, where)
-                    elif op == "ratio":
+                    elif op in ("ratio", "per"):
                         for c in arg.split("/"):
                             _check_column(c, columns, where)
                     else:

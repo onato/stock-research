@@ -109,6 +109,26 @@ class TestDerive:
         with pytest.raises(bd.SpecError):
             bd.derive([], "median:Revenue")
 
+    def test_per_is_a_plain_ratio_not_a_percent(self):
+        """Unit economics are per-unit, not percentages.
+
+        `ratio:` hardcodes x100, so marketing spend / customers came out
+        100x too large and labelled as a share of something.
+        """
+        _, rows = bd.read_csv(
+            "Period,MarketingExpense,ActiveCustomers\nFY2024,100,4\n")
+        assert bd.derive(rows, "per:MarketingExpense/ActiveCustomers") == [25.0]
+        assert bd.derive(rows, "ratio:MarketingExpense/ActiveCustomers") == [2500.0]
+
+    def test_per_null_on_missing_or_zero_denominator(self):
+        _, rows = bd.read_csv(
+            "Period,A,B\nFY2024,10,0\nFY2025,,5\nFY2026,10,\n")
+        assert bd.derive(rows, "per:A/B") == [None, None, None]
+
+    def test_per_needs_both_operands(self):
+        with pytest.raises(bd.SpecError):
+            bd.derive([], "per:MarketingExpense")
+
 
 class TestSpecValidation:
     def test_valid_spec_passes(self, spec):
@@ -119,6 +139,14 @@ class TestSpecValidation:
         spec["kpis"][0]["column"] = "Revenu"
         with pytest.raises(bd.SpecError, match="Revenu"):
             bd.validate_spec(spec, {"Revenue"})
+
+    def test_per_derive_validates_both_operands(self, spec):
+        spec["sections"][0]["charts"][0]["series"][0] = {
+            "label": "per", "derive": "per:MarketingExpense/Nope"}
+        with pytest.raises(bd.SpecError, match="Nope"):
+            bd.validate_spec(spec, {"Revenue", "GrossMargin", "EBITDA",
+                                    "FreeCashFlow", "CashAndEquivalents",
+                                    "MarketingExpense"})
 
     def test_help_key_must_exist(self, spec):
         spec["sections"][0]["charts"][0]["help"] = "nope"
