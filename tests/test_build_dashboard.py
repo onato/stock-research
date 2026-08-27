@@ -13,6 +13,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
+from typing import ClassVar
 
 import build_dashboard as bd
 import pytest
@@ -323,6 +324,29 @@ class TestValuationEngine:
         assert out["moved"]["iv"] > dcf["valuation"]["base"]["intrinsic_value"]
         assert 'id="dcfEngineNote"' in html      # the note initDCF fills at runtime
 
+    def test_sum_of_parts_model_validates_and_drives_sliders(self, spec, analysis, csv_text, tmp_path):
+        """A DCF whose value is an OpCo FCF leg PLUS an independently
+        discounted embedded-lender leg (SE: Monee, valued on distributable
+        earnings at its own cost of equity) cannot be reproduced by the
+        single-stream `component` family -- it undershoots by 15-30% and,
+        because the fallback is silent, the sliders would contradict the
+        cards above them. The engine must pick `sum-of-parts` and reproduce
+        both the IV and the entry price."""
+        dcf = load("SE_DCF.json")
+        html = bd.render("SE", spec, csv_text, analysis, dcf)
+        out = self.run(html, tmp_path)
+        for sc in ("base", "bull", "bear"):
+            assert out["engine"][sc]["family"] == "sum-of-parts"
+            assert out["engine"][sc]["ok"] is True
+            assert out["engine"][sc]["iv"] == pytest.approx(dcf["valuation"][sc]["intrinsic_value"], abs=0.01)
+            # The cards render to display precision (3sf), so they are checked
+            # loosely; the engine assertions above are the exact reproduction.
+            assert out[sc]["iv"] == pytest.approx(dcf["valuation"][sc]["intrinsic_value"], rel=0.005)
+            assert out[sc]["entry"] == pytest.approx(dcf["entry_price"][sc]["entry_price"], rel=0.005)
+        # The lender leg is deliberately NOT driven by the OpCo growth slider,
+        # but the OpCo leg is: +5pp year-1 growth must still raise the IV.
+        assert out["moved"]["iv"] > dcf["valuation"]["base"]["intrinsic_value"]
+
     def test_missing_component_fields_fall_back_to_scaler(self, html, dcf, tmp_path):
         out = self.run(html, tmp_path)
         assert all(out["engine"][sc]["ok"] is False for sc in ("base", "bull", "bear"))
@@ -363,3 +387,59 @@ class TestBuild:
     def test_main_usage(self, capsys):
         assert bd.main([]) == 2
         assert "usage" in capsys.readouterr().err
+
+
+class TestSensitivityAxes:
+    """The grid is not always WACC x terminal growth. A multiple-exit model
+    (RUA.NZ: probability-weighted EV/Sales scenarios, no Gordon terminal) ships
+    `coe_range` x `exit_multiple_range` with the same `matrix` shape, and used
+    to render as 'No sensitivity grid in the DCF JSON' -- discarding a complete,
+    correct grid because the axis keys were hardcoded."""
+
+    GENERIC: ClassVar[dict] = {
+        "axis_note": "Rows: cost of equity (%). Columns: exit EV/Sales multiple.",
+        "coe_range": [20, 28, 36],
+        "exit_multiple_range": [0.75, 1.5, 2.5],
+        "matrix": [[0.0064, 0.0128, 0.0213],
+                   [0.0056, 0.0113, 0.0188],
+                   [0.0050, 0.0100, 0.0166]],
+    }
+
+    def grid_html(self, page, tmp_path):
+        js = tmp_path / "dash.js"
+        js.write_text(
+            bd.node_harness(inline_script(page)).replace(
+                "console.log(JSON.stringify(__out));",
+                "renderSensitivityMatrix();"
+                "console.log(JSON.stringify({h: __el('sensitivityMatrix').innerHTML}));",
+            )
+        )
+        r = subprocess.run(["node", str(js)], capture_output=True, text=True, check=False)
+        assert r.returncode == 0, r.stderr
+        return json.loads(r.stdout.strip().splitlines()[-1])["h"]
+
+    def test_wacc_terminal_grid_still_renders(self, html, tmp_path):
+        """The existing axis pair must keep working -- this is the regression guard."""
+        out = self.grid_html(html, tmp_path)
+        assert "No sensitivity grid" not in out
+        assert "WACC" in out
+
+    def test_generic_axis_grid_renders_instead_of_falling_back(
+        self, spec, analysis, csv_text, dcf, tmp_path
+    ):
+        d = json.loads(json.dumps(dcf))
+        d["sensitivity"] = self.GENERIC
+        out = self.grid_html(bd.render("TEST", spec, csv_text, analysis, d), tmp_path)
+        assert "No sensitivity grid" not in out, "a complete grid was discarded"
+        assert "0.75" in out          # column axis from the JSON, not hardcoded
+        assert "2.5" in out
+        assert "20" in out            # row axis from the JSON
+        assert "36" in out
+
+    def test_grid_missing_matrix_still_falls_back(
+        self, spec, analysis, csv_text, dcf, tmp_path
+    ):
+        d = json.loads(json.dumps(dcf))
+        d["sensitivity"] = {"coe_range": [20]}
+        out = self.grid_html(bd.render("TEST", spec, csv_text, analysis, d), tmp_path)
+        assert "No sensitivity grid" in out
