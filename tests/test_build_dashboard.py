@@ -443,3 +443,56 @@ class TestSensitivityAxes:
         d["sensitivity"] = {"coe_range": [20]}
         out = self.grid_html(bd.render("TEST", spec, csv_text, analysis, d), tmp_path)
         assert "No sensitivity grid" in out
+
+
+class TestValuationPhilosophy:
+    """`valuation_philosophy` is a string on some DCF JSONs and an object on
+    others (52 of them: AMZN nests summary/approach/wacc_rationale, AFC.NZ
+    nests going_concern/uninvestable_conclusion). The template interpolated it
+    straight into innerHTML, so every object-shaped one rendered the literal
+    text `[object Object]` -- no JS error, just a silently useless panel."""
+
+    def _philosophy_html(self, html, dcf, tmp_path, value):
+        d = dict(dcf)
+        d["valuation_philosophy"] = value
+        page = bd.render("TEST", load("TEST_DashboardSpec.json"), (FIX / "TEST_Metrics.csv").read_text(),
+                         load("TEST_Analysis.json"), d)
+        js = tmp_path / "dash.js"
+        js.write_text(bd._DOM_STUB + inline_script(page) + """
+const el = { innerHTML: '', style: {} };
+renderPhilosophy(dcfData.valuation_philosophy, el);
+console.log(JSON.stringify({ html: el.innerHTML }));
+""")
+        r = subprocess.run(["node", str(js)], capture_output=True, text=True, check=False)
+        assert r.returncode == 0, r.stderr
+        return json.loads(r.stdout)["html"]
+
+    def test_string_philosophy_renders_verbatim(self, html, dcf, tmp_path):
+        out = self._philosophy_html(html, dcf, tmp_path, "Mid-cycle FCF, not the peak year.")
+        assert "Mid-cycle FCF, not the peak year." in out
+        assert "[object Object]" not in out
+
+    def test_object_philosophy_renders_its_values_not_object_object(self, html, dcf, tmp_path):
+        out = self._philosophy_html(html, dcf, tmp_path, {
+            "summary": "NTA path times an exit P/B.",
+            "wacc_rationale": "12.5% cost of equity, charged once.",
+        })
+        assert "[object Object]" not in out
+        assert "NTA path times an exit P/B." in out
+        assert "12.5% cost of equity, charged once." in out
+
+    def test_object_philosophy_labels_each_key(self, html, dcf, tmp_path):
+        out = self._philosophy_html(html, dcf, tmp_path, {"going_concern": "Receivership; no forward model."})
+        assert "Going concern" in out
+        assert "Receivership; no forward model." in out
+
+    def test_nested_list_philosophy_is_flattened(self, html, dcf, tmp_path):
+        out = self._philosophy_html(html, dcf, tmp_path, {"key_choices": ["Cost of equity, not WACC.", "No net-debt deduction."]})
+        assert "[object Object]" not in out
+        assert "Cost of equity, not WACC." in out
+        assert "No net-debt deduction." in out
+
+    def test_philosophy_values_are_escaped(self, html, dcf, tmp_path):
+        out = self._philosophy_html(html, dcf, tmp_path, {"summary": "Peak <script>alert(1)</script> FCF"})
+        assert "<script>alert(1)</script>" not in out
+        assert "&lt;script&gt;" in out

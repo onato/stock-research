@@ -1634,6 +1634,32 @@ function renderSensitivityMatrix() {
     table.innerHTML = html;
 }
 
+function philosophyLabel(key) {
+    const t = key.replace(/_/g, ' ').trim();
+    return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/* `valuation_philosophy` is a string on some DCF JSONs and a nested object on
+   others (52 of them). Interpolating the object rendered "[object Object]". */
+function philosophyParts(value, label) {
+    if (value === null || value === undefined || value === '') return [];
+    if (Array.isArray(value)) return value.flatMap(v => philosophyParts(v, label));
+    if (typeof value === 'object') {
+        return Object.keys(value).flatMap(k => philosophyParts(value[k], philosophyLabel(k)));
+    }
+    return [{ label: label, text: String(value) }];
+}
+
+function renderPhilosophy(value, el) {
+    if (!el) return;
+    const parts = philosophyParts(value, '');
+    if (!parts.length) { el.style.display = 'none'; return; }
+    const body = parts
+        .map(p => (p.label ? `<strong>${esc(p.label)}:</strong> ` : '') + esc(p.text))
+        .join('<br>');
+    el.innerHTML = `<strong>Valuation philosophy:</strong> ${body}`;
+}
+
 function initDCF() {
     if (!dcfData || !dcfData.valuation || !dcfData.assumptions) return;
     validateEngines();
@@ -1645,9 +1671,7 @@ function initDCF() {
             : 'Sliders scale the stored valuation with a generic model — the DCF JSON lacks the fields to rebuild it exactly.';
     }
     document.getElementById('dcfCurrent').textContent = fmtIV(dcfData.current_price);
-    const phil = document.getElementById('dcfPhilosophy');
-    if (dcfData.valuation_philosophy) phil.innerHTML = `<strong>Valuation philosophy:</strong> ${esc(dcfData.valuation_philosophy)}`;
-    else phil.style.display = 'none';
+    renderPhilosophy(dcfData.valuation_philosophy, document.getElementById('dcfPhilosophy'));
     const hg = dcfData.historical_growth || {};
     if (hg.growth_divergence_warning) {
         document.getElementById('growthWarning').style.display = 'flex';

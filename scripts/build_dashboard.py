@@ -564,14 +564,7 @@ def render(ticker: str, spec: dict[str, Any], csv_text: str,
 # Headless verification harness
 # ---------------------------------------------------------------------------
 
-def node_harness(script: str) -> str:
-    """Wrap the page's inline script in a DOM stub so node can execute it.
-
-    Prints JSON: for each scenario tab the IV / entry / weighted numbers the
-    cards show at that scenario's defaults, and the weighted IV after a
-    slider move -- the verify gate, without a browser.
-    """
-    stub = r"""
+_DOM_STUB = r"""
 const __els = {};
 function __el(id) {
     if (!__els[id]) __els[id] = {
@@ -588,6 +581,16 @@ globalThis.document = {
 };
 globalThis.Chart = class { constructor(ctx, cfg) { this.data = cfg.data; this.options = cfg.options; } update() {} };
 """
+
+
+def node_harness(script: str) -> str:
+    """Wrap the page's inline script in a DOM stub so node can execute it.
+
+    Prints JSON: for each scenario tab the IV / entry / weighted numbers the
+    cards show at that scenario's defaults, and the weighted IV after a
+    slider move -- the verify gate, without a browser.
+    """
+    stub = _DOM_STUB
     probe = r"""
 const __num = s => parseFloat(String(s).replace(/^[^\d\-.]+/, ''));
 const __out = {};
