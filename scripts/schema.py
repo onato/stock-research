@@ -174,6 +174,14 @@ PROMOTE_KPIS: dict[str, str] = {
     "WALT": "WALT",
     "AUM": "AUM",
     "NetInterestMargin": "NetInterestMargin",
+    # Net-revenue reporters (payments, marketplaces) have no gross Revenue
+    # line -- NetRevenue is the top line, so it must reach the CSV.
+    "NetRevenue": "NetRevenue",
+    "PayablesToMerchants": "PayablesToMerchants",
+    # Disclosed operating detail dashboards chart directly
+    "EBITDAMargin": "EBITDAMargin",
+    "EPS_Basic": "EPS_Basic",
+    "FTE": "FTE",
 }
 
 # Owner-FCF components and core-column duplicates. Listed explicitly so a
