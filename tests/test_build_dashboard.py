@@ -130,6 +130,38 @@ class TestDerive:
             bd.derive([], "per:MarketingExpense")
 
 
+class TestSeriesScale:
+    """`scale` reconciles operands recorded on different scales.
+
+    Marketing spend is stored in millions but a customer count is a raw
+    integer, so A$m / customers is ~0.00004 and rounds to zero on the axis.
+    Scaling is a display concern, kept out of `derive` so the arithmetic
+    stays dumb.
+    """
+
+    def test_scale_multiplies_a_derived_series(self):
+        _, rows = bd.read_csv(
+            "Period,MarketingExpense,ActiveCustomers\nFY2024,101.242,1333000\n")
+        s = {"label": "per", "derive": "per:MarketingExpense/ActiveCustomers",
+             "scale": 1e6}
+        assert bd._series_values(s, rows, None) == [pytest.approx(75.95, abs=0.01)]
+
+    def test_scale_multiplies_a_plain_column(self):
+        _, rows = bd.read_csv("Period,Revenue\nFY2024,1.5\n")
+        assert bd._series_values(
+            {"label": "r", "column": "Revenue", "scale": 1000}, rows, None) == [1500.0]
+
+    def test_absent_scale_leaves_values_untouched(self):
+        _, rows = bd.read_csv("Period,Revenue\nFY2024,1.5\n")
+        assert bd._series_values(
+            {"label": "r", "column": "Revenue"}, rows, None) == [1.5]
+
+    def test_scale_preserves_nulls(self):
+        _, rows = bd.read_csv("Period,Revenue\nFY2024,\n")
+        assert bd._series_values(
+            {"label": "r", "column": "Revenue", "scale": 1e6}, rows, None) == [None]
+
+
 class TestSpecValidation:
     def test_valid_spec_passes(self, spec):
         bd.validate_spec(spec, {"Revenue", "GrossMargin", "EBITDA", "FreeCashFlow",

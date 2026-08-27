@@ -32,7 +32,10 @@ Spec contract (validated by `validate_spec`):
                          interim? (default true), annotation?, y_title?,
                          y1_title?, fill?}
   series[]              {label, column | derive | dcf_path, kind?: bar|line,
-                         axis?: y|y1, color?}
+                         axis?: y|y1, color?, scale?}
+                        scale: multiply every point (display only) -- for
+                        operands recorded on different scales, e.g. A$m
+                        divided by a raw customer count
                         derive: "yoy:<col>" | "ratio:<num>/<den>" (percent)
                                 | "per:<num>/<den>" (per-unit, no % scaling)
   metric_descriptions   {help_key: {title, content(html)}}
@@ -199,10 +202,19 @@ def dcf_series(rows: list[dict[str, str]], dcf: dict[str, Any] | None,
 def _series_values(spec_series: dict[str, Any], rows: list[dict[str, str]],
                    dcf: dict[str, Any] | None) -> list[float | None]:
     if "column" in spec_series:
-        return series(rows, spec_series["column"])
-    if "derive" in spec_series:
-        return derive(rows, spec_series["derive"])
-    return dcf_series(rows, dcf, spec_series["dcf_path"])
+        vals = series(rows, spec_series["column"])
+    elif "derive" in spec_series:
+        vals = derive(rows, spec_series["derive"])
+    else:
+        vals = dcf_series(rows, dcf, spec_series["dcf_path"])
+    # `scale` reconciles operands recorded on different scales: marketing
+    # spend is in millions but a customer count is a raw integer, so the
+    # quotient is ~0.00004 and every point rounds to zero on the axis.
+    # Display-only, kept out of derive() so the arithmetic stays dumb.
+    scale = spec_series.get("scale")
+    if scale:
+        return [None if v is None else v * float(scale) for v in vals]
+    return vals
 
 
 # ---------------------------------------------------------------------------
