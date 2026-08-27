@@ -113,6 +113,175 @@ def normalize(header: object) -> str | None:
     return ALIASES.get(key)
 
 
+
+# ---------------------------------------------------------------------------
+# Promotable business KPIs
+# ---------------------------------------------------------------------------
+# `kpis` is long-form and uncanonicalised, and it is dominated by DCF plumbing
+# rather than business metrics: across the 171 ticker DBs, 871 distinct names
+# appear, 717 of them on exactly one ticker, and ~35% of all rows are
+# owner-FCF components (InterestIncome on 67 tickers, ShareRepurchases 60,
+# CashTaxesPaid 58). Those reach the valuation through dcf_context.py and
+# must never become CSV columns.
+#
+# So promotion is an explicit whitelist, not a blocklist: a name earns a
+# column by being listed here. That keeps the cross-ticker CSV shape
+# predictable and keeps this module's whole purpose -- one schema, not 382
+# columns -- intact.
+#
+# The vocabulary is flat and global rather than keyed by business type,
+# because a business type is a property of the *ticker*, not of the export.
+# export_csv.py has no business-type input and should stay a pure function of
+# the DB; choosing which of the available columns to chart belongs one layer
+# up, in the DashboardSpec.
+
+# Canonical KPI name -> CSV header. Values must not collide with CSV_HEADERS.
+PROMOTE_KPIS: dict[str, str] = {
+    # Customers and usage
+    "ActiveCustomers": "ActiveCustomers",
+    "Customers": "Customers",
+    "Subscribers": "Subscribers",
+    "MAU": "MAU",
+    "DAU": "DAU",
+    "BroadbandConnections": "BroadbandConnections",
+    # Volume
+    "GMV": "GMV",
+    "TPV": "TPV",
+    "TotalOrders": "TotalOrders",
+    "ProcessedVolume": "ProcessedVolume",
+    "GrossBookings": "GrossBookings",
+    # Unit economics
+    "AOV": "AOV",
+    "CAC": "CAC",
+    "MarketingROI": "MarketingROI",
+    "TakeRate": "TakeRate",
+    "RevenuePerActiveCustomer": "RevenuePerActiveCustomer",
+    "RepeatOrdersPctTotal": "RepeatOrdersPctTotal",
+    # Marketing cost lines
+    "MarketingExpense": "MarketingExpense",
+    "MarketingPctRevenue": "MarketingPctRevenue",
+    # Recurring revenue
+    "ARR": "ARR",
+    "SubscriptionRevenue": "SubscriptionRevenue",
+    "NetRevenueRetention": "NetRevenueRetention",
+    "ChurnRate": "ChurnRate",
+    # Property / financial sector staples
+    "AFFO": "AFFO",
+    "AFFOPerShare": "AFFOPerShare",
+    "NAVPerShare": "NAVPerShare",
+    "NTAPerShare": "NTAPerShare",
+    "Occupancy": "Occupancy",
+    "WALT": "WALT",
+    "AUM": "AUM",
+    "NetInterestMargin": "NetInterestMargin",
+}
+
+# Owner-FCF components and core-column duplicates. Listed explicitly so a
+# later vocabulary edit cannot quietly promote one spelling of a blocked
+# concept while another stays blocked.
+DCF_COMPONENT_KPIS: frozenset[str] = frozenset({
+    "InterestIncome", "InterestExpense", "ShareRepurchases", "CashTaxesPaid",
+    "EquityAwardTaxes", "DividendsPaid", "DeferredRevenue", "Depreciation",
+    "LeaseLiabilities", "LeasePrincipalRepayment", "ProfitBeforeTax",
+    "TaxExpense", "FinanceCosts", "NetDebt", "MarketableSecurities",
+    "StockBasedComp", "DilutedShares", "StayInBusinessCapex", "GrowthCapex",
+})
+
+# Spelling -> canonical KPI name, for names written more than one way across
+# the corpus. Same normalisation grammar as ALIASES above -- one grammar, not
+# two that drift apart.
+KPI_ALIASES: dict[str, str] = {
+    # Depreciation, observed six ways
+    "depreciation": "Depreciation",
+    "danda": "Depreciation",
+    "depreciationamortisation": "Depreciation",
+    "depreciationandamortisation": "Depreciation",
+    "depreciationamortization": "Depreciation",
+    "depreciationandamortization": "Depreciation",
+    "ebitdada": "Depreciation",
+    # Snake-case variants emitted by build_facts_xbrl.py
+    "cashtaxes": "CashTaxesPaid",
+    "cashtaxespaid": "CashTaxesPaid",
+    "interestincome": "InterestIncome",
+    "interestexpense": "InterestExpense",
+    "equityawardtaxes": "EquityAwardTaxes",
+    "sharerepurchases": "ShareRepurchases",
+    "buybacks": "ShareRepurchases",
+    "deferredrevenue": "DeferredRevenue",
+    "dividendspaid": "DividendsPaid",
+    "dividendspaidcash": "DividendsPaid",
+    "leaseliabilities": "LeaseLiabilities",
+    "stockbasedcomp": "StockBasedComp",
+    # Business KPIs
+    "activecustomers": "ActiveCustomers",
+    "customers": "Customers",
+    "subscribers": "Subscribers",
+    "mau": "MAU",
+    "dau": "DAU",
+    "broadbandconnections": "BroadbandConnections",
+    "gmv": "GMV",
+    "grossmerchandisevolume": "GMV",
+    "grossmerchandisevalue": "GMV",
+    "tpv": "TPV",
+    "totalpaymentvolume": "TPV",
+    "totalorders": "TotalOrders",
+    "orders": "TotalOrders",
+    "processedvolume": "ProcessedVolume",
+    "grossbookings": "GrossBookings",
+    "aov": "AOV",
+    "averageordervalue": "AOV",
+    "cac": "CAC",
+    "customeracquisitioncost": "CAC",
+    "marketingroi": "MarketingROI",
+    "takerate": "TakeRate",
+    "revenueperactivecustomer": "RevenuePerActiveCustomer",
+    "repeatorderspcttotal": "RepeatOrdersPctTotal",
+    "marketingexpense": "MarketingExpense",
+    "marketingspend": "MarketingExpense",
+    "marketingpctrevenue": "MarketingPctRevenue",
+    "arr": "ARR",
+    "annualrecurringrevenue": "ARR",
+    "subscriptionrevenue": "SubscriptionRevenue",
+    "netrevenueretention": "NetRevenueRetention",
+    "dollarbasednetretentionrate": "NetRevenueRetention",
+    "churnrate": "ChurnRate",
+    "affo": "AFFO",
+    "affopershare": "AFFOPerShare",
+    "navpershare": "NAVPerShare",
+    "ntapershare": "NTAPerShare",
+    "occupancy": "Occupancy",
+    "walt": "WALT",
+    "aum": "AUM",
+    "netinterestmargin": "NetInterestMargin",
+}
+
+
+def normalize_kpi(name: object) -> str:
+    """Canonical spelling of a `kpis.name`.
+
+    Case- and punctuation-insensitive, mirroring `normalize()`. An unknown
+    name normalises to itself (stripped of punctuation, original casing
+    preserved) so the caller can still report it -- see `make kpi-coverage`.
+    """
+    key = "".join(ch for ch in str(name).lower() if ch.isalnum())
+    return KPI_ALIASES.get(key, str(name))
+
+
+def promote_header(name: object) -> str | None:
+    """CSV header for a promotable business KPI, else None.
+
+    None covers three cases that must all stay out of the CSV: an owner-FCF
+    component, a name not in the whitelist, and any name whose header would
+    collide with a core column.
+    """
+    canon = normalize_kpi(name)
+    if canon in DCF_COMPONENT_KPIS:
+        return None
+    header = PROMOTE_KPIS.get(canon)
+    if header is None or header in CSV_HEADERS:
+        return None
+    return header
+
 def create_sql() -> str:
     """DDL for a ticker DB. Identical for every ticker -- that is the point."""
     cols = ",\n  ".join(f"{n} {t}" for n, t, _ in CORE_COLUMNS)

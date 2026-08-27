@@ -79,3 +79,53 @@ class TestFactsSchema:
         # born with it.
         cols = {r[1] for r in mem_db.execute("PRAGMA table_info('facts')").fetchall()}
         assert "currency" in cols
+
+
+class TestPromotableKpiVocabulary:
+    """The `kpis` table is long-form and uncanonicalised; only a curated
+    subset belongs in the cross-ticker CSV.
+
+    Measured over the 171 ticker DBs: 871 distinct KPI names, 717 of which
+    appear in exactly one ticker, and ~35% of all rows are DCF-component
+    lines (InterestIncome on 67 tickers, ShareRepurchases 60, CashTaxesPaid
+    58). Promoting everything would restore the 382-distinct-column drift
+    this module exists to end.
+    """
+
+    def test_promote_vocabulary_has_no_core_header_collision(self):
+        """A promoted header must never duplicate a core one.
+
+        `StockBasedComp` sits in `kpis` for 4 tickers but is already a core
+        column. Emitting both writes a duplicate CSV header, and
+        csv.DictReader silently keeps only the last of them.
+        """
+        assert not set(schema.PROMOTE_KPIS.values()) & set(schema.CSV_HEADERS)
+
+    def test_dcf_component_kpis_are_never_promoted(self):
+        """DCF inputs reach the valuation via dcf_context.py, not the CSV."""
+        assert not set(schema.PROMOTE_KPIS) & schema.DCF_COMPONENT_KPIS
+        for name in ("InterestIncome", "CashTaxesPaid", "EquityAwardTaxes",
+                     "ShareRepurchases", "DividendsPaid", "DeferredRevenue"):
+            assert schema.promote_header(name) is None
+
+    def test_promotes_a_business_kpi(self):
+        assert schema.promote_header("ActiveCustomers") == "ActiveCustomers"
+        assert schema.promote_header("MarketingExpense") == "MarketingExpense"
+
+    def test_unknown_kpi_name_is_not_promoted(self):
+        """Opt-in, not opt-out: an unrecognised name stays out of the CSV."""
+        assert schema.promote_header("WaferShipments") is None
+
+    def test_normalize_kpi_collapses_depreciation_spellings(self):
+        """One concept, six spellings observed across the corpus."""
+        names = ("Depreciation", "DandA", "DepreciationAmortisation",
+                 "DepreciationAndAmortisation", "DepreciationAmortization",
+                 "ebitda_da")
+        assert len({schema.normalize_kpi(n) for n in names}) == 1
+
+    def test_normalize_kpi_collapses_cash_taxes_spellings(self):
+        assert schema.normalize_kpi("cash_taxes") == schema.normalize_kpi("CashTaxesPaid")
+
+    def test_normalize_kpi_is_punctuation_and_case_insensitive(self):
+        for spelling in ("ActiveCustomers", "active_customers", "Active Customers"):
+            assert schema.normalize_kpi(spelling) == "ActiveCustomers"

@@ -13,6 +13,14 @@ the existing CSV. The CSV is the committed system of record and the DB a
 gitignored, rebuildable cache, so this export refines its source rather than
 replacing it. `--force` opts out and regenerates from the table alone.
 
+Whitelisted business KPIs are additionally *promoted* out of the `kpis` table
+into extra columns (see schema.PROMOTE_KPIS). That table was write-mostly --
+154 of 171 ticker DBs fill it and only dcf_context.py ever read it -- so a
+metric like ActiveCustomers was extracted, stored and then dropped, because a
+dashboard chart can only name a CSV header. Promotion is a one-way ratchet
+from the cache into the system of record: it only ever ADDS. A carried value
+always wins over a table value, so nothing already committed can be blanked.
+
 Usage: export_csv.py TICKER [--force]
 """
 
@@ -120,6 +128,60 @@ def carry_columns(out: pathlib.Path, periods: list[str]
     return extra, by_period
 
 
+def promoted_columns(db: pathlib.Path, row_periods: list[str]
+                     ) -> tuple[list[str], dict[str, dict[str, str]]]:
+    """Whitelisted business KPIs from the `kpis` table, keyed by period.
+
+    Same return shape as `carry_columns` so the writer merges both uniformly.
+    Only names in `schema.PROMOTE_KPIS` come through: the table is ~35% owner-FCF
+    components (InterestIncome on 67 tickers, CashTaxesPaid on 58), and those
+    belong to the DCF via dcf_context.py, not to a cross-ticker CSV.
+
+    Periods are matched on their canonical form, because `kpis` and
+    `core_metrics` may spell the same six months `H1 FY2020` and `H1-2020`.
+    periods.py is the single parser -- see CLAUDE.md.
+
+    Two rows that disagree about one (period, metric) yield NO value plus a
+    warning. Silently picking one is the SEK.NZ class of bug: a missing cell
+    is obvious, a plausible wrong one is not.
+    """
+    import duckdb
+
+    con = duckdb.connect(str(db), read_only=True)
+    try:
+        rows = con.execute("SELECT period, name, value FROM kpis").fetchall()
+    except duckdb.Error:
+        return [], {}          # a legacy DB born before the kpis table
+    finally:
+        con.close()
+
+    canon_to_period = {periods.canonical(periods.parse(p)): p for p in row_periods}
+    seen: dict[tuple[str, str], float | None] = {}
+    conflicts: set[tuple[str, str]] = set()
+    for raw_period, name, value in rows:
+        header = schema.promote_header(name)
+        if header is None or value is None:
+            continue
+        period = canon_to_period.get(periods.canonical(periods.parse(raw_period)))
+        if period is None:
+            continue
+        key = (period, header)
+        if key in seen and seen[key] != value:
+            conflicts.add(key)
+        seen[key] = value
+
+    for period, header in sorted(conflicts):
+        print(f"WARNING: kpis has disagreeing values for {header} in {period}"
+              " -- leaving the cell empty", file=sys.stderr)
+        del seen[(period, header)]
+
+    by_period: dict[str, dict[str, str]] = {}
+    for (period, header), value in seen.items():
+        by_period.setdefault(period, {})[header] = str(value)
+    headers = sorted({h for _, h in seen})
+    return headers, by_period
+
+
 def main() -> int:
     if len(sys.argv) < 2:
         print("usage: export_csv.py TICKER [--force]", file=sys.stderr)
@@ -177,10 +239,18 @@ def main() -> int:
                   "to discard them.", file=sys.stderr)
             return 1
 
+    row_periods = [str(r[idx]) for r in rows]
     extra: list[str] = []
     carried: dict[str, dict[str, str]] = {}
     if out.exists() and not force:
-        extra, carried = carry_columns(out, [str(r[idx]) for r in rows])
+        extra, carried = carry_columns(out, row_periods)
+
+    # Promotion runs under --force too. --force means "rebuild from the table",
+    # and a promoted column IS table-backed, so dropping it would make the one
+    # flag that regenerates from the DB the one flag that loses the DB's own
+    # KPIs. Purely-carried columns still go, which is what --force is for.
+    promoted_names, promoted = promoted_columns(db, row_periods)
+    extra += [h for h in promoted_names if h not in extra]
 
     with open(out, "w", newline="") as fh:
         w = csv.writer(fh)
@@ -189,10 +259,15 @@ def main() -> int:
             values = ["" if v is None else v for v in r]
             if extra:
                 held = carried.get(str(r[idx]), {})
-                values += [held.get(h, "") for h in extra]
+                gained = promoted.get(str(r[idx]), {})
+                # The CSV is the system of record: a populated carried cell
+                # always wins, and a promoted value only fills a blank.
+                values += [held.get(h) or gained.get(h, "") for h in extra]
             w.writerow(values)
 
     note = f", {len(extra)} carried" if extra else ""
+    if promoted_names:
+        note += f", {len(promoted_names)} promoted from kpis"
     print(f"{ticker}: {len(rows)} periods -> {out.name} "
           f"({len(schema.CSV_HEADERS)} columns{note})")
     return 0

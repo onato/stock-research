@@ -46,7 +46,7 @@ class TestSortKey:
             assert export_csv.sort_key(label) == periods_mod.sort_key(label)
 
 
-def make_db(repo, ticker, periods):
+def make_db(repo, ticker, periods, kpis=None):
     db = repo / "research" / ticker / "Reports" / f"{ticker}.duckdb"
     con = duckdb.connect(str(db))
     con.execute(schema.create_sql())
@@ -54,6 +54,9 @@ def make_db(repo, ticker, periods):
         con.execute(
             "INSERT INTO core_metrics (period, revenue, units) VALUES (?, ?, ?)",
             [p, 100.0, "millions"])
+    for row in (kpis or []):
+        con.execute("INSERT INTO kpis (period, name, value, unit) VALUES (?, ?, ?, ?)",
+                    list(row))
     con.close()
     return db
 
@@ -240,3 +243,180 @@ class TestAntiShrinkGuard:
     def test_missing_db(self, make_ticker, monkeypatch):
         make_ticker("SYN")
         assert run_main(monkeypatch, "SYN") == 1
+
+
+class TestKpiPromotion:
+    """Whitelisted business KPIs move from the `kpis` table into the CSV.
+
+    Before this, `kpis` was write-mostly: 154 of 171 ticker DBs populate it
+    and the only reader was dcf_context.py, so a metric like ActiveCustomers
+    was extracted, stored, and then dropped -- the dashboard can only chart a
+    CSV header. Promotion is the one-way ratchet from the gitignored cache
+    into the committed system of record.
+    """
+
+    def test_whitelisted_kpi_becomes_a_csv_column(self, make_ticker, monkeypatch):
+        d = make_ticker("SYN")
+        make_db(d.parent.parent, "SYN", ["FY2024", "FY2025"], kpis=[
+            ("FY2024", "ActiveCustomers", 1094000.0, "customers"),
+            ("FY2025", "ActiveCustomers", 1274000.0, "customers"),
+        ])
+        assert run_main(monkeypatch, "SYN") == 0
+        with open(d / "Reports/SYN_Metrics.csv", newline="") as fh:
+            rows = list(csv.DictReader(fh))
+        assert [r["ActiveCustomers"] for r in rows] == ["1094000.0", "1274000.0"]
+
+    def test_kpi_period_joins_on_canonical_spelling(self, make_ticker, monkeypatch):
+        """`H1 FY2020` in kpis and `H1-2020` in core_metrics are one period.
+
+        periods.py is the single parser; a startswith("FY") style match would
+        put this value on no row at all.
+        """
+        d = make_ticker("SYN")
+        make_db(d.parent.parent, "SYN", ["H1-2020", "FY2020"], kpis=[
+            ("H1 FY2020", "ActiveCustomers", 480000.0, "customers"),
+        ])
+        assert run_main(monkeypatch, "SYN") == 0
+        with open(d / "Reports/SYN_Metrics.csv", newline="") as fh:
+            rows = {r["Period"]: r for r in csv.DictReader(fh)}
+        assert rows["H1-2020"]["ActiveCustomers"] == "480000.0"
+        assert rows["FY2020"]["ActiveCustomers"] == ""
+
+    def test_dcf_component_kpi_is_not_promoted(self, make_ticker, monkeypatch):
+        """Owner-FCF inputs reach the DCF via dcf_context.py, not the CSV."""
+        d = make_ticker("SYN")
+        make_db(d.parent.parent, "SYN", ["FY2024"], kpis=[
+            ("FY2024", "InterestIncome", 0.4, "AUD millions"),
+            ("FY2024", "CashTaxesPaid", 1.2, "AUD millions"),
+        ])
+        assert run_main(monkeypatch, "SYN") == 0
+        with open(d / "Reports/SYN_Metrics.csv", newline="") as fh:
+            hdr = next(csv.reader(fh))
+        assert "InterestIncome" not in hdr
+        assert "CashTaxesPaid" not in hdr
+
+    def test_unmapped_kpi_is_not_promoted(self, make_ticker, monkeypatch):
+        d = make_ticker("SYN")
+        make_db(d.parent.parent, "SYN", ["FY2024"], kpis=[
+            ("FY2024", "WaferShipments", 42.0, "units"),
+        ])
+        assert run_main(monkeypatch, "SYN") == 0
+        with open(d / "Reports/SYN_Metrics.csv", newline="") as fh:
+            hdr = next(csv.reader(fh))
+        assert "WaferShipments" not in hdr
+
+    def test_carried_column_survives_when_kpis_table_is_empty(
+            self, make_ticker, monkeypatch):
+        """The UBER/PYPL/XYZ regression, named for it.
+
+        Those tickers hold their KPI columns ONLY in the committed CSV.
+        Promotion must add to carry-through, never replace it.
+        """
+        d = make_ticker("SYN")
+        out = d / "Reports/SYN_Metrics.csv"
+        make_db(d.parent.parent, "SYN", ["FY2024"])
+        out.write_text("Period,Revenue,GrossBookings\nFY2024,100.0,55.5\n")
+        assert run_main(monkeypatch, "SYN") == 0
+        with open(out, newline="") as fh:
+            rows = list(csv.DictReader(fh))
+        assert rows[0]["GrossBookings"] == "55.5"
+
+    def test_carried_value_wins_over_a_conflicting_kpi_row(
+            self, make_ticker, monkeypatch):
+        """The CSV is the system of record; the DB is a rebuildable cache."""
+        d = make_ticker("SYN")
+        out = d / "Reports/SYN_Metrics.csv"
+        make_db(d.parent.parent, "SYN", ["FY2024"], kpis=[
+            ("FY2024", "ActiveCustomers", 1274000.0, "customers"),
+        ])
+        out.write_text("Period,Revenue,ActiveCustomers\nFY2024,100.0,999\n")
+        assert run_main(monkeypatch, "SYN") == 0
+        with open(out, newline="") as fh:
+            rows = list(csv.DictReader(fh))
+        assert rows[0]["ActiveCustomers"] == "999"
+
+    def test_promoted_column_fills_only_blank_carried_cells(
+            self, make_ticker, monkeypatch):
+        d = make_ticker("SYN")
+        out = d / "Reports/SYN_Metrics.csv"
+        make_db(d.parent.parent, "SYN", ["FY2024", "FY2025"], kpis=[
+            ("FY2024", "ActiveCustomers", 1094000.0, "customers"),
+            ("FY2025", "ActiveCustomers", 1274000.0, "customers"),
+        ])
+        out.write_text("Period,Revenue,ActiveCustomers\n"
+                       "FY2024,100.0,999\nFY2025,100.0,\n")
+        assert run_main(monkeypatch, "SYN") == 0
+        with open(out, newline="") as fh:
+            rows = list(csv.DictReader(fh))
+        assert rows[0]["ActiveCustomers"] == "999"          # CSV wins
+        assert rows[1]["ActiveCustomers"] == "1274000.0"    # blank gets filled
+
+    def test_force_keeps_promoted_columns(self, make_ticker, monkeypatch):
+        """--force rebuilds from the DB, so it must not lose the DB's own KPIs.
+
+        It still drops purely-carried columns (that is what --force means),
+        but a promoted column is table-backed and therefore recoverable.
+        """
+        d = make_ticker("SYN")
+        out = d / "Reports/SYN_Metrics.csv"
+        make_db(d.parent.parent, "SYN", ["FY2024"], kpis=[
+            ("FY2024", "ActiveCustomers", 1094000.0, "customers"),
+        ])
+        out.write_text("Period,Revenue,ActiveCustomers,GrossBookings\n"
+                       "FY2024,100.0,999,55.5\n")
+        assert run_main(monkeypatch, "SYN", "--force") == 0
+        with open(out, newline="") as fh:
+            rows = list(csv.DictReader(fh))
+        assert rows[0]["ActiveCustomers"] == "1094000.0"   # rebuilt from the DB
+        assert "GrossBookings" not in rows[0]              # carried, dropped
+
+    def test_conflicting_duplicate_rows_produce_no_value(
+            self, make_ticker, monkeypatch, capsys):
+        """A silent pick between disagreeing values is the SEK.NZ class of bug:
+        a missing cell is obvious, a plausible wrong one is not."""
+        d = make_ticker("SYN")
+        make_db(d.parent.parent, "SYN", ["FY2024"], kpis=[
+            ("FY2024", "ActiveCustomers", 1094000.0, "customers"),
+            ("FY2024", "ActiveCustomers", 1234567.0, "customers"),
+        ])
+        assert run_main(monkeypatch, "SYN") == 0
+        with open(d / "Reports/SYN_Metrics.csv", newline="") as fh:
+            rows = list(csv.DictReader(fh))
+        # No surviving value, so no column at all -- and a warning naming it.
+        assert rows[0].get("ActiveCustomers", "") == ""
+        assert "ActiveCustomers" in capsys.readouterr().err
+
+    def test_agreeing_duplicate_rows_are_not_a_conflict(
+            self, make_ticker, monkeypatch):
+        d = make_ticker("SYN")
+        make_db(d.parent.parent, "SYN", ["FY2024"], kpis=[
+            ("FY2024", "ActiveCustomers", 1094000.0, "customers"),
+            ("FY2024", "ActiveCustomers", 1094000.0, "customers"),
+        ])
+        assert run_main(monkeypatch, "SYN") == 0
+        with open(d / "Reports/SYN_Metrics.csv", newline="") as fh:
+            rows = list(csv.DictReader(fh))
+        assert rows[0]["ActiveCustomers"] == "1094000.0"
+
+    def test_kpi_values_are_not_rescaled(self, make_ticker, monkeypatch):
+        """A headcount is not in millions. metrics_normalized deliberately
+        does not touch kpis; the export must not either."""
+        d = make_ticker("SYN")
+        make_db(d.parent.parent, "SYN", ["FY2024"], kpis=[
+            ("FY2024", "ActiveCustomers", 1094000.0, "customers"),
+        ])
+        assert run_main(monkeypatch, "SYN") == 0
+        with open(d / "Reports/SYN_Metrics.csv", newline="") as fh:
+            rows = list(csv.DictReader(fh))
+        assert rows[0]["ActiveCustomers"] == "1094000.0"
+
+    def test_promotion_is_idempotent(self, make_ticker, monkeypatch):
+        d = make_ticker("SYN")
+        out = d / "Reports/SYN_Metrics.csv"
+        make_db(d.parent.parent, "SYN", ["FY2024"], kpis=[
+            ("FY2024", "ActiveCustomers", 1094000.0, "customers"),
+        ])
+        assert run_main(monkeypatch, "SYN") == 0
+        first = out.read_text()
+        assert run_main(monkeypatch, "SYN") == 0
+        assert out.read_text() == first
