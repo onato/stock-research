@@ -496,3 +496,55 @@ console.log(JSON.stringify({ html: el.innerHTML }));
         out = self._philosophy_html(html, dcf, tmp_path, {"summary": "Peak <script>alert(1)</script> FCF"})
         assert "<script>alert(1)</script>" not in out
         assert "&lt;script&gt;" in out
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+class TestChartDrawOrder:
+    """Chart.js paints datasets by ascending `order`, so a line sharing a chart
+    with bars must carry a LOWER order than the bars or the bars cover it --
+    the "Revenue & YoY Growth" line was drawn underneath its own bars."""
+
+    def probe(self, html, tmp_path):
+        js = tmp_path / "dash.js"
+        js.write_text(bd._DOM_STUB + inline_script(html) + r"""
+initCharts();
+const out = {};
+for (const [id, ch] of Object.entries(chartRegistry)) {
+    out[id] = ch.data.datasets.map(d => ({ type: d.type, order: d.order,
+    borderWidth: d.borderWidth ?? null, pointRadius: d.pointRadius ?? null,
+    pointBorderColor: d.pointBorderColor ?? null }));
+}
+console.log(JSON.stringify(out));
+""")
+        r = subprocess.run(["node", str(js)], capture_output=True, text=True, check=False)
+        assert r.returncode == 0, r.stderr
+        return json.loads(r.stdout)
+
+    def test_line_draws_above_bars_in_a_mixed_chart(self, html, tmp_path):
+        out = self.probe(html, tmp_path)
+        rev = out["revenueChart"]
+        bar = next(d for d in rev if d["type"] == "bar")
+        line = next(d for d in rev if d["type"] == "line")
+        assert line["order"] < bar["order"], (
+            f"line order {line['order']} must be below bar order {bar['order']}"
+        )
+
+    def test_all_bar_chart_keeps_spec_order(self, html, tmp_path):
+        """fcfChart is two bars -- their relative order must stay as specified."""
+        orders = [d["order"] for d in self.probe(html, tmp_path)["fcfChart"]]
+        assert orders == sorted(orders)
+
+    def test_line_over_bars_is_thickened_and_pointed(self, html, tmp_path):
+        """Draw order alone is not enough: a hairline over chunky bars still
+        reads poorly, so a line sharing a chart with bars gets weight+points."""
+        line = next(d for d in self.probe(html, tmp_path)["revenueChart"]
+                    if d["type"] == "line")
+        assert line["borderWidth"] >= 3
+        assert line["pointRadius"] >= 3
+        assert line["pointBorderColor"], "points need a halo against the bars"
+
+    def test_standalone_line_keeps_default_weight(self, html, tmp_path):
+        """gmChart is a line on its own -- no bars to fight, so leave it alone."""
+        line = self.probe(html, tmp_path)["gmChart"][0]
+        assert line["borderWidth"] is None
+        assert line["pointRadius"] is None
