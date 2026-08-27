@@ -2304,14 +2304,29 @@ function buildChart(spec) {
     if (!cd || !el) return;
     const annual = cd.annual;
     const hasY1 = spec.series.some(s => s.axis === 'y1');
+    const kindOf = s => s.kind || spec.type || 'bar';
+    const hasBars = spec.series.some(s => kindOf(s) === 'bar');
     const datasets = spec.series.map((s, i) => {
         const color = colors[s.color] || palette[i % palette.length];
-        const kind = s.kind || spec.type || 'bar';
-        const ds = { type: kind, label: s.label, data: annual.data[i], yAxisID: s.axis || 'y', spanGaps: true };
+        const kind = kindOf(s);
+        // Chart.js paints ascending `order`, so lines need a LOWER order than
+        // bars to land on top of them -- otherwise a YoY line hides behind its bars.
+        const ds = { type: kind, label: s.label, data: annual.data[i], yAxisID: s.axis || 'y',
+                     spanGaps: true, order: (kind === 'bar' ? 100 : 0) + i };
         if (kind === 'bar') { ds.backgroundColor = color; ds.borderRadius = 4; }
         else {
             ds.borderColor = color; ds.backgroundColor = spec.fill ? color.replace(')', ',0.15)').replace('rgb', 'rgba') : color;
             ds.tension = 0.3; ds.fill = !!spec.fill;
+            if (hasBars) {
+                // Over bars a hairline disappears: give it weight and dotted
+                // points haloed in the card background so it stays legible.
+                ds.borderWidth = 3;
+                ds.pointRadius = 3.5;
+                ds.pointBackgroundColor = color;
+                ds.pointBorderColor = 'rgba(22, 26, 46, 0.9)';
+                ds.pointBorderWidth = 1.5;
+                ds.pointHoverRadius = 5.5;
+            }
         }
         return ds;
     });
@@ -2886,6 +2901,32 @@ function renderSensitivityMatrix() {
     table.innerHTML = html;
 }
 
+function philosophyLabel(key) {
+    const t = key.replace(/_/g, ' ').trim();
+    return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/* `valuation_philosophy` is a string on some DCF JSONs and a nested object on
+   others (52 of them). Interpolating the object rendered "[object Object]". */
+function philosophyParts(value, label) {
+    if (value === null || value === undefined || value === '') return [];
+    if (Array.isArray(value)) return value.flatMap(v => philosophyParts(v, label));
+    if (typeof value === 'object') {
+        return Object.keys(value).flatMap(k => philosophyParts(value[k], philosophyLabel(k)));
+    }
+    return [{ label: label, text: String(value) }];
+}
+
+function renderPhilosophy(value, el) {
+    if (!el) return;
+    const parts = philosophyParts(value, '');
+    if (!parts.length) { el.style.display = 'none'; return; }
+    const body = parts
+        .map(p => (p.label ? `<strong>${esc(p.label)}:</strong> ` : '') + esc(p.text))
+        .join('<br>');
+    el.innerHTML = `<strong>Valuation philosophy:</strong> ${body}`;
+}
+
 function initDCF() {
     if (!dcfData || !dcfData.valuation || !dcfData.assumptions) return;
     validateEngines();
@@ -2897,9 +2938,7 @@ function initDCF() {
             : 'Sliders scale the stored valuation with a generic model — the DCF JSON lacks the fields to rebuild it exactly.';
     }
     document.getElementById('dcfCurrent').textContent = fmtIV(dcfData.current_price);
-    const phil = document.getElementById('dcfPhilosophy');
-    if (dcfData.valuation_philosophy) phil.innerHTML = `<strong>Valuation philosophy:</strong> ${esc(dcfData.valuation_philosophy)}`;
-    else phil.style.display = 'none';
+    renderPhilosophy(dcfData.valuation_philosophy, document.getElementById('dcfPhilosophy'));
     const hg = dcfData.historical_growth || {};
     if (hg.growth_divergence_warning) {
         document.getElementById('growthWarning').style.display = 'flex';

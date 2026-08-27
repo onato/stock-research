@@ -3694,14 +3694,29 @@ function buildChart(spec) {
     if (!cd || !el) return;
     const annual = cd.annual;
     const hasY1 = spec.series.some(s => s.axis === 'y1');
+    const kindOf = s => s.kind || spec.type || 'bar';
+    const hasBars = spec.series.some(s => kindOf(s) === 'bar');
     const datasets = spec.series.map((s, i) => {
         const color = colors[s.color] || palette[i % palette.length];
-        const kind = s.kind || spec.type || 'bar';
-        const ds = { type: kind, label: s.label, data: annual.data[i], yAxisID: s.axis || 'y', spanGaps: true };
+        const kind = kindOf(s);
+        // Chart.js paints ascending `order`, so lines need a LOWER order than
+        // bars to land on top of them -- otherwise a YoY line hides behind its bars.
+        const ds = { type: kind, label: s.label, data: annual.data[i], yAxisID: s.axis || 'y',
+                     spanGaps: true, order: (kind === 'bar' ? 100 : 0) + i };
         if (kind === 'bar') { ds.backgroundColor = color; ds.borderRadius = 4; }
         else {
             ds.borderColor = color; ds.backgroundColor = spec.fill ? color.replace(')', ',0.15)').replace('rgb', 'rgba') : color;
             ds.tension = 0.3; ds.fill = !!spec.fill;
+            if (hasBars) {
+                // Over bars a hairline disappears: give it weight and dotted
+                // points haloed in the card background so it stays legible.
+                ds.borderWidth = 3;
+                ds.pointRadius = 3.5;
+                ds.pointBackgroundColor = color;
+                ds.pointBorderColor = 'rgba(22, 26, 46, 0.9)';
+                ds.pointBorderWidth = 1.5;
+                ds.pointHoverRadius = 5.5;
+            }
         }
         return ds;
     });

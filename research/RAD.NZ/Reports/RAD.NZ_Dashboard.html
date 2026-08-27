@@ -3262,14 +3262,29 @@ function buildChart(spec) {
     if (!cd || !el) return;
     const annual = cd.annual;
     const hasY1 = spec.series.some(s => s.axis === 'y1');
+    const kindOf = s => s.kind || spec.type || 'bar';
+    const hasBars = spec.series.some(s => kindOf(s) === 'bar');
     const datasets = spec.series.map((s, i) => {
         const color = colors[s.color] || palette[i % palette.length];
-        const kind = s.kind || spec.type || 'bar';
-        const ds = { type: kind, label: s.label, data: annual.data[i], yAxisID: s.axis || 'y', spanGaps: true };
+        const kind = kindOf(s);
+        // Chart.js paints ascending `order`, so lines need a LOWER order than
+        // bars to land on top of them -- otherwise a YoY line hides behind its bars.
+        const ds = { type: kind, label: s.label, data: annual.data[i], yAxisID: s.axis || 'y',
+                     spanGaps: true, order: (kind === 'bar' ? 100 : 0) + i };
         if (kind === 'bar') { ds.backgroundColor = color; ds.borderRadius = 4; }
         else {
             ds.borderColor = color; ds.backgroundColor = spec.fill ? color.replace(')', ',0.15)').replace('rgb', 'rgba') : color;
             ds.tension = 0.3; ds.fill = !!spec.fill;
+            if (hasBars) {
+                // Over bars a hairline disappears: give it weight and dotted
+                // points haloed in the card background so it stays legible.
+                ds.borderWidth = 3;
+                ds.pointRadius = 3.5;
+                ds.pointBackgroundColor = color;
+                ds.pointBorderColor = 'rgba(22, 26, 46, 0.9)';
+                ds.pointBorderWidth = 1.5;
+                ds.pointHoverRadius = 5.5;
+            }
         }
         return ds;
     });
@@ -3796,26 +3811,78 @@ function renderHistoricalGrowth() {
     }).join('');
 }
 
+// The grid is not always WACC x terminal growth: a multiple-exit model
+// (no Gordon terminal) ships e.g. coe_range x exit_multiple_range. Find the
+// two axes by shape -- rows match matrix.length, cols match the row width --
+// so any well-formed grid renders instead of being discarded.
+const SENS_AXES = {
+    wacc_range: { label: 'WACC', unit: '%', base: b => b.wacc },
+    coe_range: { label: 'Cost of equity', unit: '%', base: b => b.cost_of_equity ?? b.coe ?? b.wacc },
+    terminal_growth_range: { label: 'Term G', unit: '%', base: b => b.terminal_growth },
+    exit_multiple_range: { label: 'Exit multiple', unit: 'x', base: b => b.exit_multiple },
+    growth_range: { label: 'Growth', unit: '%', base: b => b.growth },
+};
+
+function pickSensAxis(sens, len, exclude) {
+    const keys = Object.keys(sens).filter(k =>
+        k !== exclude && Array.isArray(sens[k]) && sens[k].length === len && sens[k] !== sens.matrix);
+    // prefer a known axis name, else fall back to any range-shaped array
+    return keys.find(k => SENS_AXES[k]) || keys.find(k => /_range$/.test(k)) || null;
+}
+
 function renderSensitivityMatrix() {
     const sens = dcfData.sensitivity;
     const table = document.getElementById('sensitivityMatrix');
-    if (!sens || !Array.isArray(sens.matrix) || !sens.wacc_range || !sens.terminal_growth_range) {
+    const rows = sens && Array.isArray(sens.matrix) ? sens.matrix : null;
+    const rowKey = rows && rows.length ? pickSensAxis(sens, rows.length, null) : null;
+    const colKey = rowKey && Array.isArray(rows[0]) ? pickSensAxis(sens, rows[0].length, rowKey) : null;
+    if (!rowKey || !colKey) {
         table.innerHTML = '<tr><td>No sensitivity grid in the DCF JSON</td></tr>';
         return;
     }
     const price = dcfData.current_price;
-    const base = dcfData.assumptions.base;
-    let html = '<tr><th>WACC \\ Term G</th>' + sens.terminal_growth_range.map(tg => `<th>${tg}%</th>`).join('') + '</tr>';
-    sens.wacc_range.forEach((wacc, i) => {
-        html += `<tr><th>${wacc}%</th>`;
-        (sens.matrix[i] || []).forEach((val, j) => {
-            const hl = wacc === base.wacc && sens.terminal_growth_range[j] === base.terminal_growth;
+    const base = dcfData.assumptions.base || {};
+    const rowAx = SENS_AXES[rowKey] || { label: rowKey.replace(/_range$/, ''), unit: '', base: () => undefined };
+    const colAx = SENS_AXES[colKey] || { label: colKey.replace(/_range$/, ''), unit: '', base: () => undefined };
+    const rowBase = rowAx.base(base), colBase = colAx.base(base);
+    let html = `<tr><th>${rowAx.label} \\ ${colAx.label}</th>`
+        + sens[colKey].map(c => `<th>${c}${colAx.unit}</th>`).join('') + '</tr>';
+    sens[rowKey].forEach((rv, i) => {
+        html += `<tr><th>${rv}${rowAx.unit}</th>`;
+        (rows[i] || []).forEach((val, j) => {
+            const hl = rv === rowBase && sens[colKey][j] === colBase;
             const cls = hl ? 'highlight' : (val >= price ? 'above-current' : 'below-current');
             html += `<td class="${cls}">${fmtIV(val)}</td>`;
         });
         html += '</tr>';
     });
     table.innerHTML = html;
+}
+
+function philosophyLabel(key) {
+    const t = key.replace(/_/g, ' ').trim();
+    return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/* `valuation_philosophy` is a string on some DCF JSONs and a nested object on
+   others (52 of them). Interpolating the object rendered "[object Object]". */
+function philosophyParts(value, label) {
+    if (value === null || value === undefined || value === '') return [];
+    if (Array.isArray(value)) return value.flatMap(v => philosophyParts(v, label));
+    if (typeof value === 'object') {
+        return Object.keys(value).flatMap(k => philosophyParts(value[k], philosophyLabel(k)));
+    }
+    return [{ label: label, text: String(value) }];
+}
+
+function renderPhilosophy(value, el) {
+    if (!el) return;
+    const parts = philosophyParts(value, '');
+    if (!parts.length) { el.style.display = 'none'; return; }
+    const body = parts
+        .map(p => (p.label ? `<strong>${esc(p.label)}:</strong> ` : '') + esc(p.text))
+        .join('<br>');
+    el.innerHTML = `<strong>Valuation philosophy:</strong> ${body}`;
 }
 
 function initDCF() {
@@ -3829,9 +3896,7 @@ function initDCF() {
             : 'Sliders scale the stored valuation with a generic model — the DCF JSON lacks the fields to rebuild it exactly.';
     }
     document.getElementById('dcfCurrent').textContent = fmtIV(dcfData.current_price);
-    const phil = document.getElementById('dcfPhilosophy');
-    if (dcfData.valuation_philosophy) phil.innerHTML = `<strong>Valuation philosophy:</strong> ${esc(dcfData.valuation_philosophy)}`;
-    else phil.style.display = 'none';
+    renderPhilosophy(dcfData.valuation_philosophy, document.getElementById('dcfPhilosophy'));
     const hg = dcfData.historical_growth || {};
     if (hg.growth_divergence_warning) {
         document.getElementById('growthWarning').style.display = 'flex';

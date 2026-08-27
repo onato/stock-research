@@ -3330,14 +3330,29 @@ function buildChart(spec) {
     if (!cd || !el) return;
     const annual = cd.annual;
     const hasY1 = spec.series.some(s => s.axis === 'y1');
+    const kindOf = s => s.kind || spec.type || 'bar';
+    const hasBars = spec.series.some(s => kindOf(s) === 'bar');
     const datasets = spec.series.map((s, i) => {
         const color = colors[s.color] || palette[i % palette.length];
-        const kind = s.kind || spec.type || 'bar';
-        const ds = { type: kind, label: s.label, data: annual.data[i], yAxisID: s.axis || 'y', spanGaps: true };
+        const kind = kindOf(s);
+        // Chart.js paints ascending `order`, so lines need a LOWER order than
+        // bars to land on top of them -- otherwise a YoY line hides behind its bars.
+        const ds = { type: kind, label: s.label, data: annual.data[i], yAxisID: s.axis || 'y',
+                     spanGaps: true, order: (kind === 'bar' ? 100 : 0) + i };
         if (kind === 'bar') { ds.backgroundColor = color; ds.borderRadius = 4; }
         else {
             ds.borderColor = color; ds.backgroundColor = spec.fill ? color.replace(')', ',0.15)').replace('rgb', 'rgba') : color;
             ds.tension = 0.3; ds.fill = !!spec.fill;
+            if (hasBars) {
+                // Over bars a hairline disappears: give it weight and dotted
+                // points haloed in the card background so it stays legible.
+                ds.borderWidth = 3;
+                ds.pointRadius = 3.5;
+                ds.pointBackgroundColor = color;
+                ds.pointBorderColor = 'rgba(22, 26, 46, 0.9)';
+                ds.pointBorderWidth = 1.5;
+                ds.pointHoverRadius = 5.5;
+            }
         }
         return ds;
     });
@@ -3410,10 +3425,15 @@ function scenarioDefaults(sc) {
 // ---- Valuation engine --------------------------------------------------
 // Reproduces the analyst's model from `assumptions[scenario]` so the sliders
 // recompute real numbers. Three families, detected from the fields present:
-//   component  : revenue path x (ebitda margin - sbc - lease - D&A) -> tax ->
-//                + D&A - capex + wc capture on revenue change   (owner-fcf.md s2)
-//   fcf-margin : revenue path x fcf margin path
-//   fcf-growth : last_fcf compounded along the growth path
+//   component    : revenue path x (ebitda margin - sbc - lease - D&A) -> tax ->
+//                  + D&A - capex + wc capture on revenue change (owner-fcf.md s2)
+//   sum-of-parts : component OpCo leg (WACC) + a second embedded-lender leg
+//                  (assumptions[sc].monee: book_growth/roa_path/cost_of_equity,
+//                  discounted separately at its own cost of equity) + surplus
+//                  net cash, for models where one FCF stream cannot price a
+//                  credit book (dcf-methods sum-of-the-parts routing)
+//   fcf-margin   : revenue path x fcf margin path
+//   fcf-growth   : last_fcf compounded along the growth path
 // Each is validated at the scenario's own defaults against
 // valuation[scenario].intrinsic_value; a family that cannot reproduce the
 // JSON within ENGINE_TOL is not trusted and the page falls back to the
@@ -3455,10 +3475,46 @@ function engineFamily(sc) {
     const g = growthPathOf(a);
     if (!g) return null;
     const hasMargin = firstOf(a, ['ebitda_margin_path', 'ebitda_margin_path_pct', 'ebitda_margin']) != null;
+    if (hasMargin && a.monee && baseRevenueOf(sc, g[0]) != null) return 'sum-of-parts';
     if (hasMargin && baseRevenueOf(sc, g[0]) != null) return 'component';
     if (firstOf(a, ['fcf_margin', 'fcf_margins', 'fcf_margin_path']) != null && baseRevenueOf(sc, g[0]) != null) return 'fcf-margin';
     if ((dcfData.inputs || {}).last_fcf != null) return 'fcf-growth';
     return null;
+}
+// Second, independently-discounted leg for sum-of-the-parts DCFs: an
+// embedded lender/insurer valued on distributable earnings (post-tax
+// earnings less a fixed share of loan/book growth retained as capital) at
+// its own cost of equity, not the OpCo WACC. Detected from assumptions[sc]
+// .monee = {book_growth[], roa_path[], capital_ratio_pct, cost_of_equity,
+// terminal_growth, exit_pe_cap}; book0 is backed out from
+// projections[sc].monee.loan_book_year_end[0] and the first book_growth
+// rate so the leg still works if the growth slider is not wired to it.
+function moneeLeg(sc) {
+    const a = (dcfData.assumptions || {})[sc] || {};
+    const m = a.monee;
+    const proj = ((dcfData.projections || {})[sc] || {}).monee;
+    if (!m || !proj || !Array.isArray(proj.loan_book_year_end) || !proj.loan_book_year_end.length) return null;
+    const bookGrowth = m.book_growth, roa = m.roa_path;
+    if (!Array.isArray(bookGrowth) || !Array.isArray(roa)) return null;
+    const n = bookGrowth.length;
+    const coe = Number(m.cost_of_equity);
+    const capRatio = Number(m.capital_ratio_pct || 0);
+    if (!isFinite(coe)) return null;
+    let book = proj.loan_book_year_end[0] / (1 + bookGrowth[0] / 100);
+    const distrib = [];
+    for (let i = 0; i < n; i++) {
+        const prev = book;
+        book *= (1 + bookGrowth[i] / 100);
+        const avgBook = (book + prev) / 2;
+        const earnings = avgBook * roa[i] / 100;
+        const retained = (book - prev) * capRatio / 100;
+        distrib.push(earnings - retained);
+    }
+    const tg = Number(m.terminal_growth), cap = Number(m.exit_pe_cap || 12);
+    const last = distrib[n - 1];
+    const gordon = (coe - tg) > 0 ? last * (1 + tg / 100) / ((coe - tg) / 100) : last * cap;
+    const tv = Math.max(0, Math.min(gordon, last * cap));
+    return { distrib: distrib, tv: tv, coe: coe, n: n };
 }
 // Shift the growth path by the slider delta at year 1, tapering to zero by
 // the final year so the long-run rate is untouched.
@@ -3511,6 +3567,24 @@ function runEngine(sc, ov) {
         ? Number(inputs.projected_shares[n - 1]) : Number(inputs.shares_outstanding);
     if (!shares) return null;
     const pv = (rate) => fcfs.reduce((s, f, i) => s + f / Math.pow(1 + rate / 100, i + 1), 0);
+    if (family === 'sum-of-parts') {
+        // The Monee (or equivalent embedded-lender) leg is not driven by the
+        // OpCo sliders: its own book-growth/ROA/cost-of-equity path is a
+        // separate, unlisted-elsewhere model the growth/WACC/terminal
+        // sliders intentionally do not touch (see the DCF section note).
+        const leg = moneeLeg(sc);
+        if (!leg) return null;
+        const pvLeg = (rate) => leg.distrib.reduce((s, f, i) => s + f / Math.pow(1 + rate / 100, i + 1), 0);
+        const moneeEquity = pvLeg(leg.coe) + leg.tv / Math.pow(1 + leg.coe / 100, leg.n);
+        const surplusCash = -netDebt;
+        const ev = pv(wacc) + tv / Math.pow(1 + wacc / 100, n);
+        const equityValue = ev + moneeEquity + surplusCash;
+        const hurdle = ((dcfData.entry_price || {}).hurdle_rate || 0.15) * 100;
+        const entryEquity = pv(hurdle) + tv / Math.pow(1 + hurdle / 100, n)
+            + pvLeg(hurdle) + leg.tv / Math.pow(1 + hurdle / 100, leg.n) + surplusCash;
+        return { family: family, iv: equityValue / shares, entryPrice: entryEquity / shares,
+                 fcfList: fcfs, growthRates: growth };
+    }
     const ev = pv(wacc) + tv / Math.pow(1 + wacc / 100, n);
     const hurdle = ((dcfData.entry_price || {}).hurdle_rate || 0.15) * 100;
     const entry = (pv(hurdle) + tv / Math.pow(1 + hurdle / 100, n) - netDebt) / shares;
@@ -3805,26 +3879,78 @@ function renderHistoricalGrowth() {
     }).join('');
 }
 
+// The grid is not always WACC x terminal growth: a multiple-exit model
+// (no Gordon terminal) ships e.g. coe_range x exit_multiple_range. Find the
+// two axes by shape -- rows match matrix.length, cols match the row width --
+// so any well-formed grid renders instead of being discarded.
+const SENS_AXES = {
+    wacc_range: { label: 'WACC', unit: '%', base: b => b.wacc },
+    coe_range: { label: 'Cost of equity', unit: '%', base: b => b.cost_of_equity ?? b.coe ?? b.wacc },
+    terminal_growth_range: { label: 'Term G', unit: '%', base: b => b.terminal_growth },
+    exit_multiple_range: { label: 'Exit multiple', unit: 'x', base: b => b.exit_multiple },
+    growth_range: { label: 'Growth', unit: '%', base: b => b.growth },
+};
+
+function pickSensAxis(sens, len, exclude) {
+    const keys = Object.keys(sens).filter(k =>
+        k !== exclude && Array.isArray(sens[k]) && sens[k].length === len && sens[k] !== sens.matrix);
+    // prefer a known axis name, else fall back to any range-shaped array
+    return keys.find(k => SENS_AXES[k]) || keys.find(k => /_range$/.test(k)) || null;
+}
+
 function renderSensitivityMatrix() {
     const sens = dcfData.sensitivity;
     const table = document.getElementById('sensitivityMatrix');
-    if (!sens || !Array.isArray(sens.matrix) || !sens.wacc_range || !sens.terminal_growth_range) {
+    const rows = sens && Array.isArray(sens.matrix) ? sens.matrix : null;
+    const rowKey = rows && rows.length ? pickSensAxis(sens, rows.length, null) : null;
+    const colKey = rowKey && Array.isArray(rows[0]) ? pickSensAxis(sens, rows[0].length, rowKey) : null;
+    if (!rowKey || !colKey) {
         table.innerHTML = '<tr><td>No sensitivity grid in the DCF JSON</td></tr>';
         return;
     }
     const price = dcfData.current_price;
-    const base = dcfData.assumptions.base;
-    let html = '<tr><th>WACC \\ Term G</th>' + sens.terminal_growth_range.map(tg => `<th>${tg}%</th>`).join('') + '</tr>';
-    sens.wacc_range.forEach((wacc, i) => {
-        html += `<tr><th>${wacc}%</th>`;
-        (sens.matrix[i] || []).forEach((val, j) => {
-            const hl = wacc === base.wacc && sens.terminal_growth_range[j] === base.terminal_growth;
+    const base = dcfData.assumptions.base || {};
+    const rowAx = SENS_AXES[rowKey] || { label: rowKey.replace(/_range$/, ''), unit: '', base: () => undefined };
+    const colAx = SENS_AXES[colKey] || { label: colKey.replace(/_range$/, ''), unit: '', base: () => undefined };
+    const rowBase = rowAx.base(base), colBase = colAx.base(base);
+    let html = `<tr><th>${rowAx.label} \\ ${colAx.label}</th>`
+        + sens[colKey].map(c => `<th>${c}${colAx.unit}</th>`).join('') + '</tr>';
+    sens[rowKey].forEach((rv, i) => {
+        html += `<tr><th>${rv}${rowAx.unit}</th>`;
+        (rows[i] || []).forEach((val, j) => {
+            const hl = rv === rowBase && sens[colKey][j] === colBase;
             const cls = hl ? 'highlight' : (val >= price ? 'above-current' : 'below-current');
             html += `<td class="${cls}">${fmtIV(val)}</td>`;
         });
         html += '</tr>';
     });
     table.innerHTML = html;
+}
+
+function philosophyLabel(key) {
+    const t = key.replace(/_/g, ' ').trim();
+    return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/* `valuation_philosophy` is a string on some DCF JSONs and a nested object on
+   others (52 of them). Interpolating the object rendered "[object Object]". */
+function philosophyParts(value, label) {
+    if (value === null || value === undefined || value === '') return [];
+    if (Array.isArray(value)) return value.flatMap(v => philosophyParts(v, label));
+    if (typeof value === 'object') {
+        return Object.keys(value).flatMap(k => philosophyParts(value[k], philosophyLabel(k)));
+    }
+    return [{ label: label, text: String(value) }];
+}
+
+function renderPhilosophy(value, el) {
+    if (!el) return;
+    const parts = philosophyParts(value, '');
+    if (!parts.length) { el.style.display = 'none'; return; }
+    const body = parts
+        .map(p => (p.label ? `<strong>${esc(p.label)}:</strong> ` : '') + esc(p.text))
+        .join('<br>');
+    el.innerHTML = `<strong>Valuation philosophy:</strong> ${body}`;
 }
 
 function initDCF() {
@@ -3838,9 +3964,7 @@ function initDCF() {
             : 'Sliders scale the stored valuation with a generic model — the DCF JSON lacks the fields to rebuild it exactly.';
     }
     document.getElementById('dcfCurrent').textContent = fmtIV(dcfData.current_price);
-    const phil = document.getElementById('dcfPhilosophy');
-    if (dcfData.valuation_philosophy) phil.innerHTML = `<strong>Valuation philosophy:</strong> ${esc(dcfData.valuation_philosophy)}`;
-    else phil.style.display = 'none';
+    renderPhilosophy(dcfData.valuation_philosophy, document.getElementById('dcfPhilosophy'));
     const hg = dcfData.historical_growth || {};
     if (hg.growth_divergence_warning) {
         document.getElementById('growthWarning').style.display = 'flex';
