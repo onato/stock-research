@@ -407,6 +407,45 @@ class TestValuationEngine:
         # but the OpCo leg is: +5pp year-1 growth must still raise the IV.
         assert out["moved"]["iv"] > dcf["valuation"]["base"]["intrinsic_value"]
 
+    def test_float_carrying_model_validates_and_drives_sliders(self, spec, analysis, csv_text, tmp_path):
+        """A DCF whose equity bridge adds a separately-valued float stream
+        (ADYEN.AS: merchant settlement float, valued on its own interest
+        spread rather than driven by the operating growth path) cannot be
+        reproduced by the plain `component` bridge -- the float is a real
+        term the generic engine has no slot for, so the engine undershoots
+        by 4-7% and silently falls back to the 5-year toy. That fallback is
+        exactly the horizon error this ticker's DCF exists to correct, so
+        the sliders would contradict the cards above them.
+        """
+        dcf = load("ADYEN_DCF.json")
+        html = bd.render("ADYEN.AS", spec, csv_text, analysis, dcf)
+        out = self.run(html, tmp_path)
+        for sc in ("base", "bull"):
+            assert out["engine"][sc]["family"] == "component"
+            assert out["engine"][sc]["ok"] is True, f"{sc} fell back to the toy model"
+            assert out["engine"][sc]["iv"] == pytest.approx(
+                dcf["valuation"][sc]["intrinsic_value"], rel=0.015)
+        # Every scenario's CARD shows the analyst's stored number regardless of
+        # whether its engine validated -- that is the anchoring contract.
+        for sc in ("base", "bull", "bear"):
+            assert out[sc]["iv"] == pytest.approx(
+                dcf["valuation"][sc]["intrinsic_value"], rel=0.005)
+        # The float leg is not driven by the operating growth slider, but the
+        # operating leg is: +5pp year-1 growth must still raise the IV.
+        assert out["moved"]["iv"] > dcf["valuation"]["base"]["intrinsic_value"]
+
+    def test_float_stream_is_added_to_the_equity_bridge(self, spec, analysis, csv_text, tmp_path):
+        """Without the float term the component engine undershoots by ~6% and
+        every scenario silently falls back. Deleting it from the fixture must
+        break validation -- that is what proves the term is doing the work.
+        """
+        dcf = load("ADYEN_DCF.json")
+        for sc in ("base", "bull", "bear"):
+            dcf["valuation"][sc].pop("merchant_float_value", None)
+        html = bd.render("ADYEN.AS", spec, csv_text, analysis, dcf)
+        out = self.run(html, tmp_path)
+        assert all(out["engine"][sc]["ok"] is False for sc in ("base", "bull", "bear"))
+
     def test_missing_component_fields_fall_back_to_scaler(self, html, dcf, tmp_path):
         out = self.run(html, tmp_path)
         assert all(out["engine"][sc]["ok"] is False for sc in ("base", "bull", "bear"))

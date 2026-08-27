@@ -1191,6 +1191,17 @@ function baseRevenueOf(sc, g0) {
     for (const k of Object.keys(inputs)) if (/^revenue_fy\d{4}$/.test(k)) return Number(inputs[k]);
     return null;
 }
+// A separately-valued stream that the operating sliders deliberately do not
+// drive: a payment processor's merchant settlement float (ADYEN.AS) is valued
+// on its own interest spread, not on the operating growth path. It is a real
+// term in the equity bridge, so an engine that omits it undershoots and
+// silently falls back to the toy model. Read from valuation[sc] because that
+// is where the analyst records the already-discounted value.
+function sideStreamValue(sc) {
+    const v = (dcfData.valuation || {})[sc] || {};
+    const n = Number(firstOf(v, ['merchant_float_value', 'float_value', 'side_stream_value']));
+    return isFinite(n) ? n : 0;
+}
 function engineFamily(sc) {
     const a = (dcfData.assumptions || {})[sc];
     if (!a) return null;
@@ -1309,8 +1320,9 @@ function runEngine(sc, ov) {
     }
     const ev = pv(wacc) + tv / Math.pow(1 + wacc / 100, n);
     const hurdle = ((dcfData.entry_price || {}).hurdle_rate || 0.15) * 100;
-    const entry = (pv(hurdle) + tv / Math.pow(1 + hurdle / 100, n) - netDebt) / shares;
-    return { family: family, iv: (ev - netDebt) / shares, entryPrice: entry, fcfList: fcfs, growthRates: growth };
+    const side = sideStreamValue(sc);
+    const entry = (pv(hurdle) + tv / Math.pow(1 + hurdle / 100, n) + side - netDebt) / shares;
+    return { family: family, iv: (ev + side - netDebt) / shares, entryPrice: entry, fcfList: fcfs, growthRates: growth };
 }
 function validateEngines() {
     for (const sc of ['base', 'bull', 'bear']) {
