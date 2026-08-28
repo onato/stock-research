@@ -431,3 +431,56 @@ class TestMainWritesDb:
         monkeypatch.setattr(bfx, "fetch", _boom)
         assert run_main(monkeypatch, "AAPL") == 1
         assert "SEC fetch failed" in capsys.readouterr().err
+
+
+class TestTotalDebt:
+    """total_debt is a SUM of two tags, and was absent from CONCEPTS entirely.
+
+    Every other core column is a preference pick: the first listed concept
+    with data for a period wins. Debt is not -- a filer reports the current
+    portion and the non-current portion under separate tags, and the DCF
+    wants the total. ADBE tags LongTermDebt 4.80B and DebtCurrent 1.84B at
+    2026-05-29; the answer is 6.64B, which is neither of them.
+
+    Left unmapped, the XBRL path produced total_debt 0/109 for a
+    DCF-essential field, and export_csv.py refused the export rather than
+    blank the column the previous CSV had populated.
+    """
+
+    def test_total_debt_is_the_sum_of_the_components(self, xbrl_repo, monkeypatch):
+        assert run_main(monkeypatch, "TRIM") == 0
+        con = duckdb.connect(
+            str(xbrl_repo / "research" / "TRIM" / "Reports" / "TRIM.duckdb"),
+            read_only=True)
+        got = con.execute(
+            "SELECT total_debt FROM core_metrics WHERE period = 'FY2024'").fetchone()[0]
+        assert got == pytest.approx(7000.0)  # 5000 + 2000, in millions
+
+    def test_sums_for_every_period_not_just_the_latest(self, xbrl_repo, monkeypatch):
+        assert run_main(monkeypatch, "TRIM") == 0
+        con = duckdb.connect(
+            str(xbrl_repo / "research" / "TRIM" / "Reports" / "TRIM.duckdb"),
+            read_only=True)
+        got = con.execute(
+            "SELECT total_debt FROM core_metrics WHERE period = 'FY2023'").fetchone()[0]
+        assert got == pytest.approx(5000.0)  # 4000 + 1000
+
+    def test_a_debt_free_filer_gets_null_not_zero(self, xbrl_repo, monkeypatch):
+        """No debt tags at all means unknown, not zero.
+
+        The units rule applies to concepts too: a missing row is obvious,
+        a plausible wrong one is not. A filer that tags neither component
+        must leave the column NULL so the gap is visible.
+        """
+        facts = companyfacts()
+        del facts["facts"]["us-gaap"]["LongTermDebt"]
+        del facts["facts"]["us-gaap"]["DebtCurrent"]
+        _, values, _ = bfx.collect_sum(facts, bfx.SUM_CONCEPTS["total_debt"])
+        assert values == {}
+
+    def test_a_period_with_only_one_component_uses_that_component(self):
+        """A filer with no current portion still has debt."""
+        facts = companyfacts()
+        del facts["facts"]["us-gaap"]["DebtCurrent"]
+        _, values, _ = bfx.collect_sum(facts, bfx.SUM_CONCEPTS["total_debt"])
+        assert values["FY2024"] == 5_000_000_000

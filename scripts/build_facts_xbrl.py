@@ -71,6 +71,28 @@ CONCEPTS = {
     "_deferred_revenue": ["ContractWithCustomerLiabilityCurrent", "DeferredRevenueCurrent"],
 }
 
+# Columns that are a SUM of components rather than a preference pick.
+#
+# Every entry in CONCEPTS answers "which tag did this filer use for this
+# line?" -- one of them is right and the rest are absent. Debt is a
+# different question: a filer reports the current portion and the
+# non-current portion under separate tags and BOTH are right, so the
+# column is their total. ADBE tags LongTermDebt 4.80B alongside
+# DebtCurrent 1.84B; picking either alone understates a DCF input.
+#
+# Within a component, the inner list is still preference-ordered -- filers
+# rename their long-term tag over time (ADBE moved off
+# LongTermDebtNoncurrent after 2015) -- so each component resolves to one
+# value per period, and the components are then added.
+SUM_CONCEPTS: dict[str, list[list[str]]] = {
+    "total_debt": [
+        ["LongTermDebt", "LongTermDebtNoncurrent",
+         "LongTermDebtAndCapitalLeaseObligations"],
+        ["DebtCurrent", "LongTermDebtCurrent",
+         "LongTermDebtAndCapitalLeaseObligationsCurrent"],
+    ],
+}
+
 
 def fetch(url: str, dest: pathlib.Path | None = None) -> Any:
     req = urllib.request.Request(url, headers={"User-Agent": UA})
@@ -217,6 +239,31 @@ def collect(facts: dict[str, Any],
             unit_seen or "USD")
 
 
+def collect_sum(facts: dict[str, Any],
+                components: list[list[str]]) -> tuple[str | None, dict[str, Any], str]:
+    """Add together several independently-resolved components per period.
+
+    Each component is a preference-ordered concept list resolved by
+    collect(), exactly as a normal column would be; the results are then
+    summed per period. A period present in only one component is that
+    component's value -- a filer with no current portion still has debt --
+    but a period present in NO component stays absent, so an untagged
+    column lands NULL rather than a fabricated zero.
+    """
+    used: list[str] = []
+    totals: dict[str, Any] = {}
+    unit_seen = "USD"
+    for concepts in components:
+        name, values, unit = collect(facts, concepts)
+        if name is None:
+            continue
+        used.append(name)
+        unit_seen = unit
+        for period, val in values.items():
+            totals[period] = totals.get(period, 0) + val
+    return ("+".join(used) if used else None, totals, unit_seen)
+
+
 def derive(rec: dict[str, Any]) -> None:
     """Fill the columns SEC never tags: FCF and the margins.
 
@@ -274,8 +321,15 @@ def main() -> int:
     missing: list[str]
     used: dict[str, str | None]
     rows, kpis, missing, used = {}, [], [], {}
+    resolved: list[tuple[str, str | None, dict[str, Any]]] = []
     for col, concepts in CONCEPTS.items():
         concept, values, _unit = collect(facts, concepts)
+        resolved.append((col, concept, values))
+    for col, components in SUM_CONCEPTS.items():
+        concept, values, _unit = collect_sum(facts, components)
+        resolved.append((col, concept, values))
+
+    for col, concept, values in resolved:
         if not values:
             missing.append(col)
             continue
