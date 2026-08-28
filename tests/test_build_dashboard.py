@@ -647,3 +647,80 @@ console.log(JSON.stringify(out));
         line = self.probe(html, tmp_path)["gmChart"][0]
         assert line["borderWidth"] is None
         assert line["pointRadius"] is None
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+class TestNonOperatingAssetBridge:
+    """A DCF that values only operating cash flows but deducts GROSS net debt
+    must credit back the non-operating assets being sold to retire that debt,
+    or their value is silently discarded (dcf-methods section 7(d)).
+
+    SKC.NZ ships that bridge as `valuation.{sc}.non_operating_assets` (NZ$91.7m
+    base: an unconditional property sale plus investment property at a haircut).
+    `sideStreamValue` only knew the `merchant_float_value`/`float_value`/
+    `side_stream_value` aliases, so the engine rebuilt an IV short by
+    non_operating_assets/shares and failed `validateEngines` -- silently
+    demoting every slider on the page to the generic scaler.
+
+    The shipped TEST fixture stores an IV its own fcf-growth engine does not
+    reproduce, so each case below first pins the stored IV to the engine's
+    actual output (ENGINE_IV) and only then adds a bridge. That isolates the
+    bridge as the single variable.
+    """
+
+    ENGINE_IV: ClassVar[float] = 2.8224407418865365
+
+    def _engine(self, dcf, tmp_path, sc="base"):
+        page = bd.render("TEST", load("TEST_DashboardSpec.json"),
+                         (FIX / "TEST_Metrics.csv").read_text(),
+                         load("TEST_Analysis.json"), dcf)
+        js = tmp_path / "dash.js"
+        js.write_text(bd.node_harness(inline_script(page)).replace(
+            "console.log(JSON.stringify(__out));",
+            f"validateEngines();"
+            f"console.log(JSON.stringify(dcfEngineStatus[{sc!r}]));",
+        ))
+        r = subprocess.run(["node", str(js)], capture_output=True, text=True, check=False)
+        assert r.returncode == 0, r.stderr
+        return json.loads(r.stdout.strip().splitlines()[-1])
+
+    def _consistent(self, dcf):
+        """Pin base to the IV the engine genuinely produces."""
+        d = json.loads(json.dumps(dcf))
+        d["valuation"]["base"]["intrinsic_value"] = self.ENGINE_IV
+        return d
+
+    def _with_bridge(self, dcf, bridge, key="non_operating_assets"):
+        d = self._consistent(dcf)
+        d["valuation"]["base"][key] = bridge
+        d["valuation"]["base"]["intrinsic_value"] += bridge / d["inputs"]["shares_outstanding"]
+        return d
+
+    def test_baseline_fixture_validates(self, dcf, tmp_path):
+        """Guard the premise: with no bridge, the engine reproduces its IV."""
+        st = self._engine(self._consistent(dcf), tmp_path)
+        assert st["ok"], f"rebuilt {st['iv']} vs stored {st['target']}"
+
+    def test_engine_credits_non_operating_assets(self, dcf, tmp_path):
+        """The bridge is part of equity value: with it credited, the engine
+        reproduces the stored IV and the sliders stay live."""
+        st = self._engine(self._with_bridge(dcf, 91.7), tmp_path)
+        assert st["ok"], (
+            f"engine fell back: rebuilt {st['iv']} vs stored {st['target']} "
+            "-- non_operating_assets was dropped from the bridge"
+        )
+
+    def test_existing_side_stream_alias_still_works(self, dcf, tmp_path):
+        """Regression guard: the pre-existing alias must keep validating."""
+        st = self._engine(self._with_bridge(dcf, 91.7, key="side_stream_value"), tmp_path)
+        assert st["ok"], f"rebuilt {st['iv']} vs stored {st['target']}"
+
+    def test_bridge_actually_moves_the_value(self, dcf, tmp_path):
+        """A credited bridge must raise IV by exactly bridge/shares -- proving
+        it is added, not merely tolerated by a loose comparison."""
+        d = self._consistent(dcf)
+        d["valuation"]["base"]["non_operating_assets"] = 91.7
+        st = self._engine(d, tmp_path)
+        assert st["iv"] == pytest.approx(
+            self.ENGINE_IV + 91.7 / d["inputs"]["shares_outstanding"], rel=1e-6
+        )
