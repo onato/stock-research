@@ -129,3 +129,83 @@ class TestPromotableKpiVocabulary:
     def test_normalize_kpi_is_punctuation_and_case_insensitive(self):
         for spelling in ("ActiveCustomers", "active_customers", "Active Customers"):
             assert schema.normalize_kpi(spelling) == "ActiveCustomers"
+
+
+class TestEnsureSchema:
+    """A ticker DB created by an older schema must gain new core columns.
+
+    `CREATE TABLE IF NOT EXISTS` is a no-op against an existing table, so a
+    DB built before a column was added keeps the old shape forever. The
+    INSERT then dies with a BinderException naming the missing column --
+    which is exactly how ADBE's XBRL path failed and silently degraded to
+    text extraction (24-column DB vs 28-column schema).
+    """
+
+    def test_adds_columns_missing_from_an_older_db(self, tmp_path):
+        import duckdb
+        db = tmp_path / "OLD.duckdb"
+        con = duckdb.connect(str(db))
+        # A DB as an earlier schema version left it: core columns only up to
+        # dividend_per_share, without the *_continuing / *_before_significant set.
+        old = [c for c in schema.CORE_COLUMNS
+               if c[0] not in ("ebitda_before_significant", "revenue_continuing",
+                               "ebitda_continuing_before_significant",
+                               "ebit_continuing_before_significant")]
+        cols = ",\n  ".join(f"{n} {t}" for n, t, _ in old)
+        con.execute(f"CREATE TABLE core_metrics ({cols}, PRIMARY KEY (period))")
+        con.execute("INSERT INTO core_metrics (period, revenue) VALUES ('FY2024', 100.0)")
+
+        schema.ensure_schema(con)
+
+        got = {r[0] for r in con.execute(
+            "SELECT column_name FROM information_schema.columns"
+            " WHERE table_name='core_metrics'").fetchall()}
+        assert set(schema.CORE_NAMES) <= got
+
+    def test_migration_preserves_existing_rows(self, tmp_path):
+        import duckdb
+        db = tmp_path / "OLD2.duckdb"
+        con = duckdb.connect(str(db))
+        con.execute("CREATE TABLE core_metrics (period TEXT PRIMARY KEY, revenue DOUBLE)")
+        con.execute("INSERT INTO core_metrics VALUES ('FY2024', 100.0)")
+
+        schema.ensure_schema(con)
+
+        assert con.execute(
+            "SELECT revenue FROM core_metrics WHERE period='FY2024'").fetchone()[0] == 100.0
+
+    def test_full_core_insert_succeeds_after_migration(self, tmp_path):
+        """The regression itself: every core column must be writable."""
+        import duckdb
+        db = tmp_path / "OLD3.duckdb"
+        con = duckdb.connect(str(db))
+        con.execute("CREATE TABLE core_metrics (period TEXT PRIMARY KEY, revenue DOUBLE)")
+
+        schema.ensure_schema(con)
+
+        names = ",".join(schema.CORE_NAMES)
+        holes = ",".join("?" for _ in schema.CORE_NAMES)
+        vals: list[object] = []
+        for n, t, _ in schema.CORE_COLUMNS:
+            vals.append("FY2025" if n == "period" else ("USD" if t == "TEXT" else 1.0))
+        con.execute(f"INSERT INTO core_metrics ({names}) VALUES ({holes})", vals)
+        assert con.execute("SELECT count(*) FROM core_metrics").fetchone()[0] == 1
+
+    def test_is_idempotent(self, tmp_path):
+        import duckdb
+        con = duckdb.connect(str(tmp_path / "NEW.duckdb"))
+        schema.ensure_schema(con)
+        schema.ensure_schema(con)
+        got = {r[0] for r in con.execute(
+            "SELECT column_name FROM information_schema.columns"
+            " WHERE table_name='core_metrics'").fetchall()}
+        assert set(schema.CORE_NAMES) <= got
+
+    def test_creates_the_normalized_view(self, tmp_path):
+        import duckdb
+        con = duckdb.connect(str(tmp_path / "V.duckdb"))
+        schema.ensure_schema(con)
+        con.execute("INSERT INTO core_metrics (period, revenue, units)"
+                    " VALUES ('FY2024', 400.0, 'thousands')")
+        assert con.execute(
+            "SELECT revenue FROM metrics_normalized").fetchone()[0] == pytest.approx(0.4)

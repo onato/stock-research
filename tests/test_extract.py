@@ -233,3 +233,44 @@ class TestMainRouting:
             monkeypatch, ["NFLX", "--show"],
             {"build_facts_xbrl.py": (0, "ok")}, [(0, 3)])
         assert calls == [("build_facts_xbrl.py", ["NFLX", "--show"])]
+
+
+class TestXbrlCrashIsDistinguishedFromNoCoverage:
+    """A crash in the XBRL path must not be reported as absent SEC coverage.
+
+    ADBE hit a BinderException writing core_metrics (stale DB schema). The
+    fallback logged the same "XBRL yielded nothing" message it uses for a
+    genuine foreign-private-issuer miss, so a US filer with perfectly good
+    XBRL silently went through text extraction instead. The two need
+    different messages and different gap kinds, or the bug is invisible.
+    """
+
+    def test_traceback_in_output_is_reported_as_a_crash(self, tmp_path, capsys, monkeypatch):
+        import extract
+
+        monkeypatch.setattr(extract, "facts_count", lambda t: (0, 0))
+        monkeypatch.setattr(extract, "is_us_symbol", lambda t: True)
+        logged = []
+        monkeypatch.setattr(extract, "log_gap",
+                            lambda t, kind, msg: logged.append((kind, msg)))
+
+        calls = []
+
+        def fake_run(script, ticker, *a):
+            calls.append(script)
+            if script == "build_facts_xbrl.py":
+                return 1, ('ADBE: CIK 796343\n  109 periods, 20 concepts matched\n'
+                           'Traceback (most recent call last):\n'
+                           'duckdb.duckdb.BinderException: Binder Error: Table '
+                           '"core_metrics" does not have a column with name "x"')
+            return 0, ""
+
+        monkeypatch.setattr(extract, "run", fake_run)
+        monkeypatch.setattr(sys, "argv", ["extract.py", "ADBE"])
+        extract.main()
+
+        out = capsys.readouterr().out
+        assert "crash" in out.lower()
+        assert "BinderException" in out or "Binder Error" in out
+        assert logged
+        assert logged[0][0] == "extractor_bug"

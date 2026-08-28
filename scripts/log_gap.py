@@ -48,6 +48,7 @@ KINDS = (
     "ambiguous_units",   # units could not be determined from the filing
     "period_unclear",    # filename/period mapping failed
     "layout_unparsed",   # filing structure the line regex cannot handle
+    "extractor_bug",     # our code crashed; the filing was fine
     "other",
 )
 

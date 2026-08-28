@@ -96,11 +96,27 @@ def main() -> int:
                       "but core_metrics is populated; keeping XBRL result")
             print(f"  path: SEC XBRL  ({core} periods in core_metrics)")
             return 0
-        # A US symbol SEC does not cover (foreign private issuer, recent
-        # listing, ADR) still has PDFs on disk -- try those before giving up.
-        print(f"  XBRL yielded nothing for {t}; falling back to text")
-        log_gap(t, "other",
-                "XBRL path returned no core_metrics; fell back to text extraction")
+        # Two very different reasons core_metrics can be empty, and they
+        # were previously reported identically. A US filer whose XBRL is
+        # fine but whose write crashed (ADBE: a stale DB missing four core
+        # columns) looked exactly like a foreign private issuer SEC does
+        # not cover -- so the bug hid behind a routine fallback message for
+        # as long as the fallback kept working.
+        crash = "Traceback (most recent call last)" in out
+        if crash:
+            detail = next((ln.strip() for ln in reversed(out.splitlines())
+                           if ln.strip() and not ln.startswith(" ")), "")
+            print(f"  XBRL path CRASHED for {t} (exit {rc}): {detail}")
+            print("  This is an extractor bug, not missing SEC coverage. "
+                  "Falling back to text so the run completes, but fix the crash.")
+            log_gap(t, "extractor_bug",
+                    f"build_facts_xbrl.py crashed (exit {rc}): {detail}")
+        else:
+            # A US symbol SEC does not cover (foreign private issuer, recent
+            # listing, ADR) still has PDFs on disk -- try those before giving up.
+            print(f"  XBRL yielded nothing for {t}; falling back to text")
+            log_gap(t, "other",
+                    "XBRL path returned no core_metrics; fell back to text extraction")
         want = "text"
 
     rc, out = run("build_facts.py", t, *(["--show"] if args.show else []))

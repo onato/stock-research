@@ -116,7 +116,7 @@ def main() -> int:
     db = REPO / "research" / ticker / "Reports" / f"{ticker}.duckdb"
     db.parent.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect(str(db))
-    con.execute(schema.create_sql())
+    schema.ensure_schema(con)
     # Migration shim: schema.py now declares currency in the facts DDL, but
     # DBs created before that lack the column. Remove once every ticker DB
     # has been rebuilt at least once.

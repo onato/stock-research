@@ -89,3 +89,14 @@ class TestList:
         out = capsys.readouterr().out
         assert "EBITDA" in out
         assert "pattern added" in out
+
+
+def test_extractor_bug_is_a_kind():
+    """A crash in our own extractor is a distinct class from a data gap.
+
+    The other kinds all describe a filing the parser could not handle.
+    `extractor_bug` says the filing was fine and the code broke -- the two
+    need different queues, because one is fixed by a parser rule and the
+    other by a bugfix.
+    """
+    assert "extractor_bug" in log_gap.KINDS

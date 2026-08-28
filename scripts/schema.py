@@ -15,6 +15,11 @@ the `kpis` long-form table, NOT as a new core column -- adding columns per
 ticker is exactly the drift this replaces.
 """
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from duckdb import DuckDBPyConnection
+
 # Core columns, in the order they appear in the exported CSV.
 # (column_name, sql_type, csv_header) -- csv_header preserves the existing
 # CamelCase the dashboards already read.
@@ -379,6 +384,37 @@ CREATE TABLE IF NOT EXISTS facts (
   currency    TEXT
 );
 """
+
+
+def ensure_schema(con: "DuckDBPyConnection") -> None:
+    """Create the ticker schema, and migrate a DB built by an older version.
+
+    `create_sql()` alone is not enough on an existing DB: its
+    `CREATE TABLE IF NOT EXISTS` is a no-op, so a table created before a
+    core column was added keeps the old shape and every later INSERT dies
+    with `Binder Error: Table "core_metrics" does not have a column with
+    name "..."`. That is not a loud failure -- extract.py caught it, logged
+    "XBRL yielded nothing", and silently fell back to text extraction for a
+    US filer whose XBRL was fine (ADBE: a 24-column DB against a 28-column
+    schema).
+
+    Adding the missing columns is safe in both directions: DuckDB's
+    ADD COLUMN fills existing rows with NULL, which is what an unpopulated
+    metric means anyway, and the function is idempotent.
+    """
+    # Widen an existing table BEFORE running the DDL: metrics_normalized
+    # selects every core column, so it cannot be created until they exist.
+    have = {
+        r[0] for r in con.execute(
+            "SELECT column_name FROM information_schema.columns"
+            " WHERE table_name = 'core_metrics'"
+        ).fetchall()
+    }
+    if have:
+        for name, sqltype, _ in CORE_COLUMNS:
+            if name not in have:
+                con.execute(f"ALTER TABLE core_metrics ADD COLUMN {name} {sqltype}")
+    con.execute(create_sql())
 
 
 if __name__ == "__main__":

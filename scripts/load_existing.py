@@ -79,7 +79,7 @@ def write_db(ticker: str, core: list[dict[str, Any]], kpis: list[tuple[str, str,
     db = REPO / "research" / ticker / "Reports" / f"{ticker}.duckdb"
     db.parent.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect(str(db))
-    con.execute(schema.create_sql())
+    schema.ensure_schema(con)
     con.execute("DELETE FROM core_metrics")
     con.execute("DELETE FROM kpis")
     if core:
