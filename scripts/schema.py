@@ -189,9 +189,29 @@ PROMOTE_KPIS: dict[str, str] = {
     # line -- NetRevenue is the top line, so it must reach the CSV.
     "NetRevenue": "NetRevenue",
     "PayablesToMerchants": "PayablesToMerchants",
+    # ORA/DMF retirement operators (SUM.NZ, RYM.NZ, OCA.NZ). Statutory NPAT is
+    # dominated by IAS 40 revaluation, so the company's own UnderlyingProfit is
+    # the earnings measure the model runs off, and the ORA sales and portfolio
+    # counts are the volume series behind it.
+    "UnderlyingProfit": "UnderlyingProfit",
+    "NPAT": "NPAT",
+    "NetAssets": "NetAssets",
+    "CareFeesAndVillageServices": "CareFeesAndVillageServices",
+    "DeferredManagementFees": "DeferredManagementFees",
+    "NewSalesORA": "NewSalesORA",
+    "ResalesORA": "ResalesORA",
+    "TotalSalesORA": "TotalSalesORA",
+    "NewUnitsDelivered": "NewUnitsDelivered",
+    "RetirementUnitsInPortfolio": "RetirementUnitsInPortfolio",
+    "CareUnitsInPortfolio": "CareUnitsInPortfolio",
+    "DevelopmentMargin": "DevelopmentMargin",
     # Disclosed operating detail dashboards chart directly
     "EBITDAMargin": "EBITDAMargin",
     "EPS_Basic": "EPS_Basic",
+    # The NZX retirement CSVs spell it BasicEPS and carry it (in cents) as a
+    # column beside EPS. Kept as its own header rather than aliased onto
+    # EPS_Basic, which would orphan the periods already under BasicEPS.
+    "BasicEPS": "BasicEPS",
     "FTE": "FTE",
 }
 

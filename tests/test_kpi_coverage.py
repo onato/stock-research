@@ -55,3 +55,37 @@ class TestNetRevenuePromotion:
         make_db(patch_repo, "SYN",
                 ["EBITDAMargin", "EPS_Basic", "PayablesToMerchants", "FTE"])
         assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+
+
+class TestRetirementOperatorPromotion:
+    """An ORA/DMF retirement operator's own earnings measure must reach the CSV.
+
+    Summerset (and Ryman, Oceania) reports statutory NPAT dominated by IAS 40
+    investment-property revaluation, so its valuation runs off `UnderlyingProfit`
+    -- the company's own measure -- plus the ORA sales and portfolio counts.
+    Those columns already existed in SUM.NZ_Metrics.csv with 16 periods of
+    history, but they were absent from PROMOTE_KPIS, so adding H1-2026 wrote
+    the row with every one of them blank: `carry_columns` only backfills
+    periods the old CSV already had, which a newly added period never is.
+    Same failure as NetRevenue above, on the metrics that drive the model.
+    """
+
+    def test_underlying_profit_and_ora_metrics_are_promoted(self, patch_repo):
+        make_db(patch_repo, "SYN",
+                ["UnderlyingProfit", "NPAT", "NetAssets",
+                 "CareFeesAndVillageServices", "DeferredManagementFees",
+                 "NewSalesORA", "ResalesORA", "TotalSalesORA",
+                 "NewUnitsDelivered", "RetirementUnitsInPortfolio",
+                 "CareUnitsInPortfolio", "DevelopmentMargin"])
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+
+    def test_basic_eps_spelling_is_promoted(self, patch_repo):
+        """`BasicEPS` is the spelling on the NZX retirement CSVs.
+
+        PROMOTE_KPIS carries the canonical `EPS_Basic`; the kpis table stores
+        the filing's own `BasicEPS`, which mapped to nothing and so came out
+        blank on a newly added period.
+        """
+        make_db(patch_repo, "SYN", ["BasicEPS"])
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        assert schema.promote_header("BasicEPS") == "BasicEPS"
