@@ -211,9 +211,13 @@ def period_label(fact: dict[str, Any],
     if days > 300:
         return f"FY{year}"
     if days > 200:
-        # 9-month 10-Q YTD: no canonical period. Labeling it H2 collided
-        # with the genuine second half, which it overwrote when filed later.
-        return None
+        # 9-month 10-Q YTD. It is not a canonical reporting period -- and
+        # labeling it H2 collided with the genuine second half, which it
+        # overwrote when filed later -- but it is the only place Q3 cash
+        # flow exists, because a 10-Q reports cash flow year to date.
+        # Keep it under a name no real period can take; decumulate() reads
+        # it and drop_scaffolding() removes it before the write.
+        return f"9M-{year}"
     if days > 150:
         half = "H1" if int(end[5:7]) <= 8 else "H2"
         return f"{half}-{year}"
@@ -298,6 +302,60 @@ def collect_sum(facts: dict[str, Any],
         for period, val in values.items():
             totals[period] = totals.get(period, 0) + val
     return ("+".join(used) if used else None, totals, unit_seen)
+
+
+# Cash-flow columns are reported year-to-date in a 10-Q, so a discrete
+# Q2 or Q3 is never tagged. These are the columns that need subtracting.
+CUMULATIVE_COLUMNS = ("operating_cash_flow", "capex")
+
+# Cumulative spans that exist only to be subtracted, and the pair that
+# yields each discrete quarter.
+DECUMULATE = {
+    "Q2": ("H1-{year}", "Q1 {year}"),
+    "Q3": ("9M-{year}", "H1-{year}"),
+}
+
+
+def decumulate(rows: dict[str, dict[str, Any]]) -> None:
+    """Derive discrete Q2/Q3 cash flow from the cumulative spans.
+
+    A 10-Q's income statement covers the quarter but its cash flow
+    statement covers the year to date: Q2's span is six months and Q3's is
+    nine. SEC therefore has no fact for "cash from operations in Q2", and
+    the XBRL path left operating_cash_flow, capex and free_cash_flow empty
+    for every Q2 and Q3 in a filer's history -- 54 cells on ADBE that the
+    CSV it replaced had populated.
+
+    Q2 = H1 - Q1 and Q3 = 9M - H1. A directly tagged quarter is never
+    overwritten (some filers do report the discrete period), and a missing
+    predecessor leaves the quarter NULL rather than silently equal to the
+    cumulative span.
+    """
+    years = {p.split()[-1].split("-")[-1] for p in rows}
+    for year in years:
+        for quarter, (whole_key, prior_key) in DECUMULATE.items():
+            whole = rows.get(whole_key.format(year=year))
+            prior = rows.get(prior_key.format(year=year))
+            if whole is None or prior is None:
+                continue
+            target = rows.setdefault(f"{quarter} {year}", {})
+            for col in CUMULATIVE_COLUMNS:
+                if target.get(col) is not None:
+                    continue
+                a, b = whole.get(col), prior.get(col)
+                if a is None or b is None:
+                    continue
+                target[col] = a - b
+
+
+def drop_scaffolding(rows: dict[str, dict[str, Any]]) -> None:
+    """Remove the 9M-YYYY spans kept only so Q3 could be decumulated.
+
+    They are not reporting periods -- nothing downstream should chart or
+    screen on them, and periods.py does not parse them.
+    """
+    for period in [p for p in rows if p.startswith("9M-")]:
+        del rows[period]
 
 
 def derive(rec: dict[str, Any]) -> None:
@@ -405,7 +463,8 @@ def main() -> int:
     # touched: EPS of 1.98 is 1.98 whatever the revenue units are.
     scale_free = {"period", "units", "currency", "eps", "dividend_per_share",
                   "gross_margin", "operating_margin", "net_margin"}
-    for period, vals in sorted(rows.items()):
+    scaled: dict[str, dict[str, Any]] = {}
+    for period, vals in rows.items():
         rec: dict[str, Any] = dict.fromkeys(cols)
         rec["period"] = period
         rec["units"] = "millions"
@@ -414,6 +473,21 @@ def main() -> int:
             if k not in rec:
                 continue
             rec[k] = v / 1e6 if (k not in scale_free and v is not None) else v
+        scaled[period] = rec
+
+    # After scaling (so the subtraction is in one unit) and before derive(),
+    # which turns the decumulated OCF and capex into a Q2/Q3 free_cash_flow.
+    decumulate(scaled)
+    drop_scaffolding(scaled)
+
+    for period, rec in sorted(scaled.items()):
+        # decumulate() can introduce a quarter that had no facts of its own,
+        # so fill the schema shape before indexing by column.
+        for col in cols:
+            rec.setdefault(col, None)
+        rec["period"] = period
+        rec["units"] = "millions"
+        rec["currency"] = "USD"
         derive(rec)
         payload.append([rec[c] for c in cols])
     if payload:

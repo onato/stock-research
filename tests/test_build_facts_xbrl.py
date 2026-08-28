@@ -134,15 +134,25 @@ class TestPeriodLabel:
         assert bfx.period_label(
             {"start": "2024-02-01", "end": "2024-04-30"}) == "Q2 2024"
 
-    def test_nine_month_ytd_has_no_canonical_period(self):
-        # A 273-day 10-Q YTD span is neither a half nor a quarter; labeling
+    def test_nine_month_ytd_gets_a_label_that_cannot_collide(self):
+        # A 273-day 10-Q YTD span is neither a half nor a quarter. Labeling
         # it H2 let it collide with -- and, filed later, overwrite -- a
-        # genuine second half. It must be dropped, not shoehorned.
+        # genuine second half, so it must never take a real period's name.
+        #
+        # It is kept rather than dropped because it is the only place Q3
+        # cash flow exists (a 10-Q reports cash flow year to date), and
+        # decumulate() subtracts H1 from it. drop_scaffolding() removes it
+        # before the write, so it never reaches core_metrics.
         assert bfx.period_label(
-            {"start": "2024-01-01", "end": "2024-09-30"}) is None
-        # A real second half (~184 days) still labels as H2.
+            {"start": "2024-01-01", "end": "2024-09-30"}) == "9M-2024"
+        # A real second half (~184 days) still labels as H2, unaffected.
         assert bfx.period_label(
             {"start": "2024-07-01", "end": "2024-12-31"}) == "H2-2024"
+
+    def test_the_scaffolding_label_is_not_a_real_period(self):
+        """periods.py must not parse 9M-YYYY as a reporting period."""
+        import periods
+        assert not periods.is_annual(periods.parse("9M-2024"))
 
     def test_missing_end_is_none(self):
         assert bfx.period_label({}) is None
@@ -341,8 +351,8 @@ class TestDerivedColumns:
             "SELECT operating_cash_flow, capex, free_cash_flow"
             " FROM core_metrics WHERE period = 'FY2024'").fetchone()
         con.close()
-        assert (ocf, capex) == (9000.0, 2000.0)
-        assert fcf == 7000.0
+        assert (ocf, capex) == (9000.0, 600.0)
+        assert fcf == 8400.0
 
     def test_margins_derived_as_percentages(self, xbrl_repo, monkeypatch):
         # Revenue 40bn, gross profit 24bn, net income 6bn.
@@ -437,7 +447,10 @@ class TestMainWritesDb:
         n_core = con.execute("SELECT count(*) FROM core_metrics").fetchone()[0]
         n_kpis = con.execute("SELECT count(*) FROM kpis").fetchone()[0]
         con.close()
-        assert n_core == 4  # FY2022-24 + Q1 2024
+        # FY2022-24, H1-2024, Q1 2024, plus Q2/Q3 2024 decumulated from the
+        # cumulative cash-flow spans. The 9M-2024 scaffolding span that made
+        # Q3 derivable is dropped rather than written.
+        assert n_core == 7
         assert n_kpis == 1
 
     def test_check_mode_writes_nothing(self, xbrl_repo, monkeypatch, capsys):
@@ -526,3 +539,76 @@ class TestTotalDebt:
         del facts["facts"]["us-gaap"]["DebtCurrent"]
         _, values, _ = bfx.collect_sum(facts, bfx.SUM_CONCEPTS["total_debt"])
         assert values["FY2024"] == 5_000_000_000
+
+
+class TestCumulativeCashFlowIsDecumulated:
+    """A 10-Q reports cash flow year-to-date, so Q2 and Q3 are never tagged.
+
+    The income statement in a 10-Q covers the quarter, but the cash flow
+    statement covers the year to date -- Q2's span is six months and Q3's
+    is nine. So SEC has no fact for "cash from operations in Q2", and the
+    XBRL path left operating_cash_flow, capex and free_cash_flow empty for
+    every Q2 and Q3 in a filer's history (ADBE: 54 cells the CSV it
+    replaced had populated, which export_csv.py then refused to blank).
+
+    The values are all present, just cumulatively: Q2 = H1 - Q1 and
+    Q3 = 9-month - H1. Deriving them is the same contract as derive() --
+    XBRL must compute what SEC never tags, or the two extraction paths
+    produce different schemas for the same company.
+    """
+
+    def test_q2_is_the_half_year_less_q1(self, xbrl_repo, monkeypatch):
+        assert run_main(monkeypatch, "TRIM") == 0
+        con = duckdb.connect(
+            str(xbrl_repo / "research" / "TRIM" / "Reports" / "TRIM.duckdb"),
+            read_only=True)
+        got = con.execute("SELECT operating_cash_flow FROM core_metrics"
+                          " WHERE period = 'Q2 2024'").fetchone()[0]
+        assert got == pytest.approx(2500.0)  # 4500 - 2000
+
+    def test_q3_is_the_nine_month_ytd_less_the_half_year(self, xbrl_repo, monkeypatch):
+        assert run_main(monkeypatch, "TRIM") == 0
+        con = duckdb.connect(
+            str(xbrl_repo / "research" / "TRIM" / "Reports" / "TRIM.duckdb"),
+            read_only=True)
+        got = con.execute("SELECT operating_cash_flow FROM core_metrics"
+                          " WHERE period = 'Q3 2024'").fetchone()[0]
+        assert got == pytest.approx(2300.0)  # 6800 - 4500
+
+    def test_capex_decumulates_too(self, xbrl_repo, monkeypatch):
+        assert run_main(monkeypatch, "TRIM") == 0
+        con = duckdb.connect(
+            str(xbrl_repo / "research" / "TRIM" / "Reports" / "TRIM.duckdb"),
+            read_only=True)
+        assert con.execute("SELECT capex FROM core_metrics"
+                           " WHERE period = 'Q2 2024'").fetchone()[0] \
+            == pytest.approx(150.0)   # 250 - 100
+        assert con.execute("SELECT capex FROM core_metrics"
+                           " WHERE period = 'Q3 2024'").fetchone()[0] \
+            == pytest.approx(150.0)   # 400 - 250
+
+    def test_derived_quarters_get_free_cash_flow(self, xbrl_repo, monkeypatch):
+        """FCF must follow from the decumulated parts, not stay NULL."""
+        assert run_main(monkeypatch, "TRIM") == 0
+        con = duckdb.connect(
+            str(xbrl_repo / "research" / "TRIM" / "Reports" / "TRIM.duckdb"),
+            read_only=True)
+        got = con.execute("SELECT free_cash_flow FROM core_metrics"
+                          " WHERE period = 'Q2 2024'").fetchone()[0]
+        assert got == pytest.approx(2350.0)  # 2500 - 150
+
+    def test_a_directly_tagged_quarter_is_not_overwritten(self):
+        """Some filers do tag the discrete quarter. Never clobber a real fact."""
+        rows = {
+            "Q1 2024": {"operating_cash_flow": 2000.0},
+            "H1-2024": {"operating_cash_flow": 4500.0},
+            "Q2 2024": {"operating_cash_flow": 9999.0},
+        }
+        bfx.decumulate(rows)
+        assert rows["Q2 2024"]["operating_cash_flow"] == 9999.0
+
+    def test_a_missing_predecessor_leaves_the_quarter_null(self):
+        """No Q1 means Q2 is unknown, not equal to the half year."""
+        rows = {"H1-2024": {"operating_cash_flow": 4500.0}}
+        bfx.decumulate(rows)
+        assert rows.get("Q2 2024", {}).get("operating_cash_flow") is None
