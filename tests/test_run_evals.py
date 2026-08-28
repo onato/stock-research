@@ -343,6 +343,62 @@ class TestCheckDcfEdges:
         assert checks["dcf_weighted_iv"]["status"] == "skip"
         assert checks["dcf_weighted_upside"]["status"] == "skip"
 
+    def test_superseded_iv_cannot_vouch_for_a_stale_upside(self, make_ticker):
+        """A retained as-published IV must not satisfy the upside check.
+
+        When a DCF is corrected, the practice is to adopt a rebuilt
+        weighted_iv as the headline and keep the superseded figure in
+        weighted_iv_as_published. weighted_ivs() collects every key
+        starting "weighted_iv", and the check accepted a match against ANY
+        of them -- so the superseded value silently vouched for an upside
+        that no longer matched the headline.
+
+        Seen live on PINS: headline IV 23.66 against a price of 23.40 is
+        +1.1%, but the file still declared +38.8% (the as-published 32.49),
+        and the gate passed. That is a materially different investment
+        conclusion carried by a check that was supposed to catch it.
+        """
+        doc = minimal_dcf()
+        doc["probability_weighted"] = {
+            "weights": {"base": 0.5, "bull": 0.25, "bear": 0.25},
+            "weighted_iv": 10.1,               # headline: +1% on a price of 10
+            "weighted_iv_as_published": 13.9,  # superseded: +39%
+            "weighted_upside": 39.0,           # stale, matches only the superseded
+        }
+        checks = dcf_checks(make_ticker, doc, ticker="STALEUP")
+        assert checks["dcf_weighted_upside"]["status"] == "warn"
+
+    def test_upside_matching_the_headline_iv_passes(self, make_ticker):
+        """The as-published key is not disqualifying in itself."""
+        doc = minimal_dcf()
+        doc["probability_weighted"] = {
+            "weights": {"base": 0.5, "bull": 0.25, "bear": 0.25},
+            "weighted_iv": 10.1,
+            "weighted_iv_as_published": 13.9,
+            "weighted_upside": 1.0,
+        }
+        checks = dcf_checks(make_ticker, doc, ticker="FRESHUP")
+        assert checks["dcf_weighted_upside"]["status"] == "pass"
+
+    def test_a_retained_as_published_upside_cannot_satisfy_the_check(self, make_ticker):
+        """The exclusion must be symmetric across both sides.
+
+        Excluding superseded IVs but still accepting a superseded UPSIDE
+        leaves the same hole open the other way round: the headline upside
+        can be wrong while a retained as-published one satisfies `any()`.
+        Only live headline values may vouch for each other.
+        """
+        doc = minimal_dcf()
+        doc["probability_weighted"] = {
+            "weights": {"base": 0.5, "bull": 0.25, "bear": 0.25},
+            "weighted_iv": 10.1,                     # +1% on a price of 10
+            "weighted_iv_as_published": 13.9,
+            "weighted_upside": 39.0,                 # headline upside: WRONG
+            "weighted_upside_as_published": 1.0,     # superseded, happens to match
+        }
+        checks = dcf_checks(make_ticker, doc, ticker="ASYMUP")
+        assert checks["dcf_weighted_upside"]["status"] == "warn"
+
     def test_sanity_check_without_verdict_warns(self, make_ticker):
         checks = dcf_checks(make_ticker,
                             minimal_dcf(sanity_check={"ran": True}))

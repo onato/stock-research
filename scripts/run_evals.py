@@ -317,14 +317,26 @@ def check_dcf(ticker: str, card: Card) -> None:
                      f"declared {wivs} vs recomputed {expected}")
 
     ups = F.weighted_upsides(dcf)
-    if not (ups and price and wivs):
+    # A corrected DCF keeps the superseded figure in weighted_iv_as_published
+    # while a rebuilt weighted_iv becomes the headline. Grading the upside
+    # against ANY weighted-IV key let the superseded value vouch for an
+    # upside that no longer matched the headline: PINS declared +38.8% (the
+    # as-published 32.49) against a headline IV of 23.66 on a price of
+    # 23.40 -- actually +1.1% -- and this check passed. Only the live
+    # headline may satisfy it.
+    def live(d: dict[str, float]) -> dict[str, float]:
+        return {k: v for k, v in d.items()
+                if not any(t in k.lower() for t in ("as_published", "superseded"))}
+
+    headline, live_ups = live(wivs), live(ups)
+    if not (live_ups and price and headline):
         card.add("dcf_weighted_upside", "skip")
     else:
-        computed = [wiv / price - 1 for wiv in wivs.values()]
+        computed = [wiv / price - 1 for wiv in headline.values()]
         ok = any(abs(u - c) <= 0.02 or abs(u - c * 100) <= 2.0
-                 for u in ups.values() for c in computed)
+                 for u in live_ups.values() for c in computed)
         card.add("dcf_weighted_upside", "pass" if ok else "warn",
-                 f"declared {ups} vs computed {[round(c, 3) for c in computed]}")
+                 f"declared {live_ups} vs computed {[round(c, 3) for c in computed]}")
 
     # Shapes in the wild: {ran, passed}, {passed: true, ...}, {status: "PASSED"}
     sc = dcf.get("sanity_check")
