@@ -248,7 +248,13 @@ def plan_tier(repo: pathlib.Path | str, ticker: str, *,
     if age is None:
         return plan(3, "no usable valuation_date")
     if age > stale_days:
-        return plan(2, f"stale ({age}d) but no new filings: narrative only")
+        # "no new filings" would be a claim this planner cannot make: the gate
+        # above only sees the local disk, so a published-but-undownloaded
+        # filing is invisible to it (UBER/SFM/FISV Q2-2026, 2026-08-28). Say
+        # what was actually checked, so a tier 2 is not read as "numbers are
+        # current" when it means "nothing new has been fetched yet".
+        return plan(2, f"stale ({age}d), none downloaded since the CSV: "
+                       "narrative only -- check the filing calendar first")
     if drift is not None and drift > drift_pct:
         return plan(0, f"price drift {drift:.1f}%: numeric write-back only")
     return plan(1, "nothing changed")

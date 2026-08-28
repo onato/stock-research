@@ -86,7 +86,9 @@ class TestRoute:
     def test_the_reason_survives_for_the_operator(self, repo):
         ticker_at(repo, "X", filings=["X_Annual_FY2026.txt"],
                   csv_periods=["FY2026"], days_old=60)
-        assert "no new filings" in refresh_route.route(repo, "X").reason
+        # The point is that plan_tier's reason reaches the operator intact,
+        # not the exact wording -- assert on the tier-2 substance instead.
+        assert "stale (60d)" in refresh_route.route(repo, "X").reason
 
 
 class TestPrompt:

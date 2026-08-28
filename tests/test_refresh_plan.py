@@ -360,3 +360,31 @@ class TestUnextractedFilings:
         got = refresh_plan.plan_tier(repo, "DCBO")
         assert "Q2-2026" in got.reason
         assert got.newest_filing == "Q2-2026"
+
+
+class TestTierTwoDoesNotClaimCurrentNumbers:
+    """Tier 2's reason must not assert that no new filing exists.
+
+    `has_new_filings` can only see the local disk. A filing that has been
+    published but never downloaded is indistinguishable from no filing at
+    all, so the ticker falls through to the age check and is reported as
+    "stale (Nd) but no new filings: narrative only" -- routing it to a
+    refresh that skips the parser BY DESIGN.
+
+    Measured 2026-08-28: UBER, SFM and FISV were all reported tier 2 while
+    their Q2-2026 10-Qs (filed 2026-08-05, 2026-07-29 and 2026-08-07) sat
+    undownloaded and their CSVs stopped at Q1-2026. The same class of error
+    as the unextracted-filing case above, one step earlier in the pipeline.
+
+    The planner is offline by design, so it cannot know. It must therefore
+    say what it actually checked rather than claiming a fact it cannot see.
+    """
+
+    def test_tier_two_reason_does_not_claim_no_new_filings(self, repo):
+        ticker_at(repo, "UBER",
+                  filings=["UBER_10Q_Q1-2026.txt"],
+                  csv_periods=["Q1-2026"], days_old=59)
+        got = refresh_plan.plan_tier(repo, "UBER")
+        assert got.tier == 2
+        assert "no new filings" not in got.reason
+        assert "none downloaded" in got.reason
