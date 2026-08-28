@@ -145,6 +145,29 @@ def fiscal_year_end_month(facts: dict[str, Any]) -> int | None:
     return max(months, key=lambda m: (months[m], m))
 
 
+def _near_fiscal_year_end(end: str, fy_end_month: int,
+                          tolerance_days: int = 7) -> bool:
+    """Is this instant within a few days of the filer's year-end boundary?
+
+    Measured against the boundary between fy_end_month and the next month,
+    in both directions, so a year end that drifts forward (Adobe's
+    2021-12-03 for a November close) and one that drifts back (a
+    January-closing filer ending 2024-12-28) both read as annual.
+    """
+    import datetime as dt
+    d = _d(end)
+    # The month boundary the fiscal year closes on: midnight ending
+    # fy_end_month, expressed in the calendar year the instant sits near.
+    for year in (d.year - 1, d.year, d.year + 1):
+        if fy_end_month == 12:
+            boundary = dt.date(year + 1, 1, 1)
+        else:
+            boundary = dt.date(year, fy_end_month + 1, 1)
+        if abs((d - boundary).days) <= tolerance_days:
+            return True
+    return False
+
+
 def period_label(fact: dict[str, Any],
                  fy_end_month: int | None = None) -> str | None:
     """Derive the period from the fact's own dates, not its `fy`.
@@ -168,6 +191,19 @@ def period_label(fact: dict[str, Any],
     if not start:                       # instant (balance sheet)
         month = int(end[5:7])
         if fy_end_month is None or month == fy_end_month:
+            return f"FY{year}"
+        # A 52/53-week filer closes on a fixed WEEKDAY near a month end, so
+        # its year end drifts a few days either side of the boundary and
+        # some years land in the neighbouring month. Adobe closes on the
+        # Friday nearest Nov 30: FY2021 ended 2021-12-03 and FY2022 on
+        # 2022-12-02, and an exact month test labeled both Q4 -- leaving
+        # those years with no annual balance sheet at all (ADBE lost
+        # equity, cash and debt for 4 of 19 years).
+        #
+        # The window is days rather than a month: a Nov-closing filer's Q1
+        # ends in early March, and anything wide enough to catch that would
+        # give every filer a phantom second FY row.
+        if _near_fiscal_year_end(end, fy_end_month):
             return f"FY{year}"
         q = (month - 1) // 3 + 1
         return f"Q{q} {year}"

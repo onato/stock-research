@@ -148,6 +148,48 @@ class TestPeriodLabel:
         assert bfx.period_label({}) is None
         assert bfx.period_label({"end": ""}) is None
 
+    def test_52_53_week_year_end_drifting_past_the_month_boundary(self):
+        """Adobe closes on the Friday nearest Nov 30, so some years end in Dec.
+
+        `month == fy_end_month` is exact, so FY2021 (ending 2021-12-03) and
+        FY2022 (2022-12-02) were labeled Q4 -- and the annual balance sheet
+        for those years simply did not exist. ADBE lost equity, cash and
+        debt for 4 of 19 years that way. A 52/53-week calendar is normal for
+        US filers (Apple, Cisco, Lululemon all use one); the year end drifts
+        a few days either side of a fixed month, and an instant landing in
+        that window is the annual balance sheet.
+        """
+        # Nov-30 filer whose FY2021 actually closed 2021-12-03.
+        assert bfx.period_label({"end": "2021-12-03"}, fy_end_month=11) == "FY2021"
+        assert bfx.period_label({"end": "2022-12-02"}, fy_end_month=11) == "FY2022"
+        # And the ordinary in-month year ends still work.
+        assert bfx.period_label({"end": "2025-11-28"}, fy_end_month=11) == "FY2025"
+
+    def test_drift_window_does_not_swallow_a_real_quarter(self):
+        """Tolerance is days, not a month: Q1 must stay Q1.
+
+        A Nov year-end filer's first quarter closes end-Feb/early-Mar. If
+        the window were wide enough to catch that, every filer would grow a
+        second phantom FY row.
+        """
+        assert bfx.period_label({"end": "2022-03-04"}, fy_end_month=11) == "Q1 2022"
+        assert bfx.period_label({"end": "2022-06-03"}, fy_end_month=11) == "Q2 2022"
+        assert bfx.period_label({"end": "2022-09-02"}, fy_end_month=11) == "Q3 2022"
+
+    def test_drift_backwards_into_the_previous_month(self):
+        """The mirror of the ADBE case: the year end drifts a few days EARLY.
+
+        Cisco closes on the last Saturday of July, which in some years is
+        the 25th or 26th; a filer whose modal year-end month is August can
+        therefore close in late July. The window is symmetric, so an
+        instant just before the boundary is annual too -- while a date a
+        full quarter away stays a quarter.
+        """
+        assert bfx.period_label({"end": "2024-07-27"}, fy_end_month=7) == "FY2024"
+        assert bfx.period_label({"end": "2024-08-03"}, fy_end_month=7) == "FY2024"
+        # A genuine quarter end, a month clear of the boundary, is unaffected.
+        assert bfx.period_label({"end": "2024-10-31"}, fy_end_month=7) == "Q4 2024"
+
 
 class TestFiscalYearEndMonth:
     """The FY-end month comes from the filer's own annual durations.
