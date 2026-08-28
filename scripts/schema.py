@@ -213,6 +213,28 @@ PROMOTE_KPIS: dict[str, str] = {
     # EPS_Basic, which would orphan the periods already under BasicEPS.
     "BasicEPS": "BasicEPS",
     "FTE": "FTE",
+    # IFRS 15 disaggregation of revenue. A filer that discloses no cost of
+    # revenue (Serko) has no gross margin, so the stream split is the only
+    # view of business mix -- and where one stream is a single counterparty
+    # (SupplierCommissionsRevenue is Booking.com for Business, ~61% of
+    # SKO.NZ's FY2026 revenue) it is the concentration risk itself.
+    "TravelPlatformBookingRevenue": "TravelPlatformBookingRevenue",
+    "ExpensePlatformRevenue": "ExpensePlatformRevenue",
+    "SupplierCommissionsRevenue": "SupplierCommissionsRevenue",
+    "ServicesRevenue": "ServicesRevenue",
+    "OtherRevenue": "OtherRevenue",
+    # Liquidity where cash at bank is not the whole story. SKO.NZ holds
+    # 14.146 as CashAndEquivalents against 40.0 of short-term deposits at
+    # FY2026; the core column alone understates real liquidity ~4x.
+    "TotalCashAndDeposits": "TotalCashAndDeposits",
+    "ShortTermDeposits": "ShortTermDeposits",
+    # Total income (revenue plus other income) and the company's own headline
+    # earnings measure, plus capitalised development -- the cash cost of the
+    # product that never reaches the income statement.
+    "TotalIncome": "TotalIncome",
+    "EBITDAFI": "EBITDAFI",
+    "NetTangibleAssetsPerShare": "NetTangibleAssetsPerShare",
+    "CapitalisedDevelopmentCosts": "CapitalisedDevelopmentCosts",
 }
 
 # Owner-FCF components and core-column duplicates. Listed explicitly so a

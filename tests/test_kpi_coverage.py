@@ -89,3 +89,42 @@ class TestRetirementOperatorPromotion:
         make_db(patch_repo, "SYN", ["BasicEPS"])
         assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
         assert schema.promote_header("BasicEPS") == "BasicEPS"
+
+
+class TestDisaggregatedRevenueStreamPromotion:
+    """A SaaS filer's revenue-by-stream split must reach the CSV.
+
+    Serko discloses no cost of revenue, so there is no gross margin to chart
+    and the only view of business mix is the IFRS 15 disaggregation note:
+    travel platform booking, expense platform, supplier commissions, services
+    and other. Supplier commissions is the Booking.com for Business line and
+    ran 1.288 (FY2018) -> 73.387 (FY2026), taking it to ~61% of revenue --
+    the concentration that is the whole investment thesis. Those names were
+    absent from PROMOTE_KPIS, so the series existed in the `kpis` table and
+    could not be charted: a dashboard could only show consolidated revenue,
+    which hides the single fact that matters most.
+
+    `TotalCashAndDeposits` is the same class of omission on the balance sheet.
+    `CashAndEquivalents` is cash at bank only (14.146 at FY2026) against 40.0
+    of short-term deposits sitting outside it, so the core column understates
+    real liquidity by ~4x and a cash card built on it is simply wrong.
+    """
+
+    def test_revenue_streams_are_promoted(self, patch_repo):
+        make_db(patch_repo, "SYN",
+                ["TravelPlatformBookingRevenue", "ExpensePlatformRevenue",
+                 "SupplierCommissionsRevenue", "ServicesRevenue",
+                 "OtherRevenue"])
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+
+    def test_liquidity_and_income_kpis_are_promoted(self, patch_repo):
+        make_db(patch_repo, "SYN",
+                ["TotalCashAndDeposits", "ShortTermDeposits", "TotalIncome",
+                 "EBITDAFI", "NetTangibleAssetsPerShare",
+                 "CapitalisedDevelopmentCosts"])
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+
+    def test_total_cash_and_deposits_does_not_collide_with_core_cash(self):
+        """It is a distinct concept from the `CashAndEquivalents` core column."""
+        assert schema.promote_header("TotalCashAndDeposits") == "TotalCashAndDeposits"
+        assert schema.promote_header("CashAndEquivalents") is None
