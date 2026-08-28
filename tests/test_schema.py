@@ -209,3 +209,37 @@ class TestEnsureSchema:
                     " VALUES ('FY2024', 400.0, 'thousands')")
         assert con.execute(
             "SELECT revenue FROM metrics_normalized").fetchone()[0] == pytest.approx(0.4)
+
+
+class TestRedefinedKpiSeries:
+    """A company that redefines a KPI needs two columns, not one series.
+
+    Adobe reported Digital Media ARR through FY2025 ($19.20bn) and replaced
+    it with the broader Total Adobe ARR from FY2026 ($26.06bn at Q1). Both
+    are "ARR", so a single column splices them into a 36% jump where the
+    company reported 10.9% growth -- the FY2025 10-K discloses both
+    ($19.20bn and $25.20bn) precisely because they are different measures.
+
+    The promotion whitelist is generic across tickers, so the qualified
+    spellings are the generic mechanism: a prefix names WHICH series, and
+    each lands in its own CSV column.
+    """
+
+    def test_qualified_arr_series_promote_separately(self):
+        assert schema.promote_header("DigitalMediaARR") == "DigitalMediaARR"
+        assert schema.promote_header("TotalAdobeARR") == "TotalAdobeARR"
+
+    def test_qualified_series_do_not_collapse_into_plain_arr(self):
+        """The whole point: they must not normalize to the same column."""
+        names = {schema.normalize_kpi("DigitalMediaARR"),
+                 schema.normalize_kpi("TotalAdobeARR"),
+                 schema.normalize_kpi("ARR")}
+        assert len(names) == 3
+
+    def test_snake_case_from_the_kpis_table_promotes(self):
+        """kpis rows are written snake_case; promotion must find them."""
+        assert schema.promote_header("digital_media_arr") == "DigitalMediaARR"
+        assert schema.promote_header("total_adobe_arr") == "TotalAdobeARR"
+
+    def test_plain_arr_still_promotes(self):
+        assert schema.promote_header("ARR") == "ARR"

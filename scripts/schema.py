@@ -165,8 +165,14 @@ PROMOTE_KPIS: dict[str, str] = {
     # Marketing cost lines
     "MarketingExpense": "MarketingExpense",
     "MarketingPctRevenue": "MarketingPctRevenue",
-    # Recurring revenue
+    # Recurring revenue. A company that REDEFINES its ARR needs the old and
+    # new series in separate columns -- Adobe reported Digital Media ARR
+    # ($19.20bn) through FY2025 and Total Adobe ARR ($26.06bn) from FY2026,
+    # and one column splices them into a 36% jump over reported 10.9%
+    # growth. The FY2025 10-K discloses both, which is the bridge.
     "ARR": "ARR",
+    "DigitalMediaARR": "DigitalMediaARR",
+    "TotalAdobeARR": "TotalAdobeARR",
     "SubscriptionRevenue": "SubscriptionRevenue",
     "NetRevenueRetention": "NetRevenueRetention",
     "ChurnRate": "ChurnRate",
@@ -254,6 +260,8 @@ KPI_ALIASES: dict[str, str] = {
     "marketingpctrevenue": "MarketingPctRevenue",
     "arr": "ARR",
     "annualrecurringrevenue": "ARR",
+    "digitalmediaarr": "DigitalMediaARR",
+    "totaladobearr": "TotalAdobeARR",
     "subscriptionrevenue": "SubscriptionRevenue",
     "netrevenueretention": "NetRevenueRetention",
     "dollarbasednetretentionrate": "NetRevenueRetention",
