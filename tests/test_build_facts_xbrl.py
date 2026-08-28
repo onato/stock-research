@@ -612,3 +612,56 @@ class TestCumulativeCashFlowIsDecumulated:
         rows = {"H1-2024": {"operating_cash_flow": 4500.0}}
         bfx.decumulate(rows)
         assert rows.get("Q2 2024", {}).get("operating_cash_flow") is None
+
+
+class TestEbitdaDerived:
+    """EBITDA is a convention, not a tagged line item, and D&A lives in kpis.
+
+    SEC tags DepreciationDepletionAndAmortization but never "EBITDA", so the
+    column came back 0/106 on ADBE -- leaving the dashboard and the Step 8c
+    EV/EBITDA sanity check with nothing to chart on a filer whose operating
+    income and D&A were both present for 56 periods.
+
+    Same contract as free_cash_flow and the margins: the text path computes
+    it, so the XBRL path must too, or the two disagree for one company.
+    """
+
+    def test_ebitda_is_operating_income_plus_da(self):
+        rec = {"operating_income": 8706.0}
+        bfx.derive(rec, da=818.0)
+        assert rec["ebitda"] == pytest.approx(9524.0)
+
+    def test_missing_da_leaves_ebitda_null(self):
+        """No D&A means unknown, not equal to operating income."""
+        rec = {"operating_income": 8706.0}
+        bfx.derive(rec, da=None)
+        assert rec.get("ebitda") is None
+
+    def test_missing_operating_income_leaves_ebitda_null(self):
+        rec = {"operating_income": None}
+        bfx.derive(rec, da=818.0)
+        assert rec.get("ebitda") is None
+
+    def test_a_tagged_ebitda_is_not_overwritten(self):
+        rec = {"operating_income": 8706.0, "ebitda": 9999.0}
+        bfx.derive(rec, da=818.0)
+        assert rec["ebitda"] == 9999.0
+
+    def test_da_is_optional_so_existing_callers_still_work(self):
+        rec = {"operating_income": 100.0, "revenue": 1000.0}
+        bfx.derive(rec)
+        assert rec.get("ebitda") is None
+        assert rec["operating_margin"] == pytest.approx(10.0)
+
+    def test_main_populates_ebitda_from_the_kpi(self, xbrl_repo, monkeypatch):
+        assert run_main(monkeypatch, "TRIM") == 0
+        con = duckdb.connect(
+            str(xbrl_repo / "research" / "TRIM" / "Reports" / "TRIM.duckdb"),
+            read_only=True)
+        oi, da, ebitda = con.execute(
+            "SELECT c.operating_income, k.value, c.ebitda FROM core_metrics c"
+            " LEFT JOIN kpis k ON k.period = c.period AND k.name = 'ebitda_da'"
+            " WHERE c.period = 'FY2024'").fetchone()
+        con.close()
+        if oi is not None and da is not None:
+            assert ebitda == pytest.approx(oi + da)

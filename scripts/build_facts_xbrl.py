@@ -358,8 +358,8 @@ def drop_scaffolding(rows: dict[str, dict[str, Any]]) -> None:
         del rows[period]
 
 
-def derive(rec: dict[str, Any]) -> None:
-    """Fill the columns SEC never tags: FCF and the margins.
+def derive(rec: dict[str, Any], da: float | None = None) -> None:
+    """Fill the columns SEC never tags: FCF, EBITDA and the margins.
 
     XBRL carries only what a filer marked up, and nobody marks up
     "free cash flow" or "net margin" -- they are conventions, not line
@@ -377,6 +377,15 @@ def derive(rec: dict[str, Any]) -> None:
     if rec.get("free_cash_flow") is None and ocf is not None and capex is not None:
         # SEC tags PaymentsToAcquire... as a positive outflow.
         rec["free_cash_flow"] = ocf - abs(capex)
+
+    # EBITDA is a convention too, and its D&A input is a kpi rather than a
+    # core column, so the caller passes it in. Without this the column came
+    # back 0/106 on ADBE, leaving the dashboard and the Step 8c EV/EBITDA
+    # check nothing to work with on a filer that had both inputs for 56
+    # periods.
+    oi = rec.get("operating_income")
+    if rec.get("ebitda") is None and oi is not None and da is not None:
+        rec["ebitda"] = oi + da
 
     revenue = rec.get("revenue")
     if revenue:
@@ -480,6 +489,9 @@ def main() -> int:
     decumulate(scaled)
     drop_scaffolding(scaled)
 
+    # D&A is a kpi, not a core column, but EBITDA needs it.
+    da_by_period = {p: v for p, name, v, _u in kpis if name == "ebitda_da"}
+
     for period, rec in sorted(scaled.items()):
         # decumulate() can introduce a quarter that had no facts of its own,
         # so fill the schema shape before indexing by column.
@@ -488,7 +500,7 @@ def main() -> int:
         rec["period"] = period
         rec["units"] = "millions"
         rec["currency"] = "USD"
-        derive(rec)
+        derive(rec, da=da_by_period.get(period))
         payload.append([rec[c] for c in cols])
     if payload:
         con.executemany(
