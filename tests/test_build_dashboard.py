@@ -724,3 +724,111 @@ class TestNonOperatingAssetBridge:
         assert st["iv"] == pytest.approx(
             self.ENGINE_IV + 91.7 / d["inputs"]["shares_outstanding"], rel=1e-6
         )
+
+
+class TestDualCurrencyEngine:
+    """A DCF whose financials are built in one currency but whose headline
+    intrinsic_value is reported in the QUOTE currency (9999.HK: RMB
+    projections and net_debt, HKD per-share values, per the
+    canonical-weighted-iv rule) must still validate its engine.
+
+    The engine computes value from the projections, so it lands in RMB while
+    `valuation[sc].intrinsic_value` is HKD. Comparing the two directly fails
+    by exactly the FX rate -- 232.24/215.04 = 1.08 -- so all three scenarios
+    silently fell back to the 5-year toy model even though the component
+    model reproduced the analyst's RMB figures to the cent. The sliders would
+    then contradict the cards above them.
+    """
+
+    def run(self, html, tmp_path):
+        js = tmp_path / "dash.js"
+        js.write_text(bd.node_harness(inline_script(html)))
+        r = subprocess.run(["node", str(js)], capture_output=True, text=True, check=False)
+        assert r.returncode == 0, r.stderr
+        return json.loads(r.stdout)
+
+    def test_quote_currency_model_validates_and_drives_sliders(self, spec, analysis, csv_text, tmp_path):
+        dcf = load("NTES_DCF.json")
+        html = bd.render("9999.HK", spec, csv_text, analysis, dcf)
+        out = self.run(html, tmp_path)
+        for sc in ("base", "bull", "bear"):
+            assert out["engine"][sc]["family"] == "component"
+            assert out["engine"][sc]["ok"] is True, f"{sc} fell back to the toy model"
+            assert out["engine"][sc]["iv"] == pytest.approx(
+                dcf["valuation"][sc]["intrinsic_value"], rel=0.015)
+        # Cards still show the analyst's stored HKD numbers.
+        for sc in ("base", "bull", "bear"):
+            assert out[sc]["iv"] == pytest.approx(
+                dcf["valuation"][sc]["intrinsic_value"], rel=0.005)
+        assert out["moved"]["iv"] > dcf["valuation"]["base"]["intrinsic_value"]
+
+    def test_single_currency_dcf_is_unaffected(self, spec, analysis, csv_text, tmp_path):
+        """The FX conversion must be a no-op when no quote currency differs:
+        TPW.AX is AUD throughout and must keep validating unchanged."""
+        dcf = load("TPW_DCF.json")
+        html = bd.render("TPW.AX", spec, csv_text, analysis, dcf)
+        out = self.run(html, tmp_path)
+        for sc in ("base", "bull", "bear"):
+            assert out["engine"][sc]["ok"] is True
+            assert out["engine"][sc]["iv"] == pytest.approx(
+                dcf["valuation"][sc]["intrinsic_value"], rel=0.015)
+
+
+class TestPerShareCurrencyLabel:
+    """Per-share money strings must carry the QUOTE currency, not the model
+    currency of the flows.
+
+    9999.HK builds its projections in RMB but reports intrinsic_value,
+    weighted_iv, entry price and current_price in HKD (the canonical
+    weighted-iv rule picks the primary listing's quote currency). The engine
+    multiplies the per-share result by the FX rate, so those figures are HKD
+    -- but fmtIV labelled them with inputs.currency and rendered "RMB227",
+    "RMB232", "RMB192". The numbers were right and the prefix was wrong by
+    the 1.08 rate, so a reader comparing the header against the RMB
+    financials elsewhere on the page got a wrong answer.
+
+    Flows (FCF, net cash, the bridge) stay in inputs.currency -- only
+    per-share quantities move.
+    """
+
+    def probe(self, html, tmp_path, js_expr):
+        js = tmp_path / "dash.js"
+        js.write_text(bd.node_harness(inline_script(html))
+                      + f"\nconsole.log(JSON.stringify({js_expr}));\n")
+        r = subprocess.run(["node", str(js)], capture_output=True, text=True, check=False)
+        assert r.returncode == 0, r.stderr
+        return json.loads(r.stdout.strip().splitlines()[-1])
+
+    def test_per_share_strings_use_quote_currency(self, spec, analysis, csv_text, tmp_path):
+        dcf = load("NTES_DCF.json")
+        html = bd.render("9999.HK", spec, csv_text, analysis, dcf)
+        got = self.probe(html, tmp_path, """({
+            iv: __el('dcfIV').textContent,
+            entry: __el('dcfEntry').textContent,
+            weighted: __el('dcfWeighted').textContent,
+            current: __el('dcfCurrent').textContent,
+            header: __el('headerValuation').innerHTML,
+            sens: __el('sensitivityMatrix').innerHTML,
+            baseFcf: __el('baseFCF').textContent
+        })""")
+        for key in ("iv", "entry", "weighted", "current"):
+            assert got[key].startswith("HK$"), f"{key} rendered {got[key]!r}, expected an HK$ prefix"
+            assert "RMB" not in got[key]
+        assert "HK$" in got["header"]
+        assert "RMB" not in got["header"]
+        assert "HK$" in got["sens"]
+        assert "RMB" not in got["sens"]
+        # Flows keep the model currency: owner FCF is genuinely RMB millions.
+        assert got["baseFcf"].startswith("RMB"), got["baseFcf"]
+
+    def test_single_currency_ticker_keeps_model_currency(self, spec, analysis, csv_text, tmp_path):
+        """TPW.AX is AUD throughout -- no quote_currency divergence, so both
+        per-share and flow strings must keep using inputs.currency."""
+        dcf = load("TPW_DCF.json")
+        html = bd.render("TPW.AX", spec, csv_text, analysis, dcf)
+        got = self.probe(html, tmp_path, """({
+            iv: __el('dcfIV').textContent, baseFcf: __el('baseFCF').textContent
+        })""")
+        cur = dcf["inputs"]["currency"]
+        assert got["iv"].startswith(cur), got["iv"]
+        assert got["baseFcf"].startswith(cur), got["baseFcf"]

@@ -1124,8 +1124,29 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal()
 // ============================================================
 let currentScenario = 'base';
 
+// Display symbols for currencies whose ISO code is not what a reader
+// expects to see against a share price. Anything not listed renders as its
+// own code, which is the right answer for USD/EUR/AUD/NZD-style tickers.
+const CURRENCY_SYMBOLS = { hkd: 'HK$', rmb: 'RMB', cny: 'RMB', usd: 'US$', gbp: '\u00a3', jpy: '\u00a5' };
+function currencySymbol(code) {
+    if (!code) return null;
+    return CURRENCY_SYMBOLS[String(code).toLowerCase()] || String(code);
+}
+// PER-SHARE quantities (intrinsic value, weighted IV, entry price, current
+// price, every sensitivity cell) are denominated in the QUOTE currency,
+// because runEngine multiplies its model-currency result by quoteFxRate and
+// the analyst stores intrinsic_value in the quote currency too. The FLOWS
+// (owner FCF, net cash, the equity bridge) stay in inputs.currency and are
+// formatted by formatMoney, which is deliberately left alone. Labelling a
+// HKD share price "RMB192" is wrong by the 1.08 rate and invites a reader to
+// compare it against the RMB financials elsewhere on the page.
+function perShareCurrency() {
+    const inputs = (dcfData && dcfData.inputs) || {};
+    return currencySymbol(inputs.quote_currency) || currencySymbol(inputs.currency) || '$';
+}
+
 function fmtIV(v) {
-    const c = (dcfData && dcfData.inputs && dcfData.inputs.currency) || '$';
+    const c = perShareCurrency();
     if (v == null || !isFinite(v)) return '-';
     const a = Math.abs(v);
     const dp = a >= 100 ? 0 : a >= 10 ? 1 : a >= 1 ? 2 : 4;
@@ -1257,6 +1278,27 @@ function shiftedGrowth(path, startGrowth) {
     const n = path.length, delta = startGrowth - path[0];
     return path.map((g, i) => i === 0 ? startGrowth : g + delta * Math.max(0, 1 - i / Math.max(1, n - 1)));
 }
+// The engine builds value out of the PROJECTIONS, so its result is
+// denominated in the model currency (inputs.currency). The headline
+// `intrinsic_value` may be reported in the QUOTE currency instead -- for a
+// dual-listed filer the canonical-weighted-iv rule picks the currency the
+// primary listing trades in (9999.HK: RMB financials, HKD per-share values).
+// Comparing the two directly fails by exactly the FX rate and silently drops
+// every scenario to the toy model. The rate is derived from the JSON's OWN
+// paired intrinsic_value_<cur> keys rather than any hardcoded assumption, so
+// it stays correct when the analyst refreshes FX, and returns 1 whenever the
+// two currencies agree or the pair is absent.
+function quoteFxRate(sc) {
+    const v = ((dcfData.valuation || {})[sc] || {});
+    const inputs = dcfData.inputs || {};
+    const model = String(inputs.currency || '').toLowerCase();
+    const quote = String(inputs.quote_currency || '').toLowerCase();
+    if (!model || !quote || model === quote) return 1;
+    const iv = Number(v.intrinsic_value);
+    const modelIv = Number(v['intrinsic_value_' + model]);
+    if (isFinite(iv) && isFinite(modelIv) && modelIv !== 0) return iv / modelIv;
+    return 1;
+}
 function runEngine(sc, ov) {
     const family = engineFamily(sc);
     if (!family) return null;
@@ -1316,14 +1358,17 @@ function runEngine(sc, ov) {
         const hurdle = ((dcfData.entry_price || {}).hurdle_rate || 0.15) * 100;
         const entryEquity = pv(hurdle) + tv / Math.pow(1 + hurdle / 100, n)
             + pvLeg(hurdle) + leg.tv / Math.pow(1 + hurdle / 100, leg.n) + surplusCash;
-        return { family: family, iv: equityValue / shares, entryPrice: entryEquity / shares,
+        const fxSop = quoteFxRate(sc);
+        return { family: family, iv: equityValue / shares * fxSop,
+                 entryPrice: entryEquity / shares * fxSop,
                  fcfList: fcfs, growthRates: growth };
     }
     const ev = pv(wacc) + tv / Math.pow(1 + wacc / 100, n);
     const hurdle = ((dcfData.entry_price || {}).hurdle_rate || 0.15) * 100;
     const side = sideStreamValue(sc);
     const entry = (pv(hurdle) + tv / Math.pow(1 + hurdle / 100, n) + side - netDebt) / shares;
-    return { family: family, iv: (ev + side - netDebt) / shares, entryPrice: entry, fcfList: fcfs, growthRates: growth };
+    const fx = quoteFxRate(sc);
+    return { family: family, iv: (ev + side - netDebt) / shares * fx, entryPrice: entry * fx, fcfList: fcfs, growthRates: growth };
 }
 function validateEngines() {
     for (const sc of ['base', 'bull', 'bear']) {
