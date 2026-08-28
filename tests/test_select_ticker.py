@@ -91,6 +91,18 @@ class TestQueueFiles:
         assert [p.name for p in st.queue_files()] == [
             "priority.txt", "nzx.txt", "asx.txt", "aaa_new.txt", "zzz_new.txt"]
 
+    def test_eu_priority_precedes_broad_sweeps(self, st_repo):
+        """eu_priority.txt is a hand-screened shortlist, not an index sweep,
+        so it is consumed straight after the portfolio and ahead of every
+        broad exchange list -- including the alphabetically-earlier asx.txt.
+        Left unnamed in PRIORITY it would sort last, behind nifty.txt."""
+        for name in ("cac.txt", "asx.txt", "eu_priority.txt",
+                     "priority.txt", "nzx.txt"):
+            write_queue(st_repo, name, ["X"])
+        assert [p.name for p in st.queue_files()] == [
+            "priority.txt", "eu_priority.txt", "nzx.txt", "asx.txt",
+            "cac.txt"]
+
     def test_missing_queue_dir_is_empty(self, st_repo, monkeypatch):
         monkeypatch.setattr(st, "QUEUE_DIR", st_repo / "no_such_dir")
         assert st.queue_files() == []

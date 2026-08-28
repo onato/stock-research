@@ -62,6 +62,7 @@ except ImportError:  # pragma: no cover - keeps the selector usable standalone
 # appended alphabetically, so dropping in a new file just works.
 PRIORITY = [
     "priority.txt",     # portfolio + watchlist
+    "eu_priority.txt",  # hand-screened EU candidates (curated, not a sweep)
     "nzx.txt", "asx.txt",
     "us_major.txt", "adr.txt",
     "ftse.txt", "tsx.txt",
