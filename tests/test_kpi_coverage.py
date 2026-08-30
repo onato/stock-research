@@ -128,3 +128,29 @@ class TestDisaggregatedRevenueStreamPromotion:
         """It is a distinct concept from the `CashAndEquivalents` core column."""
         assert schema.promote_header("TotalCashAndDeposits") == "TotalCashAndDeposits"
         assert schema.promote_header("CashAndEquivalents") is None
+
+
+class TestGrocerSegmentAndOnlineMixPromotion:
+    """A multi-banner grocer's segment split and online mix must reach the CSV.
+
+    Ahold Delhaize's whole equity story outside the consolidated P&L is the
+    US/Europe segment split (~57.5%/42.5% of revenue) and the online sales
+    mix (EUR 10.3bn, 11.2% of FY2025 group revenue) -- both stored only in
+    `kpis` and previously absent from PROMOTE_KPIS, so a dashboard could show
+    consolidated revenue and margin only, never the segment or channel mix
+    that management itself reports on. UnderlyingOperatingMargin is the
+    company's own non-GAAP margin measure (management guides on it directly);
+    comparable sales growth is the like-for-like volume/price measure a
+    grocer discloses instead of same-store units; StoreCount and EmployeesFTE
+    are the physical-footprint scale metrics.
+    """
+
+    def test_segment_and_online_kpis_are_promoted(self, patch_repo):
+        make_db(patch_repo, "SYN",
+                ["USSegmentRevenue", "EuropeSegmentRevenue",
+                 "USSegmentOperatingIncome", "EuropeSegmentOperatingIncome",
+                 "OnlineSales", "NetConsumerOnlineSales",
+                 "UnderlyingOperatingMargin",
+                 "ComparableSalesGrowthUS", "ComparableSalesGrowthEurope",
+                 "StoreCount", "EmployeesFTE"])
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []

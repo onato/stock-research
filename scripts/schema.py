@@ -235,6 +235,23 @@ PROMOTE_KPIS: dict[str, str] = {
     "EBITDAFI": "EBITDAFI",
     "NetTangibleAssetsPerShare": "NetTangibleAssetsPerShare",
     "CapitalisedDevelopmentCosts": "CapitalisedDevelopmentCosts",
+    # Multi-banner grocer segment split and channel mix. A grocer's equity
+    # story outside the consolidated P&L lives in the geographic segment
+    # split (Ahold Delhaize US vs Europe) and the online-sales channel mix,
+    # plus the company's own non-GAAP underlying operating margin (the
+    # measure management actually guides on) and the like-for-like
+    # comparable-sales growth disclosed instead of same-store units.
+    "USSegmentRevenue": "USSegmentRevenue",
+    "EuropeSegmentRevenue": "EuropeSegmentRevenue",
+    "USSegmentOperatingIncome": "USSegmentOperatingIncome",
+    "EuropeSegmentOperatingIncome": "EuropeSegmentOperatingIncome",
+    "OnlineSales": "OnlineSales",
+    "NetConsumerOnlineSales": "NetConsumerOnlineSales",
+    "UnderlyingOperatingMargin": "UnderlyingOperatingMargin",
+    "ComparableSalesGrowthUS": "ComparableSalesGrowthUS",
+    "ComparableSalesGrowthEurope": "ComparableSalesGrowthEurope",
+    "StoreCount": "StoreCount",
+    "EmployeesFTE": "EmployeesFTE",
 }
 
 # Owner-FCF components and core-column duplicates. Listed explicitly so a
