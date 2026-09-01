@@ -62,6 +62,30 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 # suffix decides, never the prefix.
 _PREFIXES = ("weighted_iv_", "weighted_intrinsic_value_")
 
+# Suffix spellings that denote a PENCE-denominated variant. `_variants` indexes
+# `weighted_iv_gbp_pence` under "GBP_PENCE", so a lookup for the observed quote
+# currency "GBp" found nothing and the resolver refused with "no GBp variant
+# (have GBP_PENCE)" -- the very pairing its docstring warns about. Pence is
+# 1/100 GBP, so these alias to GBp/GBX ONLY, never to GBP.
+_PENCE_KEYS = ("GBP_PENCE", "PENCE", "GBX")
+_PENCE_QUOTES = ("GBP", "GBX")   # upper() of "GBp" is "GBP"
+
+
+def _lookup(variants: dict[str, tuple[str, float]],
+            quote_currency: str) -> tuple[str, float] | None:
+    """Variant matching an observed quote code, honouring the pence spellings."""
+    if quote_currency in ("GBp", "GBX"):
+        for key in _PENCE_KEYS:
+            if key in variants:
+                return variants[key]
+        return None
+    match = variants.get(quote_currency.upper())
+    # A pounds quote must never resolve to a pence variant.
+    if match is not None and quote_currency.upper() == "GBP" \
+            and match[0].rstrip("_").upper().endswith(("PENCE", "GBX")):
+        return None
+    return match
+
 CANONICAL = "weighted_iv"
 SOURCE_KEY = "weighted_iv_source"
 
@@ -124,12 +148,29 @@ def resolve(repo: pathlib.Path | str, ticker: str, *,
     if not isinstance(pw, dict):
         return Resolution(ticker, None, None, "no probability_weighted block")
 
+    variants = _variants(pw)
+
     existing = pw.get(CANONICAL)
     if not isinstance(existing, bool) and isinstance(existing, (int, float)):
+        # Present is not the same as correct. WISE.L kept `weighted_iv` in USD
+        # (12.2) beside `weighted_iv_gbp_pence` (897.3) against a pence quote
+        # and was reported "already canonical" -- the 100x mismatch this
+        # resolver exists to prevent. If a variant matches the observed quote
+        # and disagrees with the canonical key, prefer the variant.
+        if quote_currency:
+            match = _lookup(variants, quote_currency)
+            if match is not None:
+                key, value = match
+                if abs(value - float(existing)) > max(
+                        0.005 * abs(value), 1e-9):
+                    return Resolution(
+                        ticker, value, key,
+                        f"canonical {CANONICAL}={float(existing):g} is not the "
+                        f"{quote_currency} value ({key}={value:g})",
+                        candidates=tuple(sorted(v[0] for v in variants.values())))
         return Resolution(ticker, float(existing), CANONICAL,
                           "already canonical", already_canonical=True)
 
-    variants = _variants(pw)
     if not variants:
         return Resolution(ticker, None, None, "no currency-suffixed variant")
 
@@ -140,7 +181,7 @@ def resolve(repo: pathlib.Path | str, ticker: str, *,
                           f"unknown quote currency; {len(variants)} variants",
                           candidates=names)
 
-    match = variants.get(quote_currency.upper())
+    match = _lookup(variants, quote_currency)
     if match is None:
         return Resolution(
             ticker, None, None,
@@ -148,13 +189,7 @@ def resolve(repo: pathlib.Path | str, ticker: str, *,
             f"{', '.join(sorted(variants))})",
             candidates=names)
 
-    # Case-sensitive guard for the GBp/GBP pair, which .upper() collapses.
     key, value = match
-    if not key.endswith(quote_currency) and quote_currency in ("GBp", "GBX"):
-        return Resolution(ticker, None, None,
-                          f"no {quote_currency} variant (pence vs pounds)",
-                          candidates=names)
-
     return Resolution(ticker, value, key,
                       f"matched {quote_currency} quote", candidates=names)
 
@@ -280,11 +315,20 @@ def main() -> int:
 
     fixed = refused = skipped = 0
     for ticker in names:
+        # Skip only files with NOTHING to compare against. A present
+        # `weighted_iv` is not proof it is denominated like the quote, so it
+        # must not short-circuit the fetch: WISE.L sat at 12.2 USD beside
+        # `weighted_iv_gbp_pence` 897.3 against a pence quote and was reported
+        # "already canonical" without its currency ever being looked up.
         pre = resolve(REPO, ticker, quote_currency=None)
-        if pre.already_canonical:
+        if pre.reason in ("no currency-suffixed variant", "no readable DCF",
+                          "no probability_weighted block"):
             skipped += 1
             continue
-        if pre.reason == "no currency-suffixed variant":
+        # An existing canonical key with no sibling variant has nothing to be
+        # checked against -- skip without a network call (the common case).
+        if pre.already_canonical and not _variants(
+                (_load(REPO, ticker) or {}).get("probability_weighted") or {}):
             skipped += 1
             continue
 

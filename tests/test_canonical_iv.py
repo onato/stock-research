@@ -112,6 +112,28 @@ class TestResolve:
         assert r.value == 33.0
         assert r.already_canonical is True
 
+    def test_existing_canonical_key_in_wrong_currency_is_reported(self, repo):
+        """`weighted_iv` present is not proof it is denominated like the quote.
+
+        WISE.L kept `weighted_iv` in USD (12.2) beside
+        `weighted_iv_gbp_pence` (897.3) against a 980.2 pence quote, and this
+        resolver called it "already canonical" -- the exact 100x mismatch it
+        exists to prevent. When a variant matching the quote exists and
+        disagrees with the canonical key, say so.
+        """
+        dcf_at(repo, "WISE.L", {"weighted_iv": 12.2,
+                                "weighted_iv_gbp_pence": 897.3})
+        r = canonical_iv.resolve(repo, "WISE.L", quote_currency="GBp")
+        assert r.already_canonical is False
+        assert r.value == 897.3
+        assert "gbp_pence" in (r.source_key or "")
+
+    def test_existing_canonical_key_agreeing_with_its_variant_is_fine(self, repo):
+        """No churn when the canonical key already equals the quote variant."""
+        dcf_at(repo, "OK.NZ", {"weighted_iv": 5.5, "weighted_iv_nzd": 5.5})
+        r = canonical_iv.resolve(repo, "OK.NZ", quote_currency="NZD")
+        assert r.already_canonical is True
+
     def test_zero_is_a_real_verdict_not_a_missing_value(self, repo):
         """CBD.NZ's receivership waterfall leaves nil to equity.
 
@@ -379,3 +401,70 @@ class TestBadInput:
         r = canonical_iv.resolve(repo, "T", quote_currency="USD")
         assert r.value is None
         assert "no readable DCF" in r.reason
+
+
+class TestPenceAliasing:
+    """A GBp quote must match a `_gbp_pence` variant.
+
+    `_variants` indexes `weighted_iv_gbp_pence` under "GBP_PENCE", so a
+    lookup for "GBP" missed it and the resolver refused with
+    "no GBp variant (have GBP_PENCE)" -- the exact pairing its docstring
+    names. Pre-existing, found 2026-09-01 while fixing WISE.L.
+    """
+
+    def test_gbp_pence_variant_matches_a_pence_quote(self, repo):
+        dcf_at(repo, "P.L", {"weighted_iv_gbp_pence": 897.3})
+        r = canonical_iv.resolve(repo, "P.L", quote_currency="GBp")
+        assert r.value == 897.3
+        assert r.source_key == "weighted_iv_gbp_pence"
+
+    def test_gbp_pence_variant_never_matches_a_pounds_quote(self, repo):
+        """Pence is 1/100 GBP: matching them would be the 100x error."""
+        dcf_at(repo, "P.L", {"weighted_iv_gbp_pence": 897.3})
+        r = canonical_iv.resolve(repo, "P.L", quote_currency="GBP")
+        assert r.value is None
+
+    def test_plain_gbp_variant_matches_a_pounds_quote(self, repo):
+        dcf_at(repo, "Q.L", {"weighted_iv_gbp": 8.97})
+        r = canonical_iv.resolve(repo, "Q.L", quote_currency="GBP")
+        assert r.value == 8.97
+
+
+class TestMainDoesNotShortCircuit:
+    """`main` pre-resolved with quote_currency=None purely to skip files that
+    already had `weighted_iv`. That check answers "is the key present?", not
+    "is it in the right currency?", so a wrong-currency canonical key was
+    skipped before its quote was ever fetched -- WISE.L stayed at 12.2 USD
+    against a pence quote even after resolve() learned to catch it.
+    """
+
+    def test_wrong_currency_canonical_is_not_skipped(self, repo, monkeypatch):
+        dcf_at(repo, "WISE.L", {"weighted_iv": 12.2,
+                                "weighted_iv_gbp_pence": 897.3})
+        monkeypatch.setattr(canonical_iv, "REPO", repo)
+        monkeypatch.setattr(canonical_iv, "_quote_currency",
+                            lambda root, ticker: "GBp")
+        monkeypatch.setattr(canonical_iv, "_tickers", lambda repo: ["WISE.L"])
+        monkeypatch.setattr(canonical_iv.sys, "argv",
+                            ["canonical_iv.py", "--all", "--apply"])
+        monkeypatch.setattr(canonical_iv.time, "sleep", lambda *_: None)
+        canonical_iv.main()
+        data = json.loads(
+            (repo / "research" / "WISE.L" / "Reports" / "WISE.L_DCF.json").read_text())
+        assert data["probability_weighted"]["weighted_iv"] == 897.3
+
+    def test_right_currency_canonical_is_still_skipped(self, repo, monkeypatch):
+        """No needless network call or churn when the key is already right."""
+        dcf_at(repo, "OK.NZ", {"weighted_iv": 5.5, "weighted_iv_nzd": 5.5})
+        calls = []
+        monkeypatch.setattr(canonical_iv, "REPO", repo)
+        monkeypatch.setattr(canonical_iv, "_quote_currency",
+                            lambda root, ticker: calls.append(ticker) or "NZD")
+        monkeypatch.setattr(canonical_iv, "_tickers", lambda repo: ["OK.NZ"])
+        monkeypatch.setattr(canonical_iv.sys, "argv",
+                            ["canonical_iv.py", "--all", "--apply"])
+        monkeypatch.setattr(canonical_iv.time, "sleep", lambda *_: None)
+        canonical_iv.main()
+        data = json.loads(
+            (repo / "research" / "OK.NZ" / "Reports" / "OK.NZ_DCF.json").read_text())
+        assert data["probability_weighted"]["weighted_iv"] == 5.5

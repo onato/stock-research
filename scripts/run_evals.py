@@ -396,6 +396,92 @@ def check_dcf(ticker: str, card: Card) -> None:
              "inputs.sbc absent (fine for NTA/book models, a gap for FCF DCFs)")
 
 
+def check_currency_contract(dcf: dict[str, Any], card: Card) -> None:
+    """`currency` and `quote_currency` present as bare ISO codes, and any
+    mismatch documented and reconciled.
+
+    An exchange suffix does not imply a reporting currency: SMI.NZ and MKR.NZ
+    file AUD on the NZX, ANZ.NZ and EBO.NZ file AUD, ARB.NZ files USD, WISE.L
+    files USD against a GBp quote, 0285.HK/9626.HK/9999.HK file RMB against an
+    HKD quote, KKS.F files KZT against EUR -- 16 of ~150 tickers. Yet 27 DCFs
+    recorded no currency at all, only 4 recorded a quote currency, and three
+    stored prose or a symbol ("NZ$") where an ISO code belongs, so a file could
+    not be checked on its own.
+
+    The failure this prevents is quiet: an IV in one currency divided by a
+    price in another yields a plausible upside that is pure noise (WISE.L's
+    885.6 / 48.43 gives a P/E of 18.3 by coincidence).
+    """
+    inputs = dcf.get("inputs")
+    if not isinstance(inputs, dict):
+        return
+
+    def iso(value: Any) -> str | None:
+        """The value if it is a bare ISO-4217 code (GBp allowed), else None."""
+        if not isinstance(value, str):
+            return None
+        v = value.strip()
+        if len(v) != 3 or not v.isalpha():
+            return None
+        return v if v == "GBp" else (v.upper() if v.isupper() else None)
+
+    raw_ccy = inputs.get("currency")
+    raw_quote = inputs.get("quote_currency")
+    ccy, quote = iso(raw_ccy), iso(raw_quote)
+
+    # A malformed value is a defect; an absent one is a gap. `quote_currency`
+    # only became required on 2026-09-01, so 147 existing files predate it --
+    # failing them all would bury the handful that are genuinely wrong.
+    problems, gaps = [], []
+    if raw_ccy is None:
+        gaps.append("inputs.currency missing")
+    elif ccy is None:
+        problems.append(f"inputs.currency={raw_ccy!r} is not a bare ISO code")
+    if raw_quote is None:
+        gaps.append("inputs.quote_currency missing")
+    elif quote is None:
+        problems.append(
+            f"inputs.quote_currency={raw_quote!r} is not a bare ISO code")
+
+    if ccy and quote and ccy != quote and not str(inputs.get("fx_note") or "").strip():
+        problems.append(f"{ccy} flows vs {quote} quote with no inputs.fx_note "
+                        "(need the rate, its date, its source and a parity check)")
+
+    if problems:
+        card.add("dcf_currency_contract", "fail", "; ".join(problems))
+        return
+
+    # The unsuffixed IV must be comparable to current_price. Two orders of
+    # magnitude apart is the pence/pounds bug, not a valuation view.
+    # A denomination error scales EVERY scenario by the same factor and keeps
+    # their sign; a genuinely near-worthless business straddles zero (PGW.NZ
+    # runs -0.41 / -0.01 / +0.62 against a NZ$2.23 price -- a real verdict, not
+    # a scale bug). Only flag when the whole scenario set is small and positive.
+    price = F.num(dcf.get("current_price"))
+    wiv = F.num((dcf.get("probability_weighted") or {}).get("weighted_iv"))
+    ivs = [F.num((( dcf.get("valuation") or {}).get(s) or {}).get("intrinsic_value"))
+           for s in F.SCENARIOS]
+    straddles_zero = any(v is not None and v <= 0 for v in ivs)
+    if price and wiv and price > 0 and wiv > 0 and not straddles_zero:
+        ratio = wiv / price
+        if ratio > 20 or ratio < 0.05:
+            card.add("dcf_currency_contract", "warn",
+                     f"weighted_iv {wiv:g} vs current_price {price:g} "
+                     f"({ratio:.3g}x) -- is the canonical IV in "
+                     f"{quote or 'the quote currency'}?")
+            return
+
+    if gaps:
+        card.add("dcf_currency_contract", "warn",
+                 "; ".join(gaps) + " -- backfill: the exchange suffix does NOT "
+                 "imply the reporting currency")
+        return
+
+    detail = f"{ccy} flows, {quote} quote"
+    card.add("dcf_currency_contract", "pass",
+             detail if ccy == quote else detail + ", fx_note present")
+
+
 def check_entry_price_hurdle(dcf: dict[str, Any], card: Card) -> None:
     """The TV inside a hurdle entry price must be built at the hurdle rate.
 
@@ -620,6 +706,9 @@ def evaluate(ticker: str) -> dict[str, Any]:
     card = Card()
     check_metrics(ticker, card)
     check_dcf(ticker, card)
+    _dcf_ccy = F.load_dcf(ticker)
+    if _dcf_ccy is not None:
+        check_currency_contract(_dcf_ccy, card)
     _dcf_for_entry = F.load_dcf(ticker)
     if _dcf_for_entry is not None:
         check_entry_price_hurdle(_dcf_for_entry, card)

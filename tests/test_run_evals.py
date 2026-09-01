@@ -819,3 +819,131 @@ class TestEntryPriceHurdleConsistency:
         r = [c for c in card.checks if c["id"] == "dcf_entry_price_hurdle"]
         assert r
         assert r[0]["status"] == "skip", r
+
+
+class TestCurrencyContract:
+    """`inputs.currency` and `inputs.quote_currency` must be bare ISO codes,
+    and a mismatch must carry an fx_note plus a quote-currency-denominated IV.
+
+    16 of ~150 tickers report in a currency they are not quoted in (SMI.NZ and
+    MKR.NZ file AUD on the NZX, WISE.L files USD and quotes GBp, 0285.HK files
+    RMB against an HKD quote). 27 DCFs recorded no currency at all and only 4
+    recorded a quote currency, so nothing could be validated from the file.
+    """
+
+    @staticmethod
+    def _dcf(**kw):
+        inputs = {"currency": "AUD", "quote_currency": "NZD",
+                  "fx_note": "AUD/NZD 1.2123 (Yahoo AUDNZD=X, 2026-09-01); "
+                             "parity: A$0.51 x 1.2123 = NZ$0.618 vs NZ$0.615"}
+        inputs.update(kw.pop("inputs", {}))
+        d = {"current_price": 0.615, "inputs": inputs,
+             "valuation": {"base": {"intrinsic_value": 1.011}},
+             "probability_weighted": {"weighted_iv": 0.919}}
+        d.update(kw)
+        return d
+
+    def _run(self, d):
+        card = E.Card()
+        E.check_currency_contract(d, card)
+        return [c for c in card.checks if c["id"] == "dcf_currency_contract"]
+
+    def test_matched_pair_with_fx_note_passes(self):
+        r = self._run(self._dcf())
+        assert r
+        assert r[0]["status"] == "pass", r
+
+    def test_missing_currency_warns_not_fails(self):
+        """27 DCFs record no currency at all. Absence is a backfill gap; a
+        malformed value is the defect."""
+        r = self._run(self._dcf(inputs={"currency": None}))
+        assert r
+        assert r[0]["status"] == "warn", r
+
+    def test_missing_quote_currency_warns_not_fails(self):
+        """quote_currency is a new field (2026-09-01): 147 existing DCFs
+        predate it. Absence is a gap to backfill, not a defect -- grading it
+        as a failure would drown the files that are actually wrong."""
+        r = self._run(self._dcf(inputs={"quote_currency": None}))
+        assert r
+        assert r[0]["status"] == "warn", r
+
+    def test_inferable_quote_currency_still_checks_the_pair(self):
+        """Absent quote_currency, the exchange suffix is a usable fallback for
+        the IV-vs-price magnitude check -- but never for inputs.currency."""
+        d = self._dcf(inputs={"currency": "USD", "quote_currency": None},
+                      current_price=980.2,
+                      probability_weighted={"weighted_iv": 12.2})
+        r = self._run(d)
+        assert r
+        assert r[0]["status"] == "warn", r
+
+    def test_prose_currency_value_fails(self):
+        """AFI.NZ stored 'AUD (fundamentals) / NZD (reported valuation outputs)'."""
+        r = self._run(self._dcf(
+            inputs={"currency": "AUD (fundamentals) / NZD (outputs)"}))
+        assert r
+        assert r[0]["status"] == "fail", r
+
+    def test_currency_symbol_fails(self):
+        """SPK.NZ stored 'NZ$' rather than an ISO code."""
+        r = self._run(self._dcf(inputs={"currency": "NZ$"}))
+        assert r
+        assert r[0]["status"] == "fail", r
+
+    def test_mismatch_without_fx_note_fails(self):
+        r = self._run(self._dcf(inputs={"fx_note": None}))
+        assert r
+        assert r[0]["status"] == "fail", r
+
+    def test_gbp_pence_quote_is_accepted(self):
+        d = self._dcf(inputs={"currency": "USD", "quote_currency": "GBp"})
+        r = self._run(d)
+        assert r
+        assert r[0]["status"] == "pass", r
+
+    def test_iv_two_orders_off_the_price_warns(self):
+        """WISE.L: weighted_iv 12.2 (USD) against a 980.2 pence quote. The
+        unsuffixed key must be comparable to current_price."""
+        d = self._dcf(inputs={"currency": "USD", "quote_currency": "GBp"},
+                      current_price=980.2,
+                      probability_weighted={"weighted_iv": 12.2})
+        r = self._run(d)
+        assert r
+        assert r[0]["status"] == "warn", r
+
+    def test_matching_currencies_need_no_fx_note(self):
+        d = self._dcf(inputs={"currency": "NZD", "quote_currency": "NZD",
+                              "fx_note": None})
+        r = self._run(d)
+        assert r
+        assert r[0]["status"] == "pass", r
+
+    def test_near_zero_valuation_is_not_a_currency_warning(self):
+        """PGW.NZ values at -0.01/0.05 against a NZ$2.23 price -- a genuine
+        near-worthless verdict, not a scale error. A currency mistake moves
+        value by a CONSISTENT factor across scenarios; a real collapse
+        straddles zero."""
+        d = self._dcf(inputs={"currency": "NZD", "quote_currency": "NZD",
+                              "fx_note": None},
+                      current_price=2.23,
+                      probability_weighted={"weighted_iv": 0.05},
+                      valuation={"bear": {"intrinsic_value": -0.41},
+                                 "base": {"intrinsic_value": -0.01},
+                                 "bull": {"intrinsic_value": 0.62}})
+        r = self._run(d)
+        assert r
+        assert r[0]["status"] == "pass", r
+
+    def test_consistent_scale_gap_still_warns(self):
+        """WISE.L: every scenario is ~100x off, all same sign -- that is a
+        denomination error, and must still be caught."""
+        d = self._dcf(inputs={"currency": "USD", "quote_currency": "GBp"},
+                      current_price=980.2,
+                      probability_weighted={"weighted_iv": 12.2},
+                      valuation={"bear": {"intrinsic_value": 6.08},
+                                 "base": {"intrinsic_value": 11.7},
+                                 "bull": {"intrinsic_value": 19.31}})
+        r = self._run(d)
+        assert r
+        assert r[0]["status"] == "warn", r

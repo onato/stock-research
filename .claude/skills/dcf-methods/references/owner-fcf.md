@@ -439,12 +439,62 @@ non-US filers, but six things change. Each one below is a real error that was ma
 caught — the first three in the Toyota Boshoku and Tokai Rika work of 14-Aug-2026, where
 a third-party model and the house model got them wrong independently.
 
-**(a) Currency.** Set the display currency, and build WACC from the **same currency's**
-risk-free rate and equity risk premium. Never discount JPY flows at a USD-built rate.
+**(a) Currency.** Two different problems live here. Solve both, and record both.
+
+**(a1) Discount rate currency.** Build WACC from the **same currency's** risk-free rate
+and equity risk premium as the flows. Never discount JPY flows at a USD-built rate.
 House reference: ~9% for JPY keiretsu industrials against the 10.5% USD tech default.
 The sensitivity grid's terminal-growth columns should derive from the base scenario's
 own terminal growth (±1pp in 0.5pp steps, clipped at zero), not a hardcoded 2-4% band
 that may not even bracket the case being modelled.
+
+**(a2) Reporting currency ≠ quote currency.** This is the more dangerous one, and it is
+not rare: **16 of ~150 tickers in this folder report in a currency they are not quoted
+in.** An NZX listing is not an NZD filer — SMI.NZ and MKR.NZ report AUD, ANZ.NZ and
+EBO.NZ report AUD, ARB.NZ reports USD; WISE.L files USD and quotes GBp; 0285.HK,
+9626.HK and 9999.HK report RMB against an HKD quote; KKS.F reports KZT against a EUR
+quote. **Never infer the reporting currency from the ticker suffix.** Read it off the
+statements.
+
+Three fields, always, even when they agree:
+
+```
+inputs.currency        # ISO-4217 of the FLOWS and the statements: "AUD"
+inputs.quote_currency  # ISO-4217 of the market PRICE: "NZD" (GBp for pence quotes)
+inputs.fx_note         # the rate, its date, its source, and the parity check
+```
+
+`inputs.currency` is an **ISO code and nothing else** — not "NZ$", not a prose sentence
+like "AUD (fundamentals) / NZD (outputs)". Where the two bases genuinely differ, that is
+what `quote_currency` is for; explain the split in `fx_note`, not in the code field.
+
+Rules that follow:
+
+- **`current_price` and every `intrinsic_value` must be denominated the same way.**
+  This is the one an owner acts on. A price in a different currency from the IV divides
+  to a plausible-looking upside that is pure noise — WISE.L's 885.6 / 48.43 gives a P/E
+  of 18.3 by coincidence, which is why `screen_fundamentals` refuses such rows with
+  `price-currency-mismatch`.
+- **Emit a currency-suffixed twin for the non-canonical basis** —
+  `intrinsic_value_gbp_pence`, `weighted_iv_gbp_pence`, `entry_price_nzd`. Keep the
+  unsuffixed key in the **quote** currency so a naive reader of
+  `weighted_iv` vs `current_price` cannot get a wrong answer. `scripts/canonical_iv.py`
+  (`make canonical-iv`) selects by observed quote currency and will flag a file whose
+  canonical key is in the wrong one.
+- **Pence, not pounds.** A GBp quote is 1/100 GBP. Say `GBp` in `quote_currency` — never
+  `GBP` — and check the magnitude: an IV two orders of magnitude off the price is this
+  bug, not a valuation view.
+- **Parity-check a dual listing when one exists**, and put it in `fx_note`. SMI.NZ is
+  the worked example: `A$0.51 × 1.2123 = NZ$0.618` against an observed NZ$0.615, a 0.5%
+  tie that proves the rate, the direction and the quote basis in one line. Getting the
+  direction wrong is the classic error and a parity check catches it instantly.
+- **Date the rate and name the source.** An undated FX rate cannot be re-derived later;
+  `refresh_price.py` moves the price but never the rate, so a stale rate silently rots.
+
+> Worked example — **SMI.NZ**: statements and PFS in AUD, NZX quote in NZD. All
+> per-share values computed in AUD then converted at AUD/NZD 1.2123 (Yahoo AUDNZD=X,
+> 2026-09-01), with the SMI.AX cross-listing used as the parity check. That file is the
+> template for this section.
 
 **(b) Leases — pick ONE treatment and say which.** Under IFRS 16, lease principal sits
 in *financing*, so reported OCF and FCF are flattered. Two valid treatments:
@@ -541,6 +591,8 @@ Before finishing, verify every box. The items are grouped by the error each one 
 
 **Non-US / cyclical builds (section 7)**
 - [ ] WACC built from the **flows' own currency** risk-free rate and ERP
+- [ ] `inputs.currency` **and** `inputs.quote_currency` both present as bare ISO codes (`GBp` for pence), even when identical — never inferred from the ticker suffix
+- [ ] Where they differ: an `fx_note` giving the rate, its date, its source and a parity check; a currency-suffixed twin for the non-canonical basis; and the unsuffixed `intrinsic_value`/`weighted_iv` left in the **quote** currency so they are comparable to `current_price`
 - [ ] **One** lease treatment chosen, stated, and consistent — principal deducted from flows XOR lease liabilities in net debt, never both and never neither
 - [ ] **NCI charged once** — attributable-only flows XOR an NCI deduction in the bridge; FY0 NOPAT ties to reported attributable net income
 - [ ] **Every stripped income stream has its source asset in the bridge**, and vice versa (cross-shareholdings and investment securities at fair value, not just cash)

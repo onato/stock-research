@@ -161,12 +161,26 @@ Follow the method file you just read. It owns the projection mechanics, the scen
 construction and weighting, the discounting, the entry price, the sensitivity grid, the
 workbook, and its own quality checklist.
 
-Two things stay true whichever model you use:
+Three things stay true whichever model you use:
 
 - **Historical CAGRs come from the owner-FCF series**, not reported FCF, wherever the
   method makes that adjustment.
 - **The output contract below is fixed.** A non-FCF model fills the same JSON fields; it
   just derives them differently.
+- **Record `inputs.currency` AND `inputs.quote_currency`, always, even when they are the
+  same.** `currency` is the currency of the statements and the flows, read off the
+  filing; `quote_currency` is the currency of the market price. **Neither is implied by
+  the ticker suffix**: SMI.NZ and MKR.NZ file AUD on the NZX, ANZ.NZ and EBO.NZ file AUD,
+  ARB.NZ files USD, WISE.L files USD and quotes GBp (pence — 1/100 GBP), NetEase files
+  RMB against an HKD quote, and 3 of 48 bare US symbols in this folder (ASML, ADYEY,
+  SPOT) file EUR. Both must be **bare ISO codes** — never `"NZ$"`, never a prose sentence
+  like `"AUD (fundamentals) / NZD (outputs)"`; that split is what `quote_currency` and
+  `fx_note` are for. When the two differ, add `inputs.fx_note` (the rate, its date, its
+  source, and a parity check against a dual listing where one exists), emit a
+  currency-suffixed twin such as `weighted_iv_nzd`, and keep the **unsuffixed**
+  `intrinsic_value` / `weighted_iv` in the **quote** currency so they are comparable to
+  `current_price`. See section 7(a) of `references/owner-fcf.md`; SMI.NZ is the worked
+  example.
 
 
 ## Step 4: Output JSON
@@ -210,6 +224,7 @@ Write to `./research/{ticker}/Reports/{TICKER}_DCF.json`:
     "price_as_of": "2026-01-21T21:00:00Z regular close",
     "balance_sheet_date": "2025-12-31",
     "currency": "USD",
+    "quote_currency": "USD",
     "units": "millions"
   },
 
