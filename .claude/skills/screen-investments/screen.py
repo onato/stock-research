@@ -362,15 +362,44 @@ def num_td(value, text, cls=""):
 # until the generator itself knows the layout.
 HREF_PREFIX = "research/"   # overridden from --root in main()
 
+# Where dashboards are looked for on disk. Deliberately separate from
+# HREF_PREFIX: the href is relative to the published page (and is "" under
+# --root .), while the existence check has to resolve against the real
+# filesystem root.
+ROOT_DIR = "research"       # overridden from --root in main()
+
 
 def dashboard_href(t):
     return f"{HREF_PREFIX}{esc(t)}/Reports/{esc(t)}_Dashboard.html"
 
 
+def has_dashboard(t):
+    """Has this ticker's dashboard actually been built?
+
+    Not every researched ticker has one: a name in "Not ranked" typically has
+    no DCF (or no metrics at all), and a few ranked ones were simply never
+    generated. Linking to the file regardless published 33 links to a 404.
+    """
+    return os.path.isfile(os.path.join(ROOT_DIR, t, "Reports", f"{t}_Dashboard.html"))
+
+
+def ticker_td(t):
+    """The ticker cell -- a link only where there is something to link to."""
+    if has_dashboard(t):
+        return f'<td><a href="{dashboard_href(t)}">{esc(t)}</a></td>'
+    return f"<td>{esc(t)}</td>"
+
+
 def tr_open(t, co):
-    """Row opener carrying the click-through target and the search haystack."""
+    """Row opener carrying the click-through target and the search haystack.
+
+    A row whose dashboard is missing keeps its search haystack but drops
+    data-href, which is what the click handler keys off -- so the row stays
+    listed and filterable, and simply is not clickable.
+    """
     hay = " ".join(x for x in (t, co.get("name"), co.get("sector")) if x).lower()
-    return f'<tr data-href="{dashboard_href(t)}" data-search="{esc(hay)}">'
+    href = f'data-href="{dashboard_href(t)}" ' if has_dashboard(t) else ""
+    return f'<tr {href}data-search="{esc(hay)}">'
 
 
 def company_td(co):
@@ -420,7 +449,7 @@ def row_html(i, r, summary, co):
 
     return tr_open(t, co) + "".join((
         num_td(i, str(i)),
-        f'<td><a href="{dashboard_href(t)}">{esc(t)}</a></td>',
+        ticker_td(t),
         company_td(co),
         price_cell,
         num_td(iv, iv_txt),
@@ -583,7 +612,7 @@ upside = weighted IV / price &minus; 1</p>
     if unranked:
         u_rows = "\n".join(
             tr_open(r.get("ticker", "?"), companies.get(r.get("ticker"), {}))
-            + f'<td><a href="{dashboard_href(r.get("ticker", "?"))}">{esc(r.get("ticker", "?"))}</a></td>'
+            + ticker_td(r.get("ticker", "?"))
             + company_td(companies.get(r.get("ticker"), {}))
             + f"<td>{''.join(badge_html(f) for f in (r.get('flags') or [])) or '—'}</td>"
             + f"<td>{esc(fmt_price(r))}</td>"
@@ -604,7 +633,7 @@ upside = weighted IV / price &minus; 1</p>
     if excluded:
         x_rows = "\n".join(
             tr_open(r.get("ticker", "?"), companies.get(r.get("ticker"), {}))
-            + f'<td><a href="{dashboard_href(r.get("ticker", "?"))}">{esc(r.get("ticker", "?"))}</a></td>'
+            + ticker_td(r.get("ticker", "?"))
             + company_td(companies.get(r.get("ticker"), {}))
             + f"<td>{esc(fmt_price(r))}</td>"
             + num_td(r.get("weighted_iv"),
@@ -722,9 +751,12 @@ def main():
     p.add_argument("--json", default=None, help="write full results JSON to this path")
     p.add_argument("--html", default=None, help="write static leaderboard HTML to this path")
     args = p.parse_args()
-    global HREF_PREFIX  # noqa: PLW0603 -- module-level link prefix, set once from --root
+    global HREF_PREFIX, ROOT_DIR  # noqa: PLW0603 -- module-level, set once from --root
     _r = (args.root or ".").strip("/")
     HREF_PREFIX = "" if _r in ("", ".") else _r + "/"
+    # The href may be relative-to-page (""), but the existence check needs the
+    # real directory, so it keeps args.root as given.
+    ROOT_DIR = args.root or "."
 
     ranked, unranked, excluded = screen(args)
     meta = {"generated_at": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
