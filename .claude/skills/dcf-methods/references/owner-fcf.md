@@ -204,16 +204,45 @@ mid-year convention here — it is not what the rest of this folder's models ass
 mixing the two makes valuations non-comparable across tickers.
 
 ### Entry Price Calculation
-The entry price is the price at which buying today, collecting the projected interim FCF, and exiting at fair value in the terminal year `N` earns a **15% IRR** (`N` is the horizon chosen in section 2 — normally 10):
+The entry price is the price at which buying today, collecting the projected interim FCF, and exiting in the terminal year `N` earns a **15% IRR** (`N` is the horizon chosen in section 2 — normally 10):
 
-`Entry Price = ( Σ FCF_t / 1.15^t  +  TV_N / 1.15^N  −  net_debt ) / shares_outstanding`  (t = 1..N)
+`Entry Price = ( Σ FCF_t / 1.15^t  +  TV_N@hurdle / 1.15^N  −  net_debt ) / shares_outstanding`  (t = 1..N)
 
 - `FCF_t` = the base scenario's projected **SBC-adjusted** FCFs (the decelerating path, not a constant growth rate)
 - `shares_outstanding` = the flat fully diluted count, matching the intrinsic value calculation
-- `TV_N` = the Gordon terminal value `FCF_N * (1 + terminal_growth) / (WACC - terminal_growth)`, capped the same way as in section 4 — still computed with **WACC**, because it is the fair price a buyer pays at exit; only the discounting back to today uses the 15% hurdle
+- `TV_N@hurdle` = `min( FCF_N × (1 + terminal_growth) / (hurdle − terminal_growth), cap × FCF_N )` — **built at the hurdle rate, not at WACC**, and re-capped at that rate
 - `− net_debt` adds net cash (net_debt is negative for net-cash companies, so subtracting it increases the entry price)
 
-Do NOT compute entry price as terminal value per share discounted at 15% alone — that ignores the interim FCF and net cash and produces an entry price far too low. Sanity property: when projected growth ≈ 15%, entry price should land modestly below intrinsic value (the 15% hurdle exceeds WACC), never at ~half of it.
+**Build the terminal value at the same rate you discount at.** It is tempting to argue
+that `TV_N` should keep the WACC-based Gordon value "because that is the fair price a
+buyer pays at exit" — this folder's spec said exactly that until 2026-09-01, and it is
+the single biggest error the method has produced (34 tickers, entry prices overstated a
+median 28%; SAN.PA base €59.17 vs €44.48). Both versions do arithmetically return 15%,
+so nothing looks broken. The reason the WACC version is wrong as a default:
+
+- It silently assumes you exit to a buyer who accepts the WACC return while you demanded
+  15%. That is not a hurdle rate; it is a bet on finding a cheaper-capital buyer, and it
+  is precisely the multiple-expansion assumption the `implied_exit_multiple` disclosure
+  in section 4 exists to flag. Charging a hurdle on the flows and not on the exit is the
+  same double-standard as charging risk twice (section 7f), pointed the other way.
+- **The cap makes it worse, not safer.** The cap is a brake on Gordon runaway at low
+  discount rates. At a 15% hurdle Gordon is already modest (SAN.PA: 7.5x), so the brake
+  is irrelevant — but carrying the WACC-built number across imports a terminal multiple
+  chosen for a *different* discount rate. On SAN.PA the entry price inherited 15x against
+  a self-consistent 7.5x: the cap doubled the terminal value at the hurdle rate.
+
+If a specific ticker genuinely has a credible lower-cost exit buyer (an announced trade
+sale, a binding scheme), model that as a scenario with its own exit multiple and say so
+in `entry_price.method` — do not bake it into the house default.
+
+Do NOT compute entry price as terminal value per share discounted at 15% alone — that ignores the interim FCF and net cash and produces an entry price far too low.
+
+**Sanity property.** For a slow-growing business a correct hurdle entry price commonly
+lands near *half* of intrinsic value, and that is not a bug — it is what demanding 15%
+from an asset the model discounts at 7-9% costs. (The pre-2026-09-01 spec asserted the
+opposite here, "never at ~half of it", which is what made the overstated numbers look
+right.) The real check is self-consistency: recompute the IRR implied by your entry
+price using a terminal value built at that same IRR, and confirm it returns the hurdle.
 
 Compute the hurdle entry price for **all three scenarios**, then probability-weight them
 the same way as intrinsic value. The weighted figure is the model's buy-below price and
@@ -229,7 +258,15 @@ the question the reader actually has ("what return does today's price imply?") f
 better than one hurdle does, and it exposes how steeply value falls with the discount
 rate for a long-duration, terminal-heavy business. Emit it as `required_return_table`.
 
-**Non-FCF valuation models** (BVPS-compounding insurers/holdcos, residual-income banks): the same principle applies — entry price = the price at which interim distributions plus the year-5 exit value deliver a 15% IRR. For dividend payers, add the PV (at 15%) of projected dividends to the discounted exit value. For book-value models, retained earnings are already inside the projected year-5 BVPS/exit value, so do NOT add interim earnings back — only add distributions (dividends/buyback proceeds) the exit value doesn't capture.
+**Every row rebuilds its own terminal value at that row's rate**, exactly as the entry
+price does — `min(Gordon@r, cap × FCF_N)`, re-capped at `r`. A table that holds TV at the
+WACC-built value and varies only the discounting is not a required-return table: it
+understates how fast value falls and it makes the "price implies an X% IRR" reading too
+generous. Cross-check: the 15% row must equal the base-case entry price, and the WACC row
+must equal `valuation.base.intrinsic_value`. If either fails, the table and the entry
+price disagree about the model.
+
+**Non-FCF valuation models** (BVPS-compounding insurers/holdcos, residual-income banks): the same principle applies — entry price = the price at which interim distributions plus the year-5 exit value deliver a 15% IRR. The build-TV-at-the-hurdle rule carries over: if the exit value is an exit multiple (P/B, P/E) rather than a Gordon value, that multiple must be the one a 15%-hurdle buyer would pay, not the base-case multiple reused. For dividend payers, add the PV (at 15%) of projected dividends to the discounted exit value. For book-value models, retained earnings are already inside the projected year-5 BVPS/exit value, so do NOT add interim earnings back — only add distributions (dividends/buyback proceeds) the exit value doesn't capture.
 
 ### Valuation Disclosures
 Report per scenario alongside the valuation:

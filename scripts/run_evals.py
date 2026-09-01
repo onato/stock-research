@@ -396,6 +396,102 @@ def check_dcf(ticker: str, card: Card) -> None:
              "inputs.sbc absent (fine for NTA/book models, a gap for FCF DCFs)")
 
 
+def check_entry_price_hurdle(dcf: dict[str, Any], card: Card) -> None:
+    """The TV inside a hurdle entry price must be built at the hurdle rate.
+
+    Until 2026-09-01 `dcf-methods/references/owner-fcf.md` told the agent to
+    keep the WACC-built, WACC-capped terminal value and change only the
+    discounting. That silently assumes you exit to a buyer accepting the WACC
+    return while you demanded 15%, and it imports a terminal cap chosen for a
+    different discount rate (SAN.PA: 15x carried against a self-consistent
+    7.5x). It overstated entry prices on 34 tickers by a median 28%.
+
+    Both variants return exactly 15% IRR arithmetically, so nothing looks
+    wrong in the file -- only recomputation catches it. Missing inputs skip
+    rather than fail: non-FCF models (banks, REITs, LICs) have no `fcf` path.
+    """
+    ep = dcf.get("entry_price")
+    if not isinstance(ep, dict):
+        return
+    hurdle = F.num(ep.get("hurdle_rate"))
+    if hurdle is None:
+        return
+    if hurdle > 1:
+        hurdle /= 100.0
+
+    inputs = dcf.get("inputs") or {}
+    shares = F.num(inputs.get("shares_outstanding"))
+    net_debt = F.num(inputs.get("net_debt"))
+    proj = (dcf.get("projections") or {}).get("base") or {}
+    asm = (dcf.get("assumptions") or {}).get("base") or {}
+
+    fcf_raw = None
+    for key in ("fcf", "owner_fcf", "free_cash_flow"):
+        v = proj.get(key)
+        if isinstance(v, list) and v and all(F.num(x) is not None for x in v):
+            fcf_raw = [F.num(x) for x in v]
+            break
+
+    _b = ep.get("base")
+    base_blk: dict[str, Any] = _b if isinstance(_b, dict) else {}
+
+    # A currency-qualified twin (`entry_price_kzt` beside `entry_price`) means
+    # the headline number is translated into a different currency from the
+    # flows -- KKS.F reports EUR against KZT projections. Not comparable.
+    if any(k != "entry_price" and k.startswith("entry_price_")
+           for k in base_blk):
+        card.add("dcf_entry_price_hurdle", "skip",
+                 "entry price is currency-translated from the flows")
+        return
+
+    # Models that exit before the projection array ends (`years_to_terminal`).
+    horizon = F.num(base_blk.get("years_to_terminal"))
+    if fcf_raw is not None and horizon and 0 < int(horizon) <= len(fcf_raw):
+        fcf_raw = fcf_raw[:int(horizon)]
+
+    tg = F.num(asm.get("terminal_growth"))
+    cap = F.num(asm.get("terminal_cap_multiple"))
+    reported = F.num(base_blk.get("entry_price")
+                     if base_blk else ep.get("base"))
+
+    if (not fcf_raw or not shares or net_debt is None
+            or tg is None or reported is None):
+        card.add("dcf_entry_price_hurdle", "skip",
+                 "no base FCF path / entry price -- non-FCF model or absent")
+        return
+
+    fcf: list[float] = [x for x in fcf_raw if x is not None]
+    tg /= 100.0
+    if hurdle <= tg:
+        card.add("dcf_entry_price_hurdle", "skip",
+                 f"hurdle {hurdle:.3f} <= terminal growth {tg:.3f}")
+        return
+
+    n = len(fcf)
+    pv = sum(f / (1 + hurdle) ** (i + 1) for i, f in enumerate(fcf))
+    gordon = fcf[-1] * (1 + tg) / (hurdle - tg)
+    tv = min(gordon, fcf[-1] * cap) if cap else gordon
+    expected = (pv + tv / (1 + hurdle) ** n - net_debt) / shares
+
+    tol = max(0.03 * abs(expected), 0.01)
+    if abs(reported - expected) <= tol:
+        card.add("dcf_entry_price_hurdle", "pass",
+                 f"entry {reported:.2f} ~= hurdle-built {expected:.2f}")
+        return
+
+    detail = (f"entry {reported:.2f} vs hurdle-built {expected:.2f} "
+              f"({(reported - expected) / abs(expected) * 100:+.0f}%)")
+    wacc = F.num(asm.get("wacc"))
+    if wacc is not None and wacc / 100.0 > tg:
+        wr = wacc / 100.0
+        g_w = fcf[-1] * (1 + tg) / (wr - tg)
+        tv_w = min(g_w, fcf[-1] * cap) if cap else g_w
+        wrong = (pv + tv_w / (1 + hurdle) ** n - net_debt) / shares
+        if abs(reported - wrong) <= max(0.03 * abs(wrong), 0.01):
+            detail += " -- matches the WACC-built TV bug (pre-2026-09-01 spec)"
+    card.add("dcf_entry_price_hurdle", "fail", detail)
+
+
 # ---------------------------------------------------------------------------
 # Pipeline health
 # ---------------------------------------------------------------------------
@@ -514,6 +610,9 @@ def evaluate(ticker: str) -> dict[str, Any]:
     card = Card()
     check_metrics(ticker, card)
     check_dcf(ticker, card)
+    _dcf_for_entry = F.load_dcf(ticker)
+    if _dcf_for_entry is not None:
+        check_entry_price_hurdle(_dcf_for_entry, card)
     check_units_consistent(ticker, card)
     check_health(ticker, card)
     return {

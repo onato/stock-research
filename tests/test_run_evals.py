@@ -702,3 +702,104 @@ class TestProsePriceStale:
     def test_never_refreshed_is_skipped(self, make_ticker):
         checks = dcf_checks(make_ticker, minimal_dcf())
         assert checks["dcf_prose_price_stale"]["status"] == "skip"
+
+
+class TestEntryPriceHurdleConsistency:
+    """The terminal value inside an entry price must be built at the HURDLE
+    rate, not at WACC.
+
+    Regression guard for the 2026-09-01 spec fix. The old
+    `references/owner-fcf.md` told the agent to keep the WACC-built (and
+    WACC-capped) terminal value and only change the discounting, which
+    overstated entry prices on 34 tickers by a median 28% (SAN.PA base
+    EUR59.17 vs a self-consistent EUR44.48). Both variants return exactly
+    15% IRR arithmetically, so only an explicit recomputation catches it.
+    """
+
+    @staticmethod
+    def _dcf(entry, *, wacc=7.5, tg=1.5, cap=15, fcf=None):
+        if fcf is None:
+            fcf = [7876.0, 8554.0, 9209.0, 9806.0, 10385.0,
+                   10446.0, 9993.0, 9617.0, 9465.0, 9506.0]
+        return {
+            "ticker": "T", "current_price": 76.81, "valuation_date": "2026-08-30",
+            "inputs": {"shares_outstanding": 1196.6, "net_debt": 11045.0},
+            "assumptions": {"base": {"wacc": wacc, "terminal_growth": tg,
+                                     "terminal_cap_multiple": cap}},
+            "projections": {"base": {"fcf": fcf}},
+            "entry_price": {"hurdle_rate": 0.15, "base": {"entry_price": entry}},
+        }
+
+    def test_wacc_built_terminal_value_fails(self, make_ticker, tmp_path):
+        """The historical bug: TV held at the 15x WACC cap -> EUR59.17."""
+        card = E.Card()
+        E.check_entry_price_hurdle(self._dcf(59.17), card)
+        r = [c for c in card.checks if c["id"] == "dcf_entry_price_hurdle"]
+        assert r
+        assert r[0]["status"] == "fail", r
+
+    def test_hurdle_built_terminal_value_passes(self, make_ticker):
+        """The corrected number recomputes cleanly."""
+        card = E.Card()
+        E.check_entry_price_hurdle(self._dcf(44.48), card)
+        r = [c for c in card.checks if c["id"] == "dcf_entry_price_hurdle"]
+        assert r
+        assert r[0]["status"] == "pass", r
+
+    def test_cap_still_applies_when_it_binds_at_the_hurdle(self):
+        """A low cap can still bind at 15%; the check must honour it."""
+        # cap 5x on FCF_N 9506 = 47530 < Gordon@15% (71471) -> cap binds
+        d = self._dcf(0.0, cap=5)
+        fcf = d["projections"]["base"]["fcf"]
+        pv = sum(f / 1.15 ** (i + 1) for i, f in enumerate(fcf))
+        exp = (pv + fcf[-1] * 5 / 1.15 ** 10 - 11045.0) / 1196.6
+        d["entry_price"]["base"]["entry_price"] = round(exp, 2)
+        card = E.Card()
+        E.check_entry_price_hurdle(d, card)
+        r = [c for c in card.checks if c["id"] == "dcf_entry_price_hurdle"]
+        assert r
+        assert r[0]["status"] == "pass", r
+
+    def test_missing_fields_skip_not_fail(self):
+        """Non-FCF models (banks, REITs) have no fcf path -- must not fail."""
+        card = E.Card()
+        E.check_entry_price_hurdle(
+            {"entry_price": {"hurdle_rate": 0.15}, "inputs": {}}, card)
+        r = [c for c in card.checks if c["id"] == "dcf_entry_price_hurdle"]
+        assert not r or r[0]["status"] != "fail", r
+
+    def test_short_horizon_respects_years_to_terminal(self):
+        """A 5-year model must not be scored against a 10-element FCF array."""
+        d = self._dcf(0.0)
+        d["entry_price"]["base"]["years_to_terminal"] = 5
+        fcf = d["projections"]["base"]["fcf"][:5]
+        pv = sum(f / 1.15 ** (i + 1) for i, f in enumerate(fcf))
+        gordon = fcf[-1] * 1.015 / (0.15 - 0.015)
+        tv = min(gordon, fcf[-1] * 15)
+        exp = (pv + tv / 1.15 ** 5 - 11045.0) / 1196.6
+        d["entry_price"]["base"]["entry_price"] = round(exp, 2)
+        card = E.Card()
+        E.check_entry_price_hurdle(d, card)
+        r = [c for c in card.checks if c["id"] == "dcf_entry_price_hurdle"]
+        assert r
+        assert r[0]["status"] == "pass", r
+
+    def test_currency_qualified_entry_price_skips(self):
+        """KKS.F reports entry_price in EUR while its flows are KZT -- the two
+        are not comparable, so the check must skip rather than fail."""
+        d = self._dcf(49.82)
+        d["entry_price"]["base"]["entry_price_kzt"] = 26615.0
+        card = E.Card()
+        E.check_entry_price_hurdle(d, card)
+        r = [c for c in card.checks if c["id"] == "dcf_entry_price_hurdle"]
+        assert r
+        assert r[0]["status"] == "skip", r
+
+    def test_empty_fcf_array_skips(self):
+        """GNE.NZ carries `fcf: []` -- must skip, not crash or fail."""
+        d = self._dcf(0.58, fcf=[])
+        card = E.Card()
+        E.check_entry_price_hurdle(d, card)
+        r = [c for c in card.checks if c["id"] == "dcf_entry_price_hurdle"]
+        assert r
+        assert r[0]["status"] == "skip", r
