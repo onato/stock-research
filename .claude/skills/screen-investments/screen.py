@@ -436,15 +436,37 @@ def write_html(ranked, unranked, excluded, meta, scores, companies, path):
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Stock Research</title>
+<meta name="description" content="DCF leaderboard and per-ticker research dashboards.">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#16213e">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Stocks">
 <style>
 * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+html {{
+    /* Paints the overscroll/safe-area gutters too; body alone leaves them
+       white when the standalone PWA rubber-bands past the content. */
+    background: #16213e;
+    -webkit-text-size-adjust: 100%;
+}}
 body {{
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    background-attachment: fixed;
     color: #e0e0e0; min-height: 100vh; max-width: 1100px;
-    margin: 0 auto; padding: 20px;
+    margin: 0 auto;
+    /* viewport-fit=cover + black-translucent status bar: keep content clear
+       of the notch and the home indicator. */
+    padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
+             max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
 }}
 .header {{
     background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
@@ -462,6 +484,7 @@ a:hover {{ color: #00b894; }}
 .card {{
     background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
     border-radius: 12px; padding: 10px; margin-bottom: 20px; overflow-x: auto;
+    -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
 }}
 table {{ border-collapse: collapse; width: 100%; font-size: 0.92em; }}
 th {{
@@ -483,6 +506,25 @@ td.co {{ white-space: normal; max-width: 280px; line-height: 1.3; }}
     border-radius: 12px; outline: none;
 }}
 .search-box:focus {{ border-color: #00d4aa; }}
+/* iOS zooms the page in when a focused input is under 16px. */
+.search-box {{ font-size: 16px; }}
+
+@media (max-width: 700px) {{
+    body {{ padding-left: max(12px, env(safe-area-inset-left));
+            padding-right: max(12px, env(safe-area-inset-right)); }}
+    .header {{ padding: 16px; }}
+    h1 {{ font-size: 1.3em; }}
+    .card {{ padding: 6px; border-radius: 10px; }}
+    table {{ font-size: 0.86em; }}
+    th, td {{ padding: 10px 8px; }}
+    /* Touch targets: a 7px-padded row is under the 44px minimum. */
+    tbody tr td {{ padding-top: 12px; padding-bottom: 12px; }}
+    td.co {{ max-width: 150px; }}
+    .controls {{ flex-wrap: wrap; gap: 10px; }}
+    /* The leaderboard keeps Ticker/Company/Price/IV/Upside; the rest is
+       reachable by scrolling the card sideways, not lost. */
+    .header .meta {{ font-size: 0.82em; }}
+}}
 .count {{ color: #8b8ba0; white-space: nowrap; }}
 .pos {{ color: #00d4aa; }}
 .neg {{ color: #ff6b6b; }}
@@ -652,6 +694,14 @@ document.querySelector('#lb thead').addEventListener('click', (e) => {
         })
         .forEach(r => tbody.appendChild(r));
 });
+
+// Offline shell. Registration is best-effort: the page is fully functional
+// without it, and file:// has no service-worker support at all.
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+}
 </script>
 """
     doc = (head + ranked_table + unranked_html + excluded_html + footnote
