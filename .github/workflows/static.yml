@@ -1,4 +1,4 @@
-# Simple workflow for deploying static content to GitHub Pages
+# Deploys the research site to GitHub Pages.
 name: Deploy static content to Pages
 
 on:
@@ -30,14 +30,45 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
+
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
+
+      # The repo tracks ~9 GB of extraction inputs -- research/*/Extracted/
+      # (.txt dumps) and research/*/PDFs/ (SEC .htm filings, which the *.pdf
+      # ignore rule does not cover). The site links to none of it: only
+      # Reports/ is ever fetched by a browser.
+      #
+      # Uploading the whole repo made a 1.55 GB artifact against Pages' 1 GB
+      # limit ("Deployment might fail") and cost ~8 min a run. Staging just
+      # the served files takes it to ~30 MB.
+      - name: Stage site
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          # Copy TRACKED files only. Reports/ also holds gitignored local
+          # build artifacts -- the .duckdb caches (~476 MB) and downloaded
+          # PDFs -- which are absent in CI but present on a dev machine; a
+          # plain `cp -r` would publish them from a local run.
+          git ls-files -z \
+              index.html integrity.html manifest.webmanifest sw.js \
+              icons 'research/*/Reports/*' \
+            | rsync -a --from0 --files-from=- ./ dist/
+          echo "staged size: $(du -sh dist | cut -f1)"
+          echo "staged files: $(find dist -type f | wc -l)"
+          # A rename upstream could make the globs match nothing, which would
+          # quietly deploy an empty site over a working one. Fail instead.
+          test -s dist/index.html
+          n=$(find dist -name '*_Dashboard.html' | wc -l)
+          echo "staged dashboards: $n"
+          test "$n" -gt 100
+
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
-          # Upload entire repository
-          path: '.'
+          path: dist
+
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
