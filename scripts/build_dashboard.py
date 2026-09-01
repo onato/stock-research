@@ -391,7 +391,14 @@ def render_sections(spec: dict[str, Any], data: dict[str, Any]) -> str:
 
 
 def _slider_range(dcf: dict[str, Any]) -> dict[str, tuple[float, float, float]]:
-    """(min, max, default) per slider, wide enough for every scenario's default."""
+    """(min, max, default) per slider, wide enough for every scenario's default.
+
+    A scenario's own key can be present but explicitly null -- a risked
+    project-NPV DCF (pre-revenue miner awaiting a binary permit decision)
+    has no rate-based bear case and records that as `"wacc": null` rather
+    than omitting the key, so `.get(key, default)` returns the stored None,
+    not the default. `or` falls through null the same as a missing key.
+    """
     a = dcf.get("assumptions", {})
     base = a.get("base", {})
     growths, waccs, terms = [], [], []
@@ -400,8 +407,8 @@ def _slider_range(dcf: dict[str, Any]) -> dict[str, tuple[float, float, float]]:
         g = s.get("growth_rates")
         growths.append(float(g[0]) if isinstance(g, list) and g else
                        float(F.num(dcf_get(dcf, "historical_growth.selected_growth_rate")) or 0))
-        waccs.append(float(s.get("wacc", base.get("wacc", 10))))
-        terms.append(float(s.get("terminal_growth", base.get("terminal_growth", 3))))
+        waccs.append(float(s.get("wacc") or base.get("wacc") or 10))
+        terms.append(float(s.get("terminal_growth") or base.get("terminal_growth") or 3))
     return {
         "growth": (min(-5.0, min(growths) - 5), max(30.0, max(growths) + 5), growths[0]),
         "wacc": (min(6.0, min(waccs) - 1), max(18.0, max(waccs) + 1), waccs[0]),

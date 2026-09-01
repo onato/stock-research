@@ -323,6 +323,20 @@ class TestDcfSection:
         assert float(w.group(2)) >= 11
         assert float(w.group(3)) == 10
 
+    def test_explicit_null_wacc_and_terminal_growth_do_not_crash(self, dcf):
+        # A risked-project-NPV DCF (e.g. a pre-revenue miner awaiting a
+        # permit decision) has no rate-based bear case: its assumptions
+        # explicitly set wacc/terminal_growth to null rather than omitting
+        # the keys. `.get(key, default)` returns the stored None in that
+        # case, not the default -- _slider_range must tolerate that.
+        dcf = json.loads(json.dumps(dcf))
+        for sc in ("base", "bull", "bear"):
+            dcf["assumptions"][sc]["wacc"] = None
+            dcf["assumptions"][sc]["terminal_growth"] = None
+        r = bd._slider_range(dcf)
+        assert r["wacc"][2] is not None
+        assert r["terminal"][2] is not None
+
     def test_no_dcf_omits_section_and_link_but_page_still_renders(self, spec, analysis, csv_text):
         page = bd.render("TEST", spec, csv_text, analysis, None)
         assert "const dcfData = null;" in page
