@@ -59,6 +59,10 @@ SYMBOLS = [
 # WISE.L's FY2026 20-F uses the second form with "U.S." punctuated, which an
 # earlier pattern set missed entirely -- so the checker fell back to counting
 # stray GBP symbols and confidently reported the wrong answer.
+# Every name is anchored with \b at both ends. Without it the bare `yen`
+# alternative matched the substring inside a company's own name
+# ("BioSyent Inc.") and inside its CEO's ("Shantanu Narayen", 125 times in
+# ADBE's filings), so both tickers were reported as reporting in JPY.
 _NAMES = [
     (r"new zealand dollar", "NZD"),
     (r"australian dollar", "AUD"),
@@ -68,16 +72,26 @@ _NAMES = [
     (r"hong kong dollar", "HKD"),
     (r"singapore dollar", "SGD"),
     (r"canadian dollar", "CAD"),
-    (r"japanese yen|yen", "JPY"),
+    (r"(?:japanese )?yen", "JPY"),
     (r"swiss franc", "CHF"),
 ]
+# The gap in the "currency ... is the" lead must not span a sentence OR a
+# list of other currencies. ADBE's 10-Q says "exposed to foreign currencies,
+# including the euro and the japanese yen" -- an FX-RISK disclosure. The old
+# `[^.]{0,40}?` gap bridged "currencies, including the euro and the" and read
+# it as a reporting-currency statement. Excluding commas and newlines from
+# the gap keeps the lead to a single clause, which is the only place a filer
+# actually names its reporting currency.
 _LEADS = [
     r"presented in (?:thousands of |millions of )?",
     r"expressed in (?:thousands of |millions of )?",
-    r"(?:reporting|presentation|functional) currency[^.]{0,40}?is (?:the )?",
+    r"(?:reporting|presentation|functional) currency[^.,\n]{0,40}?is (?:the )?",
     r"amounts are in ",
 ]
-STATED = [(lead + name, ccy) for lead in _LEADS for name, ccy in _NAMES]
+# `\b` on both ends, with an optional plural `s` inside the trailing
+# boundary -- filings say "New Zealand dollars", not "dollar".
+STATED = [(lead + r"\b(?:" + name + r")s?\b", ccy)
+          for lead in _LEADS for name, ccy in _NAMES]
 
 
 def from_filings(ticker: str, sample: int = 5) -> tuple[str | None, dict[str, int]]:
@@ -132,11 +146,112 @@ def from_filings(ticker: str, sample: int = 5) -> tuple[str | None, dict[str, in
     return stated, dict(counts)
 
 
+def _dcf_currency(ticker: str) -> tuple[str | None, str | None, str | None]:
+    """(currency, quote_currency, fx_note) from the ticker's DCF, if any.
+
+    Absent fields read as None: 27 corpus DCFs predate the currency
+    contract and record no currency at all, and a missing field is not
+    evidence of a mismatch.
+    """
+    import json
+
+    f = (REPO / "research" / ticker / "Reports" / f"{ticker}_DCF.json")
+    if not f.is_file():
+        return None, None, None
+    try:
+        inputs = (json.loads(f.read_text()) or {}).get("inputs") or {}
+    except Exception:
+        return None, None, None
+
+    def code(value: object) -> str | None:
+        # Bare ISO codes only. Prose ("AUD (fundamentals) / NZD (outputs)")
+        # and symbols ("NZ$") are what quote_currency and fx_note replaced;
+        # treating them as a code would invent a mismatch.
+        text = value.strip() if isinstance(value, str) else ""
+        return text if re.fullmatch(r"[A-Za-z]{3}|GBp", text) else None
+
+    note = inputs.get("fx_note")
+    return (code(inputs.get("currency")), code(inputs.get("quote_currency")),
+            note if isinstance(note, str) and note.strip() else None)
+
+
+def audit(only: list[str] | None = None) -> tuple[
+        list[tuple[str, str, str]],
+        list[tuple[str, str, str]],
+        ]:
+    """(problems, notes) for every ticker with a database.
+
+    A *problem* is a recorded currency contradicted by what the filings
+    STATE -- evidence, and worth the cost of a re-run.
+
+    A *note* is a recorded currency that merely disagrees with the listing
+    suffix while the filings state nothing. The suffix predicts the QUOTE
+    currency; 16 of ~150 corpus tickers report in a currency they are not
+    quoted in, so treating the suffix as evidence permanently demands
+    re-runs of correct tickers (9999.HK, ARB.NZ and HFL.NZ were each
+    flagged that way, and each is right).
+    """
+    import duckdb
+
+    want = set(only or [])
+    problems: list[tuple[str, str, str]] = []
+    notes: list[tuple[str, str, str]] = []
+
+    for db in sorted((REPO / "research").glob("*/Reports/*.duckdb")):
+        ticker = db.parent.parent.name
+        if want and ticker not in want:
+            continue
+        try:
+            con = duckdb.connect(str(db), read_only=True)
+            rows = con.execute(
+                "SELECT DISTINCT currency FROM core_metrics "
+                "WHERE currency IS NOT NULL").fetchall()
+            con.close()
+        except Exception:
+            continue
+        if not rows:
+            continue
+        currencies = sorted(r[0] for r in rows)
+        if len(currencies) > 1:
+            # More than one distinct currency means adjudication conflated
+            # periods reported in different currencies.
+            problems.append((ticker, ", ".join(currencies), "one currency"))
+            continue
+        recorded = currencies[0]
+
+        suffix = ticker.rsplit(".", 1)[1].upper() if "." in ticker else ""
+        expect = BY_SUFFIX.get(suffix, "?")
+        stated, _ = from_filings(ticker)
+
+        if stated and recorded != stated:
+            problems.append((ticker, recorded, stated))
+            continue
+
+        # The DB and the DCF each record a reporting currency, independently.
+        # Nothing compared them until now, so BIT.NZ and FCT.NZ carried GBP
+        # in core_metrics against NZD in the DCF -- a silent split inside the
+        # very contract meant to prevent it, because the contract only ever
+        # looked at one file.
+        dcf_ccy, quote_ccy, fx_note = _dcf_currency(ticker)
+        if dcf_ccy and recorded != dcf_ccy:
+            problems.append((ticker, recorded, dcf_ccy))
+            continue
+        # Flows in one currency over a price in another, with no rate
+        # recorded, is the quiet failure the contract names: the upside
+        # looks plausible and is noise.
+        if dcf_ccy and quote_ccy and dcf_ccy != quote_ccy and not fx_note:
+            problems.append((ticker, f"{dcf_ccy} priced in {quote_ccy}",
+                             "an fx_note"))
+            continue
+
+        if not stated and expect != "?" and recorded != expect:
+            notes.append((ticker, recorded, expect))
+    return problems, notes
+
+
 def main() -> int:
     import duckdb
     only = set(sys.argv[1:])
-    problems: list[tuple[str, str, str]] = []
-    ambiguous: list[tuple[str, list[str]]] = []
 
     print(f"  {'ticker':10s} {'recorded':>8s} {'suffix':>7s} {'stated':>7s}  filing symbols")
     print("  " + "-" * 68)
@@ -156,11 +271,7 @@ def main() -> int:
         if not rows:
             continue
         currencies = sorted(r[0] for r in rows)
-        # More than one distinct currency means adjudication conflated
-        # periods reported in different currencies. Reporting whichever
-        # row came first would let that pass as agreement, so flag it.
         if len(currencies) > 1:
-            ambiguous.append((ticker, currencies))
             print(f"  {ticker:10s} ambiguous: multiple currencies recorded "
                   f"({', '.join(currencies)})")
             continue
@@ -173,28 +284,36 @@ def main() -> int:
         top = ", ".join(f"{c}x{n}" for c, n in
                         sorted(counts.items(), key=lambda kv: -kv[1])[:3])
 
-        # Trust an explicit statement over the suffix prior.
-        truth = stated or expect
-        bad = truth != "?" and recorded != truth
-        flag = f"  <-- expected {truth}" if bad else ""
-        if bad:
-            problems.append((ticker, recorded, truth))
+        if stated and recorded != stated:
+            flag = f"  <-- filings state {stated}"
+        elif not stated and expect != "?" and recorded != expect:
+            flag = f"  (note: {suffix} listings usually report {expect})"
+        else:
+            flag = ""
 
         print(f"  {ticker:10s} {recorded:>8s} {expect:>7s} "
               f"{(stated or '-'):>7s}  {top}{flag}")
 
+    problems, notes = audit(sorted(only) or None)
+
     if problems:
-        print(f"\n  {len(problems)} ticker(s) need a re-run to correct currency:")
-        for t, got, want in problems:
-            print(f"    make run TICKER={t}      # recorded {got}, should be {want}")
-    if ambiguous:
-        print(f"\n  {len(ambiguous)} ticker(s) record multiple currencies "
-              "(re-run to re-adjudicate):")
-        for t, ccys in ambiguous:
-            print(f"    make run TICKER={t}      # recorded {', '.join(ccys)}")
-    if not problems and not ambiguous:
+        print(f"\n  {len(problems)} ticker(s) contradict their own filings "
+              "-- re-run to correct:")
+        for t, got, want_ccy in problems:
+            print(f"    make run TICKER={t}      # recorded {got}, "
+                  f"should be {want_ccy}")
+    if notes:
+        print(f"\n  {len(notes)} ticker(s) report in a currency they are not "
+              "listed in.")
+        print("  This is normal for a cross-listed filer -- confirm each is "
+              "deliberate,")
+        print("  and that its DCF records a quote_currency and an fx_note:")
+        for t, got, expect_ccy in notes:
+            print(f"    {t:12s} reports {got}, listed where {expect_ccy} "
+                  "is usual")
+    if not problems and not notes:
         print("\n  no currency mismatches")
-    return 1 if problems or ambiguous else 0
+    return 1 if problems else 0
 
 
 if __name__ == "__main__":
