@@ -14,11 +14,27 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 
 LOCK="$HERE/.nightly.lock"
+# A bare mkdir lock cannot tell a live run from a corpse. The 2026-08-26 pass
+# died mid-fetch (SIGKILL / reboot skips the EXIT trap) and the leftover
+# directory silently disabled the nightly for SIX consecutive nights -- the log
+# just repeats "another nightly run is active". git_lock.py records the owning
+# PID and reclaims the lock only when that process is genuinely gone, which is
+# the same fix scripts/lib.sh already applies to the git lock.
 if ! mkdir "$LOCK" 2>/dev/null; then
-  echo "another nightly run is active ($LOCK exists) — exiting"
-  exit 0
+  if uv run --project "$REPO" python3 "$REPO/scripts/git_lock.py" \
+       --reclaim "$LOCK" >/dev/null 2>&1 && mkdir "$LOCK" 2>/dev/null; then
+    echo "reclaimed an abandoned nightly lock ($LOCK)"
+  else
+    holder="$(uv run --project "$REPO" python3 "$REPO/scripts/git_lock.py" \
+                --check "$LOCK" 2>/dev/null)"
+    echo "another nightly run is active ($LOCK, held by ${holder:-?}) — exiting"
+    exit 0
+  fi
 fi
-trap 'rmdir "$LOCK"' EXIT
+printf '%s %s\n' "$$" nightly > "$LOCK/owner" 2>/dev/null || true
+# Release on signals too, not just a clean EXIT.
+trap 'rm -rf "$LOCK"' EXIT
+trap 'rm -rf "$LOCK"; exit 143' INT TERM
 
 TICKERS=()
 for d in "$REPO"/research/*/; do

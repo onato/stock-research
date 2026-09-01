@@ -28,7 +28,7 @@ LEADERBOARD ?= 15   # rows shown by `make screen`
 .DEFAULT_GOAL := help
 .PHONY: help run digest status screen integrity missing prune-stubs standardize-scale research facts evals evals-all \
         cost gaps exchange-eval facts-xbrl adjudicate fetch-asx dcf-context dashboard kpi-coverage screen-metrics check-currency ledger ledger-backfill queue-prune \
-        screen-fundamentals backfill-units canonical-iv sync-portfolio \
+        screen-fundamentals backfill-units canonical-iv sync-portfolio commit-refreshed \
         test test-country lint coverage typecheck
 
 help: ## Show this help
@@ -51,6 +51,12 @@ run: ## Research the next few tickers, score them, report fixes, then rank every
 	@# research path when only the market moved.
 	@echo "==> refreshing drifted prices (free, no model)"
 	@$(MAKE) --no-print-directory refresh-price APPLY=1 || true
+	@# refresh-price rewrites EVERY drifted ticker, but the run only commits
+	@# the one it researches (commit_ticker stages research/$$TICKER alone), so
+	@# the rest stayed dirty indefinitely -- 133 DCFs were uncommitted on
+	@# 2026-09-01, some refreshed as far back as 2026-08-20. Commit them here,
+	@# where they are written.
+	@$(MAKE) --no-print-directory commit-refreshed || true
 	@echo
 	@# The selector reads the portfolio tracker live; this keeps the
 	@# committed fallback (used by CI, which lacks the sibling repo) current.
@@ -83,6 +89,17 @@ digest: ## Cost + quality + suggested fixes for the last batch
 refresh-plan: ## What each ticker actually needs: tier 0-3, no model, free
 	@$(PY) $(SCRIPTS)/refresh_plan.py $(if $(TICKER),--ticker $(TICKER),--all) \
 	  $(if $(TIER),--tier $(TIER),)
+
+commit-refreshed: ## Commit price-only DCF/dashboard rewrites left by refresh-price
+	@git add -A -- research state/last_screen.json index.html 2>/dev/null || true
+	@if git diff --cached --quiet; then \
+	  echo "no refreshed prices to commit"; \
+	else \
+	  n=$$(git diff --cached --name-only | grep -c '_DCF.json' || true); \
+	  git commit -q -m "chore: refresh prices on $$n DCF(s)" \
+	    -m "Automated price write-back via make run; no model, no valuation change." \
+	  && echo "committed price refresh across $$n DCF(s)"; \
+	fi
 
 refresh-price: ## Rewrite price-derived DCF numbers from live quotes (APPLY=1 to write)
 	@$(PY) $(SCRIPTS)/refresh_price.py \
