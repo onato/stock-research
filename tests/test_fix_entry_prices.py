@@ -129,15 +129,168 @@ class TestRefusals:
         assert json.loads(before)["entry_price"]["base"]["entry_price"] == \
             pytest.approx(d["entry_price"]["base"]["entry_price"], abs=.01)
 
-    def test_refuses_a_growing_terminal_share_count(self):
-        """DUOL dilutes 49.0m -> 60.64m and divides the terminal value by the
-        grown count. Recomputing on a flat count silently changes the model."""
-        for where in ("projected", "stated"):
+    def test_refuses_dilution_with_no_stated_divisor(self):
+        """A `shares` array that grows with no terminal/exit count named is
+        ambiguous: we must not guess which divisor the model used."""
+        d = _dcf()
+        for s in ("bear", "base", "bull"):
+            d["projections"][s]["shares"] = [1196.6] * 9 + [1400.0]
+        with pytest.raises(X.NotRecomputableError):
+            X.fix(d)
+
+    def test_honours_a_stated_exit_share_count(self):
+        """DUOL names its divisor `exit_shares` rather than
+        `terminal_year_shares`; both must be recognised."""
+        for key in ("terminal_year_shares", "exit_shares"):
             d = _dcf()
-            if where == "projected":
-                for s in ("bear", "base", "bull"):
-                    d["projections"][s]["shares"] = [1196.6] * 9 + [1400.0]
-            else:
-                d["entry_price"]["base"]["terminal_year_shares"] = 1400.0
-            with pytest.raises(X.NotRecomputableError):
-                X.fix(d)
+            d["entry_price"]["base"][key] = 1400.0
+            X.fix(d)
+            fcf = d["projections"]["base"]["fcf"]
+            pv = sum(f / 1.15 ** (i + 1) for i, f in enumerate(fcf))
+            tv = min(fcf[-1] * 1.015 / (0.15 - 0.015), fcf[-1] * 15)
+            exp = (pv + tv / 1.15 ** 10 - 11045.0) / 1400.0
+            assert d["entry_price"]["base"]["entry_price"] == \
+                pytest.approx(exp, abs=0.01)
+
+
+class TestDilutedAndBridged:
+    """Files that divide by a TERMINAL-year share count and add non-operating
+    assets to the bridge (CCC.NZ, ENS.NZ, GNE.NZ).
+
+    These were refused wholesale until 2026-09-01: recomputing them on a flat
+    share count and a bare net-debt bridge silently restates the model. The fix
+    is to honour their convention, not to bypass the guard -- so the guard now
+    fires only when the file gives no explicit terminal share count to use.
+    """
+
+    @staticmethod
+    def _dcf(entry, *, term_shares=1400.0, equity_investments=None):
+        fcf = [10.0, 12.0, 14.0, 16.0, 18.0]
+        blk = {"entry_price": entry, "years_to_terminal": 5,
+               "net_debt": 50.0, "terminal_year_shares": term_shares}
+        if equity_investments is not None:
+            blk["equity_investments"] = equity_investments
+        scen = {"wacc": 9.0, "terminal_growth": 2.0, "terminal_cap_multiple": 12}
+        return {
+            "current_price": 1.0,
+            "inputs": {"shares_outstanding": 1000.0, "net_debt": 50.0},
+            "assumptions": {s: dict(scen) for s in ("bear", "base", "bull")},
+            "projections": {s: {"owner_fcf": list(fcf)}
+                            for s in ("bear", "base", "bull")},
+            "entry_price": {"hurdle_rate": 0.15, "base": dict(blk)},
+        }
+
+    def _expected(self, d, *, ei=0.0):
+        f = d["projections"]["base"]["owner_fcf"]
+        pv = sum(x / 1.15 ** (i + 1) for i, x in enumerate(f))
+        tv = min(f[-1] * 1.02 / (0.15 - 0.02), f[-1] * 12)
+        return (pv + tv / 1.15 ** 5 - 50.0 + ei) / 1400.0
+
+    def test_divides_by_the_terminal_year_share_count(self):
+        d = self._dcf(0.0)
+        X.fix(d)
+        assert d["entry_price"]["base"]["entry_price"] == \
+            pytest.approx(self._expected(d), abs=1e-4)
+
+    def test_keeps_equity_investments_in_the_bridge(self):
+        d = self._dcf(0.0, equity_investments=1.199)
+        X.fix(d)
+        assert d["entry_price"]["base"]["entry_price"] == \
+            pytest.approx(self._expected(d, ei=1.199), abs=1e-4)
+
+    def test_uses_owner_fcf_when_fcf_is_absent(self):
+        d = self._dcf(0.0)
+        assert "fcf" not in d["projections"]["base"]
+        X.fix(d)
+        assert d["entry_price"]["base"]["pv_interim_fcf_at_hurdle"] is not None
+
+    def test_still_refuses_dilution_with_no_terminal_count_given(self):
+        """A growing `shares` array with no terminal_year_shares is still
+        ambiguous -- we must not guess which divisor the model used."""
+        d = self._dcf(0.0, term_shares=None)
+        del d["entry_price"]["base"]["terminal_year_shares"]
+        d["projections"]["base"]["shares"] = [1000.0] * 4 + [1400.0]
+        with pytest.raises(X.NotRecomputableError):
+            X.fix(d)
+
+    def test_infers_the_divisor_the_file_demonstrably_used(self):
+        """ENS.NZ names no terminal_year_shares, but states both
+        entry_equity_value and entry_price -- their ratio proves the divisor,
+        and it matches the last projected share count. Inferring from the
+        file's own arithmetic is evidence, not a guess."""
+        d = self._dcf(0.0, term_shares=None)
+        del d["entry_price"]["base"]["terminal_year_shares"]
+        d["projections"]["base"]["shares"] = [1000.0] * 4 + [1400.0]
+        d["entry_price"]["base"]["entry_equity_value"] = 1400.0
+        d["entry_price"]["base"]["entry_price"] = 1.0   # => divisor 1400
+        X.fix(d)
+        assert d["entry_price"]["base"]["entry_price"] == \
+            pytest.approx(self._expected(d), abs=1e-4)
+
+    def test_does_not_infer_when_the_ratio_contradicts_the_projection(self):
+        """If the implied divisor does not match the projected share path,
+        the file means something else -- refuse rather than trust the ratio."""
+        d = self._dcf(0.0, term_shares=None)
+        del d["entry_price"]["base"]["terminal_year_shares"]
+        d["projections"]["base"]["shares"] = [1000.0] * 4 + [1400.0]
+        d["entry_price"]["base"]["entry_equity_value"] = 900.0
+        d["entry_price"]["base"]["entry_price"] = 1.0   # => divisor 900, not 1400
+        with pytest.raises(X.NotRecomputableError):
+            X.fix(d)
+
+
+class TestNonFCFEngines:
+    """Models that capitalize a non-FCF flow (SUM.NZ: Underlying Profit at a
+    cost of equity with an exit-P/E cap).
+
+    The build-TV-at-the-hurdle rule is about the RATE, not the flow: SUM.NZ
+    built its terminal value at the 11% cost of equity and then discounted it
+    at 15%, which is the same defect as the FCF case. But the flow is not
+    owner FCF, so the generic path must stay refused -- only an explicit
+    opt-in that names the engine may recompute it.
+    """
+
+    @staticmethod
+    def _sum_like(entry=11.06):
+        up = [222.3, 237.9, 253.2, 271.2, 289.8]
+        return {
+            "current_price": 8.54,
+            "inputs": {"shares_outstanding": 243.483, "net_debt": 0},
+            "assumptions": {"base": {"wacc": 11.0, "terminal_growth": 3.0,
+                                     "exit_pe_cap": 14.9}},
+            "projections": {"base": {"fcf": list(up),
+                                     "fcf_label": "Underlying Profit"}},
+            "entry_price": {"hurdle_rate": 0.15,
+                            "base": {"entry_price": entry,
+                                     "years_to_terminal": 5,
+                                     "pv_interim_at_hurdle": 838.8}},
+        }
+
+    def test_generic_path_still_refuses_a_relabelled_series(self):
+        with pytest.raises(X.NotRecomputableError):
+            X.fix(self._sum_like())
+
+    def test_capitalized_engine_rebuilds_at_the_hurdle(self):
+        d = self._sum_like()
+        X.fix_capitalized(d)
+        up = d["projections"]["base"]["fcf"]
+        pv = sum(x / 1.15 ** (i + 1) for i, x in enumerate(up))
+        tv = min(up[-1] * 1.03 / (0.15 - 0.03), up[-1] * 14.9)
+        exp = (pv + tv / 1.15 ** 5) / 243.483
+        assert d["entry_price"]["base"]["entry_price"] == pytest.approx(exp, abs=.01)
+
+    def test_capitalized_engine_never_subtracts_net_debt(self):
+        """Underlying Profit is already post-finance-cost -- deducting net
+        debt would double-count it (inputs.notes says so explicitly)."""
+        d = self._sum_like()
+        d["inputs"]["net_debt"] = 2000.0
+        X.fix_capitalized(d)
+        no_debt = self._sum_like()
+        X.fix_capitalized(no_debt)
+        assert d["entry_price"]["base"]["entry_price"] == \
+            pytest.approx(no_debt["entry_price"]["base"]["entry_price"], abs=1e-6)
+
+    def test_capitalized_engine_records_the_superseded_value(self):
+        d = self._sum_like()
+        X.fix_capitalized(d)
+        assert d["entry_price"]["base"]["entry_price_superseded"] == 11.06

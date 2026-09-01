@@ -803,3 +803,19 @@ class TestEntryPriceHurdleConsistency:
         r = [c for c in card.checks if c["id"] == "dcf_entry_price_hurdle"]
         assert r
         assert r[0]["status"] == "skip", r
+
+    def test_book_value_model_with_dividend_flows_skips(self):
+        """RYM.NZ discounts DIVIDENDS to an exit P/B on a BVPS path. Its entry
+        prices are already correct at the hurdle, but comparing them against a
+        Gordon FCF formula produced a spurious +268% failure. An exit multiple
+        that is an explicit judgement (P/B, P/E), not a rate-derived Gordon
+        value, is outside what this check models."""
+        d = self._dcf(1.87)
+        d["assumptions"]["base"]["exit_pb"] = 0.75
+        d["projections"]["base"]["bvps"] = [4.04, 4.13, 4.28, 4.46, 4.65]
+        d["projections"]["base"]["dps"] = [0.0, 0.03, 0.05, 0.07, 0.09]
+        card = E.Card()
+        E.check_entry_price_hurdle(d, card)
+        r = [c for c in card.checks if c["id"] == "dcf_entry_price_hurdle"]
+        assert r
+        assert r[0]["status"] == "skip", r

@@ -40,7 +40,15 @@ import dcf_fields as F
 
 SCENARIOS = ("bear", "base", "bull")
 FCF_KEYS = ("fcf", "owner_fcf", "free_cash_flow")
-PV_INTERIM_KEYS = ("pv_interim_fcf_at_hurdle", "pv_interim_at_hurdle")
+PV_INTERIM_KEYS = ("pv_interim_fcf_at_hurdle", "pv_interim_at_hurdle",
+                   "pv_interim_distributions_at_hurdle")
+
+# Non-operating value the equity bridge adds back on top of -net_debt.
+BRIDGE_ADDBACK_KEYS = ("equity_investments", "associates", "non_operating_assets")
+
+# Spellings for "the share count the entry price is divided by at exit".
+TERMINAL_SHARE_KEYS = ("terminal_year_shares", "exit_shares",
+                       "terminal_shares", "shares_at_exit")
 
 # A label or note sitting beside the `fcf` series means those rows are NOT owner
 # free cash flow: SUM.NZ stores Underlying Profit under `fcf` (`fcf_label`), and
@@ -116,22 +124,46 @@ def fix(dcf: dict[str, Any]) -> dict[str, Any]:
         if hurdle <= tg:
             raise NotRecomputableError(f"{scen}: hurdle <= terminal growth")
 
-        # A share count that grows across the projection (DUOL 49.0m ->
-        # 60.64m, CCC.NZ, ENS.NZ, GNE.NZ) means the terminal value is divided
-        # by a different denominator than today's. Recomputing on a flat count
-        # would silently restate the model, so refuse.
-        proj_shares = proj.get("shares")
-        terminal_shares = F.num(blk.get("terminal_year_shares"))
+        # A share count that grows across the projection means the entry
+        # price is divided by a different denominator than today's count
+        # (CCC.NZ 66.4m -> 93.6m, ENS.NZ, GNE.NZ, DUOL 49.0m -> 60.64m).
+        # Where the file states which count it used we honour it; where it
+        # only implies one we refuse, because guessing the divisor silently
+        # restates the model.
+        divisor = shares
+        terminal_shares = next(
+            (F.num(blk[k]) for k in TERMINAL_SHARE_KEYS
+             if F.num(blk.get(k)) is not None), None)
+        proj_shares = proj.get("shares") or proj.get("projected_shares")
+        implied = None
         if isinstance(proj_shares, list) and proj_shares:
-            last = F.num(proj_shares[-1])
-            if last and abs(last - shares) / shares > 0.01:
+            implied = F.num(proj_shares[-1])
+        if terminal_shares:
+            divisor = terminal_shares
+        elif implied and abs(implied - shares) / shares > 0.01:
+            # The file may still PROVE its divisor: entry_equity_value /
+            # entry_price is the count it actually divided by (ENS.NZ states
+            # both but names neither). Trust that only when it corroborates
+            # the projected share path -- then it is the file's own
+            # arithmetic, not a guess.
+            eq_val = F.num(blk.get("entry_equity_value"))
+            old_entry = F.num(blk.get("entry_price"))
+            proven = (eq_val / old_entry
+                      if eq_val is not None and old_entry else None)
+            if proven and abs(proven - implied) / implied <= 0.01:
+                divisor = implied
+            else:
                 raise NotRecomputableError(
-                    f"{scen}: share count grows {shares:g} -> {last:g}; "
-                    "terminal value uses a different divisor")
-        if terminal_shares and abs(terminal_shares - shares) / shares > 0.01:
-            raise NotRecomputableError(
-                f"{scen}: terminal_year_shares={terminal_shares:g} != "
-                f"shares_outstanding={shares:g}")
+                    f"{scen}: share count grows {shares:g} -> {implied:g} but "
+                    f"no {'/'.join(TERMINAL_SHARE_KEYS[:2])} states which "
+                    "divisor was used")
+
+        # Non-operating assets the bridge adds back beyond net debt (ENS.NZ
+        # carries `equity_investments` of NZ$1.199m). Dropping them would
+        # understate the entry price.
+        bridge_adds = sum(
+            F.num(v) or 0.0 for k, v in blk.items()
+            if k in BRIDGE_ADDBACK_KEYS)
 
         horizon = F.num(blk.get("years_to_terminal"))
         if horizon and 0 < int(horizon) <= len(fcf):
@@ -153,7 +185,9 @@ def fix(dcf: dict[str, Any]) -> dict[str, Any]:
                     "from the fcf series (different series or currency)")
 
         cap = F.num(asm.get("terminal_cap_multiple"))
-        new = _entry(fcf, hurdle, tg, cap, net_debt, shares)
+        scen_nd = F.num(blk.get("net_debt"))
+        nd = scen_nd if scen_nd is not None else net_debt
+        new = _entry(fcf, hurdle, tg, cap, nd - bridge_adds, divisor)
         old = F.num(blk["entry_price"])
 
         # Record the superseded value once, so re-running never overwrites the
@@ -166,7 +200,9 @@ def fix(dcf: dict[str, Any]) -> dict[str, Any]:
         blk["entry_price"] = round(new, 4 if abs(new) < 1 else 2)
         gordon = fcf[-1] * (1 + tg) / (hurdle - tg)
         tv = min(gordon, fcf[-1] * cap) if cap else gordon
-        blk["pv_interim_fcf_at_hurdle"] = round(pv_calc, 2)
+        pv_key = next((k for k in PV_INTERIM_KEYS if k in blk),
+                      "pv_interim_fcf_at_hurdle")
+        blk[pv_key] = round(pv_calc, 2)
         blk["pv_terminal_at_hurdle"] = round(tv / (1 + hurdle) ** len(fcf), 2)
         if fcf[-1]:
             blk["terminal_multiple_at_hurdle"] = round(tv / fcf[-1], 2)
@@ -213,6 +249,91 @@ def fix(dcf: dict[str, Any]) -> dict[str, Any]:
                     "Each row rebuilds the terminal value at that row's required "
                     "return (min(Gordon@r, cap x FCF_N)), so the flows and the exit "
                     "are charged the same rate. Corrected 2026-09-01.")
+    return ep
+
+
+def fix_capitalized(dcf: dict[str, Any]) -> dict[str, Any]:
+    """Rebuild a CAPITALIZED-EARNINGS entry price at the hurdle rate.
+
+    SUM.NZ capitalizes Underlying Profit at a cost of equity with an exit-P/E
+    cap. Its terminal value was built at the 11% CoE and then discounted at
+    15% -- the same defect as the FCF case, because the rule is about the RATE,
+    not the flow. But the flow is not owner FCF, so `fix()` refuses it and this
+    explicit entry point handles it instead.
+
+    Two things stay true for this engine and are why it cannot share `fix()`:
+    the terminal cap is an exit P/E on the flow (not an FCF multiple), and net
+    debt is NEVER subtracted -- Underlying Profit is already post-finance-cost,
+    so deducting debt would double-count it.
+    """
+    ep = dcf.get("entry_price")
+    if not isinstance(ep, dict):
+        raise NotRecomputableError("no entry_price block")
+    hurdle = F.num(ep.get("hurdle_rate"))
+    if hurdle is None:
+        raise NotRecomputableError("no hurdle_rate")
+    if hurdle > 1:
+        hurdle /= 100.0
+    shares = F.num((dcf.get("inputs") or {}).get("shares_outstanding"))
+    if not shares:
+        raise NotRecomputableError("no shares_outstanding")
+
+    for scen in SCENARIOS:
+        blk = ep.get(scen)
+        if not isinstance(blk, dict) or F.num(blk.get("entry_price")) is None:
+            continue
+        proj = (dcf.get("projections") or {}).get(scen) or {}
+        asm = (dcf.get("assumptions") or {}).get(scen) or {}
+        flow = _fcf(proj)
+        tg = F.num(asm.get("terminal_growth"))
+        pe = F.num(asm.get("exit_pe_cap")) or F.num(asm.get("exit_pe"))
+        if flow is None or tg is None or pe is None:
+            raise NotRecomputableError(f"{scen}: no flow / terminal growth / exit P/E")
+        tg /= 100.0
+        if hurdle <= tg:
+            raise NotRecomputableError(f"{scen}: hurdle <= terminal growth")
+
+        horizon = F.num(blk.get("years_to_terminal"))
+        if horizon and 0 < int(horizon) <= len(flow):
+            flow = flow[:int(horizon)]
+
+        pv = sum(f / (1 + hurdle) ** (i + 1) for i, f in enumerate(flow))
+        for key, stated_v in blk.items():
+            if not key.startswith("pv_interim"):
+                continue
+            stated = F.num(stated_v)
+            if stated is not None and abs(stated - pv) > max(0.02 * abs(pv), 1e-6):
+                raise NotRecomputableError(
+                    f"{scen}: stated {key}={stated:.1f} != {pv:.1f}")
+
+        gordon = flow[-1] * (1 + tg) / (hurdle - tg)
+        tv = min(gordon, flow[-1] * pe)
+        new = (pv + tv / (1 + hurdle) ** len(flow)) / shares
+        old = F.num(blk["entry_price"])
+
+        if "entry_price_superseded" not in blk and old is not None \
+                and abs(old - new) > max(0.005 * abs(new), 0.005):
+            blk["entry_price_superseded"] = old
+            blk["entry_price_correction_note"] = NOTE
+        blk["entry_price"] = round(new, 2)
+        blk["pv_terminal_at_hurdle"] = round(tv / (1 + hurdle) ** len(flow), 1)
+        blk["terminal_value_per_share"] = round(tv / shares, 2)
+        blk["terminal_multiple_at_hurdle"] = round(tv / flow[-1], 2)
+        price = F.num(dcf.get("current_price"))
+        if price:
+            blk["entry_discount_from_current"] = round((new / price - 1) * 100, 1)
+
+    weights = ((dcf.get("probability_weighted") or {}).get("weights")) or {}
+    if len(weights) == 3:
+        tot = 0.0
+        for scen, w in weights.items():
+            v = F.num((ep.get(scen) or {}).get("entry_price"))
+            wn = F.num(w)
+            if v is None or wn is None:
+                break
+            tot += wn * v
+        else:
+            ep["weighted_entry_price"] = round(tot, 2)
     return ep
 
 

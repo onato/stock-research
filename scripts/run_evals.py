@@ -449,6 +449,16 @@ def check_entry_price_hurdle(dcf: dict[str, Any], card: Card) -> None:
     if fcf_raw is not None and horizon and 0 < int(horizon) <= len(fcf_raw):
         fcf_raw = fcf_raw[:int(horizon)]
 
+    # An exit multiple that is an explicit judgement -- P/B on a BVPS path
+    # (RYM.NZ), P/E on capitalized earnings (SUM.NZ) -- is not a rate-derived
+    # Gordon value, so the Gordon recomputation below does not describe the
+    # model. RYM.NZ's entry prices are already correct at the hurdle; checking
+    # them against an FCF Gordon formula reported a spurious +268%.
+    if any(k in asm for k in ("exit_pb", "exit_pe", "exit_pe_cap")):
+        card.add("dcf_entry_price_hurdle", "skip",
+                 "exit-multiple model (P/B or P/E), not a Gordon terminal value")
+        return
+
     tg = F.num(asm.get("terminal_growth"))
     cap = F.num(asm.get("terminal_cap_multiple"))
     reported = F.num(base_blk.get("entry_price")
