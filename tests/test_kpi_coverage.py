@@ -154,3 +154,23 @@ class TestGrocerSegmentAndOnlineMixPromotion:
                  "ComparableSalesGrowthUS", "ComparableSalesGrowthEurope",
                  "StoreCount", "EmployeesFTE"])
         assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+
+
+class TestStapledREITFundManagerSplitPromotion:
+    """A stapled REIT + external funds manager's two-leg revenue split must
+    reach the CSV.
+
+    Stride Property Group (SPG.NZ) staples a property owner (SPL, earning
+    gross rental income) to an external funds manager (SIML, earning
+    management fee income on AUM it does not own). Consolidated Revenue
+    hides which leg is growing -- SIML's fee income compounded 11.6%/yr
+    FY2017-26 while SPL's rental income shrank on asset recycling -- and
+    both names were absent from PROMOTE_KPIS, so a dashboard could only
+    chart the blended total, never the two-leg mix that is the whole
+    "REIT plus funds manager" investment thesis.
+    """
+
+    def test_two_leg_revenue_split_is_promoted(self, patch_repo):
+        make_db(patch_repo, "SYN",
+                ["GrossRentalIncome", "ManagementFeeIncome"])
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []

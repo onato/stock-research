@@ -185,6 +185,12 @@ PROMOTE_KPIS: dict[str, str] = {
     "WALT": "WALT",
     "AUM": "AUM",
     "NetInterestMargin": "NetInterestMargin",
+    # Stapled REIT + external funds manager two-leg split (SPG.NZ): the
+    # property owner's gross rental income versus the manager's fee
+    # income earned on AUM it does not own. Consolidated Revenue blends
+    # both legs and hides which one is actually growing.
+    "GrossRentalIncome": "GrossRentalIncome",
+    "ManagementFeeIncome": "ManagementFeeIncome",
     # Net-revenue reporters (payments, marketplaces) have no gross Revenue
     # line -- NetRevenue is the top line, so it must reach the CSV.
     "NetRevenue": "NetRevenue",
@@ -333,6 +339,8 @@ KPI_ALIASES: dict[str, str] = {
     "walt": "WALT",
     "aum": "AUM",
     "netinterestmargin": "NetInterestMargin",
+    "grossrentalincome": "GrossRentalIncome",
+    "managementfeeincome": "ManagementFeeIncome",
 }
 
 
