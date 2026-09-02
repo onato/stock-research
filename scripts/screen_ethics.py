@@ -174,6 +174,80 @@ BENIGN_SECTORS = ("software", "saas", "edtech", "fintech", "retail", "grocery",
                   "healthcare", "pharmaceuticals", "media")
 
 
+# Patterns matched against the registered NAME only.
+#
+# For 878 of the queue the name is the only text there is, and it is a strong
+# signal: a company called "PetroChina" or "China Coal Energy" is not ambiguous.
+# Names are matched more aggressively than prose -- including inside compounds
+# ("Petro", "Yancoal"), which would be far too loose in a paragraph.
+#
+# The brief is recall-first: a missed mismatch wastes a whole research run, a
+# wrong skip costs one name out of 1,784.
+NAME_PATTERNS: dict[str, tuple[str, ...]] = {
+    "animal_products": (
+        r"\bdairy\b", r"\bmilk\b", r"\bmeat\b", r"\bbeef\b", r"\bpork\b",
+        r"\bpoultry\b", r"\bseafood\b", r"\bfisher(?:y|ies)\b", r"\bfishing\b",
+        r"\bsalmon\b", r"\baqua(?:culture)?\b", r"\bagricultural\b",
+        r"\bagri\w*\b", r"\blivestock\b", r"\bcattle\b",
+    ),
+    "weapons": (
+        r"\bdefen[cs]e\b", r"\barmaments?\b", r"\bmunitions?\b", r"\bordnance\b",
+        r"\barms\b(?!trong)", r"\bweapons?\b", r"\bmissiles?\b",
+    ),
+    "surveillance": (
+        r"\bsurveillance\b", r"\bbiometrics?\b", r"\bcorrections?\b",
+    ),
+    "tobacco": (r"\btobacco\b", r"\bcigarettes?\b", r"\bvape\b"),
+    "gambling": (
+        r"\bcasinos?\b", r"\bgaming\b", r"\bbetting\b", r"\blotter(?:y|ies)\b",
+        r"\bwager\w*\b",
+    ),
+    "fossil_fuels": (
+        # embedded forms: PetroChina, Yancoal, Sinopec
+        r"petro\w*", r"\w*coal\b", r"\boil\b", r"\boilfield\b",
+        r"\bpetroleum\b", r"\bgasoline\b", r"\bdrilling\b", r"\brefin\w+\b",
+        r"\bshale\b", r"\bhydrocarbons?\b", r"\bsinopec\b",
+    ),
+}
+
+# "Energy" and "Gas" are far too broad on their own -- they name solar, battery,
+# grid and distribution companies. They only count in a name when paired with a
+# word that means extraction or combustion.
+NAME_QUALIFIED: dict[str, tuple[tuple[str, str], ...]] = {
+    "fossil_fuels": ((r"\benergy\b", r"coal|petro|oil|gas field|lng|shale"),),
+}
+
+# Names that look like a hit but are not the business. A gas DISTRIBUTOR pipes
+# what someone else drilled; a bank lending to farms is a bank.
+NAME_EXCLUDE = (
+    r"\bbank\b", r"\binsurance\b", r"\bgreen energy\b", r"\bnew energy\b",
+    r"\bsmart energy\b", r"\bbattery\b", r"\bbatteries\b", r"\bsolar\b",
+    r"\brenewable\b", r"\bhydrogen\b", r"\bwind\b",
+    # gas utilities/distributors rather than producers
+    r"\btowngas\b", r"\bgas holdings\b", r"\bgas group\b", r"\bgas company\b",
+    r"\bresources gas\b", r"\bcity gas\b", r"\bgas transmission\b",
+)
+
+
+def classify_name(name: str) -> dict[str, list[str]]:
+    """Categories implied by the registered name alone."""
+    if not name:
+        return {}
+    low = name.lower()
+    if any(re.search(p, low) for p in NAME_EXCLUDE):
+        return {}
+    hits: dict[str, list[str]] = {}
+    for cat, pats in NAME_PATTERNS.items():
+        found = [p for p in pats if re.search(p, low)]
+        if found:
+            hits[cat] = found
+    for cat, pairs in NAME_QUALIFIED.items():
+        for base, qual in pairs:
+            if re.search(base, low) and re.search(qual, low):
+                hits.setdefault(cat, []).append(base)
+    return hits
+
+
 def _word_re(term: str) -> re.Pattern[str]:
     """Word-boundary matcher; multi-word terms allow flexible whitespace."""
     parts = [re.escape(p) for p in term.split()]
@@ -260,17 +334,28 @@ def classify_record(rec: dict[str, Any]) -> dict[str, dict[str, Any]]:
     business in a way that the word "oil" in a paragraph is not.
     """
     sector = (rec.get("sector") or "").strip()
-    text = " ".join(x for x in (rec.get("name", ""), rec.get("text", "")) if x)
+    name = rec.get("name", "") or ""
+    text = " ".join(x for x in (name, rec.get("text", "")) if x)
     out = classify(text)
+
+    # The name is checked on its own terms: for most of the queue it is the
+    # only signal, and it is matched more aggressively than prose.
+    for cat in classify_name(name):
+        prev: dict[str, Any] = out.get(cat, {"terms": [], "snippet": ""})
+        out[cat] = {
+            "terms": sorted({*prev["terms"], f"name:{name}"}),
+            "snippet": prev["snippet"] or f"name: {name}",
+            "confidence": "high",
+        }
 
     low_sector = sector.lower()
     if low_sector and low_sector != "unknown":
         for cat, pats in SECTOR_PATTERNS.items():
             if any(_word_re(p).search(low_sector) for p in pats):
-                prev = out.get(cat, {"terms": [], "snippet": ""})
+                prev_s: dict[str, Any] = out.get(cat, {"terms": [], "snippet": ""})
                 out[cat] = {
-                    "terms": sorted({*prev["terms"], f"sector:{sector}"}),
-                    "snippet": prev["snippet"] or f"sector: {sector}",
+                    "terms": sorted({*prev_s["terms"], f"sector:{sector}"}),
+                    "snippet": prev_s["snippet"] or f"sector: {sector}",
                     "confidence": "high",
                 }
         # A clearly benign sector caps prose-only hits: a software company that
@@ -295,8 +380,13 @@ def queued_tickers(root: pathlib.Path = ROOT) -> list[str]:
     return list(seen)
 
 
-def gather_text(ticker: str, root: pathlib.Path = ROOT) -> tuple[str, str, str]:
-    """Return (sector, text, source) for a ticker from local files only."""
+def gather_text(ticker: str, root: pathlib.Path = ROOT) -> tuple[str, str, str, str]:
+    """Return (sector, name, text, source) for a ticker from local files only.
+
+    The name comes back separately because classify_record matches it against a
+    looser vocabulary than prose -- for 878 queued tickers it is the only text
+    there is.
+    """
     info_p = root / "research" / ticker / "info.json"
     info: dict[str, Any] = {}
     if info_p.exists():
@@ -351,7 +441,7 @@ def gather_text(ticker: str, root: pathlib.Path = ROOT) -> tuple[str, str, str]:
         except (json.JSONDecodeError, OSError):
             pass
 
-    return sector, " ".join(p for p in parts if p), source
+    return sector, name, " ".join(p for p in parts if p), source
 
 
 def write_info(path: pathlib.Path, flags: dict[str, dict[str, Any]], source: str,
@@ -396,13 +486,13 @@ def main(argv: list[str] | None = None) -> int:
     flagged = unknown = clean = 0
     rows: list[tuple[str, str, str, str]] = []
     for t in tickers:
-        sector, text, source = gather_text(t)
-        if not text.strip() and not sector:
+        sector, name, text, source = gather_text(t)
+        if not text.strip() and not sector and not name:
             unknown += 1
             if args.apply:
                 write_info(ROOT / "research" / t / "info.json", {}, source="no-local-text")
             continue
-        res = classify_record({"sector": sector, "name": "", "text": text})
+        res = classify_record({"sector": sector, "name": name, "text": text})
         if args.min_confidence == "high":
             res = {k: v for k, v in res.items() if v["confidence"] == "high"}
         if res:

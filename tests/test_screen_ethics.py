@@ -205,3 +205,67 @@ class TestSuppliersAndVenuesAreNotTheIndustry:
         got = se.classify(getattr(self, ticker))
         for cat, ev in got.items():
             assert ev["confidence"] != "high", f"{ticker} flagged {cat} high -- {why}"
+
+
+class TestCompanyNameIsEvidence:
+    """When a name says what the company does, that is enough to skip it.
+
+    The brief is explicitly recall-first: a missed mismatch costs a whole
+    research run, a wrong skip costs one name out of 1,784. 878 queued tickers
+    are a bare symbol with no sector and no summary, so for most of the queue
+    the registered name is the ONLY signal available -- and it is often a very
+    good one.
+    """
+
+    @pytest.mark.parametrize(("name", "category"), [
+        ("PetroChina Company Limited", "fossil_fuels"),
+        ("China Coal Energy Company Limited", "fossil_fuels"),
+        ("China Petroleum & Chemical Corporation", "fossil_fuels"),
+        ("China Oilfield Services Limited", "fossil_fuels"),
+        ("Yancoal Australia Ltd", "fossil_fuels"),
+        ("China Mengniu Dairy Company Limited", "animal_products"),
+        ("China Modern Dairy Holdings Ltd.", "animal_products"),
+        ("The a2 Milk Company Limited", "animal_products"),
+        ("Australian Agricultural Company Limited", "animal_products"),
+        ("British American Tobacco p.l.c.", "tobacco"),
+        ("China Tobacco International (HK) Company Limited", "tobacco"),
+    ])
+    def test_name_alone_flags(self, name, category):
+        got = se.classify_record({"sector": "", "name": name, "text": ""})
+        assert category in got, f"{name!r} -> {sorted(got)}"
+
+    def test_an_opaque_name_is_honestly_missed(self):
+        """Beach Energy is an oil and gas producer whose name says nothing.
+
+        Recorded rather than forced: catching it would mean flagging every
+        company with "Energy" in its name, which sweeps in solar, battery and
+        grid operators. This is the residual that a sector or summary catches
+        later -- the deliberate limit of name-only screening.
+        """
+        assert se.classify_record({"sector": "", "name": "Beach Energy Limited",
+                                   "text": ""}) == {}
+        # ...but the moment a sector exists, it is caught.
+        got = se.classify_record({"sector": "Oil & Gas Exploration",
+                                  "name": "Beach Energy Limited", "text": ""})
+        assert got["fossil_fuels"]["confidence"] == "high"
+
+    @pytest.mark.parametrize("name", [
+        "Agricultural Bank of China Limited",
+        "Hong Kong and China Gas Company Limited",
+        "China Resources Gas Group Limited",
+        "Towngas Smart Energy Company Limited",
+        "Xinyi Energy Holdings Limited",
+        "REPT BATTERO Energy Co., Ltd.",
+        "Jiangsu Zenergy Battery Technologies Group Co., Ltd.",
+        "China Suntien Green Energy Corporation Limited",
+    ])
+    def test_name_alone_does_not_overreach(self, name):
+        """A bank, a gas DISTRIBUTOR and a battery maker are not extraction.
+
+        "Energy" on its own means nothing -- it is in solar, battery and grid
+        names as often as in oil. Distribution utilities pipe gas they did not
+        drill, and are kept for the same reason a supermarket that sells meat
+        is kept.
+        """
+        got = se.classify_record({"sector": "", "name": name, "text": ""})
+        assert got == {}, f"{name!r} over-flagged as {sorted(got)}"
