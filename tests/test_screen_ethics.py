@@ -133,22 +133,51 @@ class TestPrimaryBusinessRule:
 class TestWriteBack:
     """The classifier records into info.json; it never excludes on its own."""
 
+    def test_evidence_names_the_text_read_not_the_file_written(self, tmp_path):
+        """`source: "info.json"` inside info.json read as circular nonsense.
+
+        The field answers "how much did the classifier actually know?", which
+        is what separates a name-only guess from a verdict backed by a full
+        business summary. It is now `evidence`, with values that name the kind
+        of text rather than a filename, plus a separate `status` because
+        "nothing to read" is a state, not a source.
+        """
+        p = tmp_path / "info.json"
+        p.write_text(json.dumps({"name": "PetroChina Company Limited"}))
+        se.write_info(p, {"fossil_fuels": {"terms": ["name:PetroChina"],
+                                           "snippet": "s", "confidence": "high"}},
+                      evidence="name-and-sector")
+        e = json.loads(p.read_text())["ethics"]
+        assert e["evidence"] == "name-and-sector"
+        assert e["status"] == "checked"
+        assert "source" not in e, "the confusing field is gone"
+
+    def test_unreadable_ticker_is_marked_unchecked(self, tmp_path):
+        p = tmp_path / "info.json"
+        p.write_text(json.dumps({"name": ""}))
+        se.write_info(p, {}, evidence="none")
+        e = json.loads(p.read_text())["ethics"]
+        assert e["status"] == "unchecked", (
+            "no text to read is not the same as checked-and-clean"
+        )
+        assert e["flags"] == []
+
     def test_writes_ethics_block_without_touching_other_fields(self, tmp_path):
         p = tmp_path / "info.json"
         p.write_text(json.dumps({"name": "Sanford Limited", "sector": "Seafood",
                                  "ir_url": "https://example.com"}))
         se.write_info(p, {"animal_products": {"terms": ["seafood"], "snippet": "s",
-                                              "confidence": "high"}}, source="test")
+                                              "confidence": "high"}}, evidence="business-summary")
         d = json.loads(p.read_text())
         assert d["ir_url"] == "https://example.com", "clobbered an unrelated field"
         assert d["name"] == "Sanford Limited"
         assert d["ethics"]["flags"] == ["animal_products"]
-        assert d["ethics"]["source"] == "test"
+        assert d["ethics"]["evidence"] == "business-summary"
 
     def test_no_flags_still_records_that_it_was_checked(self, tmp_path):
         p = tmp_path / "info.json"
         p.write_text(json.dumps({"name": "Duolingo, Inc."}))
-        se.write_info(p, {}, source="test")
+        se.write_info(p, {}, evidence="business-summary")
         d = json.loads(p.read_text())
         assert d["ethics"]["flags"] == []
         assert d["ethics"]["checked_at"], "a clean result must still be dated"
@@ -158,7 +187,7 @@ class TestWriteBack:
         p = tmp_path / "info.json"
         p.write_text(json.dumps({"name": "BAE Systems plc"}))
         se.write_info(p, {"weapons": {"terms": ["defence"], "snippet": "s",
-                                      "confidence": "high"}}, source="test")
+                                      "confidence": "high"}}, evidence="business-summary")
         assert not (tmp_path / "never_interested.txt").exists()
 
 

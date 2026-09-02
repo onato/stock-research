@@ -381,7 +381,7 @@ def queued_tickers(root: pathlib.Path = ROOT) -> list[str]:
 
 
 def gather_text(ticker: str, root: pathlib.Path = ROOT) -> tuple[str, str, str, str]:
-    """Return (sector, name, text, source) for a ticker from local files only.
+    """Return (sector, name, text, evidence) for a ticker from local files only.
 
     The name comes back separately because classify_record matches it against a
     looser vocabulary than prose -- for 878 queued tickers it is the only text
@@ -408,7 +408,7 @@ def gather_text(ticker: str, root: pathlib.Path = ROOT) -> tuple[str, str, str, 
     name = _flat(info.get("name"))
     sector = _flat(info.get("sector"))
     parts = [name, _flat(info.get("quirks"))]
-    source = "info.json" if (name or sector) else ""
+    evidence = "name-and-sector" if (name or sector) else ""
 
     if not name or not sector:
         comp_p = root / "state" / "companies.json"
@@ -420,7 +420,7 @@ def gather_text(ticker: str, root: pathlib.Path = ROOT) -> tuple[str, str, str, 
                 sector = sector or ("" if s == "Unknown" else s)
                 if name or sector:
                     parts.append(name)
-                    source = source or "companies.json"
+                    evidence = evidence or "name-and-sector"
             except (json.JSONDecodeError, OSError):
                 pass
 
@@ -437,19 +437,31 @@ def gather_text(ticker: str, root: pathlib.Path = ROOT) -> tuple[str, str, str, 
                 parts.append(bm)
             elif isinstance(bm, dict):
                 parts.extend(str(v) for v in bm.values() if isinstance(v, str))
-            source = "Analysis.json"
+            evidence = "business-summary"
         except (json.JSONDecodeError, OSError):
             pass
 
-    return sector, name, " ".join(p for p in parts if p), source
+    return sector, name, " ".join(p for p in parts if p), evidence
 
 
-def write_info(path: pathlib.Path, flags: dict[str, dict[str, Any]], source: str,
-               ) -> None:
+def write_info(path: pathlib.Path, flags: dict[str, dict[str, Any]],
+               evidence: str) -> None:
     """Merge an `ethics` block into info.json, leaving every other field alone.
 
-    A clean result is still written: "checked and found nothing" and "never
-    checked" must be distinguishable, or a rerun cannot tell what is left to do.
+    `evidence` says how much the classifier actually had to go on, which is
+    what separates a name-only guess from a verdict backed by a full business
+    summary:
+
+        business-summary  a researched ticker's Analysis.json overview
+        name-and-sector   info.json / companies.json name, sector, quirks
+        none              nothing local to read
+
+    It is not the filename written to -- an earlier version recorded
+    `source: "info.json"` inside info.json, which read as circular nonsense.
+
+    `status` is separate because "nothing to read" is a state, not a kind of
+    evidence: a clean result and an unchecked one must stay distinguishable or
+    a rerun cannot tell what work is left.
     """
     d: dict[str, Any] = {}
     if path.exists():
@@ -460,7 +472,8 @@ def write_info(path: pathlib.Path, flags: dict[str, dict[str, Any]], source: str
     d["ethics"] = {
         "flags": sorted(flags),
         "detail": flags,
-        "source": source,
+        "evidence": evidence,
+        "status": "unchecked" if evidence == "none" else "checked",
         "checked_at": dt.date.today().isoformat(),
     }
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -486,11 +499,11 @@ def main(argv: list[str] | None = None) -> int:
     flagged = unknown = clean = 0
     rows: list[tuple[str, str, str, str]] = []
     for t in tickers:
-        sector, name, text, source = gather_text(t)
+        sector, name, text, evidence = gather_text(t)
         if not text.strip() and not sector and not name:
             unknown += 1
             if args.apply:
-                write_info(ROOT / "research" / t / "info.json", {}, source="no-local-text")
+                write_info(ROOT / "research" / t / "info.json", {}, evidence="none")
             continue
         res = classify_record({"sector": sector, "name": name, "text": text})
         if args.min_confidence == "high":
@@ -502,7 +515,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             clean += 1
         if args.apply:
-            write_info(ROOT / "research" / t / "info.json", res, source=source or "none")
+            write_info(ROOT / "research" / t / "info.json", res, evidence=evidence or "none")
 
     for t, cat, conf, terms in sorted(rows, key=lambda r: (r[1], r[2], r[0])):
         print(f"{t:<12} {cat:<16} {conf:<5} {terms}")
@@ -516,6 +529,7 @@ def main(argv: list[str] | None = None) -> int:
 def _report() -> int:
     from collections import Counter
     cats: Counter[str] = Counter()
+    ev: Counter[str] = Counter()
     n = 0
     for f in glob.glob(str(ROOT / "research" / "*" / "info.json")):
         try:
@@ -526,11 +540,16 @@ def _report() -> int:
         if not e:
             continue
         n += 1
+        ev[e.get("evidence", "?")] += 1
         for c in e.get("flags", []):
             cats[c] += 1
     print(f"info.json files carrying an ethics block: {n}")
     for c, k in cats.most_common():
         print(f"  {c:<18} {k}")
+    if ev:
+        print("\nevidence the verdict rests on:")
+        for e, k in ev.most_common():
+            print(f"  {e:<18} {k}")
     return 0
 
 
