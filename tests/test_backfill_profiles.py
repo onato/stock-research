@@ -171,3 +171,59 @@ class TestWriteBack:
         d = json.loads(p.read_text())
         assert d["profile_source"] == "stockanalysis.com"
         assert d["profile_fetched_at"]
+
+
+class TestCommit:
+    """A week-long unattended run must leave its work committed.
+
+    Run nightly from `make run`, the backfill writes hundreds of info.json
+    files. Left uncommitted they pile up in the working tree, get swept into
+    an unrelated ticker's commit by `git add -A`, or are lost to a checkout --
+    the same class of problem as the uncommitted price refreshes.
+    """
+
+    @staticmethod
+    def _fake_git(calls, msgs=None):
+        """Stub matching git's exit codes.
+
+        `diff --cached --quiet` returns 1 when something IS staged -- the
+        inverse of the usual convention, and easy to get backwards.
+        """
+        def run(*a, **k):
+            calls.append(a)
+            if a[:3] == ("diff", "--cached", "--quiet"):
+                return 1, ""          # 1 = there are staged changes
+            if msgs is not None and a and a[0] == "commit":
+                msgs.append(" ".join(a))
+            return 0, ""
+        return run
+
+    def test_commits_only_the_files_it_wrote(self, tmp_path, monkeypatch):
+        calls = []
+        monkeypatch.setattr(bp, "_git", self._fake_git(calls))
+        bp.commit_profiles(["research/AAPL/info.json", "research/MSFT/info.json"],
+                           filled=2, root=tmp_path)
+        added = [a for a in calls if a and a[0] == "add"]
+        assert added, "nothing staged"
+        staged = set(added[0][1:])
+        assert "research/AAPL/info.json" in staged
+        assert "state/profile_backfill.json" in staged, "resume state must travel"
+        assert not any("-A" in a for a in added), (
+            "git add -A would sweep in unrelated work from a concurrent run"
+        )
+
+    def test_says_what_it_did_in_the_message(self, tmp_path, monkeypatch):
+        msgs: list[str] = []
+        monkeypatch.setattr(bp, "_git", self._fake_git([], msgs))
+        bp.commit_profiles(["research/AAPL/info.json"], filled=1, root=tmp_path)
+        assert msgs, "no commit issued"
+        assert "1" in msgs[0]
+        assert "chore:" in msgs[0], "project uses Conventional Commits"
+
+    def test_nothing_written_means_no_commit(self, tmp_path, monkeypatch):
+        calls = []
+        monkeypatch.setattr(bp, "_git", self._fake_git(calls))
+        bp.commit_profiles([], filled=0, root=tmp_path)
+        assert not any(a and a[0] == "commit" for a in calls), (
+            "an empty run must not create an empty commit"
+        )

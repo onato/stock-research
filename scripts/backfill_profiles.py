@@ -46,6 +46,7 @@ import json
 import pathlib
 import random
 import re
+import subprocess
 import sys
 import time
 import urllib.error
@@ -207,6 +208,46 @@ def merge_info(path: pathlib.Path, profile: dict[str, str]) -> None:
 
 
 # --------------------------------------------------------------------------
+# Commit
+# --------------------------------------------------------------------------
+def _git(*args: str, root: pathlib.Path = ROOT) -> tuple[int, str]:
+    proc = subprocess.run(["git", *args], cwd=root, capture_output=True,
+                          text=True, check=False)
+    return proc.returncode, (proc.stdout + proc.stderr).strip()
+
+
+def commit_profiles(paths: list[str], filled: int,
+                    root: pathlib.Path = ROOT) -> bool:
+    """Commit the info.json files this run wrote, and nothing else.
+
+    Run nightly and unattended, uncommitted output is a known failure mode in
+    this repo: it piles up, gets swept into an unrelated ticker's commit by a
+    `git add -A`, or is lost. So the paths are staged explicitly -- never -A,
+    which would capture a concurrent research run's half-finished work.
+
+    The resume state travels with them: a commit whose state file said the
+    tickers were still pending would redo them all next night.
+    """
+    if not paths or filled <= 0:
+        return False
+    rc, _ = _git("add", *paths, "state/profile_backfill.json", root=root)
+    if rc != 0:
+        return False
+    rc, _ = _git("diff", "--cached", "--quiet", root=root)
+    if rc == 0:          # nothing actually staged
+        return False
+    msg = (f"chore: backfill {filled} company profile(s)\n\n"
+           "Names and business summaries from stockanalysis.com, so the "
+           "ethical screen can read tickers that were a bare symbol.\n"
+           "Automated; no model, no valuation change.")
+    rc, out = _git("commit", "-q", "-m", msg, root=root)
+    if rc != 0:
+        print(f"commit failed: {out}", file=sys.stderr)
+        return False
+    return True
+
+
+# --------------------------------------------------------------------------
 # CLI
 # --------------------------------------------------------------------------
 def unnamed_tickers(root: pathlib.Path = ROOT) -> list[str]:
@@ -230,6 +271,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--status", action="store_true", help="progress so far")
     p.add_argument("--delay", type=float, default=DELAY_SECONDS,
                    help=f"seconds between requests (default {DELAY_SECONDS})")
+    p.add_argument("--commit", action="store_true",
+                   help="commit the info.json files written (for unattended runs)")
     args = p.parse_args(argv)
 
     state = load_state()
@@ -258,6 +301,7 @@ def main(argv: list[str] | None = None) -> int:
 
     filled = failures = 0
     consecutive_429 = 0
+    written: list[str] = []
     for i, t in enumerate(batch, 1):
         url = profile_url(t)
         if not url:
@@ -272,6 +316,7 @@ def main(argv: list[str] | None = None) -> int:
                 failures += 1
             else:
                 merge_info(ROOT / "research" / t / "info.json", profile)
+                written.append(f"research/{t}/info.json")
                 state["done"][t] = dt.date.today().isoformat()
                 state["failed"].pop(t, None)
                 filled += 1
@@ -303,6 +348,8 @@ def main(argv: list[str] | None = None) -> int:
     save_state(STATE_PATH, state)
     left = len(pending(unnamed_tickers(), state))
     print(f"\nfilled {filled}   failed {failures}   remaining {left}")
+    if args.commit and commit_profiles(written, filled):
+        print(f"committed {filled} profile(s)")
     return 0
 
 
