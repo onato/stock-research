@@ -594,11 +594,30 @@ def render(ticker: str, spec: dict[str, Any], csv_text: str,
 _DOM_STUB = r"""
 const __els = {};
 function __el(id) {
-    if (!__els[id]) __els[id] = {
-        id: id, textContent: '', innerHTML: '', value: '', style: {}, dataset: {},
-        classList: { add() {}, remove() {}, toggle() {} },
-        getContext() { return {}; }, querySelectorAll() { return []; }
-    };
+    if (!__els[id]) {
+        const el = {
+            id: id, textContent: '', innerHTML: '', style: {}, dataset: {},
+            classList: { add() {}, remove() {}, toggle() {} },
+            getContext() { return {}; }, querySelectorAll() { return []; }
+        };
+        // A real <input type="range"> never holds null or a non-numeric string:
+        // assigning one snaps the value to the midpoint of min/max. Modelling
+        // that matters -- a slider whose scenario default is null (SMI.NZ has no
+        // growth model) reads 12.5 in a browser but held null here, so the
+        // equality guard in weightedIV passed under node and failed in the page.
+        let _v = '';
+        Object.defineProperty(el, 'value', {
+            enumerable: true,
+            get() { return _v; },
+            set(x) {
+                const n = parseFloat(x);
+                if (isFinite(n)) { _v = String(n); return; }
+                const lo = parseFloat(el.min), hi = parseFloat(el.max);
+                _v = (isFinite(lo) && isFinite(hi)) ? String((lo + hi) / 2) : '';
+            }
+        });
+        __els[id] = el;
+    }
     return __els[id];
 }
 globalThis.window = globalThis;

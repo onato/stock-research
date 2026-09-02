@@ -846,3 +846,145 @@ class TestPerShareCurrencyLabel:
         cur = dcf["inputs"]["currency"]
         assert got["iv"].startswith(cur), got["iv"]
         assert got["baseFcf"].startswith(cur), got["baseFcf"]
+
+
+class TestWeightedIVWithoutAWorkingEngine:
+    """A failed slider engine must not be allowed to rewrite the weighted IV.
+
+    SMI.NZ published `PROB-WEIGHTED IV NZD-5.59 / -1017% downside` on a DCF
+    whose stored weighted_iv is +0.919 -- while the header on the same page
+    read +51% upside. Santana is a finite gold mine: there is no owner-FCF
+    projection to discount, so all three engines resolve `family: null,
+    ok: false` and return ~0.027 against a base target of 1.011.
+
+    Two things then combine:
+
+    - `scenarioDefaults` returns growth/terminal `null` (correct -- the model
+      has neither), but the sliders carry real numbers, so `weightedIV`'s
+      `growth === d.growth` guard can never fire and the scaling path runs
+      even at page load, untouched.
+    - `isWeightedLive` admitted that path anyway: `if (!anyEngine &&
+      !canScale()) return false` lets a BROKEN engine through whenever
+      canScale() is true.
+
+    `weightedIV` then returns `stored * (now / ref)` over two meaningless
+    near-zero numbers. ref was +0.0205 and now was -0.1246, so a positive
+    0.919 came out as -5.59; dragging WACC to 6% printed -51.5.
+
+    The engine must actually work before its ratio is trusted. When it does
+    not, the stored weighted_iv is the only honest number.
+    """
+
+    def _probe(self, dcf, spec, csv_text, analysis, tmp_path, slider_growth):
+        """Render, then ask the page what it shows with the slider at a real value.
+
+        The browser seeds each slider from the `value=` build_dashboard bakes
+        into the HTML, so on SMI.NZ growthSlider reads 12.5 while the scenario
+        default is null. The node stub has no HTML parser, so the slider is set
+        explicitly here to reproduce that state.
+        """
+        page = bd.render("TEST", spec, csv_text, analysis, dcf)
+        js = tmp_path / "dash.js"
+        js.write_text(bd._DOM_STUB + inline_script(page) + f"""
+__el('growthSlider').min = '-5'; __el('growthSlider').max = '30';
+__el('growthSlider').value = {slider_growth};
+const s = sliderValues();
+console.log(JSON.stringify({{
+    live: isWeightedLive(),
+    weighted: weightedIV(s.growth, s.wacc, s.terminal),
+    stored: dcfData.probability_weighted.weighted_iv,
+    engineOk: ['base','bull','bear'].map(sc => !!(dcfEngineStatus[sc] && dcfEngineStatus[sc].ok))
+}}));
+""")
+        r = subprocess.run(["node", str(js)], capture_output=True, text=True, check=False)
+        assert r.returncode == 0, r.stderr
+        return json.loads(r.stdout.strip().splitlines()[-1])
+
+    @staticmethod
+    def _unmodellable(dcf):
+        """A DCF the engine cannot rebuild: no growth model, no terminal value.
+
+        This is the SMI.NZ shape -- a finite mine valued by risked project NPV.
+        """
+        d = json.loads(json.dumps(dcf))
+        for sc in ("base", "bull", "bear"):
+            d["assumptions"][sc]["growth_rate"] = None
+            d["assumptions"][sc]["growth_rates"] = None
+            d["assumptions"][sc]["terminal_growth"] = None
+        # scenarioDefaults falls back to this when growth_rates is empty; SMI.NZ
+        # has no growth series at all, which is what leaves defaults.growth null
+        # and makes weightedIV's equality guard unfireable.
+        d["historical_growth"]["selected_growth_rate"] = None
+        # A pre-revenue miner burning cash: canScale() still passes (last_fcf and
+        # shares exist), so isWeightedLive let the failed engine through.
+        d["inputs"]["last_fcf"] = -19.0
+        d["inputs"]["shares_outstanding"] = 992.5
+        d["assumptions"]["base"]["wacc"] = 12.0
+        d["assumptions"]["bull"]["wacc"] = 10.0
+        d["assumptions"]["bear"]["wacc"] = None
+        d["probability_weighted"] = {
+            "weights": {"bull": 0.2, "base": 0.5, "bear": 0.3},
+            "weighted_iv": 0.919,
+        }
+        return d
+
+    def test_failed_engine_is_not_treated_as_live(
+        self, spec, analysis, csv_text, dcf, tmp_path
+    ):
+        """canScale() must not promote a broken engine to a trusted one."""
+        out = self._probe(self._unmodellable(dcf), spec, csv_text, analysis, tmp_path, 12.5)
+        assert not any(out["engineOk"]), "fixture no longer models a failed engine"
+        assert out["live"] is False, (
+            "isWeightedLive admitted an engine whose scenarios all failed"
+        )
+
+    def test_broken_engine_does_not_flip_the_weighted_iv_negative(
+        self, spec, analysis, csv_text, dcf, tmp_path
+    ):
+        out = self._probe(self._unmodellable(dcf), spec, csv_text, analysis, tmp_path, 12.5)
+        assert out["weighted"] > 0, (
+            f"a stored weighted_iv of +0.919 rendered as {out['weighted']}: "
+            "a failed engine's ratio was applied"
+        )
+        assert out["weighted"] == pytest.approx(0.919, abs=0.01)
+
+    def test_dragging_the_slider_cannot_flip_it_either(
+        self, spec, analysis, csv_text, dcf, tmp_path
+    ):
+        """WACC 6% printed -51.5 on the real page; every slider value must hold."""
+        for g in (-5, 0, 12.5, 30):
+            out = self._probe(self._unmodellable(dcf), spec, csv_text, analysis, tmp_path, g)
+            assert out["weighted"] == pytest.approx(0.919, abs=0.01), (
+                f"growth={g} produced {out['weighted']}"
+            )
+
+
+class TestSliderStubCoercesLikeARangeInput:
+    """The node DOM stub must clamp like a real <input type="range">.
+
+    A real range input never holds null: `el.value = null` coerces to the
+    midpoint of min/max (a -5..30 growth slider becomes 13), and the value
+    baked into the HTML by build_dashboard is likewise a number. The stub
+    stored whatever it was given, so `sliderValues()` returned null under node
+    while the browser returned 12.5.
+
+    That difference is exactly what let the SMI.NZ weighted-IV bug ship: under
+    node the equality guard in weightedIV compared null to null and returned
+    the stored value, so the verify gate saw a correct page. In a browser it
+    compared 12.5 to null, took the scaling branch, and printed -5.59.
+    """
+
+    def test_assigning_null_to_a_slider_yields_a_number(self, tmp_path):
+        js = tmp_path / "stub.js"
+        js.write_text(bd._DOM_STUB + """
+const g = __el('growthSlider');
+g.min = '-5'; g.max = '30';
+g.value = null;
+console.log(JSON.stringify({value: g.value, isNumeric: isFinite(parseFloat(g.value))}));
+""")
+        r = subprocess.run(["node", str(js)], capture_output=True, text=True, check=False)
+        assert r.returncode == 0, r.stderr
+        out = json.loads(r.stdout)
+        assert out["isNumeric"], (
+            f"slider held {out['value']!r}; a real range input coerces null to a number"
+        )

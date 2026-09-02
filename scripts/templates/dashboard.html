@@ -1441,8 +1441,28 @@ function isWeightedLive() {
     const pw = dcfData.probability_weighted || {};
     const w = pw.weights, a = dcfData.assumptions;
     if (!w || !a || !a.base || !a.bull || !a.bear) return false;
-    const anyEngine = ['base', 'bull', 'bear'].every(sc => dcfEngineStatus[sc] && dcfEngineStatus[sc].ok);
-    if (!anyEngine && !canScale()) return false;
+    // Two different things are needed before the weighted IV may be rescaled.
+    //
+    // `ok` is strict: the engine reproduced the stored IV within ENGINE_TOL. An
+    // engine can miss that and still be perfectly usable for a RATIO -- it only
+    // has to move the same way the model does -- so `ok` alone is too harsh and
+    // would freeze the sliders on dashboards that model fine.
+    //
+    // What must not happen is trusting an engine that modelled NOTHING. A
+    // finite-mine DCF (SMI.NZ) has no FCF projection to discount: family
+    // resolves null and the engine returns ~0.027 against a 1.011 target. The
+    // ratio stored * (now / ref) then divides two meaningless near-zero numbers,
+    // and once ref crosses zero the sign flips -- which published a +0.919
+    // weighted IV as NZD-5.59 (-1017%) while the header still read +51%.
+    //
+    // canScale() cannot stand in for this: it only says the inputs for a
+    // proportional rescale exist (last_fcf + shares), which a pre-revenue miner
+    // burning cash still satisfies.
+    const engineModels = ['base', 'bull', 'bear'].every(sc => {
+        const st = dcfEngineStatus[sc];
+        return st && st.family && isFinite(st.iv) && st.iv > 0;
+    });
+    if (!engineModels) return false;
     const total = (w.bull || 0) + (w.base || 0) + (w.bear || 0);
     return Math.abs(total - 1) <= 0.001;
 }
