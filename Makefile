@@ -23,6 +23,7 @@ PARALLEL ?= 2
 # of them had aged past 45 days. They now route to the cheap /refresh-stock
 # path, so REQUIRE_NEW=0 is an inexpensive way to work that backlog down.
 REQUIRE_NEW ?= 1
+PROFILE_BATCH ?= 150
 LEADERBOARD ?= 15   # rows shown by `make screen`
 
 .DEFAULT_GOAL := help
@@ -79,6 +80,16 @@ endif
 	@$(MAKE) --no-print-directory digest
 	@echo
 	@$(MAKE) --no-print-directory screen
+	@echo
+	@# Fill in names and business summaries for queued tickers that are a bare
+	@# symbol, so the ethical screen can see them before one is researched.
+	@# Self-committing and resumable; a few seconds once the queue is drained.
+	@# Never fails the run -- a rate limit is not a reason to fail a night's
+	@# research that already succeeded.
+	@$(MAKE) --no-print-directory backfill-profiles-nightly || true
+
+backfill-profiles-nightly: ## One night's batch of profile fetches, committed
+	@$(PY) $(SCRIPTS)/backfill_profiles.py --limit $(PROFILE_BATCH) --commit
 
 sync-portfolio: ## Regenerate queue/priority.txt from ../portfolio-tracker (no-op without it)
 	@$(PY) $(SCRIPTS)/sync_portfolio_queue.py
