@@ -410,6 +410,14 @@ def gather_text(ticker: str, root: pathlib.Path = ROOT) -> tuple[str, str, str, 
     parts = [name, _flat(info.get("quirks"))]
     evidence = "name-and-sector" if (name or sector) else ""
 
+    # A profile fetched by backfill_profiles.py is a real business description,
+    # not just a name -- it is what makes the 877 previously unreadable tickers
+    # classifiable at all.
+    summary = _flat(info.get("business_summary"))
+    if summary:
+        parts.append(summary)
+        evidence = "business-summary"
+
     if not name or not sector:
         comp_p = root / "state" / "companies.json"
         if comp_p.exists():

@@ -298,3 +298,34 @@ class TestCompanyNameIsEvidence:
         """
         got = se.classify_record({"sector": "", "name": name, "text": ""})
         assert got == {}, f"{name!r} over-flagged as {sorted(got)}"
+
+
+class TestBackfilledSummaryIsRead:
+    """A profile fetched by backfill_profiles.py must reach the classifier.
+
+    backfill_profiles.py writes `business_summary` into info.json for the 877
+    queued tickers that had no local text at all. If gather_text does not read
+    that field the whole backfill is invisible here, which defeats its purpose:
+    those are exactly the tickers that can waste a research run.
+    """
+
+    def test_business_summary_is_gathered_and_classified(self, tmp_path):
+        d = tmp_path / "research" / "2914.T"
+        d.mkdir(parents=True)
+        (d / "info.json").write_text(json.dumps({
+            "name": "Japan Tobacco",
+            "business_summary": (
+                "Japan Tobacco Inc., a tobacco company, engages in the manufacture "
+                "and sale of tobacco products in Japan and internationally."
+            ),
+        }))
+        (tmp_path / "queue").mkdir()
+        (tmp_path / "queue" / "q.txt").write_text("2914.T\n")
+
+        sector, name, text, evidence = se.gather_text("2914.T", tmp_path)
+        assert "tobacco products" in text, "business_summary was not gathered"
+        assert evidence == "business-summary", (
+            f"a fetched profile is real evidence, got {evidence!r}"
+        )
+        got = se.classify_record({"sector": sector, "name": name, "text": text})
+        assert "tobacco" in got

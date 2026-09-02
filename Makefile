@@ -231,6 +231,19 @@ canonical-iv: ## Name the canonical weighted_iv on dual-currency DCFs (APPLY=1 t
 	$(PY) $(SCRIPTS)/canonical_iv.py $(if $(TICKER),--ticker $(TICKER),--all) \
 	  $(if $(APPLY),--apply,)
 
+backfill-profiles: ## Fetch company name + business summary for unnamed queued tickers (LIMIT=n)
+	$(PY) $(SCRIPTS)/backfill_profiles.py $(if $(LIMIT),--limit $(LIMIT),) $(if $(DRY),--dry-run,)
+
+backfill-profiles-status: ## How much of the profile backfill is left
+	@$(PY) $(SCRIPTS)/backfill_profiles.py --status
+
+screen-ethics: ## Flag queued tickers on the six ethical exclusions (APPLY=1 to write)
+	$(PY) $(SCRIPTS)/screen_ethics.py $(if $(TICKER),--ticker $(TICKER),--all) \
+	  $(if $(APPLY),--apply,) $(if $(HIGH),--min-confidence high,)
+
+screen-ethics-report: ## Summary of recorded ethical flags
+	@$(PY) $(SCRIPTS)/screen_ethics.py --report
+
 backfill-units: ## Infer missing core_metrics.units from DCF anchors (APPLY=1 to write)
 	$(PY) $(SCRIPTS)/backfill_units.py $(if $(APPLY),--apply,) $(if $(TICKER),--ticker $(TICKER),)
 
