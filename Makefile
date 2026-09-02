@@ -29,7 +29,7 @@ LEADERBOARD ?= 15   # rows shown by `make screen`
 .DEFAULT_GOAL := help
 .PHONY: help run digest status screen integrity missing prune-stubs standardize-scale research facts evals evals-all \
         cost gaps exchange-eval facts-xbrl adjudicate fetch-asx dcf-context dashboard kpi-coverage screen-metrics check-currency ledger ledger-backfill queue-prune \
-        screen-fundamentals backfill-units canonical-iv sync-portfolio commit-refreshed \
+        screen-fundamentals backfill-units canonical-iv sync-portfolio commit-refreshed commit-scores \
         test test-country lint coverage typecheck
 
 help: ## Show this help
@@ -81,6 +81,10 @@ endif
 	@echo
 	@$(MAKE) --no-print-directory screen
 	@echo
+	@# The scoring/digest/screen steps above all write files that no
+	@# commit_ticker owns; without this they accumulate in the working tree.
+	@$(MAKE) --no-print-directory commit-scores || true
+	@echo
 	@# Fill in names and business summaries for queued tickers that are a bare
 	@# symbol, so the ethical screen can see them before one is researched.
 	@# Self-committing and resumable; a few seconds once the queue is drained.
@@ -100,6 +104,23 @@ digest: ## Cost + quality + suggested fixes for the last batch
 refresh-plan: ## What each ticker actually needs: tier 0-3, no model, free
 	@$(PY) $(SCRIPTS)/refresh_plan.py $(if $(TICKER),--ticker $(TICKER),--all) \
 	  $(if $(TIER),--tier $(TIER),)
+
+commit-scores: ## Commit eval scorecards + screener output left by `make run`
+	@# commit_ticker commits the scores for the ticker it just researched, but
+	@# `make run` then scores EVERY ticker (run_evals.py --all) and regenerates
+	@# the leaderboard and digest, and nothing owned that output -- 185
+	@# scorecards, a schema change and index.html were left in the working tree
+	@# after one night. Same shape as the uncommitted price refreshes.
+	@git add -A -- state/scores state/cost_baseline.json state/improvements.jsonl \
+	  state/last_screen.json state/companies.json index.html evals 2>/dev/null || true
+	@if git diff --cached --quiet; then \
+	  echo "no scores or screener output to commit"; \
+	else \
+	  n=$$(git diff --cached --name-only | grep -c 'state/scores/' || true); \
+	  git commit -q -m "chore: record $$n eval scorecard(s) and refresh the leaderboard" \
+	    -m "Automated via make run; no model, no valuation change." \
+	  && echo "committed $$n scorecard(s)"; \
+	fi
 
 commit-refreshed: ## Commit price-only DCF/dashboard rewrites left by refresh-price
 	@git add -A -- research state/last_screen.json index.html 2>/dev/null || true
