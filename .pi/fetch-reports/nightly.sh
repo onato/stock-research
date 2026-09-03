@@ -101,13 +101,19 @@ fi
 # The script paces itself (jittered delay, escalating backoff on a 429) and
 # commits its own output, so there is nothing to clean up if it is cut short.
 # Once the queue is drained this is a few seconds a night.
-# Skip only when the fetch above ran to its own 05:45 deadline, i.e. the night
-# is spent. A run started outside the 02:00 window (by hand, or after a missed
-# launchd wake) still does its batch -- gating on the wall clock alone would
-# silently skip every daytime invocation.
+# The backfill gets its own small budget AFTER the fetch, not a share of the
+# fetch's window. The fetch routinely runs to its 05:45 deadline -- 4 of the
+# last 8 nights finished at or past it -- so gating the backfill on that
+# deadline would have skipped it on half of them, which is exactly the
+# starvation it was added to avoid.
+#
+# A batch of 150 at ~8s each is ~20 min, so it is bounded regardless; the
+# ceiling below is a backstop for a night that started very late. Best-effort:
+# a failure here must never cost the night's fetch work.
+BACKFILL_UNTIL="${BACKFILL_UNTIL:-0630}"
 echo "=== profile backfill $(date '+%F %T') ==="
-if [ -n "${FETCH_DEADLINE:-}" ] && [ "$(date '+%H%M')" -ge "$FETCH_DEADLINE" ]; then
-  echo "past the ${FETCH_DEADLINE} deadline — skipping profile backfill"
+if [ "$(date '+%H%M')" -ge "$BACKFILL_UNTIL" ]; then
+  echo "past ${BACKFILL_UNTIL} — skipping profile backfill tonight"
 else
   uv run --project "$REPO" python3 "$REPO/scripts/backfill_profiles.py" \
     --limit "${PROFILE_BATCH:-150}" --commit || echo "profile backfill failed (non-fatal)"

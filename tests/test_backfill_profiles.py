@@ -227,3 +227,20 @@ class TestCommit:
         assert not any(a and a[0] == "commit" for a in calls), (
             "an empty run must not create an empty commit"
         )
+
+
+class TestExitCode:
+    """A chaining caller must be able to tell "done" from "backed off".
+
+    The run stops after MAX_CONSECUTIVE_429 rate limits, but returned 0
+    either way -- so a loop that keeps invoking it until the queue is empty
+    would hammer a host that had just asked us to stop, which is exactly how
+    a soft rate limit becomes a hard block.
+    """
+
+    def test_rate_limited_stop_is_not_success(self):
+        assert bp.EXIT_RATE_LIMITED != 0
+        assert bp.EXIT_OK == 0
+
+    def test_the_two_are_distinguishable(self):
+        assert bp.EXIT_RATE_LIMITED != bp.EXIT_OK

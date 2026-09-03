@@ -68,6 +68,12 @@ MAX_BACKOFF = 3600.0         # ...but never sleep more than an hour in one go
 MAX_CONSECUTIVE_429 = 4      # after this many, the host wants us gone: stop
 DEFAULT_LIMIT = 150          # per invocation; ~6 nights for 877
 
+# A chaining caller (run one batch, then another) must be able to tell a clean
+# finish from a back-off. Returning 0 for both would let a loop keep hammering
+# a host that had just asked us to stop.
+EXIT_OK = 0
+EXIT_RATE_LIMITED = 3
+
 # stockanalysis.com uses a different path per market.
 MARKETS: dict[str, str] = {
     "HK": "hkg", "T": "tyo", "AX": "asx", "NZ": "nzx", "L": "lon",
@@ -301,6 +307,7 @@ def main(argv: list[str] | None = None) -> int:
 
     filled = failures = 0
     consecutive_429 = 0
+    rate_limited = False
     written: list[str] = []
     for i, t in enumerate(batch, 1):
         url = profile_url(t)
@@ -329,6 +336,7 @@ def main(argv: list[str] | None = None) -> int:
                 if consecutive_429 >= MAX_CONSECUTIVE_429:
                     print(f"\n{consecutive_429} rate-limits in a row -- stopping. "
                           "Rerun later; progress is saved.", file=sys.stderr)
+                    rate_limited = True
                     break
                 wait = backoff_seconds(consecutive_429)
                 print(f"  rate-limited, sleeping {wait / 60:.0f} min", file=sys.stderr)
@@ -350,7 +358,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"\nfilled {filled}   failed {failures}   remaining {left}")
     if args.commit and commit_profiles(written, filled):
         print(f"committed {filled} profile(s)")
-    return 0
+    return EXIT_RATE_LIMITED if rate_limited else EXIT_OK
 
 
 if __name__ == "__main__":

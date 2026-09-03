@@ -23,7 +23,6 @@ PARALLEL ?= 2
 # of them had aged past 45 days. They now route to the cheap /refresh-stock
 # path, so REQUIRE_NEW=0 is an inexpensive way to work that backlog down.
 REQUIRE_NEW ?= 1
-PROFILE_BATCH ?= 150
 LEADERBOARD ?= 15   # rows shown by `make screen`
 
 .DEFAULT_GOAL := help
@@ -84,14 +83,6 @@ endif
 	@# The scoring/digest/screen steps above all write files that no
 	@# commit_ticker owns; without this they accumulate in the working tree.
 	@$(MAKE) --no-print-directory commit-scores || true
-	@# NOTE: the profile backfill is NOT run here. It is driven by the 02:00
-	@# nightly (.pi/fetch-reports/nightly.sh), which already has a lock, a
-	@# 05:45 deadline and a Telegram summary. Running it from `make run` too
-	@# would double-fetch the same source. Invoke it by hand with
-	@# `make backfill-profiles`.
-
-backfill-profiles-nightly: ## One night's batch of profile fetches, committed
-	@$(PY) $(SCRIPTS)/backfill_profiles.py --limit $(PROFILE_BATCH) --commit
 
 sync-portfolio: ## Regenerate queue/priority.txt from ../portfolio-tracker (no-op without it)
 	@$(PY) $(SCRIPTS)/sync_portfolio_queue.py
@@ -262,7 +253,11 @@ canonical-iv: ## Name the canonical weighted_iv on dual-currency DCFs (APPLY=1 t
 	  $(if $(APPLY),--apply,)
 
 backfill-profiles: ## Fetch company name + business summary for unnamed queued tickers (LIMIT=n)
-	$(PY) $(SCRIPTS)/backfill_profiles.py $(if $(LIMIT),--limit $(LIMIT),) $(if $(DRY),--dry-run,)
+	@# --commit by default: without it a manual run leaves its info.json edits
+	@# loose in the working tree, where they get swept into an unrelated
+	@# commit or lost. DRY=1 fetches nothing, so it has nothing to commit.
+	$(PY) $(SCRIPTS)/backfill_profiles.py $(if $(LIMIT),--limit $(LIMIT),) \
+	  $(if $(DRY),--dry-run,--commit)
 
 backfill-profiles-status: ## How much of the profile backfill is left
 	@$(PY) $(SCRIPTS)/backfill_profiles.py --status
