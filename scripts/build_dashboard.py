@@ -440,7 +440,17 @@ def render_dcf_section(ticker: str, spec: dict[str, Any], dcf: dict[str, Any]) -
     r = _slider_range(dcf)
     g, w, t = r["growth"], r["wacc"], r["terminal"]
     e = html.escape
-    return f"""<h2 class="section-title">DCF Valuation</h2>
+    banner = ""
+    note = labels.get("model_approach_note")
+    if note:
+        banner = (
+            '<div style="max-width:1400px;margin:0 auto 20px;padding:16px 20px;'
+            'background:rgba(253,203,110,0.08);border:1px solid rgba(253,203,110,0.3);'
+            'border-radius:10px;font-size:0.9rem;line-height:1.6;color:#d0d0d0">'
+            '<strong style="color:#fdcb6e">Model approach:</strong> '
+            f'{note}</div>\n\n'
+        )
+    return f"""{banner}<h2 class="section-title">DCF Valuation</h2>
 
 <div class="dcf-section">
   <div class="dcf-philosophy" id="dcfPhilosophy"></div>

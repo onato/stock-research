@@ -337,6 +337,21 @@ class TestDcfSection:
         assert r["wacc"][2] is not None
         assert r["terminal"][2] is not None
 
+    def test_model_approach_banner_only_when_spec_asks_for_it(self, spec, analysis, csv_text, dcf):
+        # Step 8c.6 of the research-stock skill requires a yellow "Model
+        # approach" banner above the DCF section when the sanity check
+        # tripped or the valuation needs framing. It is opt-in per ticker:
+        # a Spec without the key must render byte-identically to before.
+        assert "Model approach:" not in bd.render("TEST", spec, csv_text, analysis, dcf)
+
+        spec = json.loads(json.dumps(spec))
+        spec.setdefault("dcf", {})["model_approach_note"] = "Mid-cycle <b>not</b> growth."
+        page = bd.render("TEST", spec, csv_text, analysis, dcf)
+        assert "Model approach:" in page
+        assert "Mid-cycle <b>not</b> growth." in page
+        # banner sits above the section heading it is framing
+        assert page.index("Model approach:") < page.index('DCF Valuation</h2>')
+
     def test_no_dcf_omits_section_and_link_but_page_still_renders(self, spec, analysis, csv_text):
         page = bd.render("TEST", spec, csv_text, analysis, None)
         assert "const dcfData = null;" in page
@@ -396,6 +411,13 @@ class TestValuationEngine:
             assert out[sc]["iv"] == pytest.approx(dcf["valuation"][sc]["intrinsic_value"], abs=0.005)
         # +5pp year-1 growth on a company with positive later-year owner FCF raises value
         assert out["moved"]["iv"] > dcf["valuation"]["base"]["intrinsic_value"]
+        # Entry price at a moved slider must rebuild the terminal value at the
+        # HURDLE rate, not reuse the WACC-built terminal value from `tv`. Reusing
+        # it (the historical bug) overstates entry by ~11% on this fixture
+        # (SPN.NZ measured $4.38 vs the correct $3.51 at defaults for the same
+        # reason -- this test catches it away from defaults, where `anchored()`
+        # no longer just echoes the JSON's stored number).
+        assert out["moved"]["entry"] == pytest.approx(2.943, abs=0.01)
         assert 'id="dcfEngineNote"' in html      # the note initDCF fills at runtime
 
     def test_sum_of_parts_model_validates_and_drives_sliders(self, spec, analysis, csv_text, tmp_path):
