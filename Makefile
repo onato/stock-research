@@ -84,13 +84,11 @@ endif
 	@# The scoring/digest/screen steps above all write files that no
 	@# commit_ticker owns; without this they accumulate in the working tree.
 	@$(MAKE) --no-print-directory commit-scores || true
-	@echo
-	@# Fill in names and business summaries for queued tickers that are a bare
-	@# symbol, so the ethical screen can see them before one is researched.
-	@# Self-committing and resumable; a few seconds once the queue is drained.
-	@# Never fails the run -- a rate limit is not a reason to fail a night's
-	@# research that already succeeded.
-	@$(MAKE) --no-print-directory backfill-profiles-nightly || true
+	@# NOTE: the profile backfill is NOT run here. It is driven by the 02:00
+	@# nightly (.pi/fetch-reports/nightly.sh), which already has a lock, a
+	@# 05:45 deadline and a Telegram summary. Running it from `make run` too
+	@# would double-fetch the same source. Invoke it by hand with
+	@# `make backfill-profiles`.
 
 backfill-profiles-nightly: ## One night's batch of profile fetches, committed
 	@$(PY) $(SCRIPTS)/backfill_profiles.py --limit $(PROFILE_BATCH) --commit

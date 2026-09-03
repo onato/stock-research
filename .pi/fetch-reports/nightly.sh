@@ -93,6 +93,26 @@ else
   echo "=== queue exhausted after $n batches $(date '+%F %T') ==="
 fi
 
+# Fill in company names and business descriptions for queued tickers that are
+# still a bare symbol, so the ethical screen can judge one BEFORE a research
+# run is spent on it. Deliberately last: it is best-effort enrichment, and a
+# rate limit must not cost us the night's fetch work.
+#
+# The script paces itself (jittered delay, escalating backoff on a 429) and
+# commits its own output, so there is nothing to clean up if it is cut short.
+# Once the queue is drained this is a few seconds a night.
+# Skip only when the fetch above ran to its own 05:45 deadline, i.e. the night
+# is spent. A run started outside the 02:00 window (by hand, or after a missed
+# launchd wake) still does its batch -- gating on the wall clock alone would
+# silently skip every daytime invocation.
+echo "=== profile backfill $(date '+%F %T') ==="
+if [ -n "${FETCH_DEADLINE:-}" ] && [ "$(date '+%H%M')" -ge "$FETCH_DEADLINE" ]; then
+  echo "past the ${FETCH_DEADLINE} deadline — skipping profile backfill"
+else
+  uv run --project "$REPO" python3 "$REPO/scripts/backfill_profiles.py" \
+    --limit "${PROFILE_BATCH:-150}" --commit || echo "profile backfill failed (non-fatal)"
+fi
+
 # Send a Telegram summary if credentials are configured (telegram.env is
 # gitignored; create it with TELEGRAM_BOT_TOKEN=... and TELEGRAM_CHAT_ID=...).
 if [ -f "$HERE/telegram.env" ]; then
