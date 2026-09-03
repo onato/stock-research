@@ -47,9 +47,17 @@ START="$(date '+%F %T')"
 echo "=== profile backfill loop started $START (batch $BATCH) ==="
 
 while true; do
-  if [ -n "$UNTIL" ] && [ "$(date '+%H%M')" -ge "$UNTIL" ]; then
-    echo "=== reached $UNTIL -- stopping ==="
-    break
+  # --until names a MORNING wall time, and an overnight run starts the evening
+  # before, so a plain `now >= until` is true immediately at 23:05 and the loop
+  # exits without doing anything. Only apply the stop once we are actually in
+  # the small hours (i.e. now is earlier in the day than the deadline window).
+  if [ -n "$UNTIL" ]; then
+    now="$(date '+%H%M')"
+    # 10#: strip the leading zero, or bash reads 0630 as octal.
+    if [ "$((10#$now))" -ge "$((10#$UNTIL))" ] && [ "$((10#$now))" -lt 1200 ]; then
+      echo "=== reached $UNTIL -- stopping ==="
+      break
+    fi
   fi
   if [ "$MAX_BATCHES" -gt 0 ] && [ "$n" -ge "$MAX_BATCHES" ]; then
     echo "=== $MAX_BATCHES batches done -- stopping ==="
