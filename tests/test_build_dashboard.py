@@ -1010,3 +1010,54 @@ console.log(JSON.stringify({value: g.value, isNumeric: isFinite(parseFloat(g.val
         assert out["isNumeric"], (
             f"slider held {out['value']!r}; a real range input coerces null to a number"
         )
+
+
+class TestEntryPriceIsNotAnchoredToAStaleStoredValue:
+    """`anchored()` must not re-inject the bug the engine just fixed.
+
+    A slider-moved entry price is computed correctly by the engine -- the
+    terminal value is rebuilt at the HURDLE rate, not reused from the
+    WACC-built `tv`. But anchored() then returned `stored * (now / ref)`,
+    and on any DCF JSON written before that fix the stored entry_price was
+    itself built with the WACC terminal value.
+
+    On the TPW fixture that turns a correct 2.943 into 3.254: the engine's
+    ratio is right, the number it is scaled onto is not. Every DCF JSON
+    predating the fix carries the same stale anchor, so the fix was invisible
+    wherever it mattered.
+
+    The IV anchor stays: intrinsic value is not what the fix changed, and
+    anchoring it keeps a tab click from moving the headline number.
+    """
+
+    def _entry(self, tmp_path, moved):
+        dcf = load("TPW_DCF.json")
+        page = bd.render("TPW.AX", load("TEST_DashboardSpec.json"),
+                         (FIX / "TEST_Metrics.csv").read_text(),
+                         load("TEST_Analysis.json"), dcf)
+        js = tmp_path / "dash.js"
+        js.write_text(bd._DOM_STUB + inline_script(page) + f"""
+switchScenario('base');
+const d = scenarioDefaults('base');
+const g = d.growth + {5 if moved else 0};
+console.log(JSON.stringify({{
+    anchored: anchored('entry', g, d.wacc, d.terminal),
+    engine: calculateDCF('base', g, d.wacc, d.terminal).entryPrice,
+    stored: dcfData.entry_price.base.entry_price
+}}));
+""")
+        r = subprocess.run(["node", str(js)], capture_output=True, text=True, check=False)
+        assert r.returncode == 0, r.stderr
+        return json.loads(r.stdout.strip().splitlines()[-1])
+
+    def test_moved_entry_price_comes_from_the_engine_not_the_stale_anchor(self, tmp_path):
+        got = self._entry(tmp_path, moved=True)
+        assert got["anchored"] == pytest.approx(got["engine"], abs=0.001), (
+            f"anchored {got['anchored']} != engine {got['engine']}: "
+            "the pre-fix stored entry price was scaled back in"
+        )
+
+    def test_at_defaults_the_stored_value_still_shows(self, tmp_path):
+        """Untouched sliders must echo the JSON, or the page contradicts it."""
+        got = self._entry(tmp_path, moved=False)
+        assert got["anchored"] == pytest.approx(got["stored"], abs=0.001)

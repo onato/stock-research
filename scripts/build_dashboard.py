@@ -663,7 +663,7 @@ for (const sc of ['base', 'bull', 'bear']) {
 switchScenario('base');
 __el('growthSlider').value = String(sliderValues().growth + 5);
 updateDCFDisplay();
-__out.moved = { weighted: __num(__el('dcfWeighted').textContent), iv: __num(__el('dcfIV').textContent) };
+__out.moved = { weighted: __num(__el('dcfWeighted').textContent), iv: __num(__el('dcfIV').textContent), entry: __num(__el('dcfEntry').textContent) };
 __out.engine = dcfEngineStatus;
 console.log(JSON.stringify(__out));
 """

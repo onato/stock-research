@@ -1336,8 +1336,17 @@ function runEngine(sc, ov) {
     }
     const cap = Number(firstOf(a, ['terminal_cap_multiple', 'terminal_fcf_multiple_cap', 'terminal_multiple_cap']) || 20);
     const last = fcfs[n - 1];
-    const gordon = (wacc - tg) > 0 ? last * (1 + tg / 100) / ((wacc - tg) / 100) : last * cap;
-    const tv = Math.max(0, Math.min(gordon, last * cap));
+    // Terminal value depends on the discount rate through the Gordon spread
+    // (r - g), so it must be rebuilt at whichever rate is doing the
+    // discounting -- WACC for the intrinsic value, the entry-price hurdle
+    // rate for the entry price. Reusing the WACC-built `tv` for the hurdle
+    // leg overstated every slider-moved entry price (SPN.NZ: $4.38 vs the
+    // correct $3.51 at defaults for the same reason).
+    const tvAt = (rate) => {
+        const g = (rate - tg) > 0 ? last * (1 + tg / 100) / ((rate - tg) / 100) : last * cap;
+        return Math.max(0, Math.min(g, last * cap));
+    };
+    const tv = tvAt(wacc);
     const netDebt = Number(inputs.net_debt || 0);
     const shares = (inputs.projected_shares && inputs.projected_shares.length >= n)
         ? Number(inputs.projected_shares[n - 1]) : Number(inputs.shares_outstanding);
@@ -1356,7 +1365,8 @@ function runEngine(sc, ov) {
         const ev = pv(wacc) + tv / Math.pow(1 + wacc / 100, n);
         const equityValue = ev + moneeEquity + surplusCash;
         const hurdle = ((dcfData.entry_price || {}).hurdle_rate || 0.15) * 100;
-        const entryEquity = pv(hurdle) + tv / Math.pow(1 + hurdle / 100, n)
+        const tvHurdle = tvAt(hurdle);
+        const entryEquity = pv(hurdle) + tvHurdle / Math.pow(1 + hurdle / 100, n)
             + pvLeg(hurdle) + leg.tv / Math.pow(1 + hurdle / 100, leg.n) + surplusCash;
         const fxSop = quoteFxRate(sc);
         return { family: family, iv: equityValue / shares * fxSop,
@@ -1366,7 +1376,8 @@ function runEngine(sc, ov) {
     const ev = pv(wacc) + tv / Math.pow(1 + wacc / 100, n);
     const hurdle = ((dcfData.entry_price || {}).hurdle_rate || 0.15) * 100;
     const side = sideStreamValue(sc);
-    const entry = (pv(hurdle) + tv / Math.pow(1 + hurdle / 100, n) + side - netDebt) / shares;
+    const tvHurdle = tvAt(hurdle);
+    const entry = (pv(hurdle) + tvHurdle / Math.pow(1 + hurdle / 100, n) + side - netDebt) / shares;
     const fx = quoteFxRate(sc);
     return { family: family, iv: (ev + side - netDebt) / shares * fx, entryPrice: entry * fx, fcfList: fcfs, growthRates: growth };
 }
@@ -1432,6 +1443,16 @@ function anchored(field, growth, wacc, terminal) {
     const key = field === 'iv' ? 'iv' : 'entryPrice';
     const now = calculateDCF(currentScenario, growth, wacc, terminal)[key];
     if (stored == null) return now;
+    // The entry price is returned STRAIGHT from the engine once a slider has
+    // moved, never scaled onto the stored number. Every DCF JSON written
+    // before the terminal-value-at-hurdle fix has a stored entry_price built
+    // with the WACC terminal value, so `stored * (now / ref)` re-injects the
+    // very bug the engine corrects -- on the TPW fixture a correct 2.943
+    // comes back out as 3.254.
+    //
+    // IV keeps its anchor: it is not what that fix changed, and anchoring
+    // stops a tab click nudging the headline number off the JSON.
+    if (key === 'entryPrice') return now;
     const ref = calculateDCF(currentScenario, d.growth, d.wacc, d.terminal)[key];
     if (!ref || !isFinite(ref) || !isFinite(now)) return stored;
     return stored * (now / ref);
