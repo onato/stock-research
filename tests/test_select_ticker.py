@@ -424,3 +424,58 @@ class TestLivePortfolioPriority:
         p = self.tracker(st_repo / "elsewhere.json", held=["ENV"])
         monkeypatch.setenv("PORTFOLIO_JSON", str(p))
         assert st.portfolio_path() == p
+
+
+class TestNeverInterestedIsSkipped:
+    """A ticker in never_interested.txt must not be handed to a research run.
+
+    The screener has always read state/never_interested.txt, so an excluded
+    company vanished from the leaderboard -- but the SELECTOR did not, so the
+    queue could still pick one and spend a full research run (~$6) on a
+    company that would be discarded the moment it was ranked.
+
+    That gap became expensive when the ethical screen added 122 names at once:
+    fossil fuels, weapons, tobacco, gambling and animal products, all still
+    sitting in the queue files and all still selectable.
+    """
+
+    def _never(self, repo, body):
+        (repo / "state").mkdir(exist_ok=True)
+        (repo / "state" / "never_interested.txt").write_text(body)
+
+    def test_pick_new_skips_an_excluded_ticker(self, st_repo):
+        write_queue(st_repo, "q.txt", ["LMT", "DUOL"])
+        self._never(st_repo, "# header\nLMT  ethical screen: weapons\n")
+        assert st.pick_new() == "DUOL"
+
+    def test_pick_new_returns_none_when_all_are_excluded(self, st_repo):
+        write_queue(st_repo, "q.txt", ["LMT", "BATS.L"])
+        self._never(st_repo, "LMT  weapons\nBATS.L  tobacco\n")
+        assert st.pick_new() is None
+
+    def test_comments_and_blank_lines_are_not_treated_as_tickers(self, st_repo):
+        write_queue(st_repo, "q.txt", ["DUOL"])
+        self._never(st_repo, "# a comment\n\n   \nLMT  weapons\n")
+        assert st.pick_new() == "DUOL", "a comment line was read as a ticker"
+
+    def test_a_missing_file_excludes_nothing(self, st_repo):
+        """No file is not an empty file: the selector must still work."""
+        write_queue(st_repo, "q.txt", ["DUOL"])
+        assert st.pick_new() == "DUOL"
+
+    def test_pick_stalest_skips_an_excluded_ticker(self, st_repo):
+        for t, date in (("LMT", "2020-01-01"), ("DUOL", "2026-01-01")):
+            d = st_repo / "research" / t / "Reports"
+            d.mkdir(parents=True)
+            (d / f"{t}_DCF.json").write_text(json.dumps({"valuation_date": date}))
+        self._never(st_repo, "LMT  ethical screen: weapons\n")
+        # LMT is by far the stalest, so only the exclusion can keep it out.
+        assert st.pick_stalest() == "DUOL"
+
+    def test_pick_batch_skips_excluded_tickers(self, st_repo):
+        write_queue(st_repo, "q.txt", ["LMT", "DUOL", "BATS.L", "WISE.L"])
+        self._never(st_repo, "LMT  weapons\nBATS.L  tobacco\n")
+        got = st.pick_batch(4)
+        assert "LMT" not in got
+        assert "BATS.L" not in got
+        assert "DUOL" in got

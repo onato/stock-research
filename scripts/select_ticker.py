@@ -91,6 +91,30 @@ def read_tickers(path: Path) -> list[str]:
     return out
 
 
+def never_interested() -> set[str]:
+    """Tickers state/never_interested.txt says to leave alone.
+
+    The screener has always honoured this file, but the selector did not, so
+    an excluded company still cost a full research run before being dropped at
+    ranking time. Read fresh on every call rather than cached at import: a
+    long-lived process must see a ticker added mid-run.
+
+    Format is `TICKER  reason`; comments and blank lines are skipped.
+    """
+    path = REPO_ROOT / "state" / "never_interested.txt"
+    out: set[str] = set()
+    try:
+        text = path.read_text()
+    except OSError:
+        return out          # no file excludes nothing
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        out.add(line.split()[0])
+    return out
+
+
 def has_reports(ticker: str) -> bool:
     """A ticker counts as researched once its Reports/ dir has content.
 
@@ -138,7 +162,7 @@ def queue_sources() -> list[tuple[str, list[str]]]:
 
 
 def pick_new(exclude: Iterable[str] = ()) -> str | None:
-    exclude = set(exclude)
+    exclude = set(exclude) | never_interested()
     for _, tickers in queue_sources():
         for ticker in tickers:
             if ticker in exclude:
@@ -161,7 +185,7 @@ def pick_stalest(exclude: Iterable[str] = (), *,
     tickers stale by valuation_date, 19 had no unparsed filing, so refreshing
     them re-derives identical financials at ~$6 each. Off by default.
     """
-    exclude = set(exclude)
+    exclude = set(exclude) | never_interested()
     candidates = []
     for dcf in REPO_ROOT.glob("research/*/Reports/*_DCF.json"):
         ticker = dcf.parent.parent.name
