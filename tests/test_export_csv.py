@@ -410,6 +410,27 @@ class TestKpiPromotion:
             rows = list(csv.DictReader(fh))
         assert rows[0]["ActiveCustomers"] == "1094000.0"
 
+    def test_port_cargo_kpis_are_promoted(self, make_ticker, monkeypatch):
+        """Port/terminal operators (SPN.NZ): tonnage is the operating driver,
+        not just a financial-statement line, and is disclosed as such."""
+        d = make_ticker("SYN")
+        make_db(d.parent.parent, "SYN", ["FY2025", "FY2026"], kpis=[
+            ("FY2025", "CargoVolumeTonnes", 3.553, "million tonnes"),
+            ("FY2026", "CargoVolumeTonnes", 3.96, "million tonnes"),
+            ("FY2026", "TiwaiVolumeTonnes", 0.942, "million tonnes"),
+            ("FY2026", "BulkCargoVolumeTonnes", 2.36, "million tonnes"),
+            ("FY2026", "ContainerCargoTonnes", 0.665, "million tonnes"),
+            ("FY2026", "NormalisedNPAT", 16.14, "millions"),
+        ])
+        assert run_main(monkeypatch, "SYN") == 0
+        with open(d / "Reports/SYN_Metrics.csv", newline="") as fh:
+            rows = list(csv.DictReader(fh))
+        assert rows[1]["CargoVolumeTonnes"] == "3.96"
+        assert rows[1]["TiwaiVolumeTonnes"] == "0.942"
+        assert rows[1]["BulkCargoVolumeTonnes"] == "2.36"
+        assert rows[1]["ContainerCargoTonnes"] == "0.665"
+        assert rows[1]["NormalisedNPAT"] == "16.14"
+
     def test_promotion_is_idempotent(self, make_ticker, monkeypatch):
         d = make_ticker("SYN")
         out = d / "Reports/SYN_Metrics.csv"

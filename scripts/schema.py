@@ -258,6 +258,19 @@ PROMOTE_KPIS: dict[str, str] = {
     "ComparableSalesGrowthEurope": "ComparableSalesGrowthEurope",
     "StoreCount": "StoreCount",
     "EmployeesFTE": "EmployeesFTE",
+    # Port/terminal operators (SPN.NZ). Cargo tonnage is the operating
+    # driver of a port -- the real KPI, not a proxy off revenue -- and
+    # customer concentration (Tiwai smelter is ~24% of SPN.NZ FY2026
+    # volume) is the single most important risk fact about the business.
+    # NormalisedNPAT is the company's own earnings measure stripping
+    # one-off tax items (e.g. the FY2024 deferred-tax charge) that
+    # statutory NetIncome would otherwise misread as an operating dip.
+    "CargoVolumeTonnes": "CargoVolumeTonnes",
+    "TiwaiVolumeTonnes": "TiwaiVolumeTonnes",
+    "BulkCargoVolumeTonnes": "BulkCargoVolumeTonnes",
+    "ContainerCargoTonnes": "ContainerCargoTonnes",
+    "ContainerVolumeTEU": "ContainerVolumeTEU",
+    "NormalisedNPAT": "NormalisedNPAT",
 }
 
 # Owner-FCF components and core-column duplicates. Listed explicitly so a
