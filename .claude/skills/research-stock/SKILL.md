@@ -253,30 +253,11 @@ Write the analysis to: ./research/$ARGUMENTS/Reports/{TICKER}_Analysis.json
 
 This analysis will be embedded in the dashboard.
 
-## Step 7: Generate Dashboard
+## Step 7: Dashboard — deferred to after Step 8c
 
-**IMPORTANT: Do NOT reference other ticker dashboards (WISE, DUOL, etc.). Create a fully self-contained dashboard.**
-
-Before generating the dashboard, analyze the extracted reports to understand:
-1. **Business Model**: How does this company make money?
-2. **Key Metrics**: What does management emphasize in earnings calls/letters?
-3. **Industry Context**: What metrics matter for this type of business?
-
-Use the dashboard-generator agent instructions in `.claude/agents/dashboard-generator.md` for:
-- Complete CSS styling (dark theme, glassmorphism cards)
-- JavaScript patterns (Chart.js, embedded CSV parsing)
-- Help modal structure
-
-Dashboard must include:
-1. **Embed CSV data directly in the HTML** - Do NOT use fetch() to load external files (won't work with file:// URLs)
-2. Self-contained HTML with embedded CSS/JS (only Chart.js CDN is external)
-3. KPI cards with current values and YoY changes
-4. Chart.js visualizations tailored to the business model
-5. Log-scale toggle ("Log" button) on absolute-value time-series charts (skip percentage metrics and series with zero/negative values — see dashboard-generator.md for the pattern)
-6. Help buttons (?) with company-specific metric explanations
-7. Derived metrics (growth rates, margins, ratios relevant to THIS company)
-
-Output: ./research/$ARGUMENTS/Reports/{TICKER}_Dashboard.html
+The dashboard embeds the DCF, so it is rendered **once, after the valuation and its
+sanity check** (Step 9a below). Do not build it here and do not hand-edit HTML at any
+point: `scripts/build_dashboard.py` renders the page from a Spec JSON.
 
 ## Step 8: DCF Valuation
 
@@ -306,25 +287,16 @@ The dashboard generator will embed the DCF JSON and add an interactive valuation
 
 ## Step 8b: Verify Stock Price in DCF
 
-After DCF generation, verify the stock price is accurate:
-
-1. Fetch the live price from Yahoo Finance:
 ```bash
-curl -s "https://query1.finance.yahoo.com/v8/finance/chart/$ARGUMENTS?range=1d&interval=1d" \
-  -H "User-Agent: Mozilla/5.0" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['chart']['result'][0]['meta']['regularMarketPrice'])"
+python3 scripts/refresh_price.py --ticker $ARGUMENTS --apply
 ```
 
-2. Read `current_price` from `./research/$ARGUMENTS/Reports/{TICKER}_DCF.json`
-
-3. If the prices differ by more than 5%, update the DCF JSON:
-   - Set `current_price` to the Yahoo Finance price
-   - Recalculate `upside` for all three scenarios: `((intrinsic_value / new_price) - 1) * 100`
-   - Recalculate `probability_weighted.weighted_iv` is unchanged (it's based on intrinsic values, not current price) — but verify the `entry_price.base.entry_discount_from_current` is updated: `((current_price - entry_price) / current_price) * -100`. The `entry_price` value itself does not depend on current price, so it never needs recomputing on price drift.
-   - Write the updated JSON back to the file
-
-4. If the prices match within 5%, no changes needed — log that the price was verified.
-
-5. **If the DCF JSON was updated**, re-embed the updated DCF JSON into the dashboard HTML (`./research/$ARGUMENTS/Reports/{TICKER}_Dashboard.html`) by replacing the existing `const dcfData = {...};` block with the corrected data. This ensures the dashboard displays the verified price.
+It fetches the live quote, rewrites every price-derived number (root `current_price`,
+every nested `current_price`, `market_data.price`, the scenario upsides, entry
+discounts and the weighted upside) surgically, and refuses on a currency or
+denomination mismatch. Prose that quotes the old price is listed under
+`price_refresh.prose_paths_quoting_previous_price` — fix those sentences only if the
+claim they make has flipped. Do not recompute any of this by hand.
 
 ## Step 8c: DCF Sanity Check (Implied Multiples vs History)
 
@@ -437,6 +409,32 @@ Add a `sanity_check` block to the DCF JSON regardless of pass/fail:
 ```
 
 This makes the fix auditable and surfaces in future runs whether assumptions have drifted back into unrealistic territory.
+
+## Step 9a: Generate the Dashboard (no model, then an optional tweak)
+
+```bash
+make dashboard-spec TICKER=$ARGUMENTS      # default Spec from templates + populated columns
+make dashboard TICKER=$ARGUMENTS           # render Reports/{TICKER}_Dashboard.html
+python3 scripts/kpi_coverage.py $ARGUMENTS # which stored KPIs are stranded
+```
+
+`dashboard_spec.py` routes the ticker to a business-model template (SaaS, payments,
+e-commerce, REIT, bank, LIC, retirement-village, pre-revenue miner, or plain
+operating) via `scripts/sectors.py`, keeps only the cards and charts whose columns
+are populated, and writes company-substituted help text. If a Spec already exists
+(an agent edited it on an earlier run) it is kept; pass `FORCE=1` to regenerate.
+
+Spawn the `dashboard-generator` agent **only** when `kpi_coverage.py` lists
+`unmapped` or `promoted` KPIs the default Spec did not chart, or the business has a
+driver the templates cannot know (a segment split, a disclosed unit-economics
+series). It edits the existing Spec — it never authors one and never reads another
+ticker's dashboard — then re-runs `make dashboard`. On 40 measured runs the old
+author-everything agent cost $1.64 a ticker and spent 28 turns reading other
+tickers' dashboards.
+
+Check the `slider engine:` line the build prints. `FALLBACK` means the DCF JSON's
+assumptions do not rebuild its valuation (the sliders use a generic scaler); it is
+not a dashboard error, and only the dcf-analyst can fix it.
 
 ## Step 9: Update Company Registry + Index Page
 

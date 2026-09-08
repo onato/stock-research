@@ -26,7 +26,7 @@ REQUIRE_NEW ?= 1
 LEADERBOARD ?= 15   # rows shown by `make screen`
 
 .DEFAULT_GOAL := help
-.PHONY: help run digest status screen integrity missing prune-stubs standardize-scale research facts evals evals-all \
+.PHONY: help run digest status screen integrity missing prune-stubs standardize-scale research facts evals evals-all dashboard-spec fix \
         cost gaps exchange-eval facts-xbrl adjudicate fetch-asx dcf-context dashboard kpi-coverage screen-metrics check-currency ledger ledger-backfill queue-prune \
         screen-fundamentals backfill-units canonical-iv sync-portfolio commit-refreshed commit-scores \
         test test-country lint coverage typecheck
@@ -192,6 +192,9 @@ adjudicate: ## Pre-resolve facts into Reports/{T}_Worksheet.md (no model; CHECK=
 facts-xbrl: ## Structured extraction for a US filer via SEC XBRL (TICKER=PYPL)
 	@test -n "$(TICKER)" || { echo "usage: make facts-xbrl TICKER=PYPL" >&2; exit 2; }
 	$(PY) $(SCRIPTS)/build_facts_xbrl.py $(TICKER) --show
+
+dashboard-spec: ## Write the default DashboardSpec.json from templates + populated columns (TICKER=X [FORCE=1]; no model)
+	$(PY) $(SCRIPTS)/dashboard_spec.py $(TICKER) $(if $(FORCE),--force,)
 
 dashboard: ## Render Reports/{T}_Dashboard.html from its DashboardSpec.json (no model)
 	@test -n "$(TICKER)" || { echo "usage: make dashboard TICKER=AGL.NZ" >&2; exit 2; }
