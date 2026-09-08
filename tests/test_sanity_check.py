@@ -228,6 +228,22 @@ class TestFyEndPriceAlignment:
     def test_a_december_fy_takes_the_december_close(self):
         assert sanity_check.fy_end_price(PRICES, 2024, 12) == 6.00
 
+    def test_a_monthly_bar_is_stamped_at_the_month_start(self):
+        """Yahoo stamps the 1mo bar at the FIRST of the month and fills it
+        with that month's close, so December 2024's bar is 2024-12-01 and
+        carries the 31-Dec price. Matching on year+month is what makes a
+        December FY-end pick December's close rather than January's."""
+        series = [(dt.date(2024, 12, 1), 6.0), (dt.date(2025, 1, 1), 8.0)]
+        assert sanity_check.fy_end_price(series, 2024, 12) == 6.0
+
+    def test_a_partial_current_month_bar_does_not_displace_the_close(self):
+        """Yahoo appends a second, part-formed bar for the month in
+        progress -- DUOL's series ends 2026-09-01 and 2026-09-04 on the
+        same day's price. The completed month's bar is the FY anchor; a
+        mid-month quote is not the year's closing price."""
+        series = [(dt.date(2024, 12, 1), 6.0), (dt.date(2024, 12, 19), 9.0)]
+        assert sanity_check.fy_end_price(series, 2024, 12) == 6.0
+
     def test_a_year_outside_the_series_is_none(self):
         assert sanity_check.fy_end_price(PRICES, 2010, 12) is None
 

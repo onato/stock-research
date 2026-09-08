@@ -316,6 +316,12 @@ def fy_end_price(series: list[tuple[dt.date, float]], year: int,
     target = dt.date(year, month, 1)
     best: tuple[dt.date, float] | None = None
     for when, close in series:
+        # Yahoo stamps a 1mo bar at the FIRST of the month and fills it with
+        # that month's close, so a December FY-end matches 2024-12-01 and
+        # gets the 31-Dec price. It also appends a part-formed bar for the
+        # month in progress (DUOL ends 2026-09-01 AND 2026-09-04); taking
+        # the first match keeps the completed month's close, which is what
+        # a fiscal year ended on.
         if when.year == year and when.month == month:
             return close
         if when <= target and (best is None or when > best[0]):
