@@ -110,6 +110,10 @@ STRUCTURAL_RISK_KEYWORDS = {
 # no meaningful EV/EBITDA and an LIC has no earnings at all, so grading them
 # against P/E and EV/EBITDA thresholds would produce a confident verdict
 # about arithmetic that was never performed.
+# ORDER IS LOAD-BEARING: owner_fcf is last, so a philosophy that names it
+# only to deny it -- ARG.NZ's "AFFO-capitalization / cost-of-equity model
+# (REIT), NOT a WACC-based owner-FCF DCF" -- resolves to the model it
+# actually is. The specific families are matched first for the same reason.
 MODEL_PATTERNS: list[tuple[str, str]] = [
     ("affo", r"\baffo\b|funds from operations|distributable profit"),
     ("risked_npv", r"risked[- ]?(?:project[- ]?)?npv|pre[- ]revenue|resource ounces"),
@@ -543,7 +547,8 @@ def dcf_model_label(doc: dict[str, object]) -> str:
             haystack.append(value)
     philosophy = doc.get("valuation_philosophy")
     if isinstance(philosophy, dict):
-        for field in ("model", "method", "approach", "methodology"):
+        for field in ("model", "model_type", "method", "approach",
+                      "methodology"):
             value = philosophy.get(field)
             if isinstance(value, str):
                 haystack.append(value)

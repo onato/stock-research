@@ -514,6 +514,29 @@ class TestNonFcfModels:
     def test_model_label_is_read_from_the_dcf(self, label, expected):
         assert sanity_check.dcf_model_label({"valuation_model": label}) == expected
 
+    @pytest.mark.parametrize("key", ["model", "model_type", "method",
+                                     "approach", "methodology"])
+    def test_valuation_philosophy_states_the_model_under_any_of_its_keys(self, key):
+        """ARG.NZ declares its REIT model ONLY in
+        valuation_philosophy.model_type -- "AFFO-capitalization /
+        cost-of-equity model (REIT), NOT a WACC-based owner-FCF DCF" -- and
+        still carries inputs.last_fcf. Scanning only some of the subkeys
+        graded it against P/E and EV/EBITDA thresholds it was never built
+        to satisfy.
+        """
+        doc = {"valuation_philosophy": {key: "AFFO capitalization at cost of equity"},
+               "inputs": {"last_fcf": 58.818}}
+        assert sanity_check.dcf_model_label(doc) == "affo"
+
+    def test_a_philosophy_that_disclaims_owner_fcf_is_not_owner_fcf(self):
+        """The label says what the model IS; a sentence that names owner-FCF
+        only to deny it must not be read as claiming it."""
+        doc = {"valuation_philosophy": {"model_type": (
+            "AFFO-capitalization / cost-of-equity model (REIT), NOT a "
+            "WACC-based owner-FCF DCF")},
+            "inputs": {"last_fcf": 58.818}}
+        assert sanity_check.dcf_model_label(doc) == "affo"
+
     def test_an_unlabelled_dcf_with_last_fcf_is_owner_fcf(self):
         assert sanity_check.dcf_model_label(
             {"inputs": {"last_fcf": 60.0}}) == "owner_fcf"
