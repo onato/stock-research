@@ -586,8 +586,8 @@ def check(repo: pathlib.Path, ticker: str,
     if not dcf_path.exists():
         raise FileNotFoundError(dcf_path)
     doc = _load_json(dcf_path)
-    inputs = doc.get("inputs") if isinstance(doc.get("inputs"), dict) else {}
-    assert isinstance(inputs, dict)
+    raw_inputs = doc.get("inputs")
+    inputs: dict[str, object] = raw_inputs if isinstance(raw_inputs, dict) else {}
 
     reporting = _canon_currency(inputs.get("currency")) or _canon_currency(doc.get("currency"))
     quoted = _canon_currency(inputs.get("quote_currency"))
