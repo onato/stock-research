@@ -174,9 +174,24 @@ def _read_cache(path: pathlib.Path) -> list[tuple[dt.date, float]]:
     return rows
 
 
+def _close(value: float) -> str:
+    """A share price at a precision worth committing.
+
+    Yahoo returns 129.55999755859375; the file is read by humans in diffs
+    and no multiple here is sensitive to the eleventh decimal. But two
+    decimals is not the answer either -- BGI.NZ traded at $0.004 and DOW.NZ
+    at $0.00063, and rounding those to zero would turn every multiple built
+    on them into nonsense. So: six significant figures, trailing zeros
+    trimmed.
+    """
+    if value == 0:
+        return "0"
+    return f"{value:.6g}"
+
+
 def _write_cache(path: pathlib.Path, rows: list[tuple[dt.date, float]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    lines = ["Date,Close"] + [f"{d.isoformat()},{c}" for d, c in rows]
+    lines = ["Date,Close"] + [f"{d.isoformat()},{_close(c)}" for d, c in rows]
     path.write_text("\n".join(lines) + "\n")
 
 

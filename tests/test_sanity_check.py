@@ -141,7 +141,35 @@ class TestPriceCache:
         text = (repo / "research" / "SEK.NZ" / "Reports"
                 / "SEK.NZ_Prices.csv").read_text()
         assert text.startswith("Date,Close")
-        assert "2025-12-01,7.0" in text
+        # 6 significant figures, trailing zeros trimmed -- 7.0 is "7".
+        assert "2025-12-01,7" in text
+        assert sanity_check._read_cache(
+            repo / "research" / "SEK.NZ" / "Reports"
+            / "SEK.NZ_Prices.csv") == [(dt.date(2025, 12, 1), 7.0)]
+
+    def test_the_cache_is_written_at_a_readable_precision(self, repo, monkeypatch):
+        """Yahoo returns 129.55999755859375. The file is committed and read
+        by humans in diffs, and no multiple in this script is sensitive to
+        the eleventh decimal place of a share price."""
+        monkeypatch.setattr(sanity_check.quotes, "monthly", lambda *a, **k: [
+            (dt.date(2025, 12, 1), 129.55999755859375)])
+        sanity_check.price_series(repo, "SEK.NZ")
+        text = (repo / "research" / "SEK.NZ" / "Reports"
+                / "SEK.NZ_Prices.csv").read_text()
+        assert "2025-12-01,129.56" in text
+        assert "129.5599975" not in text
+
+    def test_a_sub_cent_price_keeps_its_significant_digits(self, repo, monkeypatch):
+        """BGI.NZ traded at $0.004 and CBD.NZ lower still. Rounding to two
+        decimals would turn a real price into zero and every multiple
+        derived from it into nonsense."""
+        monkeypatch.setattr(sanity_check.quotes, "monthly", lambda *a, **k: [
+            (dt.date(2025, 12, 1), 0.00063123456)])
+        sanity_check.price_series(repo, "SEK.NZ")
+        text = (repo / "research" / "SEK.NZ" / "Reports"
+                / "SEK.NZ_Prices.csv").read_text()
+        assert "0.00063" in text
+        assert ",0.0\n" not in text
 
     def test_a_failed_refetch_keeps_the_stale_cache(self, repo, monkeypatch):
         """A blank series would compute every multiple as None and report a
