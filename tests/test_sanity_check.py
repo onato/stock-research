@@ -628,8 +628,8 @@ class TestNonFcfModels:
         ("owner-fcf-dcf", "owner_fcf"),
         ("Owner-FCF component DCF on a strict statutory basis", "owner_fcf"),
     ])
-    def test_model_label_is_read_from_the_dcf(self, label, expected):
-        assert sanity_check.dcf_model_label({"valuation_model": label}) == expected
+    def test_model_family_is_read_from_the_dcf(self, label, expected):
+        assert sanity_check.model_family({"valuation_model": label}) == expected
 
     @pytest.mark.parametrize("key", ["model", "model_type", "method",
                                      "approach", "methodology"])
@@ -643,7 +643,7 @@ class TestNonFcfModels:
         """
         doc = {"valuation_philosophy": {key: "AFFO capitalization at cost of equity"},
                "inputs": {"last_fcf": 58.818}}
-        assert sanity_check.dcf_model_label(doc) == "affo"
+        assert sanity_check.model_family(doc) == "affo"
 
     def test_a_philosophy_that_disclaims_owner_fcf_is_not_owner_fcf(self):
         """The label says what the model IS; a sentence that names owner-FCF
@@ -652,14 +652,14 @@ class TestNonFcfModels:
             "AFFO-capitalization / cost-of-equity model (REIT), NOT a "
             "WACC-based owner-FCF DCF")},
             "inputs": {"last_fcf": 58.818}}
-        assert sanity_check.dcf_model_label(doc) == "affo"
+        assert sanity_check.model_family(doc) == "affo"
 
     def test_an_unlabelled_dcf_with_last_fcf_is_owner_fcf(self):
-        assert sanity_check.dcf_model_label(
+        assert sanity_check.model_family(
             {"inputs": {"last_fcf": 60.0}}) == "owner_fcf"
 
     def test_an_unlabelled_dcf_without_last_fcf_is_unknown(self):
-        assert sanity_check.dcf_model_label({"inputs": {}}) == "unknown"
+        assert sanity_check.model_family({"inputs": {}}) == "unknown"
 
     def test_a_replaced_model_gets_a_null_verdict_and_a_note(self, repo):
         make_db(repo, "ARG.NZ")

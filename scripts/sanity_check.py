@@ -565,8 +565,12 @@ def diagnose(inputs: dict[str, object], fcf_history: list[float],
 # Model routing
 # --------------------------------------------------------------------------
 
-def dcf_model_label(doc: dict[str, object]) -> str:
-    """Which valuation family this DCF used.
+def model_family(doc: dict[str, object]) -> str:
+    """Which of the six valuation families in dcf-methods this DCF used.
+
+    Returns a family key ("affo", "nav", "owner_fcf", ...), NOT the label
+    text -- `sectors.dcf_model_label` on main answers the other question,
+    joining every spelling for template routing.
 
     The corpus states it in five different fields and thirty-odd spellings,
     so it is keyword-matched, never compared for equality. An unlabelled
@@ -652,7 +656,7 @@ def check(repo: pathlib.Path, ticker: str,
     table = historical_table(rows, series, month, convert)
     hist = averages(table)
 
-    model = dcf_model_label(doc)
+    model = model_family(doc)
     base = doc.get("valuation")
     base_case = base.get("base") if isinstance(base, dict) else None
     intrinsic = _num(base_case.get("intrinsic_value")) if isinstance(base_case, dict) else None
