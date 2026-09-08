@@ -163,6 +163,24 @@ def _last_export_sha(db: pathlib.Path) -> str | None:
         con.close()
 
 
+def _nulled_by_correction(db: pathlib.Path) -> set[tuple[str, str]]:
+    """(period, core column) pairs a recorded correction set to NULL --
+    a deliberate blank, not a cell the export would lose."""
+    import duckdb
+    con = duckdb.connect(str(db), read_only=True)
+    try:
+        tables = {r[0] for r in con.execute(
+            "SELECT table_name FROM information_schema.tables").fetchall()}
+        if "corrections" not in tables:
+            return set()
+        rows = con.execute(
+            "SELECT period, col FROM corrections"
+            " WHERE target = 'core_metrics' AND new_value IS NULL").fetchall()
+    finally:
+        con.close()
+    return {(str(p), str(c)) for p, c in rows}
+
+
 def _explained(db: pathlib.Path,
                differing: list[tuple[str, str, float, float]]
                ) -> list[tuple[str, str, float, float]]:
@@ -369,6 +387,9 @@ def main() -> int:
     # that the CSV is stale.
     if out.exists() and not force:
         lost_periods, lost_cells = _would_lose(out, rows)
+        nulled = _nulled_by_correction(db)
+        col_of = dict(zip(schema.CSV_HEADERS, schema.CORE_NAMES, strict=True))
+        lost_cells = [(p, h) for p, h in lost_cells if (p, col_of.get(h, "")) not in nulled]
         if lost_periods:
             print(f"REFUSING to overwrite {out.name}: it has "
                   f"{len(rows) + len(lost_periods)} periods but core_metrics "

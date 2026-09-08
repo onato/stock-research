@@ -604,3 +604,25 @@ class TestCorrectionsExplainDisagreements:
                              source="40F:1701", actor="t")
         con.close()
         assert run_main(monkeypatch, "SYN") == 1       # FY2023 999 vs 100 unexplained
+
+
+class TestNulledByCorrectionIsNotALoss:
+    def test_cell_nulled_through_fix_metric_exports(self, make_ticker, monkeypatch):
+        """SMI.NZ: two as-printed EPS cells were nulled via fix_metric because
+        no restated share count exists to derive from; the anti-blank guard
+        must not read a recorded null as data loss."""
+        d = make_ticker("SYN")
+        repo = d.parent.parent
+        make_db(repo, "SYN", ["FY2015"])
+        db_set(repo, "SYN", "FY2015", "eps", -152.133)
+        out = d / "Reports" / "SYN_Metrics.csv"
+        out.write_text("Period,Revenue,EPS\nFY2015,100,-152.133\n")
+        import fix_metric
+        con = duckdb.connect(str(repo / "research/SYN/Reports/SYN.duckdb"))
+        fix_metric.apply_ops(con, [fix_metric.Null(["eps"], ["FY2015"])],
+                             source="cents, un-restated", actor="t")
+        con.close()
+        assert run_main(monkeypatch, "SYN") == 0
+        with open(out, newline="") as fh:
+            rows = list(csv.DictReader(fh))
+        assert rows[0]["EPS"] == ""
