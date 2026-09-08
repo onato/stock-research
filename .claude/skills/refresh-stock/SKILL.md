@@ -108,6 +108,17 @@ the `dcf-analyst` agent (`.claude/agents/dcf-analyst.md`,
 `run_in_background: false`) to rebuild the valuation from the **existing**
 CSV plus the refreshed analysis.
 
+After a rebuild under path (b), run the deterministic sanity check and record it:
+
+```bash
+uv run python3 scripts/sanity_check.py $ARGUMENTS --apply
+```
+
+Exit 3 means a trip rule fired: spawn the `dcf-analyst` **once more** with the
+printed trip reasons and diagnosis candidates and the instruction to adjust the
+drivers, rebuild, record `fix_applied` and `implied_multiples_after_fix`, and stop.
+Do not compute multiples by hand.
+
 State plainly which path you took and why. "Assumptions unchanged" is a
 finding, not a shortcut — but it must be a conclusion you actually reached,
 not a default. If you are unsure, take path (b): a re-run DCF is far cheaper
@@ -116,23 +127,23 @@ than a wrong valuation.
 ## Step 4: Regenerate the dashboard
 
 Only if the CSV, Analysis or DCF changed. The dashboard embeds all three, so
-a changed input means a stale dashboard.
+a changed input means a stale dashboard. If only `valuation_date` and price
+numbers moved under path (a), `refresh_price.py` already updated the
+dashboard's embedded copy and nothing more is needed.
 
-Spawn `dashboard-generator` (`.claude/agents/dashboard-generator.md`), or —
-if only `valuation_date` and price numbers moved under path (a) — note that
-`refresh_price.py` already updated the dashboard's embedded copy and no
-regeneration is needed.
-
-**Verify before declaring done** (this agent has shipped broken JS before):
+Otherwise render it from the Spec — no model:
 
 ```bash
-node --check <(python3 - <<'PY'
-import re,sys
-h=open("research/$ARGUMENTS/Reports/${ARGUMENTS}_Dashboard.html").read()
-print("\n".join(re.findall(r"<script[^>]*>(.*?)</script>", h, re.S)))
-PY
-)
+test -f research/$ARGUMENTS/Reports/${ARGUMENTS}_DashboardSpec.json || make dashboard-spec TICKER=$ARGUMENTS
+make dashboard TICKER=$ARGUMENTS
+python3 scripts/kpi_coverage.py $ARGUMENTS
 ```
+
+`make dashboard` prints the byte count, the anchored IVs and a `slider engine:`
+line; `FALLBACK` there is a DCF-assumptions gap, not a dashboard error. Spawn
+`dashboard-generator` (`.claude/agents/dashboard-generator.md`) only when
+`kpi_coverage.py` lists `unmapped` or `promoted` KPIs the Spec does not chart; it
+edits the existing Spec and re-runs `make dashboard`. Never hand-edit the HTML.
 
 ## Step 5: Canonical IV + index
 
