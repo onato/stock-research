@@ -3,9 +3,12 @@ name: research-stock
 description: Downloads financial reports from company IR website, extracts data, and creates a CSV-backed HTML dashboard for stock research
 allowed-tools: Bash, Read, Write, Edit, WebFetch, WebSearch, Glob, Grep, Task
 argument-hint: "[TICKER]"
-# Orchestration is mkdir/ls/spawn work; Fable here cost $3.89 of a $13 TPW.AX run.
-# Matches BATCH_MODEL in scripts/lib.sh; valuation stays on fable via dcf-analyst.md.
-model: claude-opus-5
+# Orchestration is mkdir/ls/spawn work; Fable here cost $3.89 of a $13 TPW.AX run, and
+# once Step 8c became scripts/sanity_check.py the only judgment left is which fix to
+# ask for. Sonnet passed the exit gate on EBO.NZ (2026-09-08: eval 1.0, 19 turns,
+# $0.73 vs $0.98 on opus). Matches BATCH_MODEL in scripts/lib.sh; valuation stays on
+# fable via dcf-analyst.md.
+model: claude-sonnet-5
 ---
 
 # Stock Research Workflow
