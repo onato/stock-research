@@ -31,7 +31,17 @@ Example:
    aliases live in `scripts/schema.py`.
 6. `python3 scripts/export_csv.py {TICKER}` derives `{TICKER}_Metrics.csv` from
    `core_metrics`. **Never hand-write the CSV** — the script applies the snake_case →
-   CamelCase header mapping and refuses to shrink an existing CSV.
+   CamelCase header mapping, refuses to shrink an existing CSV, and refuses to
+   overwrite a CSV whose populated cells disagree with the DB unless the DB value
+   came from a recorded correction (DCBO's FY2022 row was fixed in the CSV on
+   2026-08-19 and clobbered by the next export). `--check` only reports.
+7. **Hand corrections go through `make fix`**, never into the CSV or an ad-hoc
+   `UPDATE`: `make fix TICKER=X ARGS='--period FY2022 --set revenue=142.912'
+   SOURCE='X_Annual_FY2022.txt:1701' APPLY=1` (also `--scale`, `--derive`, `--null`,
+   `--move col->kpis:Name`, `--kpi Name=value --unit U`, `--kpi-unit Name=U`). It
+   writes `core_metrics`, records old/new/source in the `corrections` table and the
+   committed `{TICKER}_Corrections.jsonl` (replayed by `load_existing.py` when a
+   gitignored DB is rebuilt), then re-exports and runs the eval. Dry run by default.
 
 The `.duckdb` files are gitignored: they are local, rebuildable caches. The committed
 system of record is the CSV/JSON in `Reports/`. `scripts/load_existing.py` is the one
@@ -69,11 +79,19 @@ screening table. Three rules the derivations exist to enforce:
   `FY(Y-1) + H1(Y) − H1(Y-1)`, not a sum of four quarters. Where no true TTM is
   available the row falls back to the latest FY and is tagged `FY-BASIS`, excluded
   from PASS unless `--allow-fy-basis`.
-- **Never use the `eps` column for anything cross-ticker.** 13 tickers store EPS in
-  cents (WISE.L, ANZ.NZ, AIA.NZ, ATM.NZ, EBO.NZ, SPK.NZ, ARG.NZ, AFI.NZ, OCA.NZ,
-  SDL.NZ, 9999.HK, MELI) and 5 have a shares-scale bug (AFT.NZ, APL.NZ, DCBO, XPEL,
-  FIG). `metrics_normalized` deliberately leaves per-share figures unscaled. Derive
-  EPS as `ttm_net_income / shares_outstanding` instead.
+- **Prefer `ttm_net_income / shares_outstanding` over the `eps` column cross-ticker.**
+  EPS is in major units on every ticker since 2026-09-08 (ten cents-printers were
+  rescaled through `make fix`; SMI.NZ is derived on the restated share basis) and
+  the `eps_share_scale` eval fails a column that is wrong on every period, but four
+  tickers still carry a shares-scale bug (AFT.NZ, APL.NZ, XPEL, FIG) and
+  `metrics_normalized` deliberately leaves per-share figures unscaled.
+- **CapEx sign is positive = outflow** for new extractions; older tickers store the
+  cash-flow negative. Consumers use `capex_abs` from `metrics_normalized`, never the
+  raw sign, and the `capex_sign` eval warns on a ticker that mixes both.
+- **Chronology comes from the parsed period columns**, not the label: `core_metrics`
+  and `metrics_normalized` carry `period_type`, `fiscal_year`, `months` (filled by
+  `schema.backfill_period_columns`, delegating to `periods.py`). `ORDER BY period` is
+  lexical (`9M 2021` < `FY2021` < `Q1 2021`).
 - **A price must be denominated like the financials it divides.** WISE.L quotes GBP
   pence against USD filings, and `885.6 / 48.43` yields a plausible P/E of 18.3 that
   is pure coincidence. Such rows are refused with `price-currency-mismatch`.
