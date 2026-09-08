@@ -441,3 +441,116 @@ class TestKpiPromotion:
         first = out.read_text()
         assert run_main(monkeypatch, "SYN") == 0
         assert out.read_text() == first
+
+
+def db_set(repo, ticker, period, col, value):
+    db = repo / "research" / ticker / "Reports" / f"{ticker}.duckdb"
+    con = duckdb.connect(str(db))
+    con.execute(f"UPDATE core_metrics SET {col} = ? WHERE period = ?", [value, period])
+    con.close()
+
+
+def db_query(repo, ticker, sql):
+    db = repo / "research" / ticker / "Reports" / f"{ticker}.duckdb"
+    con = duckdb.connect(str(db), read_only=True)
+    rows = con.execute(sql).fetchall()
+    con.close()
+    return rows
+
+
+def csv_revenue(out):
+    with open(out, newline="") as fh:
+        return {r["Period"]: r["Revenue"] for r in csv.DictReader(fh)}
+
+
+class TestHandEditGuard:
+    """DCBO's FY2022 row was corrected by hand in the CSV (197bbd9a) and
+    clobbered by the next export from a DB that still held the old values.
+    A populated CSV cell that disagrees with a populated DB cell means one
+    of two things: the CSV was edited by hand (the edit belongs in the DB,
+    via fix_metric.py) or the DB moved on legitimately. The export_log
+    tells them apart: if the CSV still matches what the last export wrote,
+    the DB is newer and the export proceeds."""
+
+    def test_disagreeing_cell_with_no_export_history_refuses(
+            self, make_ticker, monkeypatch, capsys):
+        d = make_ticker("SYN")
+        make_db(d.parent.parent, "SYN", ["FY2024"])
+        out = d / "Reports" / "SYN_Metrics.csv"
+        out.write_text("Period,Revenue\nFY2024,142.912\n")
+        assert run_main(monkeypatch, "SYN") == 1
+        err = capsys.readouterr().err
+        assert "FY2024" in err
+        assert "Revenue" in err
+        assert "make fix" in err
+        assert "--force" in err
+        assert csv_revenue(out) == {"FY2024": "142.912"}     # untouched
+
+    def test_force_lets_the_db_win(self, make_ticker, monkeypatch):
+        d = make_ticker("SYN")
+        make_db(d.parent.parent, "SYN", ["FY2024"])
+        out = d / "Reports" / "SYN_Metrics.csv"
+        out.write_text("Period,Revenue\nFY2024,142.912\n")
+        assert run_main(monkeypatch, "SYN", "--force") == 0
+        assert csv_revenue(out) == {"FY2024": "100.0"}
+
+    def test_db_newer_than_an_unedited_csv_exports_without_force(
+            self, make_ticker, monkeypatch, capsys):
+        d = make_ticker("SYN")
+        repo = d.parent.parent
+        make_db(repo, "SYN", ["FY2024"])
+        out = d / "Reports" / "SYN_Metrics.csv"
+        assert run_main(monkeypatch, "SYN") == 0          # first export: log written
+        db_set(repo, "SYN", "FY2024", "revenue", 120.0)  # a legitimate DB update
+        assert run_main(monkeypatch, "SYN") == 0
+        assert csv_revenue(out) == {"FY2024": "120.0"}
+        assert "1 cell(s) updated from the DB" in capsys.readouterr().out
+
+    def test_csv_edited_after_the_last_export_refuses(
+            self, make_ticker, monkeypatch, capsys):
+        d = make_ticker("SYN")
+        repo = d.parent.parent
+        make_db(repo, "SYN", ["FY2024"])
+        out = d / "Reports" / "SYN_Metrics.csv"
+        assert run_main(monkeypatch, "SYN") == 0
+        text = out.read_text().replace("100.0", "142.912")     # the hand edit
+        out.write_text(text)
+        assert run_main(monkeypatch, "SYN") == 1
+        assert "edited by hand" in capsys.readouterr().err
+        assert csv_revenue(out) == {"FY2024": "142.912"}
+
+    def test_export_records_itself_and_backfills_period_columns(
+            self, make_ticker, monkeypatch):
+        d = make_ticker("SYN")
+        repo = d.parent.parent
+        make_db(repo, "SYN", ["FY2024", "H1 FY2025"])
+        assert run_main(monkeypatch, "SYN") == 0
+        assert db_query(repo, "SYN", "SELECT periods FROM export_log") == [(2,)]
+        assert db_query(repo, "SYN",
+                        "SELECT period, period_type, fiscal_year FROM core_metrics"
+                        " ORDER BY fiscal_year, period_type") == [
+            ("FY2024", "FY", 2024), ("H1 FY2025", "H1", 2025)]
+
+    def test_check_reports_disagreements_and_writes_nothing(
+            self, make_ticker, monkeypatch, capsys):
+        d = make_ticker("SYN")
+        make_db(d.parent.parent, "SYN", ["FY2024"])
+        out = d / "Reports" / "SYN_Metrics.csv"
+        out.write_text("Period,Revenue\nFY2024,142.912\n")
+        assert run_main(monkeypatch, "SYN", "--check") == 1
+        assert "FY2024 Revenue" in capsys.readouterr().out
+        assert csv_revenue(out) == {"FY2024": "142.912"}
+        out.write_text("Period,Revenue\nFY2024,100\n")
+        assert run_main(monkeypatch, "SYN", "--check") == 0
+
+    def test_disagreements_are_relative_and_ignore_blanks(self, tmp_path):
+        out = tmp_path / "x.csv"
+        out.write_text("Period,Revenue,NetIncome,EPS\nFY2024,100.4,,0.5\n")
+        idx = {n: i for i, n in enumerate(schema.CORE_NAMES)}
+        row = [None] * len(schema.CORE_NAMES)
+        row[idx["period"]], row[idx["revenue"]], row[idx["net_income"]] = "FY2024", 100.0, 7.0
+        row[idx["eps"]] = 0.5
+        assert export_csv._disagreements(out, [tuple(row)]) == []      # 0.4% and blanks
+        row[idx["eps"]] = 0.51                                          # 2%
+        assert export_csv._disagreements(out, [tuple(row)]) == [
+            ("FY2024", "EPS", 0.5, 0.51)]

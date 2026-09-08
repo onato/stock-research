@@ -21,10 +21,21 @@ dashboard chart can only name a CSV header. Promotion is a one-way ratchet
 from the cache into the system of record: it only ever ADDS. A carried value
 always wins over a table value, so nothing already committed can be blanked.
 
-Usage: export_csv.py TICKER [--force]
+A populated CSV cell that disagrees with a populated DB cell means one of
+two things: the CSV was edited by hand (DCBO's FY2022 row, corrected in the
+CSV and then clobbered by the next export from a DB that still held the old
+values) or the DB moved on legitimately. The `export_log` table records
+what each export wrote, so the two can be told apart: a CSV that still
+matches the last export is unedited and the DB is newer -- export; a CSV
+that differs was edited by hand -- refuse, and point at fix_metric.py,
+which puts the edit where it belongs. `--check` only reports.
+
+Usage: export_csv.py TICKER [--force] [--check]
 """
 
 import csv
+import datetime as dt
+import hashlib
 import pathlib
 import sys
 
@@ -89,6 +100,82 @@ def _would_lose(out: pathlib.Path,
             if target[schema.CORE_NAMES.index(col)] is None:
                 lost_cells.append((period, header))
     return lost_periods, lost_cells
+
+
+DISAGREE_TOL = 0.01
+
+
+def _disagreements(out: pathlib.Path, rows: list[tuple[object, ...]]
+                   ) -> list[tuple[str, str, float, float]]:
+    """Populated core cells where the CSV and the DB disagree by >1%.
+
+    Returns (period, csv header, csv value, db value). Blanks on either
+    side are not disagreements -- _would_lose owns the blank-vs-value case.
+    """
+    try:
+        with open(out, newline="", errors="replace") as fh:
+            existing = list(csv.DictReader(fh))
+    except OSError:
+        return []
+    idx = schema.CORE_NAMES.index("period")
+    exported = {str(r[idx]): r for r in rows}
+    header_to_col = dict(zip(schema.CSV_HEADERS, schema.CORE_NAMES, strict=True))
+    out_cells: list[tuple[str, str, float, float]] = []
+    for row in existing:
+        period = str(row.get("Period") or "")
+        target = exported.get(period)
+        if target is None:
+            continue
+        for header, value in row.items():
+            col = header_to_col.get(header)
+            if col is None or col in ("period", "units", "currency"):
+                continue
+            if not (value or "").strip():
+                continue
+            try:
+                cv = float(str(value).replace(",", ""))
+            except ValueError:
+                continue
+            dv = target[schema.CORE_NAMES.index(col)]
+            if not isinstance(dv, (int, float)):
+                continue
+            if abs(cv - dv) > DISAGREE_TOL * max(abs(cv), abs(dv), 1e-9):
+                out_cells.append((period, header, cv, float(dv)))
+    return out_cells
+
+
+def _sha(path: pathlib.Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _last_export_sha(db: pathlib.Path) -> str | None:
+    import duckdb
+    con = duckdb.connect(str(db), read_only=True)
+    try:
+        tables = {r[0] for r in con.execute(
+            "SELECT table_name FROM information_schema.tables").fetchall()}
+        if "export_log" not in tables:
+            return None
+        row = con.execute(
+            "SELECT sha256 FROM export_log ORDER BY ts DESC LIMIT 1").fetchone()
+        return None if row is None else str(row[0])
+    finally:
+        con.close()
+
+
+def _log_export(db: pathlib.Path, out: pathlib.Path, periods: int) -> None:
+    """Record what was written, and fill the derived period columns while a
+    write connection is open anyway."""
+    import duckdb
+    con = duckdb.connect(str(db))
+    try:
+        schema.ensure_schema(con)
+        schema.backfill_period_columns(con)
+        con.execute("INSERT INTO export_log (ts, sha256, periods) VALUES (?, ?, ?)",
+                    [dt.datetime.now(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                     _sha(out), periods])
+    finally:
+        con.close()
 
 
 def carry_columns(out: pathlib.Path, periods: list[str]
@@ -184,10 +271,11 @@ def promoted_columns(db: pathlib.Path, row_periods: list[str]
 
 def main() -> int:
     if len(sys.argv) < 2:
-        print("usage: export_csv.py TICKER [--force]", file=sys.stderr)
+        print("usage: export_csv.py TICKER [--force] [--check]", file=sys.stderr)
         return 2
     ticker = sys.argv[1]
     force = "--force" in sys.argv
+    check = "--check" in sys.argv
 
     db = REPO / "research" / ticker / "Reports" / f"{ticker}.duckdb"
     out = REPO / "research" / ticker / "Reports" / f"{ticker}_Metrics.csv"
@@ -207,6 +295,33 @@ def main() -> int:
 
     idx = schema.CORE_NAMES.index("period")
     rows.sort(key=lambda r: sort_key(r[idx]))
+
+    differing = _disagreements(out, rows) if out.exists() else []
+    if check:
+        for period, header, cv, dv in differing:
+            print(f"  {ticker} {period} {header}: csv={cv:g} db={dv:g}")
+        print(f"{ticker}: {len(differing)} cell(s) disagree between CSV and DB")
+        return 1 if differing else 0
+
+    if differing and not force:
+        # Told apart by the export log: a CSV that still matches what the
+        # last export wrote was not edited by hand, so the DB is newer.
+        last = _last_export_sha(db)
+        edited = last is None or last != _sha(out)
+        if edited:
+            shown = ", ".join(f"{p} {h} (csv {cv:g} vs db {dv:g})"
+                              for p, h, cv, dv in differing[:5])
+            why = ("was edited by hand since the last export" if last
+                   else "has no export history, so its edits cannot be trusted to the DB")
+            print(f"REFUSING to overwrite {out.name}: {len(differing)} populated "
+                  f"cell(s) disagree with core_metrics and the CSV {why}.",
+                  file=sys.stderr)
+            print(f"  {shown}", file=sys.stderr)
+            print("  If the CSV values are the corrections, put them in the DB: "
+                  "`make fix TICKER=... ARGS='--period P --set col=value' "
+                  "SOURCE='file:line' APPLY=1`.", file=sys.stderr)
+            print("  If the DB is right, re-run with --force.", file=sys.stderr)
+            return 1
 
     # Refuse to shrink an existing CSV. WISE.L's agent wrote 18 periods
     # (H1 + FY) to the CSV but only 5 annual ones to core_metrics; running
@@ -265,9 +380,13 @@ def main() -> int:
                 values += [held.get(h) or gained.get(h, "") for h in extra]
             w.writerow(values)
 
+    _log_export(db, out, len(rows))
+
     note = f", {len(extra)} carried" if extra else ""
     if promoted_names:
         note += f", {len(promoted_names)} promoted from kpis"
+    if differing:
+        note += f", {len(differing)} cell(s) updated from the DB"
     print(f"{ticker}: {len(rows)} periods -> {out.name} "
           f"({len(schema.CSV_HEADERS)} columns{note})")
     return 0
