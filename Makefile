@@ -269,6 +269,9 @@ screen-ethics: ## Flag queued tickers on the six ethical exclusions (APPLY=1 to 
 screen-ethics-report: ## Summary of recorded ethical flags
 	@$(PY) $(SCRIPTS)/screen_ethics.py --report
 
+fix: ## Hand-correct a metric DB-first with provenance (TICKER= ARGS='--period FY2022 --set revenue=1' SOURCE='file:line' APPLY=1)
+	$(PY) $(SCRIPTS)/fix_metric.py $(TICKER) $(ARGS) --source "$(SOURCE)" $(if $(APPLY),--apply,)
+
 backfill-units: ## Infer missing core_metrics.units from DCF anchors (APPLY=1 to write)
 	$(PY) $(SCRIPTS)/backfill_units.py $(if $(APPLY),--apply,) $(if $(TICKER),--ticker $(TICKER),)
 

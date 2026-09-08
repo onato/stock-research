@@ -487,9 +487,10 @@ CREATE TABLE IF NOT EXISTS corrections (
   col       TEXT,
   old_value DOUBLE,
   new_value DOUBLE,
+  unit      TEXT,     -- for kpi rows: the unit written with the value
   source    TEXT,     -- filing file:line, or a stated basis
   actor     TEXT,
-  op        TEXT      -- set / scale / derive / move / null / kpi
+  op        TEXT      -- set / scale / derive / null / move / kpi / kpi_unit
 );
 
 -- What export_csv.py last wrote, so it can tell a CSV that was edited by
