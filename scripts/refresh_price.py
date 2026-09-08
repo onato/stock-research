@@ -48,7 +48,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 
-from prune_queue import quote
+import quotes
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
@@ -509,15 +509,30 @@ def refresh(repo: pathlib.Path | str, ticker: str, price: float | None,
     return res
 
 
+def quote(ticker: str) -> tuple[float | None, str]:
+    """(price, currency) for a ticker, or (None, reason).
+
+    Routes through `info.json:price_symbol` (scripts/quotes.py). It did not
+    before, and that is a wrong number rather than a missing one: BGI.NZ was
+    renamed RTO.NZ in May 2024, so Yahoo serves BGI.NZ frozen at its last
+    trade of $0.004 while RTO.NZ trades at $0.119. A --all sweep wrote the
+    corpse's price back into the DCF and called it live.
+
+    Every fetch failure collapses to (None, reason) and never writes. The
+    404-vs-429 distinction prune_queue needs -- it comments tickers OUT of
+    the queue on that evidence -- is not needed here, because both outcomes
+    are the same outcome: leave the stored price alone.
+    """
+    symbol = quotes.price_symbol(REPO / "research", ticker)
+    q = quotes.live(symbol)
+    if q is None:
+        return None, f"fetch failed for {symbol}"
+    return q.price, q.currency or "?"
+
+
 def refresh_ticker(repo: pathlib.Path | str, ticker: str, *,
                    apply: bool = False) -> Result:
-    """Fetch a live quote and refresh, refusing to write on any fetch failure.
-
-    Uses prune_queue.quote, which distinguishes a 404 (real evidence about the
-    symbol) from a 429/5xx/network error (evidence about nothing). screen.py's
-    fetcher collapses every failure to None, which under write-back would make
-    a rate-limit blip indistinguishable from a genuine quote.
-    """
+    """Fetch a live quote and refresh, refusing to write on any fetch failure."""
     price, info = quote(ticker)
     if price is None:
         return Result(ticker=ticker, reason=f"no quote: {info}")

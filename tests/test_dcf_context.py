@@ -90,3 +90,33 @@ class TestMemoryLine:
             "- [Temple (TPW.AX)](tpw.md) — Jun-30 FY; owner-FCF\n")
         assert dcf_context.memory_line("TPW.AX", tmp_path) == "- [Temple (TPW.AX)](tpw.md) — Jun-30 FY; owner-FCF"
         assert dcf_context.memory_line("XYZ.AX", tmp_path) is None
+
+
+class TestQuotesDelegation:
+    """The Yahoo client is scripts/quotes.py, not a fourth private copy.
+
+    dcf_context printed the price for the DCF agent while refresh_price
+    wrote it back, and only one of them applied the info.json price_symbol
+    redirect. Sharing the client is what keeps them agreeing.
+    """
+
+    def test_fetch_price_goes_through_quotes(self, monkeypatch):
+        import quotes
+
+        seen = []
+
+        def fake_live(symbol):
+            seen.append(symbol)
+            return quotes.Quote(4.82, "AUD", "2026-08-24T00:00:00Z",
+                                "CLOSED", 25.61, 4.07)
+
+        monkeypatch.setattr(quotes, "live", fake_live)
+        p = dcf_context.fetch_price("TPW.AX")
+        assert seen == ["TPW.AX"]
+        assert (p.price, p.currency, p.state, p.low_52w) == (4.82, "AUD", "CLOSED", 4.07)
+
+    def test_fetch_failure_stays_none(self, monkeypatch):
+        import quotes
+
+        monkeypatch.setattr(quotes, "live", lambda s: None)
+        assert dcf_context.fetch_price("NOPE.XX") is None

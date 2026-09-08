@@ -21,10 +21,10 @@ import json
 import pathlib
 import re
 import sys
-import urllib.request
 from dataclasses import dataclass
 
 import periods
+import quotes
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 MEMORY_DIR = pathlib.Path.home() / ".claude" / "projects" / "-Users-swilliams-Stocks-Research" / "memory"
@@ -125,6 +125,8 @@ def render_history(rows: list[dict[str, object]], cols: list[str]) -> str:
 
 
 def parse_price(payload: str) -> Price | None:
+    """Kept as a pure parser so the payload shape stays under test here;
+    the fetching itself belongs to scripts/quotes.py."""
     try:
         m = json.loads(payload)["chart"]["result"][0]["meta"]
         ts = dt.datetime.fromtimestamp(int(m["regularMarketTime"]), dt.UTC)
@@ -136,13 +138,15 @@ def parse_price(payload: str) -> Price | None:
 
 
 def fetch_price(symbol: str) -> Price | None:
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=1d&interval=1d"
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=20) as r:
-            return parse_price(r.read().decode())
-    except OSError:
+    """One Yahoo client for the repo (scripts/quotes.py). The private copy
+    that used to live here disagreed with refresh_price about the
+    price_symbol redirect, which is how a renamed ticker got quoted against
+    its own corpse."""
+    q = quotes.live(symbol)
+    if q is None:
         return None
+    return Price(q.price, str(q.currency), str(q.as_of), str(q.market_state),
+                 q.high_52w, q.low_52w)
 
 
 def memory_line(ticker: str, memory_dir: pathlib.Path = MEMORY_DIR) -> str | None:

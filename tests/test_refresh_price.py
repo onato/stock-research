@@ -606,3 +606,62 @@ class TestEveryPriceFieldMoves:
         assert "valuation_context.current_price" in changed
         assert doc["sanity_check"]["fy_table"]["2016"]["price"] == 32.74   # history untouched
         assert doc["sanity_check"]["current_price"] == 17.52               # history block untouched
+
+
+class TestPriceSymbolRedirect:
+    """`info.json:price_symbol` must reach the quote, or a renamed ticker
+    refreshes against its own corpse.
+
+    BGI.NZ was renamed RTO.NZ on 1-May-2024. Yahoo still serves BGI.NZ,
+    frozen at the last trade of $0.004, while RTO.NZ trades at $0.119. Every
+    other quote site in the repo applied the redirect; this one did not, so
+    a --all sweep wrote the dead price back into the DCF as live.
+    """
+
+    def _bgi(self, tmp_path, price_symbol=None):
+        reports = tmp_path / "research" / "BGI.NZ" / "Reports"
+        reports.mkdir(parents=True)
+        (reports / "BGI.NZ_DCF.json").write_text(json.dumps(dcf_doc(), indent=2))
+        if price_symbol is not None:
+            (tmp_path / "research" / "BGI.NZ" / "info.json").write_text(
+                json.dumps({"price_symbol": price_symbol}))
+        return tmp_path
+
+    def _stub(self, monkeypatch, seen, result):
+        import quotes
+
+        def fake_live(symbol):
+            seen.append(symbol)
+            return result
+
+        monkeypatch.setattr(quotes, "live", fake_live)
+
+    def test_redirected_symbol_is_the_one_quoted(self, tmp_path, monkeypatch):
+        import quotes
+
+        repo = self._bgi(tmp_path, "RTO.NZ")
+        seen = []
+        self._stub(monkeypatch, seen, quotes.Quote(0.119, "USD", None))
+        monkeypatch.setattr(refresh_price, "REPO", repo)
+        result = refresh_price.refresh_ticker(repo, "BGI.NZ", apply=True)
+        assert seen == ["RTO.NZ"]
+        assert result.current_price == 0.119
+
+    def test_without_a_redirect_the_ticker_is_quoted(self, tmp_path, monkeypatch):
+        import quotes
+
+        repo = self._bgi(tmp_path)
+        seen = []
+        self._stub(monkeypatch, seen, quotes.Quote(0.004, "USD", None))
+        monkeypatch.setattr(refresh_price, "REPO", repo)
+        refresh_price.refresh_ticker(repo, "BGI.NZ", apply=True)
+        assert seen == ["BGI.NZ"]
+
+    def test_a_failed_quote_still_reports_a_reason(self, tmp_path, monkeypatch):
+        repo = self._bgi(tmp_path, "RTO.NZ")
+        seen = []
+        self._stub(monkeypatch, seen, None)
+        monkeypatch.setattr(refresh_price, "REPO", repo)
+        result = refresh_price.refresh_ticker(repo, "BGI.NZ", apply=True)
+        assert not result.ok
+        assert "no quote" in result.reason
