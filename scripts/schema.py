@@ -189,6 +189,7 @@ PROMOTE_KPIS: dict[str, str] = {
     "ChurnRate": "ChurnRate",
     # Property / financial sector staples
     "AFFO": "AFFO",
+    "AISC": "AISC",                       # gold miners: all-in sustaining cost per oz
     "AFFOPerShare": "AFFOPerShare",
     "NAVPerShare": "NAVPerShare",
     "NTAPerShare": "NTAPerShare",

@@ -309,3 +309,10 @@ class TestProvenanceTables:
             " WHERE table_name = 'corrections'").fetchall()}
         assert {"ts", "target", "period", "col", "old_value", "new_value",
                 "source", "actor", "op"} <= cols
+
+
+class TestPromotedMinerKpis:
+    def test_aisc_is_promotable(self):
+        """All-in sustaining cost is the gold miner's comparability anchor;
+        SMI.NZ's PFS figure was stored in kpis and never reached the CSV."""
+        assert schema.promote_header("AISC") == "AISC"

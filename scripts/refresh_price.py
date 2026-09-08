@@ -237,15 +237,26 @@ def apply_price(doc: dict, price: float) -> list[str]:
 
     # FLOW.AS carried four current prices after an agent rebuild changed the
     # root alone: every price-shaped field the file has must follow.
-    for block, keys in (("market_data", ("price", "current_price")),
-                        ("price_refresh", ("current_price",))):
-        node = doc.get(block)
-        if not isinstance(node, dict):
-            continue
-        for key in keys:
-            if isinstance(node.get(key), (int, float)) and node[key] != price:
-                node[key] = price
-                changed.append(f"{block}.{key}")
+    node = doc.get("market_data")
+    if isinstance(node, dict) and isinstance(node.get("price"), (int, float)) \
+            and node["price"] != price:
+        node["price"] = price
+        changed.append("market_data.price")
+
+    def walk(obj: dict, path: str) -> None:
+        for key, val in obj.items():
+            here = f"{path}.{key}" if path else key
+            # sanity_check is the FY-end price history; never a current price.
+            if key == "sanity_check" or key.isdigit():
+                continue
+            if isinstance(val, dict):
+                walk(val, here)
+            elif (path and key == "current_price"
+                    and isinstance(val, (int, float)) and val != price):
+                obj[key] = price
+                changed.append(here)
+
+    walk(doc, "")
 
     thesis = doc.get("investment_thesis")
     if isinstance(thesis, dict):

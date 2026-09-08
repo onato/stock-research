@@ -594,3 +594,15 @@ class TestEveryPriceFieldMoves:
         assert "market_data" not in doc
         assert "price_refresh" not in doc
         assert "upside_from_current_pct" not in doc["probability_weighted"]
+
+    def test_any_nested_current_price_outside_history_follows(self):
+        """FLOW.AS: valuation_context.current_price still said 26.48 after
+        two refreshes because only named blocks were rewritten."""
+        doc = dcf_doc(valuation_context={"current_price": 17.52, "commentary": "x"},
+                      sanity_check={"fy_table": {"2016": {"price": 32.74}},
+                                    "current_price": 17.52})
+        changed = refresh_price.apply_price(doc, 20.0)
+        assert doc["valuation_context"]["current_price"] == 20.0
+        assert "valuation_context.current_price" in changed
+        assert doc["sanity_check"]["fy_table"]["2016"]["price"] == 32.74   # history untouched
+        assert doc["sanity_check"]["current_price"] == 17.52               # history block untouched

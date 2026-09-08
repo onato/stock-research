@@ -516,6 +516,10 @@ def check_dcf(ticker: str, card: Card) -> None:
         def walk(node: dict[str, Any], path: str) -> None:
             for k, v in node.items():
                 here = f"{path}.{k}" if path else k
+                # sanity_check holds the FY-end price history (dicts keyed
+                # by year); nothing in there is a current price.
+                if k == "sanity_check" or k.isdigit():
+                    continue
                 if isinstance(v, dict):
                     walk(v, here)
                 elif (path and k in ("price", "current_price")

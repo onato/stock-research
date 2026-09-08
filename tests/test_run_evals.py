@@ -1086,3 +1086,14 @@ class TestChangedSince:
         monkeypatch.setattr(sys, "argv", ["run_evals.py", "--changed-since", "HEAD"])
         assert E.main() == 0
         assert "no tickers changed" in capsys.readouterr().out
+
+
+class TestDcfPriceConsistentIgnoresHistory:
+    def test_year_keyed_price_tables_are_not_current_prices(self, make_ticker):
+        """FLOW.AS keeps its FY-end price history under sanity_check as a
+        dict keyed by year; those are history, not a current price."""
+        doc = minimal_dcf(sanity_check={"ran": True, "passed": True,
+                                        "historical_averages_ex_outliers": {
+                                            "fy_table": {"2016": {"price": 32.74},
+                                                         "2017": {"price": 20.0}}}})
+        assert dcf_checks(make_ticker, doc)["dcf_price_consistent"]["status"] == "pass"
