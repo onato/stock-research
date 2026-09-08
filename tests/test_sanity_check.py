@@ -555,6 +555,47 @@ class TestDiagnosis:
         assert any(c["candidate"] == "terminal_growth_too_high" for c in cands)
 
 
+class TestThroughCycleCagr:
+    """8c.4.3 asks whether projected growth beats the through-cycle CAGR --
+    first genuine year to last, not the cyclical recovery window."""
+
+    def test_cagr_spans_the_whole_history(self):
+        rows = [{"period": "FY2020", "revenue": 100.0},
+                {"period": "FY2025", "revenue": 200.0}]
+        # 2x over five years is 14.87%/yr.
+        got = sanity_check._revenue_cagr_pct(rows)
+        assert got == pytest.approx(14.87, abs=0.01)
+
+    def test_a_gap_in_the_years_is_measured_end_to_end(self):
+        """The count of rows is not the span in years. ARB.NZ's stub years
+        and any ticker missing a filing leave holes, and measuring
+        `len(rows) - 1` years back from the last one lands on a year that
+        does not exist -- silently returning no CAGR at all.
+        """
+        rows = [{"period": "FY2015", "revenue": 100.0},
+                {"period": "FY2020", "revenue": 150.0},
+                {"period": "FY2025", "revenue": 200.0}]
+        got = sanity_check._revenue_cagr_pct(rows)
+        assert got is not None
+        assert got == pytest.approx(7.18, abs=0.01)      # 10 years, not 2
+
+    def test_a_single_year_has_no_cagr(self):
+        assert sanity_check._revenue_cagr_pct(
+            [{"period": "FY2025", "revenue": 200.0}]) is None
+
+    def test_a_nonpositive_base_has_no_cagr(self):
+        rows = [{"period": "FY2020", "revenue": 0.0},
+                {"period": "FY2025", "revenue": 200.0}]
+        assert sanity_check._revenue_cagr_pct(rows) is None
+
+    def test_non_annual_rows_do_not_define_the_span(self):
+        rows = [{"period": "FY2020", "revenue": 100.0},
+                {"period": "H1 2023", "revenue": 60.0},
+                {"period": "FY2025", "revenue": 200.0}]
+        assert sanity_check._revenue_cagr_pct(rows) == pytest.approx(14.87,
+                                                                     abs=0.01)
+
+
 class TestNonFcfModels:
     """A REIT has no EBITDA multiple worth the name and an LIC has no
     earnings at all. Grading them against P/E and EV/EBITDA thresholds

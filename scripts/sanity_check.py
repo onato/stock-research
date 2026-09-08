@@ -725,15 +725,23 @@ def check(repo: pathlib.Path, ticker: str,
 
 def _revenue_cagr_pct(rows: list[dict[str, object]]) -> float | None:
     """Through-cycle revenue CAGR, first genuine year to last -- not the
-    cyclical recovery window, which is what 8c.4.3 warns about."""
+    cyclical recovery window, which is what 8c.4.3 warns about.
+
+    The span is measured in YEARS, not in rows. `fundamentals._cagr` looks
+    up `end_year - span`, so passing a row count lands on a year that may
+    not exist -- a ticker with a missing filing, or ARB.NZ's stub years,
+    silently yields no CAGR at all and the growth diagnosis never fires.
+    """
     values = {str(r.get("period") or ""): v
               for r in rows if (v := _num(r.get("revenue"))) is not None}
-    if len(values) < 2:
+    years = [p.fiscal_year for p in (periods.parse(k) for k in values)
+             if periods.is_annual(p) and p.fiscal_year is not None]
+    if len(years) < 2:
         return None
     import fundamentals
     reasons: list[str] = []
-    span = len(values) - 1
-    cagr, _ = fundamentals._cagr(values, span, reasons, "revenue")
+    cagr, _ = fundamentals._cagr(values, max(years) - min(years), reasons,
+                                 "revenue")
     return cagr * 100 if cagr is not None else None
 
 
