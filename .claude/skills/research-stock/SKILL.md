@@ -330,6 +330,15 @@ the base-case IV on the latest FY actuals, the four trip rules, and the
 `null` adjusted multiples rather than an unadjusted number, so an adjusted
 implied multiple is never compared against a half-unadjusted average.
 
+**Read `rules_evaluated` before trusting a pass.** A year with no
+`StockBasedComp` has no adjusted P/E or EV/EBITDA, and measured across the
+corpus that is 65 of 127 owner-FCF tickers (51 of them missing SBC in the
+latest FY) — those passed on P/B and P/Sales alone. The block lists which
+rules had the inputs to run, so a `passed: true` reached on two rules does
+not read like one reached on four. If the earnings rules were skipped and
+the ticker plausibly has SBC, the fix is to get `StockBasedComp` into
+`core_metrics`, not to loosen the check.
+
 **Exit codes:**
 
 - **0** — clean, or a model whose trip rules do not apply (AFFO, NAV/NTA,

@@ -707,6 +707,35 @@ class TestBlockShape:
         assert "pb_max" in avg
         assert "ev_ebitda_max" in avg
 
+    def test_the_block_says_which_rules_could_be_evaluated(self, repo):
+        """Measured on the corpus: 65 of 127 owner-FCF tickers have neither
+        an implied P/E nor an implied EV/EBITDA, because 51 of them have no
+        stock_based_comp in the latest FY. That is the SBC rule working --
+        never mix adjusted and unadjusted -- but it means those tickers
+        passed on P/B and P/Sales alone.
+
+        A `passed: true` that was reached on two multiples must not read
+        like one reached on four, so the block records which rules could be
+        evaluated and which could not.
+        """
+        block = self.block(repo)
+        assert set(block["rules_evaluated"]) == {"pe", "pb", "ev_ebitda",
+                                                 "p_sales"}
+        assert block["rules_not_evaluated"] == []
+
+    def test_a_missing_sbc_is_named_as_the_reason_a_rule_was_skipped(self, repo):
+        make_db(repo, "SEK.NZ", rows=[
+            ("FY2024", 600.0, 120.0, 60.0, 480.0, 100.0, 20.0, 100.0, None),
+            ("FY2025", 650.0, 130.0, 65.0, 520.0, 100.0, 20.0, 100.0, None)])
+        make_prices(repo, "SEK.NZ")
+        make_dcf(repo, "SEK.NZ")
+        block = sanity_check.check(repo, "SEK.NZ", today=TODAY)
+        assert set(block["rules_not_evaluated"]) == {"pe", "ev_ebitda"}
+        assert block["rules_evaluated"] == ["pb", "p_sales"]
+        # It still passes -- P/B and P/Sales are real evidence -- but the
+        # reader can see the verdict rests on half the rules.
+        assert block["passed"] is True
+
     def test_computed_by_names_the_script(self, repo):
         assert self.block(repo)["computed_by"] == "scripts/sanity_check.py"
 

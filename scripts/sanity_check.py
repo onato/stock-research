@@ -646,11 +646,25 @@ def check(repo: pathlib.Path, ticker: str,
                if intrinsic is not None and latest else
                {"pe": None, "pb": None, "ev_ebitda": None, "p_sales": None})
 
+    # Measured over the corpus: 65 of 127 owner-FCF tickers have neither an
+    # implied P/E nor an implied EV/EBITDA, because 51 have no
+    # stock_based_comp in the latest FY. That is the SBC rule working as
+    # intended -- never mix adjusted and unadjusted -- but it means those
+    # tickers were judged on P/B and P/Sales alone. A `passed: true`
+    # reached on two rules must not read like one reached on four, so the
+    # block records which rules had the inputs to run.
+    evaluated = [k for k in ("pe", "pb", "ev_ebitda", "p_sales")
+                 if implied.get(k) is not None]
+    skipped = [k for k in ("pe", "pb", "ev_ebitda", "p_sales")
+               if implied.get(k) is None]
+
     block: dict[str, object] = {
         "ran": True,
         "passed": True,
         "model": model,
         "basis": BASIS,
+        "rules_evaluated": evaluated,
+        "rules_not_evaluated": skipped,
         "fy_end_month": month,
         "fy_end_month_source": fy_source,
         "implied_multiples": implied,
