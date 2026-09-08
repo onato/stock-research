@@ -45,6 +45,16 @@ valuation and obvious the moment you try to explain a change in one.
 
 **No prior DCF → fresh build.** Proceed to Step 1.
 
+## Scope: judgment, not plumbing
+
+Do not read or grep anything under `scripts/` (`sanity_check.py`, `build_dashboard.py`,
+`dcf_fields.py`, `ledger.py`, the Makefile). Their field expectations are the output
+contract in Step 4 below, and nothing else. The multiples sanity check is
+`make sanity-check TICKER={TICKER} APPLY=1`, run by the orchestrator after you finish;
+the dashboard is rendered by `make dashboard`; the ledger row is appended by the
+orchestrator. On SDL.NZ (2026-09-08) six of fourteen Fable turns went to inspecting
+those scripts, and none of it changed the valuation.
+
 ## Step 1: Gather Historical Data
 
 **Run `make dcf-context TICKER={TICKER}` first** and read its output before anything
