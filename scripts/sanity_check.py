@@ -598,10 +598,19 @@ def check(repo: pathlib.Path, ticker: str,
     quoted = _canon_currency(inputs.get("quote_currency"))
     fx_rate = _num(inputs.get("fx_rate"))
     if reporting and quoted and reporting != quoted and fx_rate is None:
+        # WISE.L is the canonical case -- 885.6 GBp over 48.43 USD is a
+        # plausible P/E of 18.3 and pure coincidence -- but the HK-listed
+        # China filers (RMB books, HKD quote) are the bigger class, so the
+        # message names THIS ticker's two currencies and what would fix it.
         raise DenominationError(
-            f"{ticker}: quote is {quoted} but the financials are {reporting}, "
-            "and inputs.fx_rate is absent. WISE.L's 885.6 GBp over 48.43 USD "
-            "yields a plausible P/E of 18.3 that is pure coincidence.")
+            f"{ticker}: the quote is in {quoted} but the financials are in "
+            f"{reporting}, and inputs.fx_rate is absent. Dividing one by the "
+            f"other yields a plausible-looking multiple that is arithmetic "
+            f"about nothing. Record inputs.fx_rate ({quoted}->{reporting}, "
+            f"the multiplier that takes a {quoted} price to {reporting}) "
+            f"or correct inputs.quote_currency.")
+    # quote_currency -> currency: the price arrives denominated like the
+    # market and has to end up denominated like the financials it divides.
     convert = fx_rate if (reporting and quoted and reporting != quoted) else None
 
     month, fy_source = fy_end_month(repo, ticker)

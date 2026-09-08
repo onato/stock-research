@@ -588,6 +588,30 @@ class TestCurrencyGuard:
         assert sanity_check.main(["WISE.L", "--as-of", TODAY.isoformat()]) == 2
         assert "refused" in capsys.readouterr().err.lower()
 
+    def test_the_fx_rate_is_quote_to_reporting(self, repo):
+        """Direction is the whole point of the field. The price is quoted
+        in quote_currency and has to end up denominated like the
+        financials, so fx_rate multiplies quote -> reporting. Backwards is
+        a silent 100x on precisely the ticker the guard exists for.
+        """
+        make_db(repo, "WISE.L")
+        make_prices(repo, "WISE.L")
+        # 6.00 GBp is 0.075 USD at 0.0125 USD per penny, not 480.
+        make_dcf(repo, "WISE.L", currency="USD", quote_currency="GBp",
+                 fx_rate=0.0125)
+        block = sanity_check.check(repo, "WISE.L", today=TODAY)
+        row = {r["period"]: r for r in block["historical_table"]}["FY2024"]
+        assert row["price"] == pytest.approx(0.075)
+        assert row["price"] < 1.0            # not multiplied the wrong way
+
+    def test_the_refusal_says_which_direction_the_rate_must_be(self, repo):
+        make_db(repo, "9988.HK")
+        make_prices(repo, "9988.HK")
+        make_dcf(repo, "9988.HK", currency="RMB", quote_currency="HKD")
+        with pytest.raises(sanity_check.DenominationError) as e:
+            sanity_check.check(repo, "9988.HK", today=TODAY)
+        assert "HKD->RMB" in str(e.value)
+
     def test_an_fx_rate_converts_the_price_instead_of_refusing(self, repo):
         make_db(repo, "WISE.L")
         make_prices(repo, "WISE.L")
@@ -597,6 +621,21 @@ class TestCurrencyGuard:
         # FY2024 close 6.00 GBp x 0.0125 = 0.075 USD
         row = {r["period"]: r for r in block["historical_table"]}["FY2024"]
         assert row["price"] == pytest.approx(0.075)
+
+    def test_the_refusal_names_this_ticker_s_own_currencies(self, repo):
+        """The message is read by whoever has to fix the DCF, and the
+        HK-listed China filers (RMB financials, HKD quote) are a whole
+        class of it. A refusal that only ever recites WISE.L's pence
+        reads as boilerplate about a different ticker."""
+        make_db(repo, "9988.HK")
+        make_prices(repo, "9988.HK")
+        make_dcf(repo, "9988.HK", currency="RMB", quote_currency="HKD")
+        with pytest.raises(sanity_check.DenominationError) as e:
+            sanity_check.check(repo, "9988.HK", today=TODAY)
+        assert "HKD" in str(e.value)
+        assert "RMB" in str(e.value)
+        assert "fx_rate" in str(e.value)
+        assert "885.6" not in str(e.value)
 
     def test_matching_currencies_need_no_fx_rate(self, repo):
         make_db(repo, "SEK.NZ")
