@@ -55,18 +55,26 @@ Common patterns:
 
 ## Step 2: Download Financial Reports
 
-**ASX tickers (`.AX`) — run the deterministic fetcher first, no agent:**
+**Non-US tickers — run the deterministic fetcher first, no agent:**
 ```bash
-make fetch-asx TICKER=$ARGUMENTS YEARS=2016-$(date +%Y)
+make fetch-filings TICKER=$ARGUMENTS
 ```
-It walks the ASX per-year announcement listings, picks the Appendix 4E / annual
-report and the Appendix 4D / half-yearly accounts for each fiscal label, follows the
-terms interstitial to the real PDF, and saves them already named
-(`{T}_Annual_FY2025.pdf`, `{T}_HalfYear_H1-FY2026.pdf`, fiscal label from
-`info.json`'s year-end). It skips files that exist. Only spawn the ir-scraper
-afterwards for what it could not find (investor presentations, a report the company
-filed under an unusual title) — on TPW.AX the scraper burned 31 turns doing by hand
-what this does in one call.
+It dispatches on the suffix — `.AX` to the ASX per-year announcement listings, `.NZ`
+to nzx.com's hydration and per-year listing API, `.HK` to HKEXnews' title search —
+and seeds a thin `.L`/`.AX`/`.NZ` ticker from the AnnualReports.com archive as well.
+Everything it downloads is staged and must pass a deterministic gate (real PDF,
+≥30 KB, extractable text, the company's own name in that text, no overwrite) before
+it reaches `research/{T}/PDFs/`; survivors are extracted to `Extracted/` in the same
+pass, so Step 3 and Step 4 have less to do. Files that exist are skipped, and the
+run prints `planned / downloaded / promoted / quarantined` with a reason per reject.
+Add `DRY=1` to see the plan without downloading.
+
+Exit codes: **0** ran cleanly (even if nothing was new), **1** the adapter failed,
+**3** the deadline was spent. Only spawn the ir-scraper afterwards for what it
+reports as missing (investor presentations, a report filed under an unusual title)
+or when it exits 1 — on TPW.AX the scraper burned 31 turns, and on SMI.NZ 3.5
+minutes, doing by hand what this does in one call. US filers have no adapter here:
+they take the SEC XBRL route (Step 4).
 
 **If PDFs already exist:** Check the IR website for any NEW reports (quarters/years) published since last download. Only download missing reports.
 

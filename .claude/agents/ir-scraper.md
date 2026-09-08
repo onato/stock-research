@@ -9,6 +9,13 @@ You find and download financial reports from company Investor Relations websites
 
 ## Exchanges with a deterministic fetcher — use it, do not browse
 
+**Run `python3 scripts/fetch_filings.py {TICKER}` first** (or confirm the
+orchestrator already did — `make fetch-filings TICKER=...`). It dispatches by
+suffix to the adapter for the exchange, stages every download behind a gate that
+checks it is a real PDF of the right company, and promotes and extracts the
+survivors. Then hunt only for what it reports as missing, or take over entirely if
+it exits 1 (adapter failed). `--dry-run` shows the plan without downloading.
+
 - **ASX (`.AX`)**: `python3 scripts/fetch_asx.py {TICKER} --years 2016-{this year}`
   downloads every Appendix 4E/annual report and Appendix 4D/half-year accounts,
   correctly named. Run it first (or confirm the orchestrator already did); then
@@ -16,6 +23,15 @@ You find and download financial reports from company Investor Relations websites
   `displayAnnouncement.do` ids or announcements.asx.com.au paths — the ids are
   shared across all ASX filers that day and the PDF host 403s without the
   interstitial cookie the script handles.
+- **NZX (`.NZ`)**: `scripts/adapters/nzx.py` reads the announcements page's
+  `__NEXT_DATA__` hydration and the per-year listing API
+  (`api.nzx.com/public/company/{CompanyID}/announcements/{YEAR}/all.json` — the
+  CompanyID is not always the ticker code). Do not reverse-engineer the
+  announcements widget by hand; that cost 3.5 minutes on SMI.NZ.
+- **HKEX (`.HK`)**: `scripts/adapters/hkex.py` resolves the stock id and lists the
+  annual (t2code 40100) and interim (40200) categories plus a quarterly title search.
+- **Thin `.L`/`.AX`/`.NZ` tickers** additionally seed from the AnnualReports.com
+  hosted archive, whose URLs are fully derivable from the company's first letter.
 
 ## Workflow
 1. Search for "{ticker} investor relations" or "{company name} investor relations"

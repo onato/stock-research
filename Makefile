@@ -27,7 +27,7 @@ LEADERBOARD ?= 15   # rows shown by `make screen`
 
 .DEFAULT_GOAL := help
 .PHONY: help run digest status screen integrity missing prune-stubs standardize-scale research facts evals evals-all dashboard-spec fix \
-        cost gaps exchange-eval facts-xbrl adjudicate fetch-asx dcf-context dashboard kpi-coverage screen-metrics check-currency ledger ledger-backfill queue-prune \
+        cost gaps exchange-eval facts-xbrl adjudicate fetch-asx fetch-filings dcf-context dashboard kpi-coverage screen-metrics check-currency ledger ledger-backfill queue-prune \
         screen-fundamentals backfill-units canonical-iv sync-portfolio commit-refreshed commit-scores \
         test test-country lint coverage typecheck
 
@@ -176,6 +176,10 @@ research: ## Research one ticker with live progress (TICKER=AGL.NZ)
 fetch-asx: ## Download ASX annual/half-year reports deterministically (TICKER=TPW.AX YEARS=2016-2026 [DRY=1])
 	@test -n "$(TICKER)" || { echo "usage: make fetch-asx TICKER=TPW.AX YEARS=2016-2026 [DRY=1]" >&2; exit 2; }
 	$(PY) $(SCRIPTS)/fetch_asx.py $(TICKER) --years $(or $(YEARS),2016-2026) $(if $(DRY),--dry-run,)
+
+fetch-filings: ## Download annual/half-year filings deterministically for .NZ/.HK/.AX/.L (TICKER= [YEARS=] [DRY=1])
+	@test -n "$(TICKER)" || { echo "usage: make fetch-filings TICKER=SMI.NZ [YEARS=2016-2026] [DRY=1]" >&2; exit 2; }
+	$(PY) $(SCRIPTS)/fetch_filings.py $(TICKER) $(if $(YEARS),--years $(YEARS),) $(if $(DRY),--dry-run,)
 
 dcf-context: ## Print the DCF agent's inputs for one ticker: price, history pivot, KPIs, component lines (no model)
 	@test -n "$(TICKER)" || { echo "usage: make dcf-context TICKER=TPW.AX" >&2; exit 2; }
