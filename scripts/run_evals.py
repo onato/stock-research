@@ -459,7 +459,18 @@ def check_dcf(ticker: str, card: Card) -> None:
         passed = sc.get("passed")
         if passed is None and isinstance(sc.get("status"), str):
             passed = sc["status"].strip().upper() in ("PASSED", "PASS", "OK")
-        if passed:
+        replaced = sc.get("checks_replaced")
+        if (passed is None and replaced
+                and sc.get("computed_by") == "scripts/sanity_check.py"):
+            # scripts/sanity_check.py writes `passed: null` for a model
+            # whose trip rules do not apply -- a REIT's AFFO capitalization
+            # has no earnings multiple to grade, an LIC no earnings at all.
+            # That is the check working, not the check missing, so it must
+            # not sit in the review queue forever. The exemption is narrow
+            # on purpose: only the script's own block, and only when it
+            # says which checks it replaced.
+            card.add("dcf_sanity_check", "pass", f"checks replaced: {replaced}")
+        elif passed:
             card.add("dcf_sanity_check", "pass")
         elif passed is False and not (sc.get("fix_applied") or sc.get("trip_reasons")):
             card.add("dcf_sanity_check", "warn", "failed with no diagnosis/fix recorded")

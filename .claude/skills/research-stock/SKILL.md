@@ -310,61 +310,42 @@ claim they make has flipped. Do not recompute any of this by hand.
 
 **Always run after Step 8b.** This step exists because DCF models can produce intrinsic values implying multiples the market has never paid. SEK.NZ (Seeka) was the canonical failure: a peak-FCF DCF produced IV $22.75 implying 30x P/E and 3.4x P/B, despite Seeka never trading above 0.99x P/B or 7.8x EV/EBITDA in 10 years.
 
-### Step 8c.1: Compute historical multiples from local data
-
-Fetch 10 years of monthly closing prices from Yahoo Finance and align FY-end prices with FY metrics in `{TICKER}_Metrics.csv`:
+### Steps 8c.1-8c.4: Run the check
 
 ```bash
-curl -s "https://query1.finance.yahoo.com/v8/finance/chart/$ARGUMENTS?range=10y&interval=1mo" \
-  -H "User-Agent: Mozilla/5.0" | python3 -c "
-import sys, json
-from datetime import datetime
-d = json.load(sys.stdin)
-r = d['chart']['result'][0]
-for t, c in zip(r['timestamp'], r['indicators']['quote'][0]['close']):
-    if c: print(datetime.fromtimestamp(t).strftime('%Y-%m'), round(c, 2))
-"
+python3 scripts/sanity_check.py $ARGUMENTS --apply
 ```
 
-For each FY row in the metrics CSV, match the FY-end month's closing price (use Dec for calendar-year FYs, Jun for June FYs, etc. — check the company's reporting calendar). For each year compute:
+That is the whole of 8c.1 through 8c.4, and it writes the 8c.7 block. Do
+**not** fetch prices, compute multiples or apply the trip rules by hand:
+this used to be ~10 turns of an Opus orchestrator per ticker, and every one
+of those steps is arithmetic with one right answer.
 
-- **P/E** = price / (EPS − SBC_per_share) (skip years where adjusted EPS is negative)
-- **P/B** = (price × shares_outstanding) / total_equity
-- **EV/EBITDA** = (market_cap + net_debt) / (EBITDA − SBC)
-- **P/Sales** = market_cap / revenue
+What it does, so you can read the output: 10 years of monthly closes
+(cached to a committed `{TICKER}_Prices.csv`), FY-end prices aligned to the
+annual rows from `metrics_normalized`, historical P/E, P/B, EV/EBITDA and
+P/Sales **on an SBC-adjusted basis on both sides**, the implied multiples of
+the base-case IV on the latest FY actuals, the four trip rules, and the
+8c.4 diagnosis candidates. A year whose `StockBasedComp` is missing gets
+`null` adjusted multiples rather than an unadjusted number, so an adjusted
+implied multiple is never compared against a half-unadjusted average.
 
-**Earnings-based multiples are computed on SBC-adjusted earnings on both sides** — historical and implied — so the comparison is apples-to-apples with the SBC-adjusted DCF. Where `StockBasedComp` is unavailable for a historical year, mark that year's adjusted multiple as unavailable rather than silently mixing adjusted and unadjusted figures.
+**Exit codes:**
 
-These deliberately will **not** match published P/E figures from Yahoo or stock screeners, which use GAAP EPS. Note this in the JSON so a future reader doesn't "correct" it back.
+- **0** — clean, or a model whose trip rules do not apply (AFFO, NAV/NTA,
+  book-value, earnings-at-CoE, risked-NPV: `passed` is `null` with a
+  `checks_replaced` note). Nothing more to do; go to Step 9.
+- **2** — refused. Either there is no DCF, or the quote currency differs
+  from the reporting currency with no `inputs.fx_rate` to bridge them
+  (WISE.L's GBp quote against USD filings). Fix the input and re-run.
+- **3** — tripped. Spawn the `dcf-analyst` **once** with the printed
+  `trip_reasons` and `diagnosis` candidates and the instruction in 8c.5
+  below: adjust the drivers, rebuild the DCF, record `fix_applied` and
+  `implied_multiples_after_fix` in the `sanity_check` block, and stop. Do
+  not loop; one fix pass is the budget.
 
-Exclude any clear outlier years (cyclone, COVID write-down, one-off impairment) from the averages — but keep them in the table for visibility.
-
-### Step 8c.2: Compute implied multiples from base case IV
-
-From the base case `intrinsic_value` in the DCF JSON, compute what multiples that IV would imply on the most recent FY actuals:
-
-- **Implied P/E** = base_IV / (latest_EPS − latest_SBC_per_share)
-- **Implied P/B** = base_IV / (latest_equity / shares_outstanding)
-- **Implied EV/EBITDA** = (base_IV × shares + net_debt) / (latest_EBITDA − latest_SBC)
-
-Use the same SBC-adjusted basis as Step 8c.1 — comparing an SBC-adjusted implied multiple against an unadjusted historical average would manufacture a false trip.
-
-### Step 8c.3: Trip detection
-
-Sanity check **fails** if ANY of:
-- Implied P/E > 2.0× the 10yr average (excluding outlier years)
-- Implied P/B > 1.5× the 10yr maximum
-- Implied EV/EBITDA > 1.5× the 10yr maximum
-- Base case upside > 100% AND current price is in the upper half of the 10yr price range (suggests the market already incorporates the good news)
-
-### Step 8c.4: Auto-diagnose root cause
-
-If sanity check fails, identify which assumption is producing the over-valuation. Check in order:
-
-1. **Peak-earnings extrapolation**: Is `last_fcf` near the highest value in the company's FCF history? Compute the 5-8 year FCF mean and median **from the SBC-adjusted series** (both sides adjusted — comparing an adjusted base against an unadjusted median would understate the peak). If `last_fcf` > 1.5× the historical median, the base year is a peak.
-2. **WACC too low for the risk profile**: Are there structural risks not in the WACC? Look at the qualitative analysis for: single-customer concentration, small-cap illiquidity (market cap < $500m), extreme cyclicality (EBITDA range > 3× in 5 years), regulatory single-point-of-failure. Each unaccounted structural risk should add 1.5-2.5% to WACC.
-3. **Growth rate too aggressive**: Are projected growth rates above the historical revenue/EBITDA CAGRs through-the-cycle (not the recent recovery CAGR)? Through-cycle growth should reflect industry volume growth, not cyclical bounce-back.
-4. **Terminal growth too high**: Is `terminal_growth` near or above long-run GDP growth for a mature business? For cyclical/agricultural businesses it should be 1.5-2.5% maximum.
+The script preserves any existing `fix_applied` / `implied_multiples_after_fix`
+across re-runs, so the agent's record of what it changed stays auditable.
 
 ### Step 8c.5: Auto-apply the fix
 
@@ -401,22 +382,22 @@ Also populate a `valuation_philosophy` block in the DCF JSON capturing the same 
 
 ### Step 8c.7: Record the sanity check in the DCF JSON
 
-Add a `sanity_check` block to the DCF JSON regardless of pass/fail:
+Already done — `scripts/sanity_check.py --apply` wrote the block. It
+rewrites only the `sanity_check` key, leaving the rest of the file
+byte-for-byte, so the diff shows the one thing that changed.
 
-```json
-"sanity_check": {
-  "ran": true,
-  "passed": false,
-  "implied_multiples": {"pe": 29.9, "pb": 3.36, "ev_ebitda": 11.5},
-  "historical_averages_ex_outliers": {"pe_avg": 13.1, "pb_avg": 0.72, "pb_max": 0.99, "ev_ebitda_avg": 5.6, "ev_ebitda_max": 7.8},
-  "trip_reasons": ["Implied P/B 3.36x exceeds 1.5x historical max 0.99x", "Base case upside 354% with price in upper half of 10yr range"],
-  "diagnosis": "Peak-FCF extrapolation: base year FCF $79m is 2.4x historical median $32m",
-  "fix_applied": "Switched to mid-cycle FCF $50m; added structural WACC premiums totalling +5.5% (Zespri concentration +2%, NZX illiquidity +2%, weather +1.5%)",
-  "implied_multiples_after_fix": {"pe": 10.4, "pb": 1.17, "ev_ebitda": 6.4}
-}
-```
+The block carries `ran`, `passed`, `implied_multiples`,
+`historical_averages_ex_outliers` (with `pb_max` and `ev_ebitda_max`, the
+figures the trip rules actually use), `trip_reasons`, `diagnosis`, the
+per-FY `historical_table`, and `computed_by` / `computed_at`.
 
-This makes the fix auditable and surfaces in future runs whether assumptions have drifted back into unrealistic territory.
+The only fields you add by hand are the two that record **your** judgment
+after a trip: `fix_applied` and `implied_multiples_after_fix`. Both survive
+subsequent re-runs of the script.
+
+These multiples are SBC-adjusted on both sides and so deliberately will not
+match Yahoo's or a screener's GAAP P/E — the block says as much in `basis`,
+so a future reader does not "correct" it back.
 
 ## Step 9a: Generate the Dashboard (no model, then an optional tweak)
 

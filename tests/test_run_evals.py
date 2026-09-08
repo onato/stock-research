@@ -215,6 +215,35 @@ class TestCheckDcf:
             checks = dcf_checks(make_ticker, doc, ticker=f"SC{i}")
             assert checks["dcf_sanity_check"]["status"] == expected, (sc, checks["dcf_sanity_check"])
 
+    def test_a_replaced_check_is_a_pass_not_a_warn(self, make_ticker):
+        """scripts/sanity_check.py writes passed: null for a model whose
+        trip rules do not apply -- a REIT's AFFO capitalization has no
+        earnings multiple to grade. That is the check working, not the
+        check missing, so it must not sit in the review queue forever.
+        """
+        checks = dcf_checks(make_ticker, minimal_dcf(sanity_check={
+            "ran": True, "passed": None,
+            "computed_by": "scripts/sanity_check.py",
+            "checks_replaced": "model is affo: P/E and EV/EBITDA trip rules "
+                               "do not apply"}), ticker="AFFO1")
+        assert checks["dcf_sanity_check"]["status"] == "pass"
+        assert "replaced" in checks["dcf_sanity_check"]["detail"]
+
+    def test_a_null_verdict_without_the_script_still_warns(self, make_ticker):
+        """Only the script's own block earns the exemption. A hand-written
+        `passed: null` is an agent that did not reach a verdict."""
+        checks = dcf_checks(make_ticker, minimal_dcf(sanity_check={
+            "ran": True, "passed": None}), ticker="AFFO2")
+        assert checks["dcf_sanity_check"]["status"] == "warn"
+
+    def test_the_script_still_reports_a_real_verdict(self, make_ticker):
+        """computed_by is not a blanket exemption: a computed False with no
+        fix recorded is still the warn it always was."""
+        checks = dcf_checks(make_ticker, minimal_dcf(sanity_check={
+            "ran": True, "passed": False,
+            "computed_by": "scripts/sanity_check.py"}), ticker="AFFO3")
+        assert checks["dcf_sanity_check"]["status"] == "warn"
+
     def test_missing_dcf_fails_parse(self, make_ticker):
         make_ticker("NODCF")
         card = E.Card()

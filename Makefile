@@ -26,8 +26,8 @@ REQUIRE_NEW ?= 1
 LEADERBOARD ?= 15   # rows shown by `make screen`
 
 .DEFAULT_GOAL := help
-.PHONY: help run digest status screen integrity missing prune-stubs standardize-scale research facts evals evals-all dashboard-spec fix \
-        cost gaps exchange-eval facts-xbrl adjudicate fetch-asx fetch-filings dcf-context dashboard kpi-coverage screen-metrics check-currency ledger ledger-backfill queue-prune \
+.PHONY: help run digest status screen integrity missing prune-stubs standardize-scale research facts evals evals-all dashboard-spec \
+        fix cost gaps exchange-eval facts-xbrl adjudicate fetch-asx fetch-filings dcf-context dashboard kpi-coverage screen-metrics check-currency ledger ledger-backfill queue-prune sanity-check \
         screen-fundamentals backfill-units canonical-iv sync-portfolio commit-refreshed commit-scores \
         test test-country lint coverage typecheck
 
@@ -180,6 +180,10 @@ fetch-asx: ## Download ASX annual/half-year reports deterministically (TICKER=TP
 fetch-filings: ## Download annual/half-year filings deterministically for .NZ/.HK/.AX/.L (TICKER= [YEARS=] [DRY=1])
 	@test -n "$(TICKER)" || { echo "usage: make fetch-filings TICKER=SMI.NZ [YEARS=2016-2026] [DRY=1]" >&2; exit 2; }
 	$(PY) $(SCRIPTS)/fetch_filings.py $(TICKER) $(if $(YEARS),--years $(YEARS),) $(if $(DRY),--dry-run,)
+
+sanity-check: ## Historical vs implied multiples for a DCF (TICKER=X [APPLY=1]; no model)
+	@test -n "$(TICKER)" || { echo "usage: make sanity-check TICKER=SEK.NZ [APPLY=1]" >&2; exit 2; }
+	$(PY) $(SCRIPTS)/sanity_check.py $(TICKER) $(if $(APPLY),--apply,)
 
 dcf-context: ## Print the DCF agent's inputs for one ticker: price, history pivot, KPIs, component lines (no model)
 	@test -n "$(TICKER)" || { echo "usage: make dcf-context TICKER=TPW.AX" >&2; exit 2; }
