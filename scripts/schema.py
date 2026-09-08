@@ -57,6 +57,17 @@ CORE_COLUMNS: list[tuple[str, str, str]] = [
 CORE_NAMES: list[str] = [c[0] for c in CORE_COLUMNS]
 CSV_HEADERS: list[str] = [c[2] for c in CORE_COLUMNS]
 
+# Parsed from `period` by periods.py and stored beside it, so SQL can order
+# chronologically and pick 12-month rows without re-parsing labels
+# (`ORDER BY period` is lexical: `9M 2021` < `FY2021` < `Q1 2021`). Derived,
+# not core: they never reach the CSV, and backfill_period_columns() can
+# always regenerate them.
+DERIVED_COLUMNS: list[tuple[str, str]] = [
+    ("period_type", "TEXT"),
+    ("fiscal_year", "INTEGER"),
+    ("months",      "INTEGER"),
+]
+
 # Existing CSV headers -> core column. Drawn from the aliases actually
 # observed across the 67 committed CSVs, plus the legacy names called out
 # in financial-parser.md (SBC / StockBasedComp / ShareBasedComp).
@@ -386,9 +397,11 @@ def promote_header(name: object) -> str | None:
 def create_sql() -> str:
     """DDL for a ticker DB. Identical for every ticker -- that is the point."""
     cols = ",\n  ".join(f"{n} {t}" for n, t, _ in CORE_COLUMNS)
+    derived = ",\n  ".join(f"{n} {t}" for n, t in DERIVED_COLUMNS)
     return f"""
 CREATE TABLE IF NOT EXISTS core_metrics (
   {cols},
+  {derived},
   PRIMARY KEY (period)
 );
 
@@ -427,6 +440,7 @@ WITH scaled AS (
 )
 SELECT
   period, currency, units AS units_raw,
+  period_type, fiscal_year, months,
   -- money columns, all in millions of the reporting currency
   revenue * k              AS revenue,
   cost_of_revenue * k      AS cost_of_revenue,
@@ -436,6 +450,10 @@ SELECT
   net_income * k           AS net_income,
   operating_cash_flow * k  AS operating_cash_flow,
   capex * k                AS capex,
+  -- The stored sign of capex varies by ticker (positive outflow on some,
+  -- cash-flow-statement negative on others); capex_abs is the outflow
+  -- magnitude so a consumer never has to guess the convention.
+  abs(capex) * k           AS capex_abs,
   free_cash_flow * k       AS free_cash_flow,
   shareholders_equity * k  AS shareholders_equity,
   total_assets * k         AS total_assets,
@@ -456,6 +474,32 @@ CREATE TABLE IF NOT EXISTS kpis (
   name   TEXT,
   value  DOUBLE,
   unit   TEXT
+);
+
+-- Every hand correction to core_metrics or kpis, with what it replaced and
+-- why. The DB is gitignored, so scripts/fix_metric.py mirrors each row into
+-- Reports/{{T}}_Corrections.jsonl and load_existing.py replays that file
+-- when it rebuilds a DB from a legacy CSV.
+CREATE TABLE IF NOT EXISTS corrections (
+  ts        TEXT,
+  target    TEXT,     -- 'core_metrics' or 'kpis:<Name>'
+  period    TEXT,
+  col       TEXT,
+  old_value DOUBLE,
+  new_value DOUBLE,
+  source    TEXT,     -- filing file:line, or a stated basis
+  actor     TEXT,
+  op        TEXT      -- set / scale / derive / move / null / kpi
+);
+
+-- What export_csv.py last wrote, so it can tell a CSV that was edited by
+-- hand since (refuse: the edit belongs in the DB) from a DB that moved on
+-- legitimately (export). DCBO's FY2022 row was corrected in the CSV, then
+-- silently clobbered by the next export because nothing could tell.
+CREATE TABLE IF NOT EXISTS export_log (
+  ts      TEXT,
+  sha256  TEXT,
+  periods INTEGER
 );
 
 -- Raw extraction candidates. The agent adjudicates these; nothing here is
@@ -499,10 +543,32 @@ def ensure_schema(con: "DuckDBPyConnection") -> None:
         ).fetchall()
     }
     if have:
-        for name, sqltype, _ in CORE_COLUMNS:
+        wanted = [(n, t) for n, t, _ in CORE_COLUMNS] + DERIVED_COLUMNS
+        for name, sqltype in wanted:
             if name not in have:
                 con.execute(f"ALTER TABLE core_metrics ADD COLUMN {name} {sqltype}")
     con.execute(create_sql())
+
+
+def backfill_period_columns(con: "DuckDBPyConnection") -> int:
+    """Fill period_type / fiscal_year / months where they are still NULL.
+
+    Delegates to periods.parse -- the single period grammar -- so the
+    stored columns can never disagree with what the screens compute.
+    Returns the number of rows written; idempotent, because an unparseable
+    label is stored as 'OTHER' rather than left NULL to be retried.
+    """
+    import periods
+
+    todo = con.execute(
+        "SELECT period FROM core_metrics WHERE period_type IS NULL").fetchall()
+    for (label,) in todo:
+        p = periods.parse(label)
+        con.execute(
+            "UPDATE core_metrics SET period_type = ?, fiscal_year = ?, months = ?"
+            " WHERE period = ?",
+            [p.ptype, p.fiscal_year, p.months, label])
+    return len(todo)
 
 
 if __name__ == "__main__":

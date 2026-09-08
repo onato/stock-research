@@ -243,3 +243,69 @@ class TestRedefinedKpiSeries:
 
     def test_plain_arr_still_promotes(self):
         assert schema.promote_header("ARR") == "ARR"
+
+
+class TestPeriodColumns:
+    """core_metrics carries the parsed period beside the label, so SQL can
+    order chronologically and pick annual rows without re-parsing strings
+    (`ORDER BY period` is lexical: `9M 2021` < `FY2021` < `Q1 2021`)."""
+
+    def test_create_sql_declares_the_derived_columns(self, mem_db):
+        have = {r[0] for r in mem_db.execute(
+            "SELECT column_name FROM information_schema.columns"
+            " WHERE table_name = 'core_metrics'").fetchall()}
+        assert {"period_type", "fiscal_year", "months"} <= have
+        # Derived, not core: the CSV export must not grow three columns.
+        assert "period_type" not in schema.CORE_NAMES
+        assert "PeriodType" not in schema.CSV_HEADERS
+
+    def test_ensure_schema_migrates_a_legacy_table(self):
+        import duckdb
+        con = duckdb.connect(":memory:")
+        con.execute("CREATE TABLE core_metrics (period TEXT PRIMARY KEY, revenue DOUBLE)")
+        con.execute("INSERT INTO core_metrics VALUES ('FY2024', 1.0)")
+        schema.ensure_schema(con)
+        have = {r[0] for r in con.execute(
+            "SELECT column_name FROM information_schema.columns"
+            " WHERE table_name = 'core_metrics'").fetchall()}
+        assert {"period_type", "fiscal_year", "months", "units"} <= have
+
+    def test_backfill_fills_from_the_shared_period_parser(self, mem_db):
+        for p in ("FY2024", "H1 FY2026", "9M 2021", "FY2017-15mo", "banana"):
+            mem_db.execute("INSERT INTO core_metrics (period) VALUES (?)", [p])
+        n = schema.backfill_period_columns(mem_db)
+        assert n == 5
+        got = {r[0]: r[1:] for r in mem_db.execute(
+            "SELECT period, period_type, fiscal_year, months FROM core_metrics").fetchall()}
+        assert got["FY2024"] == ("FY", 2024, 12)
+        assert got["H1 FY2026"] == ("H1", 2026, 6)
+        assert got["9M 2021"] == ("9M", 2021, 9)
+        assert got["FY2017-15mo"] == ("OTHER", 2017, 15)
+        assert got["banana"] == ("OTHER", None, None)
+
+    def test_backfill_is_idempotent_and_only_touches_blank_rows(self, mem_db):
+        mem_db.execute("INSERT INTO core_metrics (period) VALUES ('FY2024')")
+        assert schema.backfill_period_columns(mem_db) == 1
+        assert schema.backfill_period_columns(mem_db) == 0
+
+    def test_view_exposes_period_columns_and_capex_abs(self, mem_db):
+        mem_db.execute(
+            "INSERT INTO core_metrics (period, capex, units) VALUES ('FY2024', -5.0, 'thousands')")
+        schema.backfill_period_columns(mem_db)
+        row = mem_db.execute(
+            "SELECT period_type, fiscal_year, months, capex, capex_abs"
+            " FROM metrics_normalized").fetchone()
+        # capex keeps its stored sign; capex_abs is the sign-free outflow.
+        assert row == ("FY", 2024, 12, -0.005, 0.005)
+
+
+class TestProvenanceTables:
+    def test_corrections_and_export_log_exist(self, mem_db):
+        tables = {r[0] for r in mem_db.execute(
+            "SELECT table_name FROM information_schema.tables").fetchall()}
+        assert {"corrections", "export_log"} <= tables
+        cols = {r[0] for r in mem_db.execute(
+            "SELECT column_name FROM information_schema.columns"
+            " WHERE table_name = 'corrections'").fetchall()}
+        assert {"ts", "target", "period", "col", "old_value", "new_value",
+                "source", "actor", "op"} <= cols
