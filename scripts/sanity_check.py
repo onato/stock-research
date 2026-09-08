@@ -81,6 +81,16 @@ TERMINAL_GROWTH_CEILING = 0.03
 # an obvious invalidation rule rather than a guess about freshness.
 CACHE_MAX_AGE_DAYS = 35
 
+# A P/E is informative only while the denominator is a real earnings base.
+# MCY.NZ earned NZ$1m on 1,400m shares in FY2025 -- adjusted EPS $0.00026,
+# P/E 23,958x. The division is right and the number says nothing: it pulled
+# the 10yr average to 3,028x and then tripped the rule against its own
+# garbage. Above this, the year is treated like a loss-making one and
+# dropped, on both the historical and the implied side so the comparison
+# stays symmetric. Set far above any real multiple -- a growth company at
+# 80x is information, not noise.
+MAX_MEANINGFUL_PE = 500.0
+
 # 8c.1's fallback when a month has no close (halted, pre-listing, a data
 # gap). One quarter back at most: an anchor from a year earlier is not the
 # FY-end price by any reading.
@@ -336,7 +346,9 @@ def multiples(price: float | None, row: dict[str, object]) -> dict[str, float | 
             and shares is not None and shares > 0:
         adjusted_eps = (net_income - sbc) / shares
         if adjusted_eps > 0:
-            pe = price / adjusted_eps
+            candidate = price / adjusted_eps
+            if candidate <= MAX_MEANINGFUL_PE:
+                pe = candidate
 
     ev_ebitda: float | None = None
     if market_cap is not None and net_debt is not None and sbc is not None \

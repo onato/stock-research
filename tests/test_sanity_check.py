@@ -306,6 +306,38 @@ class TestHistoricalMultiples:
         assert rows[0]["price"] is None
         assert rows[0]["pe"] is None
 
+    def test_a_near_breakeven_year_has_no_meaningful_pe(self, repo):
+        """MCY.NZ earned NZ$1m on 1,400m shares in FY2025 -- an adjusted
+        EPS of $0.00026 and a P/E of 23,958x. The division is correct and
+        the number is meaningless: it dragged the 10yr average to 3,028x
+        and then tripped the rule against its own garbage.
+
+        A P/E is only informative while the denominator is a real earnings
+        base, so a year yielding an absurd multiple is dropped from the
+        table exactly as a loss-making year already was.
+        """
+        rows = [("FY2025", 650.0, 130.0, 1.0, 520.0, 100.0, 20.0, 1400.0, 0.6)]
+        row = self.hist(repo, rows=rows)[0]
+        assert row["pe"] is None
+        assert row["pb"] is not None       # book value is unaffected
+
+    def test_an_ordinary_high_pe_still_counts(self, repo):
+        """The cutoff must not quietly discard real expensive years -- a
+        growth company at 80x is information, not noise."""
+        rows = [("FY2025", 650.0, 130.0, 20.0, 520.0, 100.0, 20.0, 100.0, 10.0)]
+        # adjusted EPS = (20 - 10) / 100 = 0.10; price 7.00 -> 70x
+        row = self.hist(repo, rows=rows)[0]
+        assert row["pe"] == pytest.approx(70.0, abs=1e-3)
+
+    def test_the_implied_multiple_uses_the_same_cutoff(self, repo):
+        """Otherwise an implied 26,878x gets compared against a historical
+        average that correctly excluded its own equivalent."""
+        latest = {"period": "FY2025", "revenue": 650.0, "ebitda": 130.0,
+                  "net_income": 1.0, "shareholders_equity": 520.0,
+                  "total_debt": 100.0, "cash_and_equivalents": 20.0,
+                  "shares_outstanding": 1400.0, "stock_based_comp": 0.6}
+        assert sanity_check.implied_multiples(7.0, latest)["pe"] is None
+
     def test_zero_ebitda_does_not_divide_by_zero(self, repo):
         rows = [("FY2024", 600.0, 10.0, 60.0, 480.0, 100.0, 20.0, 100.0, 10.0)]
         assert self.hist(repo, rows=rows)[0]["ev_ebitda"] is None
