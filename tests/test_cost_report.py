@@ -255,3 +255,135 @@ class TestDuplicateMessageLines:
                       [assistant(usage=USAGE), assistant(usage=USAGE)])
         _, rows = cost_report.analyse(p)
         assert rows[0]["msgs"] == 2
+
+
+def spawn(tool_id, subagent_type, tool_name="Agent", model="claude-opus-5"):
+    """A MAIN-thread message spawning a subagent via the Agent (or Task) tool."""
+    return assistant(model=model, content=[{
+        "type": "tool_use", "id": tool_id, "name": tool_name,
+        "input": {"subagent_type": subagent_type, "prompt": "..."}}])
+
+
+class TestStageAttribution:
+    """Subagent rows are named by the `subagent_type` of the Agent call that
+    spawned them, not by the first line of prose they happened to emit --
+    the prose labels made per-stage costs unreadable across 40 logs."""
+
+    def test_subagent_stage_from_spawning_agent_call(self, tmp_path):
+        p = write_log(tmp_path / "T.log", [
+            spawn("toolu_X", "dcf-analyst"),
+            assistant(parent="toolu_X", model="claude-fable-5", usage=USAGE,
+                      content=[{"type": "text", "text": "Reading the CSV"}]),
+            result(),
+        ])
+        _, rows = cost_report.analyse(p)
+        by_id = {r["id"]: r for r in rows}
+        assert by_id["MAIN"]["stage"] == "MAIN"
+        assert by_id["toolu_X"]["stage"] == "dcf-analyst"
+        assert by_id["toolu_X"]["label"] == "Reading the CSV"   # still kept
+
+    def test_legacy_task_tool_name_also_attributes(self, tmp_path):
+        p = write_log(tmp_path / "T.log", [
+            spawn("toolu_Y", "financial-parser", tool_name="Task"),
+            assistant(parent="toolu_Y", usage=USAGE),
+        ])
+        _, rows = cost_report.analyse(p)
+        assert {r["id"]: r["stage"] for r in rows}["toolu_Y"] == "financial-parser"
+
+    def test_unknown_parent_falls_back_to_subagent(self, tmp_path):
+        p = write_log(tmp_path / "T.log", [assistant(parent="toolu_Z", usage=USAGE)])
+        _, rows = cost_report.analyse(p)
+        assert rows[0]["stage"] == "subagent"
+
+    def test_detail_prints_the_stage_name(self, logs, monkeypatch, capsys):
+        write_log(logs / "AAA.NZ.log", [
+            spawn("toolu_X", "dashboard-generator"),
+            assistant(parent="toolu_X", usage=USAGE), result()])
+        assert run_main(monkeypatch, "AAA.NZ") == 0
+        assert "dashboard-generator" in capsys.readouterr().out
+
+    def test_started_date_from_first_timestamp(self, tmp_path):
+        ev = assistant(usage=USAGE)
+        ev["timestamp"] = "2026-09-04T20:19:50.223Z"
+        p = write_log(tmp_path / "T.log", [ev, result()])
+        summary, _ = cost_report.analyse(p)
+        assert summary["started"] == "2026-09-04"
+
+    def test_started_is_none_without_timestamps(self, tmp_path):
+        p = write_log(tmp_path / "T.log", [assistant(usage=USAGE)])
+        summary, _ = cost_report.analyse(p)
+        assert summary["started"] is None
+
+
+class TestStageReport:
+    """`--stage` aggregates $/run per stage across transcripts and snapshots
+    the numbers so an optimisation of one stage has a before/after figure."""
+
+    def _two_logs(self, logs):
+        old = spawn("t1", "dcf-analyst")
+        old["timestamp"] = "2026-08-01T00:00:00Z"
+        write_log(logs / "OLD.log", [
+            old, assistant(parent="t1", model="claude-fable-5", usage=USAGE),
+            result(cost=1.0)])
+        new = spawn("t2", "dcf-analyst")
+        new["timestamp"] = "2026-09-01T00:00:00Z"
+        write_log(logs / "NEW.log", [
+            new, assistant(parent="t2", model="claude-fable-5", usage=USAGE),
+            spawn("t3", "ir-scraper"),
+            assistant(parent="t3", usage=USAGE),
+            result(cost=2.0)])
+
+    def test_stage_table_and_snapshot(self, logs, monkeypatch, tmp_path, capsys):
+        self._two_logs(logs)
+        out_fp = tmp_path / "stages.json"
+        monkeypatch.setattr(cost_report, "STAGES_OUT", out_fp)
+        assert run_main(monkeypatch, "--stage") == 0
+        out = capsys.readouterr().out
+        assert "dcf-analyst" in out
+        assert "ir-scraper" in out
+        assert "MAIN" in out
+        snap = json.loads(out_fp.read_text())
+        assert snap["runs"] == 2
+        assert snap["stages"]["dcf-analyst"]["runs"] == 2
+        assert snap["stages"]["ir-scraper"]["runs"] == 1
+        # fable-priced USAGE: 1000*10e-6 + 2000*10e-6*2 + 10000*10e-6*0.1 + 500*50e-6
+        assert snap["stages"]["dcf-analyst"]["per_run"] == pytest.approx(0.085)
+        assert snap["stages"]["ir-scraper"]["per_run"] == pytest.approx(USAGE_COST)
+
+    def test_since_filters_by_transcript_timestamp(self, logs, monkeypatch,
+                                                   tmp_path, capsys):
+        self._two_logs(logs)
+        out_fp = tmp_path / "stages.json"
+        monkeypatch.setattr(cost_report, "STAGES_OUT", out_fp)
+        assert run_main(monkeypatch, "--stage", "--since", "2026-08-21") == 0
+        snap = json.loads(out_fp.read_text())
+        assert snap["runs"] == 1
+        assert snap["since"] == "2026-08-21"
+        assert snap["stages"]["dcf-analyst"]["runs"] == 1
+
+    def test_since_without_stage_still_filters_table(self, logs, monkeypatch, capsys):
+        self._two_logs(logs)
+        assert run_main(monkeypatch, "--since", "2026-08-21") == 0
+        out = capsys.readouterr().out
+        assert "NEW" in out
+        assert "OLD" not in out
+
+    def test_since_needs_a_date(self, logs, monkeypatch, capsys):
+        self._two_logs(logs)
+        assert run_main(monkeypatch, "--since") == 2
+        assert "needs a date" in capsys.readouterr().err
+
+    def test_spawn_block_on_a_duplicate_line_still_names_the_stage(self, tmp_path):
+        """The Agent tool_use often lands on the second transcript line of a
+        message whose first line (text block) already claimed the id. The
+        dedup must not skip the spawn map, or 38 of 40 real runs read as
+        an anonymous `subagent`."""
+        first = assistant(content=[{"type": "text", "text": "Spawning"}])
+        first["message"]["id"] = "msg_01"
+        second = spawn("toolu_X", "dcf-analyst")
+        second["message"]["id"] = "msg_01"
+        p = write_log(tmp_path / "T.log", [
+            first, second, assistant(parent="toolu_X", usage=USAGE), result()])
+        _, rows = cost_report.analyse(p)
+        assert {r["id"]: r["stage"] for r in rows}["toolu_X"] == "dcf-analyst"
+        assert {r["id"]: r["msgs"] for r in rows}["MAIN"] == 1

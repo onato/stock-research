@@ -231,8 +231,8 @@ test-country: ## One country's parser tests (COUNTRY=nzx)
 	@test -n "$(COUNTRY)" || { echo "usage: make test-country COUNTRY=nzx" >&2; exit 2; }
 	uv run pytest tests/parsers/test_$(COUNTRY).py -v
 
-cost: ## Per-ticker cost report from run transcripts
-	$(PY) $(SCRIPTS)/cost_report.py
+cost: ## Per-ticker cost report from run transcripts (ARGS="--stage --since 2026-08-21")
+	$(PY) $(SCRIPTS)/cost_report.py $(ARGS)
 
 exchange-eval: ## Extraction coverage per exchange (free, no model calls)
 	$(PY) $(SCRIPTS)/exchange_eval.py $(if $(EXCHANGE),--exchange $(EXCHANGE),) $(if $(VERBOSE),--verbose,)
