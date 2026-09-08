@@ -24,6 +24,7 @@ Usage:
   fix_metric.py T --period "Q1 2021" --move cash_and_equivalents->kpis:SharesAsPrinted --unit shares --source "..."
   fix_metric.py T --period FY2025 --kpi AISC=1450 --unit "AUD/oz" --source "PFS p.12"
   fix_metric.py T --kpi-unit-default "USD millions" --source "units never tagged"
+  fix_metric.py T --kpi-unit ARR="USD millions" --kpi-unit Customers=count --source "..."
   fix_metric.py T --periods all --null net_margin --source "..."
   ... [--apply] [--no-export] [--actor NAME]
 
@@ -106,7 +107,13 @@ class KpiUnitDefault:
     unit: str
 
 
-Op = Set | Scale | Derive | Null | Move | Kpi | KpiUnitDefault
+@dataclass
+class KpiUnit:
+    name: str
+    unit: str
+
+
+Op = Set | Scale | Derive | Null | Move | Kpi | KpiUnitDefault | KpiUnit
 
 NUMERIC = [n for n, t, _ in schema.CORE_COLUMNS if t == "DOUBLE"]
 
@@ -283,10 +290,15 @@ def apply_ops(con: "DuckDBPyConnection", ops: list[Op], *, source: str,
             _upsert_kpi(con, op.period, op.kpi_name, old, op.unit, rec)
         elif isinstance(op, Kpi):
             _upsert_kpi(con, op.period, op.name, float(op.value), op.unit, rec)
-        elif isinstance(op, KpiUnitDefault):
-            rows = con.execute(
-                "SELECT period, name FROM kpis WHERE unit IS NULL ORDER BY period, name"
-            ).fetchall()
+        elif isinstance(op, (KpiUnitDefault, KpiUnit)):
+            if isinstance(op, KpiUnit):
+                rows = con.execute(
+                    "SELECT period, name FROM kpis WHERE unit IS NULL AND name = ?"
+                    " ORDER BY period", [op.name]).fetchall()
+            else:
+                rows = con.execute(
+                    "SELECT period, name FROM kpis WHERE unit IS NULL ORDER BY period, name"
+                ).fetchall()
             for period, name in rows:
                 con.execute("UPDATE kpis SET unit = ? WHERE period = ? AND name = ?"
                             " AND unit IS NULL", [op.unit, period, name])
@@ -436,6 +448,11 @@ def parse_ops(argv: list[str]) -> list[Op]:
         if a == "--kpi-unit-default":
             vals, i = values_after(i + 1)
             ops.append(KpiUnitDefault(" ".join(vals)))
+            continue
+        if a == "--kpi-unit":
+            vals, i = values_after(i + 1)
+            name, _, unit = " ".join(vals).partition("=")
+            ops.append(KpiUnit(name.strip(), unit.strip()))
             continue
         # Flags handled by main() (--source, --apply, ...) and their values.
         if a.startswith("--"):

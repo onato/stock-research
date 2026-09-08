@@ -91,6 +91,14 @@ def write_db(ticker: str, core: list[dict[str, Any]], kpis: list[tuple[str, str,
         )
     if kpis:
         con.executemany("INSERT INTO kpis VALUES (?, ?, ?, ?)", kpis)
+    # The CSV may predate hand corrections that were applied DB-first; the
+    # committed Corrections.jsonl is their durable record, so a rebuild
+    # replays it rather than resurrecting the stale numbers.
+    import fix_metric
+    recs = fix_metric.load_jsonl(db.parent / f"{ticker}_Corrections.jsonl")
+    if recs:
+        fix_metric.replay(con, recs)
+    schema.backfill_period_columns(con)
     con.close()
     return db
 

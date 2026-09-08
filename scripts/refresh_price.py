@@ -225,13 +225,27 @@ def apply_price(doc: dict, price: float) -> list[str]:
                 changed.append(f"entry_price.{name}.entry_discount_from_current")
 
     pw = doc.get("probability_weighted")
-    if isinstance(pw, dict) and "weighted_upside" in pw:
+    if isinstance(pw, dict):
         wiv = pw.get("weighted_iv")
         if isinstance(wiv, (int, float)):
             want = _round((wiv / price - 1.0) * 100.0)
-            if pw["weighted_upside"] != want:
-                pw["weighted_upside"] = want
-                changed.append("probability_weighted.weighted_upside")
+            # Two spellings of the same figure exist in the corpus.
+            for key in ("weighted_upside", "upside_from_current_pct"):
+                if key in pw and pw[key] != want:
+                    pw[key] = want
+                    changed.append(f"probability_weighted.{key}")
+
+    # FLOW.AS carried four current prices after an agent rebuild changed the
+    # root alone: every price-shaped field the file has must follow.
+    for block, keys in (("market_data", ("price", "current_price")),
+                        ("price_refresh", ("current_price",))):
+        node = doc.get(block)
+        if not isinstance(node, dict):
+            continue
+        for key in keys:
+            if isinstance(node.get(key), (int, float)) and node[key] != price:
+                node[key] = price
+                changed.append(f"{block}.{key}")
 
     thesis = doc.get("investment_thesis")
     if isinstance(thesis, dict):

@@ -947,3 +947,142 @@ class TestCurrencyContract:
         r = self._run(d)
         assert r
         assert r[0]["status"] == "warn", r
+
+
+# ---------------------------------------------------------------------------
+# Checks added after the DCBO FY2022 clobber (2026-09): the row scored 1.0
+# because every identity only warned and nothing compared CSV to DB.
+# ---------------------------------------------------------------------------
+
+def make_full_db(d, ticker, rows):
+    """rows: {period: {core_col: value}} into a DB with the canonical schema."""
+    import duckdb
+    import schema as S
+    con = duckdb.connect(str(d / "Reports" / f"{ticker}.duckdb"))
+    con.execute(S.create_sql())
+    for period, cells in rows.items():
+        cols = ["period", *cells]
+        con.execute(f"INSERT INTO core_metrics ({', '.join(cols)}) VALUES "
+                    f"({', '.join('?' * len(cols))})", [period, *cells.values()])
+    con.close()
+
+
+def one_check(fn, ticker, *args):
+    card = E.Card()
+    fn(*args, ticker, card) if args else fn(ticker, card)
+    return {c["id"]: c for c in card.checks}
+
+
+class TestCsvDbAgree:
+    def test_disagreeing_cell_fails(self, make_ticker):
+        d = make_ticker("SYN")
+        make_full_db(d, "SYN", {"FY2022": {"revenue": 143.6, "net_income": 1.2}})
+        write_csv(d, "SYN", ["Period", "Revenue", "NetIncome"], [["FY2022", 142.912, 7.018]])
+        c = one_check(E.check_csv_db_agree, "SYN")["csv_db_agree"]
+        assert c["status"] == "fail"
+        assert "FY2022" in c["detail"]
+        assert "NetIncome" in c["detail"]
+
+    def test_agreement_passes_and_blanks_are_not_disagreements(self, make_ticker):
+        d = make_ticker("SYN")
+        make_full_db(d, "SYN", {"FY2022": {"revenue": 143.6, "net_income": None}})
+        write_csv(d, "SYN", ["Period", "Revenue", "NetIncome"], [["FY2022", 143.6, 7.018]])
+        assert one_check(E.check_csv_db_agree, "SYN")["csv_db_agree"]["status"] == "pass"
+
+    def test_skip_without_db(self, make_ticker):
+        d = make_ticker("SYN")
+        write_csv(d, "SYN", GOOD_HEADER, GOOD_ROWS)
+        assert one_check(E.check_csv_db_agree, "SYN")["csv_db_agree"]["status"] == "skip"
+
+
+class TestColumnPlausibility:
+    def test_share_count_in_the_cash_column_fails(self, make_ticker):
+        """DCBO Q1 2021: 32,781,080 in CashAndEquivalents, shares blank."""
+        header = ["Period", "Revenue", "CashAndEquivalents", "SharesOutstanding"]
+        rows = [["FY2021", 104.2, 215.3, 33.0], ["Q1 2021", 21.7, 32781080.0, ""]]
+        c = csv_checks(make_ticker, header, rows)["column_plausibility"]
+        assert c["status"] == "fail"
+        assert "Q1 2021" in c["detail"]
+
+    def test_shares_magnitude_jump_fails(self, make_ticker):
+        header = ["Period", "Revenue", "SharesOutstanding"]
+        rows = [["FY2022", 100, 33.0], ["FY2023", 110, 33067716.0], ["FY2024", 120, 34.0]]
+        c = csv_checks(make_ticker, header, rows)["column_plausibility"]
+        assert c["status"] == "fail"
+        assert "FY2023" in c["detail"]
+
+    def test_ordinary_rows_pass(self, make_ticker):
+        header = ["Period", "Revenue", "CashAndEquivalents", "TotalDebt", "SharesOutstanding"]
+        rows = [["FY2023", 100, 40, 10, 33.0], ["FY2024", 110, 45, 12, 33.5]]
+        assert csv_checks(make_ticker, header, rows)["column_plausibility"]["status"] == "pass"
+
+
+class TestEpsScaleGrading:
+    def test_every_period_off_is_a_fail(self, make_ticker):
+        """SMI.NZ: EPS in cents on un-restated shares, 11 of 11 periods off."""
+        header = ["Period", "NetIncome", "EPS", "SharesOutstanding"]
+        rows = [[f"FY{y}", -2.5, -32.667, 6.28] for y in range(2016, 2026)]
+        c = csv_checks(make_ticker, header, rows)["eps_share_scale"]
+        assert c["status"] == "fail"
+
+    def test_a_minority_off_stays_a_warn(self, make_ticker):
+        header = ["Period", "NetIncome", "EPS", "SharesOutstanding"]
+        rows = [[f"FY{y}", 10.0, 0.5, 20.0] for y in range(2016, 2025)]
+        rows.append(["FY2025", 10.0, 50.0, 20.0])
+        assert csv_checks(make_ticker, header, rows)["eps_share_scale"]["status"] == "warn"
+
+
+class TestCapexSign:
+    def test_mixed_signs_warn(self, make_ticker):
+        header = ["Period", "Revenue", "CapEx"]
+        rows = [["FY2023", 100, -5.0], ["FY2024", 110, 6.0]]
+        c = csv_checks(make_ticker, header, rows)["capex_sign"]
+        assert c["status"] == "warn"
+
+    def test_consistent_sign_passes(self, make_ticker):
+        header = ["Period", "Revenue", "CapEx"]
+        rows = [["FY2023", 100, -5.0], ["FY2024", 110, -6.0], ["FY2025", 120, 0.0]]
+        assert csv_checks(make_ticker, header, rows)["capex_sign"]["status"] == "pass"
+
+
+class TestDcfPriceConsistent:
+    def test_nested_price_disagreeing_with_root_warns(self, make_ticker):
+        doc = minimal_dcf(price_refresh={"current_price": 27.28},
+                          market_data={"price": 28.24},
+                          investment_thesis={"current_price": 10.0})
+        c = dcf_checks(make_ticker, doc)["dcf_price_consistent"]
+        assert c["status"] == "warn"
+        assert "price_refresh.current_price" in c["detail"]
+        assert "market_data.price" in c["detail"]
+        assert "investment_thesis" not in c["detail"]
+
+    def test_all_prices_agree_passes(self, make_ticker):
+        doc = minimal_dcf(price_refresh={"current_price": 10.02},
+                          market_data={"current_price": 10.0})
+        assert dcf_checks(make_ticker, doc)["dcf_price_consistent"]["status"] == "pass"
+
+    def test_previous_price_is_not_a_current_price(self, make_ticker):
+        doc = minimal_dcf(price_refresh={"previous_price": 8.0, "current_price": 10.0})
+        assert dcf_checks(make_ticker, doc)["dcf_price_consistent"]["status"] == "pass"
+
+
+class TestChangedSince:
+    def test_changed_since_selects_tickers_from_git(self, make_ticker, pinned_identity,
+                                                     monkeypatch, capsys):
+        install_good_ticker(make_ticker, "AAA")
+        install_good_ticker(make_ticker, "BBB")
+        monkeypatch.setattr(E, "git_changed_paths",
+                            lambda ref: ["research/BBB/Reports/BBB_Metrics.csv", "scripts/x.py"])
+        monkeypatch.setattr(sys, "argv", ["run_evals.py", "--changed-since", "HEAD~3"])
+        assert E.main() == 0
+        out = capsys.readouterr().out
+        assert out.startswith("BBB: score=")
+        assert "AAA" not in out
+
+    def test_changed_since_with_nothing_changed_is_a_no_op(self, make_ticker, pinned_identity,
+                                                             monkeypatch, capsys):
+        install_good_ticker(make_ticker, "AAA")
+        monkeypatch.setattr(E, "git_changed_paths", lambda ref: [])
+        monkeypatch.setattr(sys, "argv", ["run_evals.py", "--changed-since", "HEAD"])
+        assert E.main() == 0
+        assert "no tickers changed" in capsys.readouterr().out

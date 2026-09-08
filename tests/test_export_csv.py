@@ -554,3 +554,53 @@ class TestHandEditGuard:
         row[idx["eps"]] = 0.51                                          # 2%
         assert export_csv._disagreements(out, [tuple(row)]) == [
             ("FY2024", "EPS", 0.5, 0.51)]
+
+
+class TestLegacySchema:
+    def test_legacy_db_missing_columns_still_exports(self, make_ticker, monkeypatch):
+        """87 of 178 corpus DBs predate a core column and failed with a
+        binder error on SELECT; the export migrates first."""
+        d = make_ticker("SYN")
+        db = d / "Reports" / "SYN.duckdb"
+        con = duckdb.connect(str(db))
+        con.execute("CREATE TABLE core_metrics (period TEXT PRIMARY KEY, revenue DOUBLE, units TEXT)")
+        con.execute("INSERT INTO core_metrics VALUES ('FY2024', 100.0, 'millions')")
+        con.close()
+        assert run_main(monkeypatch, "SYN") == 0
+        assert csv_revenue(d / "Reports" / "SYN_Metrics.csv") == {"FY2024": "100.0"}
+
+
+class TestCorrectionsExplainDisagreements:
+    def test_a_recorded_correction_is_not_a_hand_edit(self, make_ticker, monkeypatch, capsys):
+        """fix_metric.py is the sanctioned way to change the DB; a CSV cell
+        that disagrees with a DB value the corrections table accounts for
+        must export without --force (which would drop carried columns)."""
+        d = make_ticker("SYN")
+        repo = d.parent.parent
+        make_db(repo, "SYN", ["FY2022"])
+        out = d / "Reports" / "SYN_Metrics.csv"
+        out.write_text("Period,Revenue,EPS_alt\nFY2022,100,0.21\n")
+        import fix_metric
+        con = duckdb.connect(str(repo / "research/SYN/Reports/SYN.duckdb"))
+        fix_metric.apply_ops(con, [fix_metric.Set("FY2022", {"revenue": 142.912})],
+                             source="40F:1701", actor="t")
+        con.close()
+        assert run_main(monkeypatch, "SYN") == 0
+        with open(out, newline="") as fh:
+            rows = list(csv.DictReader(fh))
+        assert rows[0]["Revenue"] == "142.912"
+        assert rows[0]["EPS_alt"] == "0.21"          # carried column survives
+        assert "1 cell(s) updated from the DB" in capsys.readouterr().out
+
+    def test_an_unexplained_cell_still_refuses(self, make_ticker, monkeypatch):
+        d = make_ticker("SYN")
+        repo = d.parent.parent
+        make_db(repo, "SYN", ["FY2022", "FY2023"])
+        out = d / "Reports" / "SYN_Metrics.csv"
+        out.write_text("Period,Revenue\nFY2022,142.912\nFY2023,999\n")
+        import fix_metric
+        con = duckdb.connect(str(repo / "research/SYN/Reports/SYN.duckdb"))
+        fix_metric.apply_ops(con, [fix_metric.Set("FY2022", {"revenue": 142.912})],
+                             source="40F:1701", actor="t")
+        con.close()
+        assert run_main(monkeypatch, "SYN") == 1       # FY2023 999 vs 100 unexplained

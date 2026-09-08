@@ -567,3 +567,30 @@ class TestDashboardKeyLoss:
         path = self.dash_with(ticker, embedded)
         refresh_price.refresh(ticker.repo, "DCBO", 23.06, "USD", apply=True)
         assert "23.06" in path.read_text()
+
+
+class TestEveryPriceFieldMoves:
+    """FLOW.AS carried four different current prices after an agent rebuild
+    changed the root without touching market_data or the weighted upside
+    alias. apply_price must reach every price-shaped field it knows."""
+
+    def test_market_data_and_upside_alias_follow_the_root_price(self):
+        doc = dcf_doc(market_data={"price": 17.52, "current_price": 17.52},
+                      price_refresh={"current_price": 17.52, "previous_price": 15.0})
+        doc["probability_weighted"]["upside_from_current_pct"] = 88.4
+        changed = refresh_price.apply_price(doc, 20.0)
+        assert doc["market_data"]["price"] == 20.0
+        assert doc["market_data"]["current_price"] == 20.0
+        assert doc["price_refresh"]["current_price"] == 20.0
+        assert doc["probability_weighted"]["upside_from_current_pct"] == 65.0   # 33/20-1
+        for path in ("market_data.price", "market_data.current_price",
+                     "price_refresh.current_price",
+                     "probability_weighted.upside_from_current_pct"):
+            assert path in changed
+
+    def test_absent_blocks_are_not_created(self):
+        doc = dcf_doc()
+        refresh_price.apply_price(doc, 20.0)
+        assert "market_data" not in doc
+        assert "price_refresh" not in doc
+        assert "upside_from_current_pct" not in doc["probability_weighted"]

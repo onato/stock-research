@@ -21,19 +21,23 @@ prompt hash, so score changes are attributable to prompt versions.
 
 Usage:
   run_evals.py TICKER [TICKER...]
-  run_evals.py --all            # every ticker directory with a Reports/
-  run_evals.py --strict ...     # exit 1 if any check fails (default exit 0)
+  run_evals.py --all                  # every ticker directory with a Reports/
+  run_evals.py --changed-since REF    # tickers whose Reports/ changed since a git ref
+  run_evals.py --strict ...           # exit 1 if any check fails (default exit 0)
 """
 
 import csv
 import datetime as dt
 import itertools
 import json
+import statistics
+import subprocess
 import sys
 from collections.abc import Callable
 from typing import Any
 
 import dcf_fields as F
+import schema
 from schema import normalize
 
 SCORES = F.REPO / "state" / "scores"
@@ -43,6 +47,9 @@ WIV_TOL = 0.02          # weighted-IV recompute: 2%
 CONTINUITY_RATIO = 8    # adjacent-period jump that suggests unit drift
 SHARES_RATIO = 3        # shares should be split-adjusted, so tighter
 MIN_EXTRACT_BYTES = 200
+EPS_FAIL_FRACTION = 0.9   # eps_share_scale: this share of periods off is a fail
+PLAUSIBLE_CASH_X_REVENUE = 50   # a balance-sheet cell this far above peak revenue is a shifted column
+SHARES_MAGNITUDE = 1000         # a share count 1000x off the ticker's median is a scale slip
 
 
 def close(a: float, b: float, tol: float = REL_TOL) -> bool:
@@ -183,7 +190,11 @@ def check_metrics(ticker: str, card: Card) -> None:
              f"duplicate periods: {dupes}" if dupes else "")
 
     def identity(cid: str, fields: tuple[str, ...],
-                 test: Callable[..., bool], note: str = "") -> None:
+                 test: Callable[..., bool], note: str = "",
+                 fail_at: float | None = None) -> None:
+        """fail_at: fraction of graded periods off (with >=3 graded) that
+        turns the warn into a fail -- a whole column on the wrong basis is
+        not a review item, it is a broken artifact (SMI.NZ EPS: 11/11)."""
         bad: list[Any]
         bad, n = [], 0
         for r in rows:
@@ -196,7 +207,10 @@ def check_metrics(ticker: str, card: Card) -> None:
         if n == 0:
             card.add(cid, "skip", "fields not present")
         elif bad:
-            card.add(cid, "warn", f"{len(bad)}/{n} periods off: {bad[:6]}{' ' + note if note else ''}")
+            status = "warn"
+            if fail_at is not None and n >= 3 and len(bad) / n >= fail_at:
+                status = "fail"
+            card.add(cid, status, f"{len(bad)}/{n} periods off: {bad[:6]}{' ' + note if note else ''}")
         else:
             card.add(cid, "pass", f"{n} periods")
 
@@ -218,7 +232,10 @@ def check_metrics(ticker: str, card: Card) -> None:
              lambda a, liab, e: close(a, liab + e, 0.02))
 
     identity("eps_share_scale", ("net_income", "eps", "shares_outstanding"),
-             eps_ok, note="(units/split mismatch)")
+             eps_ok, note="(units/split mismatch)", fail_at=EPS_FAIL_FRACTION)
+
+    check_capex_sign(rows, card)
+    check_column_plausibility(rows, card)
 
     def continuity(cid: str, field: str, limit: float) -> None:
         jumps: list[str]
@@ -251,6 +268,100 @@ def check_metrics(ticker: str, card: Card) -> None:
         card.add("coverage", "warn", "no headers map to core schema")
 
     check_essential_coverage(rows, header, card)
+
+
+def check_capex_sign(rows: list[dict[str, Any]], card: Card) -> None:
+    """One sign convention per ticker. The corpus stores capex positive on
+    some tickers (DCBO) and cash-flow negative on others (SMI.NZ, FLOW.AS);
+    canonical is positive = outflow, but a ticker mixing both is the only
+    state no consumer can read correctly."""
+    signs = [r["capex"] > 0 for r in rows
+             if r.get("capex") is not None and abs(r["capex"]) > 1e-9]
+    if not signs:
+        card.add("capex_sign", "skip", "no capex")
+        return
+    pos, neg = sum(signs), len(signs) - sum(signs)
+    if pos and neg:
+        card.add("capex_sign", "warn", f"mixed capex sign: {pos} positive, {neg} negative")
+    else:
+        card.add("capex_sign", "pass",
+                 "positive = outflow" if pos else "negative (cash-flow sign)")
+
+
+def check_column_plausibility(rows: list[dict[str, Any]], card: Card) -> None:
+    """Catch a value that landed in the wrong column.
+
+    DCBO Q1 2021 carried a share count (32,781,080) in CashAndEquivalents
+    with SharesOutstanding blank, and cash in TotalDebt; every identity
+    passed because none of them relates cash to anything. Two shapes are
+    graded: a balance-sheet cell far above the ticker's peak revenue on a
+    row with no share count, and a share count 1000x off the ticker's
+    median (a scale slip in one row, not a split).
+    """
+    revenues = [abs(r["revenue"]) for r in rows if r.get("revenue") is not None]
+    shares = [abs(r["shares_outstanding"]) for r in rows
+              if r.get("shares_outstanding") not in (None, 0)]
+    if not revenues and not shares:
+        card.add("column_plausibility", "skip", "no revenue or share count")
+        return
+    flags: list[str] = []
+    peak = max(revenues) if revenues else None
+    if peak:
+        for r in rows:
+            if r.get("shares_outstanding") is not None:
+                continue
+            for field, header in (("cash_and_equivalents", "CashAndEquivalents"),
+                                  ("total_debt", "TotalDebt")):
+                v = r.get(field)
+                if v is not None and abs(v) > PLAUSIBLE_CASH_X_REVENUE * peak:
+                    flags.append(f"{r.get('period')}: {header}={v:g} with "
+                                 "SharesOutstanding blank (shifted column?)")
+    if len(shares) >= 3:
+        med = statistics.median(shares)
+        for r in rows:
+            v = r.get("shares_outstanding")
+            if not isinstance(v, (int, float)) or v == 0:
+                continue
+            ratio = abs(v) / med
+            if ratio >= SHARES_MAGNITUDE or ratio <= 1 / SHARES_MAGNITUDE:
+                flags.append(f"{r.get('period')}: SharesOutstanding={v:g} is "
+                             f"{ratio:.0e}x the median (scale slip?)")
+    card.add("column_plausibility", "fail" if flags else "pass",
+             "; ".join(flags[:4]) if flags else f"{len(rows)} rows plausible")
+
+
+def check_csv_db_agree(ticker: str, card: Card) -> None:
+    """Every populated core cell in the CSV must match the DB within 1%.
+
+    The CSV is derived from the DB by export_csv.py; a disagreement means a
+    hand edit landed in the CSV (where the next export destroys it) or an
+    export was skipped. DCBO's FY2022 row scored 1.0 with both wrong.
+    """
+    reports = F.REPO / "research" / ticker / "Reports"
+    db = reports / f"{ticker}.duckdb"
+    path = reports / f"{ticker}_Metrics.csv"
+    if not db.exists() or not path.exists():
+        card.add("csv_db_agree", "skip", "no database or CSV")
+        return
+    try:
+        import duckdb
+        import export_csv
+        con = duckdb.connect(str(db), read_only=True)
+        have = {r[0] for r in con.execute(
+            "SELECT column_name FROM information_schema.columns"
+            " WHERE table_name = 'core_metrics'").fetchall()}
+        cols = ", ".join(c if c in have else f"NULL AS {c}" for c in schema.CORE_NAMES)
+        rows = con.execute(f"SELECT {cols} FROM core_metrics").fetchall()
+        con.close()
+        diffs = export_csv._disagreements(path, rows)
+    except Exception as e:
+        card.add("csv_db_agree", "skip", f"unreadable: {str(e)[:60]}")
+        return
+    if diffs:
+        shown = "; ".join(f"{p} {h} (csv {cv:g} vs db {dv:g})" for p, h, cv, dv in diffs[:4])
+        card.add("csv_db_agree", "fail", f"{len(diffs)} cell(s) disagree: {shown}")
+    else:
+        card.add("csv_db_agree", "pass", f"{len(rows)} periods agree")
 
 
 # ---------------------------------------------------------------------------
@@ -394,6 +505,27 @@ def check_dcf(ticker: str, card: Card) -> None:
     card.add("policy_sbc", "pass" if has_sbc else "warn",
              "" if has_sbc else
              "inputs.sbc absent (fine for NTA/book models, a gap for FCF DCFs)")
+
+    # FLOW.AS carried four current prices (root, price_refresh, market_data,
+    # a note) after an agent rebuild changed the root alone. Every
+    # price-shaped field must agree with the root; lists are not walked, so
+    # a historical price table is not a candidate.
+    if price:
+        off: list[str] = []
+
+        def walk(node: dict[str, Any], path: str) -> None:
+            for k, v in node.items():
+                here = f"{path}.{k}" if path else k
+                if isinstance(v, dict):
+                    walk(v, here)
+                elif (path and k in ("price", "current_price")
+                        and isinstance(v, (int, float))
+                        and abs(v - price) > 0.005 * price):
+                    off.append(f"{here}={v}")
+
+        walk(dcf, "")
+        card.add("dcf_price_consistent", "warn" if off else "pass",
+                 f"root current_price={price} but " + ", ".join(off[:4]) if off else "")
 
 
 def check_currency_contract(dcf: dict[str, Any], card: Card) -> None:
@@ -705,6 +837,7 @@ def check_health(ticker: str, card: Card) -> None:
 def evaluate(ticker: str) -> dict[str, Any]:
     card = Card()
     check_metrics(ticker, card)
+    check_csv_db_agree(ticker, card)
     check_dcf(ticker, card)
     _dcf_ccy = F.load_dcf(ticker)
     if _dcf_ccy is not None:
@@ -729,11 +862,33 @@ def all_tickers() -> list[str]:
                   if p.is_dir() and " " not in p.parent.name)
 
 
+def git_changed_paths(ref: str) -> list[str]:
+    out = subprocess.run(["git", "diff", "--name-only", ref, "--", "research"],
+                         cwd=F.REPO, capture_output=True, text=True, check=False).stdout
+    return [ln.strip() for ln in out.splitlines() if ln.strip()]
+
+
+def changed_tickers(ref: str) -> list[str]:
+    """Tickers whose Reports/ changed since a git ref -- what the exit gate
+    should score, instead of every ticker (~2 min) or none."""
+    out: set[str] = set()
+    for p in git_changed_paths(ref):
+        parts = p.split("/")
+        if len(parts) >= 3 and parts[0] == "research" and parts[2] == "Reports":
+            out.add(parts[1])
+    return sorted(out)
+
+
 def main() -> int:
     argv = sys.argv[1:]
     strict = "--strict" in argv
     argv = [a for a in argv if a != "--strict"]
-    if argv == ["--all"]:
+    if len(argv) == 2 and argv[0] == "--changed-since":
+        tickers = changed_tickers(argv[1])
+        if not tickers:
+            print(f"no tickers changed since {argv[1]}")
+            return 0
+    elif argv == ["--all"]:
         tickers = all_tickers()
     elif argv and not any(a.startswith("-") for a in argv):
         tickers = argv

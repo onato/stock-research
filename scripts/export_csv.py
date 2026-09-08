@@ -163,6 +163,38 @@ def _last_export_sha(db: pathlib.Path) -> str | None:
         con.close()
 
 
+def _explained(db: pathlib.Path,
+               differing: list[tuple[str, str, float, float]]
+               ) -> list[tuple[str, str, float, float]]:
+    """Disagreements the corrections table does NOT account for.
+
+    fix_metric.py is the sanctioned way to change the DB. A CSV cell that
+    disagrees with a DB value some correction produced is stale, not
+    hand-edited, so it must not trigger the refusal.
+    """
+    import duckdb
+    con = duckdb.connect(str(db), read_only=True)
+    try:
+        tables = {r[0] for r in con.execute(
+            "SELECT table_name FROM information_schema.tables").fetchall()}
+        if "corrections" not in tables:
+            return differing
+        fixed = con.execute(
+            "SELECT period, col, new_value FROM corrections"
+            " WHERE target = 'core_metrics'").fetchall()
+    finally:
+        con.close()
+    header_to_col = dict(zip(schema.CSV_HEADERS, schema.CORE_NAMES, strict=True))
+    produced = {(str(p), str(c)): v for p, c, v in fixed}
+    left = []
+    for period, header, cv, dv in differing:
+        want = produced.get((period, header_to_col.get(header, "")))
+        if want is not None and abs(want - dv) <= 1e-9 * max(abs(dv), 1.0):
+            continue
+        left.append((period, header, cv, dv))
+    return left
+
+
 def _log_export(db: pathlib.Path, out: pathlib.Path, periods: int) -> None:
     """Record what was written, and fill the derived period columns while a
     write connection is open anyway."""
@@ -284,6 +316,11 @@ def main() -> int:
         return 1
 
     import duckdb
+    # Migrate first: 87 of 178 corpus DBs predate a core column, and the
+    # SELECT below dies with a binder error on any of them.
+    con = duckdb.connect(str(db))
+    schema.ensure_schema(con)
+    con.close()
     con = duckdb.connect(str(db), read_only=True)
     cols = ", ".join(schema.CORE_NAMES)
     rows = con.execute(f"SELECT {cols} FROM core_metrics").fetchall()
@@ -305,15 +342,17 @@ def main() -> int:
 
     if differing and not force:
         # Told apart by the export log: a CSV that still matches what the
-        # last export wrote was not edited by hand, so the DB is newer.
+        # last export wrote was not edited by hand, so the DB is newer. A
+        # cell the corrections table produced is sanctioned either way.
         last = _last_export_sha(db)
         edited = last is None or last != _sha(out)
-        if edited:
+        unexplained = _explained(db, differing) if edited else []
+        if unexplained:
             shown = ", ".join(f"{p} {h} (csv {cv:g} vs db {dv:g})"
-                              for p, h, cv, dv in differing[:5])
+                              for p, h, cv, dv in unexplained[:5])
             why = ("was edited by hand since the last export" if last
                    else "has no export history, so its edits cannot be trusted to the DB")
-            print(f"REFUSING to overwrite {out.name}: {len(differing)} populated "
+            print(f"REFUSING to overwrite {out.name}: {len(unexplained)} populated "
                   f"cell(s) disagree with core_metrics and the CSV {why}.",
                   file=sys.stderr)
             print(f"  {shown}", file=sys.stderr)

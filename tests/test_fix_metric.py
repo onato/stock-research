@@ -250,3 +250,21 @@ class TestCli:
     def test_periods_all_means_no_filter(self):
         ops = FM.parse_ops(["--periods", "all", "--scale", "eps", "0.01"])
         assert ops[0].periods is None
+
+
+class TestKpiUnitByName:
+    def test_kpi_unit_sets_only_that_name_where_null(self, con):
+        con.execute("INSERT INTO kpis VALUES ('FY2023', 'ACV', 46.3, NULL),"
+                    " ('FY2023', 'Customers', 3395, 'count')")
+        recs = FM.apply_ops(con, [FM.KpiUnit("ARR", "USD millions"), FM.KpiUnit("ACV", "USD thousands")],
+                            source="units never tagged", actor="t")
+        assert len(recs) == 3
+        assert con.execute("SELECT DISTINCT unit FROM kpis WHERE name='ARR'").fetchall() == [("USD millions",)]
+        assert con.execute("SELECT unit FROM kpis WHERE name='ACV'").fetchone() == ("USD thousands",)
+        assert con.execute("SELECT unit FROM kpis WHERE name='Customers'").fetchone() == ("count",)
+        assert recs[0]["op"] == "kpi_unit"
+
+    def test_parse_kpi_unit_flag(self):
+        ops = FM.parse_ops(["--kpi-unit", "ARR=USD millions", "--kpi-unit", "Customers=count"])
+        assert [type(o).__name__ for o in ops] == ["KpiUnit", "KpiUnit"]
+        assert (ops[0].name, ops[0].unit) == ("ARR", "USD millions")

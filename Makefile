@@ -74,7 +74,7 @@ else
 endif
 	@echo
 	@echo "==> scoring"
-	@$(PY) $(SCRIPTS)/run_evals.py --all >/dev/null 2>&1 || true
+	@$(PY) $(SCRIPTS)/run_evals.py --all 2>/dev/null | grep -E "FAIL:" || true
 	@echo
 	@$(MAKE) --no-print-directory digest
 	@echo

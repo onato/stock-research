@@ -253,3 +253,25 @@ class TestMain:
         d = load_syn(make_ticker, text="Period,Revenue\n,100\n")
         assert run_main(monkeypatch, "SYN") == 0
         assert not (d / "Reports" / "SYN.duckdb").exists()
+
+
+class TestReplayCorrections:
+    def test_rebuild_reapplies_the_committed_corrections(self, patch_repo):
+        """The DB is gitignored; Reports/{T}_Corrections.jsonl is the durable
+        record of every hand fix, and a rebuild from the legacy CSV must
+        land on the corrected numbers, not the CSV's stale ones."""
+        import json
+        reports = patch_repo / "research" / "SYN" / "Reports"
+        reports.mkdir(parents=True)
+        (reports / "SYN_Metrics.csv").write_text("Period,Revenue,NetIncome\nFY2022,143.6,1.2\n")
+        (reports / "SYN_Corrections.jsonl").write_text(json.dumps({
+            "ts": "2026-09-08T00:00:00Z", "target": "core_metrics", "period": "FY2022",
+            "col": "net_income", "old_value": 1.2, "new_value": 7.018, "unit": None,
+            "source": "DCBO_40F_FY2022.txt:100", "actor": "t", "op": "set"}) + "\n")
+        rows, _, _ = L.read_csv(reports / "SYN_Metrics.csv")
+        core, kpis = L.to_core(rows)
+        db = L.write_db("SYN", core, kpis)
+        con = duckdb.connect(str(db), read_only=True)
+        assert con.execute("SELECT net_income FROM core_metrics").fetchone()[0] == 7.018
+        assert con.execute("SELECT count(*) FROM corrections").fetchone()[0] == 1
+        con.close()
