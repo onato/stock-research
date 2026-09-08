@@ -713,6 +713,17 @@ def check(repo: pathlib.Path, ticker: str,
             "the historical table is reported for context only")
         return block
 
+    if not evaluated:
+        # SDL.NZ: units NULL on every row, so metrics_normalized was all
+        # NULL and nothing could be graded. A pass on zero rules is not a
+        # pass; say why the rules had no inputs so the fix is obvious.
+        block["passed"] = None
+        block["not_evaluated_reason"] = (
+            "no rule had inputs: no annual row with revenue, equity or earnings "
+            "on a known scale (core_metrics.units NULL? see make backfill-units) "
+            "or no FY-end price aligned to it")
+        return block
+
     reasons = trip_reasons(implied, hist, upside, position)
     block["trip_reasons"] = reasons
     block["passed"] = not reasons

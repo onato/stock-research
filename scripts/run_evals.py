@@ -470,6 +470,10 @@ def check_dcf(ticker: str, card: Card) -> None:
             # on purpose: only the script's own block, and only when it
             # says which checks it replaced.
             card.add("dcf_sanity_check", "pass", f"checks replaced: {replaced}")
+        elif (passed is None and sc.get("computed_by") == "scripts/sanity_check.py"
+                and sc.get("not_evaluated_reason")):
+            card.add("dcf_sanity_check", "warn",
+                     f"no rule could be evaluated: {sc['not_evaluated_reason']}")
         elif passed:
             card.add("dcf_sanity_check", "pass")
         elif passed is False and not (sc.get("fix_applied") or sc.get("trip_reasons")):

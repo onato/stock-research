@@ -983,3 +983,19 @@ class TestCli:
 
     def test_no_arguments_exits_two(self, repo, capsys):
         assert sanity_check.main([]) == 2
+
+
+class TestNoRuleHadInputs:
+    def test_null_units_leave_no_rule_evaluable_and_no_verdict(self, repo):
+        """SDL.NZ (2026-09-08): core_metrics.units was NULL on every row, so
+        metrics_normalized returned NULL for every money column, no implied
+        multiple could be computed, and the block said `passed: true` on
+        zero rules. A verdict reached on nothing is not a verdict."""
+        make_db(repo, "SEK.NZ", units=None)
+        make_prices(repo, "SEK.NZ")
+        make_dcf(repo, "SEK.NZ")
+        block = sanity_check.check(repo, "SEK.NZ", today=TODAY)
+        assert block["rules_evaluated"] == []
+        assert block["passed"] is None
+        assert "not_evaluated_reason" in block
+        assert "units" in block["not_evaluated_reason"]

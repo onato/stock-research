@@ -1126,3 +1126,14 @@ class TestDcfPriceConsistentIgnoresHistory:
                                             "fy_table": {"2016": {"price": 32.74},
                                                          "2017": {"price": 20.0}}}})
         assert dcf_checks(make_ticker, doc)["dcf_price_consistent"]["status"] == "pass"
+
+
+class TestSanityCheckWithNoRules:
+    def test_script_block_with_no_evaluable_rule_is_a_warn(self, make_ticker):
+        doc = minimal_dcf(sanity_check={"ran": True, "passed": None,
+                                        "computed_by": "scripts/sanity_check.py",
+                                        "rules_evaluated": [],
+                                        "not_evaluated_reason": "no annual row on a known scale (units NULL?)"})
+        c = dcf_checks(make_ticker, doc)["dcf_sanity_check"]
+        assert c["status"] == "warn"
+        assert "units" in c["detail"]
