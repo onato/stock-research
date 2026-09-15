@@ -268,3 +268,62 @@ class TestKpiUnitByName:
         ops = FM.parse_ops(["--kpi-unit", "ARR=USD millions", "--kpi-unit", "Customers=count"])
         assert [type(o).__name__ for o in ops] == ["KpiUnit", "KpiUnit"]
         assert (ops[0].name, ops[0].unit) == ("ARR", "USD millions")
+
+
+class TestSetUnits:
+    """`--set-units LABEL` relabels core_metrics.units after a --scale.
+
+    standardize_scale.py put MPG.NZ's CSV on the millions scale while the
+    DB stayed in thousands (memory: standardize-scale-csv-only); scaling the
+    money columns back into agreement leaves the `units` label wrong, and
+    there was no recorded, replayable way to change a TEXT column.
+    """
+
+    def test_parse_set_units_scoped_by_periods(self):
+        ops = FM.parse_ops(["--periods", "all", "--set-units", "millions"])
+        assert [type(o).__name__ for o in ops] == ["SetUnits"]
+        assert ops[0].unit == "millions"
+        assert ops[0].periods is None
+        ops = FM.parse_ops(["--period", "FY2022", "--set-units", "NZD thousands"])
+        assert ops[0].unit == "NZD thousands"
+        assert ops[0].periods == ["FY2022"]
+
+    def test_set_units_relabels_and_records(self, con):
+        con.execute("UPDATE core_metrics SET units = 'thousands'")
+        recs = FM.apply_ops(con, [FM.SetUnits("millions", periods=None)], source=SRC, actor="t")
+        assert con.execute("SELECT DISTINCT units FROM core_metrics").fetchall() == [("millions",)]
+        assert len(recs) == 2
+        assert {r["op"] for r in recs} == {"set_units"}
+        assert {r["unit"] for r in recs} == {"millions"}
+        assert {r["col"] for r in recs} == {"units"}
+        assert corrections(con)[0][6] == "set_units"
+
+    def test_set_units_skips_rows_already_labelled(self, con):
+        recs = FM.apply_ops(con, [FM.SetUnits("millions", periods=None)], source=SRC, actor="t")
+        assert recs == []
+        assert corrections(con) == []
+
+    def test_replay_reapplies_set_units(self, con):
+        con.execute("UPDATE core_metrics SET units = 'thousands'")
+        recs = FM.apply_ops(con, [FM.SetUnits("millions", periods=["FY2022"])], source=SRC, actor="t")
+        fresh = duckdb.connect(":memory:")
+        fresh.execute(schema.create_sql())
+        fresh.execute("INSERT INTO core_metrics (period, revenue, units) VALUES"
+                      " ('FY2021', 100.0, 'thousands'), ('FY2022', 143.6, 'thousands')")
+        assert FM.replay(fresh, [json.loads(json.dumps(r)) for r in recs]) == 1
+        assert fresh.execute("SELECT period, units FROM core_metrics ORDER BY period").fetchall() == [
+            ("FY2021", "thousands"), ("FY2022", "millions")]
+        assert fresh.execute("SELECT revenue FROM core_metrics WHERE period='FY2022'").fetchone()[0] == 143.6
+
+
+class TestScaleRounding:
+    def test_scale_does_not_record_float_representation_noise(self, con):
+        con.execute("UPDATE core_metrics SET revenue = 268293.0, shares_outstanding = 185378.0"
+                    " WHERE period = 'FY2021'")
+        recs = FM.apply_ops(con, [FM.Scale(["revenue", "shares_outstanding"], 0.001, periods=["FY2021"])],
+                            source=SRC, actor="t")
+        # 268293 * 0.001 is 268.29300000000001 in binary; the record and the
+        # cell must carry the decimal the filing implies, not the noise.
+        assert cell(con, "FY2021", "revenue") == 268.293
+        assert cell(con, "FY2021", "shares_outstanding") == 185.378
+        assert {r["new_value"] for r in recs} == {268.293, 185.378}

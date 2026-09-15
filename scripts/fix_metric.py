@@ -26,6 +26,7 @@ Usage:
   fix_metric.py T --kpi-unit-default "USD millions" --source "units never tagged"
   fix_metric.py T --kpi-unit ARR="USD millions" --kpi-unit Customers=count --source "..."
   fix_metric.py T --periods all --null net_margin --source "..."
+  fix_metric.py T --periods all --scale revenue ... 0.001 --set-units millions --source "..."
   ... [--apply] [--no-export] [--actor NAME]
 
 Expressions for --derive are plain arithmetic over core column names and
@@ -113,7 +114,14 @@ class KpiUnit:
     unit: str
 
 
-Op = Set | Scale | Derive | Null | Move | Kpi | KpiUnitDefault | KpiUnit
+@dataclass
+class SetUnits:
+    """Relabel core_metrics.units (a TEXT column --set cannot touch)."""
+    unit: str
+    periods: list[str] | None      # None = every period
+
+
+Op = Set | Scale | Derive | Null | Move | Kpi | KpiUnitDefault | KpiUnit | SetUnits
 
 NUMERIC = [n for n, t, _ in schema.CORE_COLUMNS if t == "DOUBLE"]
 
@@ -253,6 +261,8 @@ def apply_ops(con: "DuckDBPyConnection", ops: list[Op], *, source: str,
         elif isinstance(op, Move):
             _periods(con, [op.period])
             _check_col(op.col)
+        elif isinstance(op, SetUnits):
+            _periods(con, op.periods)
         # A Kpi may name a period with no core row (a feasibility-study
         # year, a metric disclosed only quarterly), so it is not checked.
 
@@ -265,7 +275,9 @@ def apply_ops(con: "DuckDBPyConnection", ops: list[Op], *, source: str,
                 for col in op.cols:
                     old = _cell(con, period, col)
                     if old is not None:
-                        core_update(period, col, old * op.factor, "scale")
+                        # 268293 * 0.001 is 268.29300000000001 in binary;
+                        # record the decimal the filing implies, not the noise.
+                        core_update(period, col, round(old * op.factor, 10), "scale")
         elif isinstance(op, Derive):
             tree, names = _parse_expr(op.expr)
             for period in _periods(con, op.periods):
@@ -290,6 +302,15 @@ def apply_ops(con: "DuckDBPyConnection", ops: list[Op], *, source: str,
             _upsert_kpi(con, op.period, op.kpi_name, old, op.unit, rec)
         elif isinstance(op, Kpi):
             _upsert_kpi(con, op.period, op.name, float(op.value), op.unit, rec)
+        elif isinstance(op, SetUnits):
+            for period in _periods(con, op.periods):
+                cur = con.execute("SELECT units FROM core_metrics WHERE period = ?",
+                                  [period]).fetchone()
+                if cur is None or cur[0] == op.unit:
+                    continue
+                con.execute("UPDATE core_metrics SET units = ? WHERE period = ?",
+                            [op.unit, period])
+                rec(period=period, col="units", unit=op.unit, op="set_units")
         elif isinstance(op, (KpiUnitDefault, KpiUnit)):
             if isinstance(op, KpiUnit):
                 rows = con.execute(
@@ -329,7 +350,10 @@ def replay(con: "DuckDBPyConnection", recs: list[Record]) -> int:
     n = 0
     for r in recs:
         target, op = r["target"], r["op"]
-        if target == "core_metrics":
+        if op == "set_units":
+            con.execute("UPDATE core_metrics SET units = ? WHERE period = ?",
+                        [r.get("unit"), r["period"]])
+        elif target == "core_metrics":
             _write_core(con, r["period"], r["col"], r["new_value"])
         elif op == "kpi":
             name = target.split(":", 1)[1]
@@ -454,6 +478,12 @@ def parse_ops(argv: list[str]) -> list[Op]:
             name, _, unit = " ".join(vals).partition("=")
             ops.append(KpiUnit(name.strip(), unit.strip()))
             continue
+        if a == "--set-units":
+            vals, i = values_after(i + 1)
+            if not vals:
+                raise FixError("--set-units LABEL")
+            ops.append(SetUnits(" ".join(vals), scope))
+            continue
         # Flags handled by main() (--source, --apply, ...) and their values.
         if a.startswith("--"):
             _, i = values_after(i + 1)
@@ -499,7 +529,7 @@ def main() -> int:
         return 2
     if not ops:
         print("nothing to do: give at least one of --set/--scale/--derive/--null/"
-              "--move/--kpi/--kpi-unit-default", file=sys.stderr)
+              "--move/--kpi/--kpi-unit-default/--set-units", file=sys.stderr)
         return 2
 
     reports = REPO / "research" / ticker / "Reports"
@@ -530,6 +560,9 @@ def main() -> int:
     print(f"{ticker}: {len(recs)} cell(s) -- {mode}")
     for r in recs:
         where = f"{r['target']} {r['period'] or ''} {r['col']}"
+        if r["op"] == "set_units":
+            print(f"  {r['op']:8s} {where:45s} {'':>16s} -> {r['unit']}")
+            continue
         print(f"  {r['op']:8s} {where:45s} {_fmt(r['old_value']):>16s} -> {_fmt(r['new_value'])}")
     print(f"  source: {source}")
 
