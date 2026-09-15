@@ -502,8 +502,10 @@ in *financing*, so reported OCF and FCF are flattered. Two valid treatments:
 - **(A) Leases as debt** — do NOT deduct principal from the flows; subtract lease
   liabilities once in the net-debt bridge; charge ongoing lease-asset renewal through a
   capex-like line.
-- **(B) Leases as operating cost** — deduct the full lease payment inside adjusted
-  EBITDA and **exclude lease liabilities from net debt**.
+- **(B) Leases as operating cost** — deduct the full lease payment (principal **and**
+  interest, both on the cash-flow statement) inside adjusted EBITDA and **exclude lease
+  liabilities from net debt**. Cash-tax EBIT must then use D&A ex right-of-use
+  depreciation, or the lease is charged twice.
 
 Charging **both** (a third-party Boshoku model) cost ~¥800-1,000/share. Charging
 roughly **neither** inflates value by a similar order. Check the reporting standard
@@ -594,6 +596,10 @@ Before finishing, verify every box. The items are grouped by the error each one 
 - [ ] `inputs.currency` **and** `inputs.quote_currency` both present as bare ISO codes (`GBp` for pence), even when identical — never inferred from the ticker suffix
 - [ ] Where they differ: an `fx_note` giving the rate, its date, its source and a parity check; a currency-suffixed twin for the non-canonical basis; and the unsuffixed `intrinsic_value`/`weighted_iv` left in the **quote** currency so they are comparable to `current_price`
 - [ ] **One** lease treatment chosen, stated, and consistent — principal deducted from flows XOR lease liabilities in net debt, never both and never neither
+- [ ] Under treatment (B) the lease line is **principal + interest**, both read off the cash-flow statement (`Lease liability principal payments` in financing, `Interest paid on leases` in operating) — MPG.NZ's first build deducted the $8.0m principal and called it the full payment, missing $4.5m/yr on flows of $2-5m
+- [ ] **Working-capital sign matches the balance sheet**: a manufacturer or distributor with receivables + inventory > payables has `wc_capture` **negative** (growth consumes cash); positive capture is only for prepaid/deferred-revenue models
+- [ ] **EBIT for cash tax is after D&A ex right-of-use depreciation** when leases are in the flows — otherwise the lease is charged twice, EBIT goes negative and a flat tax rate books a cash *credit*; tax is `max(0, EBIT) × rate`
+- [ ] **Sanity multiples are lease-consistent**: ex-lease EV against EBITDA less lease cash, or lease-inclusive EV against post-IFRS-16 EBITDA — never ex-lease EV over post-IFRS-16 EBITDA (MPG.NZ read 2.7x that way; 6.4-8.4x consistently)
 - [ ] **NCI charged once** — attributable-only flows XOR an NCI deduction in the bridge; FY0 NOPAT ties to reported attributable net income
 - [ ] **Every stripped income stream has its source asset in the bridge**, and vice versa (cross-shareholdings and investment securities at fair value, not just cash)
 - [ ] SBC rows kept explicit at 0% in SBC-zero markets; `band_position` set to null and the collapse explained rather than reported as 0%
