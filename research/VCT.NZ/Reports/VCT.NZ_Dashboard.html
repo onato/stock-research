@@ -1,0 +1,4536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vector Limited (VCT.NZ) Financial Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 20px;
+}
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+}
+.header h1 {
+    font-size: 2.5rem;
+    background: linear-gradient(90deg, #00d4aa, #00b894);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+}
+.header p {
+    color: #888;
+    font-size: 1.1rem;
+}
+/* Headline valuation chip — fills the wide, otherwise-empty header strip so the
+   number the reader should act on is visible without scrolling to the DCF. */
+.header-valuation {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 14px 32px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.hv-item {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+.hv-label {
+    font-size: 0.75rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.hv-value {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #e0e0e0;
+}
+.hv-value.positive { color: #00d4aa; }
+.hv-value.negative { color: #ff6b6b; }
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.kpi-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.kpi-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 212, 170, 0.2);
+}
+.kpi-value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #00d4aa;
+    margin-bottom: 5px;
+}
+.kpi-label {
+    font-size: 0.85rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.kpi-change {
+    font-size: 0.9rem;
+    margin-top: 5px;
+}
+.kpi-change.positive { color: #00d4aa; }
+.kpi-change.negative { color: #ff6b6b; }
+/* Guidance Section */
+.guidance-section {
+    max-width: 1400px;
+    margin: 0 auto 30px;
+}
+.guidance-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+.guidance-header h3 {
+    color: #fff;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.guidance-header h3::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894);
+    border-radius: 2px;
+}
+.guidance-meta {
+    font-size: 0.85rem;
+    color: #888;
+}
+.guidance-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+.guidance-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.2s ease;
+}
+.guidance-card:hover {
+    transform: translateY(-2px);
+}
+.guidance-metric {
+    font-size: 0.8rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+.guidance-target {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: #00d4aa;
+    margin-bottom: 6px;
+}
+.guidance-period {
+    font-size: 0.85rem;
+    color: #e0e0e0;
+    margin-bottom: 8px;
+}
+.guidance-vs-prior {
+    display: inline-block;
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+.guidance-vs-prior.raised {
+    background: rgba(0, 212, 170, 0.15);
+    color: #00d4aa;
+}
+.guidance-vs-prior.lowered {
+    background: rgba(255, 107, 107, 0.15);
+    color: #ff6b6b;
+}
+.guidance-vs-prior.maintained {
+    background: rgba(255, 255, 255, 0.1);
+    color: #888;
+}
+.guidance-vs-prior.new {
+    background: rgba(99, 102, 241, 0.15);
+    color: #818cf8;
+}
+.guidance-notes {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 8px;
+    line-height: 1.4;
+}
+.guidance-commentary {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    padding: 16px 20px;
+    border-left: 3px solid #00d4aa;
+    font-style: italic;
+    color: #b0b0b0;
+    line-height: 1.6;
+}
+.guidance-commentary::before {
+    content: '"';
+    font-size: 1.5rem;
+    color: #00d4aa;
+    margin-right: 4px;
+}
+.section-title {
+    font-size: 1.5rem;
+    color: #fff;
+    margin: 40px auto 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid rgba(0, 212, 170, 0.3);
+    max-width: 1400px;
+}
+.charts-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 25px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+.chart-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    padding: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+.chart-header h3 {
+    color: #fff;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.chart-header h3::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894);
+    border-radius: 2px;
+}
+.help-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(0, 212, 170, 0.2);
+    border: 1px solid #00d4aa;
+    color: #00d4aa;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+.help-btn:hover {
+    background: #00d4aa;
+    color: #1a1a2e;
+}
+.chart-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.view-toggle {
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #888;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.view-toggle:hover {
+    border-color: #0984e3;
+    color: #0984e3;
+}
+.view-toggle.active {
+    background: rgba(9, 132, 227, 0.2);
+    border-color: #0984e3;
+    color: #0984e3;
+}
+.log-toggle {
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #888;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.log-toggle:hover {
+    border-color: #00d4aa;
+    color: #00d4aa;
+}
+.log-toggle.active {
+    background: rgba(0, 212, 170, 0.2);
+    border-color: #00d4aa;
+    color: #00d4aa;
+}
+.chart-wrapper {
+    position: relative;
+    height: 300px;
+}
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+    background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%);
+    border-radius: 16px;
+    max-width: 600px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    border: 1px solid rgba(0, 212, 170, 0.3);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.modal-header {
+    padding: 20px 25px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.modal-header h3 {
+    color: #00d4aa;
+    font-size: 1.4rem;
+    margin: 0;
+}
+.modal-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 107, 107, 0.2);
+    border: 1px solid #ff6b6b;
+    color: #ff6b6b;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.modal-close:hover {
+    background: #ff6b6b;
+    color: #fff;
+}
+.modal-body {
+    padding: 25px;
+    line-height: 1.7;
+}
+.modal-body p { margin-bottom: 15px; }
+.modal-body strong { color: #00d4aa; }
+.modal-body ul { margin: 15px 0; padding-left: 20px; }
+.modal-body li { margin-bottom: 8px; }
+.metric-highlight {
+    background: rgba(0, 212, 170, 0.1);
+    border-left: 3px solid #00d4aa;
+    padding: 12px 15px;
+    margin: 15px 0;
+    border-radius: 0 8px 8px 0;
+}
+/* Investment Overview Section */
+.overview-section {
+    max-width: 1400px;
+    margin: 0 auto 30px;
+}
+.overview-toggle {
+    width: 100%;
+    background: rgba(0, 212, 170, 0.1);
+    border: 1px solid rgba(0, 212, 170, 0.3);
+    border-radius: 12px;
+    padding: 16px 24px;
+    color: #00d4aa;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s ease;
+}
+.overview-toggle:hover {
+    background: rgba(0, 212, 170, 0.2);
+}
+.overview-toggle .arrow {
+    transition: transform 0.3s ease;
+}
+.overview-toggle.active .arrow {
+    transform: rotate(180deg);
+}
+.overview-content {
+    display: none;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    padding: 30px;
+    margin-top: -12px;
+}
+.overview-content.active {
+    display: block;
+}
+.overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 25px;
+}
+.overview-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.overview-card h3 {
+    color: #00d4aa;
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.overview-card p {
+    margin-bottom: 12px;
+    line-height: 1.6;
+}
+.overview-card ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.overview-card li {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    line-height: 1.5;
+}
+.overview-card li:last-child {
+    border-bottom: none;
+}
+.overview-card.bull h3 { color: #00d4aa; }
+.overview-card.bear h3 { color: #ff6b6b; }
+.overview-card.risks h3 { color: #fdcb6e; }
+.risk-high { color: #ff6b6b; }
+.risk-moderate { color: #fdcb6e; }
+.risk-low { color: #00d4aa; }
+.revenue-stream {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.revenue-stream .percent {
+    color: #00d4aa;
+    font-weight: 600;
+}
+.trend-growing { color: #00d4aa; }
+.trend-stable { color: #888; }
+.trend-declining { color: #ff6b6b; }
+
+@media (max-width: 768px) {
+    .charts-container { grid-template-columns: 1fr; }
+    .overview-grid { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.8rem; }
+}
+/* DCF Valuation Section */
+.dcf-section {
+    max-width: 1400px;
+    margin: 0 auto 40px;
+}
+.dcf-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+.dcf-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease;
+}
+.dcf-card:hover {
+    transform: translateY(-3px);
+}
+.dcf-card.highlight {
+    background: rgba(0, 212, 170, 0.1);
+    border-color: rgba(0, 212, 170, 0.3);
+}
+.dcf-label {
+    font-size: 0.85rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+}
+.dcf-value {
+    font-size: 2.2rem;
+    font-weight: bold;
+    color: #00d4aa;
+}
+.dcf-card:not(.highlight) .dcf-value {
+    color: #fff;
+}
+.dcf-change {
+    font-size: 1rem;
+    margin-top: 8px;
+    font-weight: 600;
+}
+.dcf-change.positive { color: #00d4aa; }
+.dcf-change.negative { color: #ff6b6b; }
+.dcf-sublabel {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 8px;
+}
+.dcf-warning {
+    background: rgba(253, 203, 110, 0.15);
+    border: 1px solid rgba(253, 203, 110, 0.4);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 25px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #fdcb6e;
+}
+.warning-icon {
+    font-size: 1.2rem;
+}
+/* DCF Inputs Display */
+.dcf-inputs {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.dcf-inputs h4 {
+    color: #e0e0e0;
+    margin-bottom: 15px;
+    font-size: 1rem;
+}
+.dcf-inputs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+.dcf-input-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.dcf-input-label {
+    font-size: 0.75rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+.dcf-input-value {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #00d4aa;
+}
+.dcf-input-note {
+    font-size: 0.7rem;
+    color: #666;
+    margin-top: 4px;
+}
+.fcf-projections h5 {
+    color: #b0b0b0;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+}
+.fcf-projection-table {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 12px;
+}
+.fcf-projection-item {
+    text-align: center;
+}
+.fcf-projection-item.header {
+    font-size: 0.75rem;
+    color: #888;
+    font-weight: 600;
+}
+.fcf-projection-item .year {
+    font-size: 0.75rem;
+    color: #888;
+    margin-bottom: 2px;
+}
+.fcf-projection-item .fcf-value {
+    font-size: 1rem;
+    color: #e0e0e0;
+    font-weight: 500;
+}
+.fcf-projection-item .growth-rate {
+    font-size: 0.75rem;
+    color: #00d4aa;
+    margin-top: 2px;
+}
+.dcf-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 25px;
+    margin-bottom: 30px;
+    padding: 25px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.slider-group label {
+    font-size: 0.95rem;
+    color: #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+}
+.slider-group label span {
+    color: #00d4aa;
+    font-weight: 600;
+}
+.slider-group input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #00d4aa;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+.slider-hint {
+    font-size: 0.8rem;
+    color: #666;
+}
+.scenario-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+.scenario-tab {
+    padding: 10px 24px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: transparent;
+    color: #888;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+}
+.scenario-tab:hover {
+    border-color: rgba(0, 212, 170, 0.5);
+    color: #e0e0e0;
+}
+.scenario-tab.active {
+    background: rgba(0, 212, 170, 0.15);
+    border-color: #00d4aa;
+    color: #00d4aa;
+}
+.scenario-details {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.scenario-details h4 {
+    color: #00d4aa;
+    margin-bottom: 15px;
+}
+.assumption-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+}
+.assumption-item {
+    text-align: center;
+}
+.assumption-item .label {
+    font-size: 0.8rem;
+    color: #888;
+    margin-bottom: 4px;
+}
+.assumption-item .value {
+    font-size: 1.1rem;
+    color: #e0e0e0;
+    font-weight: 500;
+}
+.sensitivity-section {
+    margin-bottom: 30px;
+}
+.sensitivity-section h4 {
+    color: #e0e0e0;
+    margin-bottom: 15px;
+}
+.sensitivity-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.sensitivity-table th,
+.sensitivity-table td {
+    padding: 12px 16px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.sensitivity-table th {
+    background: rgba(0, 212, 170, 0.1);
+    color: #00d4aa;
+    font-weight: 600;
+}
+.sensitivity-table td {
+    color: #e0e0e0;
+}
+.sensitivity-table td.highlight {
+    background: rgba(0, 212, 170, 0.15);
+    color: #00d4aa;
+    font-weight: 600;
+}
+.sensitivity-table td.below-current {
+    color: #ff6b6b;
+}
+.sensitivity-table td.above-current {
+    color: #00d4aa;
+}
+.historical-growth {
+    margin-bottom: 30px;
+}
+.historical-growth h4 {
+    color: #e0e0e0;
+    margin-bottom: 15px;
+}
+.growth-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 15px;
+}
+.growth-item {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.growth-item .metric {
+    font-size: 0.8rem;
+    color: #888;
+    margin-bottom: 6px;
+}
+.growth-item .rate {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+.growth-item .rate.positive { color: #00d4aa; }
+.growth-item .rate.negative { color: #ff6b6b; }
+.growth-item.selected {
+    border-color: #00d4aa;
+    background: rgba(0, 212, 170, 0.1);
+}
+.dcf-download {
+    text-align: center;
+    margin-top: 30px;
+}
+.download-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 28px;
+    background: rgba(0, 212, 170, 0.15);
+    border: 1px solid #00d4aa;
+    border-radius: 8px;
+    color: #00d4aa;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+.download-btn:hover {
+    background: #00d4aa;
+    color: #1a1a2e;
+}
+.download-icon {
+    font-size: 1.2rem;
+}
+/* Additions beyond the original agent template */
+.section-subtitle { font-size: 0.9rem; color: #888; max-width: 1400px; margin: -12px auto 20px; }
+.kpi-note { font-size: 0.75rem; color: #666; margin-top: 6px; line-height: 1.3; }
+.chart-annotation {
+    font-size: 0.75rem; color: #fdcb6e; background: rgba(253, 203, 110, 0.08);
+    border-left: 2px solid #fdcb6e; padding: 6px 10px; margin-top: 10px; border-radius: 0 6px 6px 0;
+}
+.dcf-philosophy {
+    background: rgba(255, 255, 255, 0.03); border-left: 3px solid #00d4aa; border-radius: 0 10px 10px 0;
+    padding: 16px 20px; margin-bottom: 25px; font-size: 0.92rem; line-height: 1.7; color: #b0b0b0;
+}
+.dcf-philosophy strong { color: #00d4aa; }
+.scenario-narrative { font-size: 0.9rem; color: #b0b0b0; line-height: 1.6; margin-bottom: 18px; }
+.dcf-banner {
+    max-width: 1400px; margin: 0 auto 25px; background: rgba(255, 107, 107, 0.12);
+    border: 1px solid rgba(255, 107, 107, 0.4); border-radius: 8px; padding: 12px 16px; color: #ff6b6b;
+}
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Vector Limited (VCT.NZ)</h1>
+    <p>Utilities - Regulated Electricity & Gas Distribution &middot; reported in NZD</p>
+    <div class="header-valuation" id="headerValuation" style="display:none"></div>
+</div>
+
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid" id="overviewGrid"></div>
+    </div>
+</div>
+
+<div class="kpi-grid" id="kpiGrid">
+    <div class="kpi-card">
+        <div class="kpi-value">NZ$1,195.3m</div>
+        <div class="kpi-label">Revenue (latest FY)</div>
+        <div class="kpi-change positive">+1.0% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">NZ$240.2m</div>
+        <div class="kpi-label">Net Income</div>
+        <div class="kpi-change positive">+43.2% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">NZ$101.2m</div>
+        <div class="kpi-label">Free Cash Flow (reported)</div>
+        <div class="kpi-change positive">+151.1% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">NZ$72.6m</div>
+        <div class="kpi-label">Owner FCF (DCF base)</div>
+        <div class="kpi-change positive">after SBC, interest income &amp; leases</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">NZ$5.4m</div>
+        <div class="kpi-label">Cash &amp; Equivalents</div>
+        <div class="kpi-change negative">-76.8% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">NZ$2,306.9m</div>
+        <div class="kpi-label">Total Debt</div>
+        <div class="kpi-change positive">+9.8% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">1,000</div>
+        <div class="kpi-label">Shares Outstanding (m)</div>
+        <div class="kpi-change positive">+0.0% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">0.2</div>
+        <div class="kpi-label">EPS</div>
+        <div class="kpi-change positive">+43.7% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">NZ$482.2m</div>
+        <div class="kpi-label">Adjusted EBITDA (FY2026)</div>
+        <div class="kpi-change positive">+16.5% YoY</div>
+        <div class="kpi-note">company&#x27;s own normalised measure, ex significant items</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">NZ$2,282.0m</div>
+        <div class="kpi-label">Economic Net Debt</div>
+        <div class="kpi-change negative">gearing 39% at FY2026</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">NZ$531.3m</div>
+        <div class="kpi-label">Gross CapEx (FY2026)</div>
+        <div class="kpi-change negative">record spend, FY2027 guided $605-635m</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">NZ$191.5m</div>
+        <div class="kpi-label">Capital Contributions (FY2026)</div>
+        <div class="kpi-change positive">netted against gross capex; FY2027 guided lower ($160-190m)</div>
+    </div>
+</div>
+
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf">-</span> | <span id="guidanceFY">-</span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<h2 class="section-title">Growth &amp;amp; Profitability</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Revenue &amp;amp; YoY Growth</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('revenueChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('revenueChart', 'interim', this)">H1/H2</button>
+                <button class="help-btn" onclick="openModal('revenue')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="revenueChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Margins</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('marginsChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('marginsChart', 'interim', this)">H1/H2</button>
+                <button class="help-btn" onclick="openModal('margins')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="marginsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Gross Profit, Operating Income &amp;amp; Net Income</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('profitChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('profitChart', 'interim', this)">H1/H2</button>
+                <button class="log-toggle" onclick="toggleLogScale('profitChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('profit')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="profitChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>EBITDA &amp;amp; EBITDA Margin</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('ebitdaChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('ebitdaChart', 'interim', this)">H1/H2</button>
+                <button class="log-toggle" onclick="toggleLogScale('ebitdaChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('ebitda')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="ebitdaChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>EPS &amp;amp; Dividend per Share</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('epsDps')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="epsDpsChart"></canvas></div>
+    </div>
+</div>
+<h2 class="section-title">Cash Flow &amp;amp; Balance Sheet</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Income vs Free Cash Flow vs Owner FCF</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('fcfChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('fcfChart', 'interim', this)">H1/H2</button>
+                <button class="help-btn" onclick="openModal('fcf')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="fcfChart"></canvas></div>
+        <div class="chart-annotation">Owner FCF, where shown, is the DCF's series after SBC, interest income and lease principal.</div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Operating Cash Flow &amp;amp; CapEx</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('ocfCapexChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('ocfCapexChart', 'interim', this)">H1/H2</button>
+                <button class="help-btn" onclick="openModal('ocfCapex')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="ocfCapexChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Cash vs Total Debt</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('cashDebtChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('cashDebtChart', 'interim', this)">H1/H2</button>
+                <button class="help-btn" onclick="openModal('cashDebt')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="cashDebtChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shareholders&#x27; Equity vs Total Liabilities</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('balanceChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('balanceChart', 'interim', this)">H1/H2</button>
+                <button class="log-toggle" onclick="toggleLogScale('balanceChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('balanceSheet')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="balanceChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Stock-Based Comp &amp;amp; Shares Outstanding</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('sbcChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('sbcChart', 'interim', this)">H1/H2</button>
+                <button class="help-btn" onclick="openModal('sbc')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="sbcChart"></canvas></div>
+    </div>
+</div>
+<h2 class="section-title">Regulatory &amp;amp; Adjusted Metrics</h2>
+<p class="section-subtitle">GAAP figures include the FY2023 metering and FY2024 gas-distribution disposals; the adjusted/continuing-ops lines are Vector's own normalised measures</p>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Reported EBITDA vs Adjusted EBITDA</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('gaapVsAdjustedChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('gaapVsAdjustedChart', 'interim', this)">H1/H2</button>
+                <button class="log-toggle" onclick="toggleLogScale('gaapVsAdjustedChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('gaapVsAdjusted')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="gaapVsAdjustedChart"></canvas></div>
+        <div class="chart-annotation">Adjusted EBITDA strips significant/one-off items (impairments, disposal gains); continuing-ops strips the sold metering and gas-trading businesses on top of that.</div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Network Investment: Gross CapEx vs Operating Cash Flow</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('capexSupercycleChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('capexSupercycleChart', 'interim', this)">H1/H2</button>
+                <button class="help-btn" onclick="openModal('capexSupercycle')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="capexSupercycleChart"></canvas></div>
+        <div class="chart-annotation">Gross CapEx is before customer capital contributions ($190.9m in FY2026; company nets these against capex in its own reporting). FY2027 gross capex is guided to a record $605-635m.</div>
+    </div>
+</div>
+
+<h2 class="section-title">DCF Valuation</h2>
+
+<div class="dcf-section">
+  <div class="dcf-philosophy" id="dcfPhilosophy"></div>
+
+  <div class="dcf-summary">
+    <div class="dcf-card highlight">
+      <div class="dcf-label">Prob-Weighted IV</div>
+      <div class="dcf-value" id="dcfWeighted">-</div>
+      <div class="dcf-change" id="dcfWeightedUpside"></div>
+      <div class="dcf-sublabel" id="dcfWeightedSublabel">-</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Intrinsic Value (Base)</div>
+      <div class="dcf-value" id="dcfIV">-</div>
+      <div class="dcf-change positive" id="dcfUpside"></div>
+      <div class="dcf-sublabel">Owner FCF &mdash; after SBC, interest income &amp; leases</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Entry Price (15% CAGR)</div>
+      <div class="dcf-value" id="dcfEntry">-</div>
+      <div class="dcf-sublabel">Buy below for a 15% annual return (incl. interim FCF)</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Current Price</div>
+      <div class="dcf-value" id="dcfCurrent">-</div>
+      <div class="dcf-sublabel">as of 2026-09-19</div>
+    </div>
+  </div>
+
+  <div class="dcf-warning" id="growthWarning" style="display: none;">
+    <span class="warning-icon">&#9888;</span>
+    <span id="warningText"></span>
+  </div>
+
+  <div class="dcf-inputs">
+    <h4>DCF Model Inputs</h4>
+    <div class="dcf-inputs-grid">
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Base Owner FCF (FY2026)</div>
+        <div class="dcf-input-value" id="baseFCF">-</div>
+        <div class="dcf-input-note" id="sbcBreakdown">Starting point for projections</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Shares Outstanding</div>
+        <div class="dcf-input-value" id="sharesOut">-</div>
+        <div class="dcf-input-note" id="dilutionNote"></div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Net Debt</div>
+        <div class="dcf-input-value" id="netDebt">-</div>
+        <div class="dcf-input-note">Negative = net cash</div>
+      </div>
+    </div>
+    <div class="fcf-projections">
+      <h5>Projected FCF</h5>
+      <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+    </div>
+  </div>
+
+  <!-- step is fine enough to hold every scenario default exactly; a range
+       input snaps to its step and 7.5 became 8 on NPH.NZ with step="1". -->
+  <div class="slider-hint" id="dcfEngineNote" style="max-width:1400px;margin:0 auto 8px"></div>
+  <div class="dcf-controls">
+    <div class="slider-group">
+      <label>Growth Rate (Yr 1): <span id="growthValue">-</span></label>
+      <input type="range" id="growthSlider" min="-5" max="30" value="9" step="0.1" oninput="updateDCFDisplay()">
+      <div class="slider-hint" id="growthHint">Base-case Year-1 revenue growth</div>
+    </div>
+    <div class="slider-group">
+      <label>WACC: <span id="waccValue">-</span></label>
+      <input type="range" id="waccSlider" min="5.75" max="18" value="6.75" step="0.05" oninput="updateDCFDisplay()">
+    </div>
+    <div class="slider-group">
+      <label>Terminal Growth: <span id="terminalValue">-</span></label>
+      <input type="range" id="terminalSlider" min="0" max="5" value="3" step="0.1" oninput="updateDCFDisplay()">
+    </div>
+  </div>
+
+  <div class="scenario-tabs">
+    <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+    <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+    <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+  </div>
+
+  <div class="scenario-details" id="scenarioDetails">
+    <h4>Assumptions</h4>
+    <div class="scenario-narrative" id="scenarioNarrative"></div>
+    <div class="assumption-grid" id="assumptionGrid"></div>
+  </div>
+
+  <div class="sensitivity-section">
+    <h4>Sensitivity Analysis: Intrinsic Value by WACC &amp; Terminal Growth (Base Case)</h4>
+    <table class="sensitivity-table" id="sensitivityMatrix"></table>
+  </div>
+
+  <div class="historical-growth">
+    <h4>Historical Growth Rates (CAGR)</h4>
+    <div class="growth-grid" id="growthGrid"></div>
+  </div>
+
+  <div class="dcf-download">
+    <a href="VCT.NZ_DCF_Model.xlsx" class="download-btn" download>
+      <span class="download-icon">&#8681;</span> Download Excel Model
+    </a>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// EMBEDDED DATA (generated by scripts/build_dashboard.py -- do not hand-edit;
+// edit the Spec JSON / CSV / Analysis / DCF and rebuild)
+// ============================================================
+const csvData = `Period,Revenue,CostOfRevenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,EBITDA,NetIncome,NetMargin,EPS,OperatingCashFlow,CapEx,FreeCashFlow,ShareholdersEquity,TotalAssets,TotalLiabilities,TotalDebt,CashAndEquivalents,SharesOutstanding,StockBasedComp,DividendPerShare,EBITDABeforeSignificant,RevenueContinuing,EBITDAContinuingBeforeSignificant,EBITContinuingBeforeSignificant,Units,Currency,NetTangibleAssetsPerShare
+FY2019,1318.6,,,,,,516.6,84.0,6.4,0.083,348.1,418.4,-70.3,2349.4,6061.0,3711.6,2800.9,27.6,999.973657,,0.165,,,,,millions,NZD,0.978
+FY2020,1294.0,,,,,,573.8,97.3,7.5,0.095,397.3,476.4,-79.1,2259.7,6380.9,4121.2,3175.3,28.3,999.973657,,0.165,,,,,millions,NZD,
+FY2021,1279.3,,,,,,634.3,194.6,15.2,0.193,499.1,516.2,-17.1,2335.4,6519.5,4184.1,3098.3,17.4,999.973657,,0.1675,,,,,millions,NZD,
+FY2022,1339.0,,,,,,672.5,160.9,12.0,0.159,518.8,558.8,-40.0,2430.1,6812.2,4382.1,3257.1,22.5,999.973657,,0.1675,,1103.4,,,millions,NZD,
+FY2023,1451.1,,,,,,523.3,1715.8,118.2,1.714,517.1,639.0,-121.9,3958.0,7527.6,3569.6,2333.8,537.0,999.973657,,0.2225,,1192.3,,,millions,NZD,2.726
+FY2024,1241.5,,,,,,601.0,91.0,7.3,0.089,445.1,488.7,-43.6,3776.7,7125.6,3348.9,2106.6,104.6,999.973657,,0.2225,,1141.2,,,millions,NZD,2.622
+H1 FY2025,,,,,,,336.3,118.1,,,237.0,261.0,-24.0,,,,,,999.973657,,0.12,,437.0,201.6,,millions,NZD,
+FY2025,1183.2,,,,169.7,,611.6,167.7,14.17,0.167,515.2,474.9,40.3,3600.9,6922.3,3321.4,2100.6,23.3,999.973657,,0.25,414.0,1104.0,401.1,169.7,millions,NZD,2.549
+H1 FY2026,,,,,,,324.6,113.0,,,277.0,223.0,54.0,,,,,,999.973657,,0.125,,498.0,239.7,,millions,NZD,
+FY2026,1195.3,,,,249.2,,673.1,240.2,20.1,0.24,632.5,531.3,101.2,3629.0,7157.1,3528.1,2306.9,5.4,1000.0,,0.26,482.2,1195.3,482.2,249.2,millions,NZD,2.582`;
+
+const analysis = {
+ "ticker": "VCT.NZ",
+ "company_name": "Vector Limited",
+ "sector": "Utilities - Regulated Electricity & Gas Distribution",
+ "analysis_date": "2026-09-19",
+ "overview": "Vector Limited owns and operates the regulated electricity distribution network covering Auckland (from Wellsford to central Papakura, plus Waiheke and Great Barrier Islands) and the Auckland gas distribution network, serving over 640,000 electricity and ~120,000 gas connections. The company has transformed its portfolio over FY2023-FY2024, selling its metering business (retaining a 50% stake in the renamed Bluecurrent joint venture with QIC) and its natural gas trading business (Ongas/Liquigas), leaving a simplified structure of regulated electricity distribution, regulated gas distribution, and a smaller 'Other' segment (Vector Technology Solutions, HRV, Vector Fibre). Vector is majority-owned (75.1%) by Entrust, a community trust that distributes an annual cash dividend to ~370,000+ Auckland electricity consumer beneficiaries, with the balance of shares NZX-listed and freely traded (ticker VCT).",
+ "business_model": {
+  "summary": "Vector is fundamentally a regulated-asset-base (RAB) utility: it earns revenue set under the Commerce Commission's Default Price-Quality Path (DPP) framework for electricity distribution, reset every five years (current period DPP4, effective 1 April 2025 to 31 March 2030), which determines allowable revenue based on the regulatory asset base, an allowed rate of return (WACC, currently favourable given the higher interest rate environment baked into DPP4), depreciation, and pass-through costs (e.g. Transpower transmission charges). Gas distribution operates under a similar but separate DPQP regime. Revenue is highly recurring and monopoly-protected (network access charges paid by all retailers/consumers on the network) but growth requires capital investment; capital contributions from customers for new connections partly offset gross capex. The 'Other' segment (Vector Technology Solutions/VTS, HRV, Vector Fibre, and 50%-owned Bluecurrent JV) contributes a much smaller, less regulated, and currently loss-making-to-marginal earnings stream, though Bluecurrent distributions ($55m in FY26) are growing.",
+  "revenue_streams": [
+   {
+    "name": "Electricity distribution (Adjusted EBITDA)",
+    "percent": 91,
+    "trend": "growing",
+    "notes": "FY26: $440m adjusted EBITDA (+25% YoY) on revenue growth driven by the DPP4 reset (effective 1 April 2025) which recognises higher allowable returns from higher interest rates/inflation and pass-through of Transpower transmission cost increases. 642,134 total connections (+1.6% YoY)."
+   },
+   {
+    "name": "Gas distribution (Adjusted EBITDA)",
+    "percent": 10,
+    "trend": "stable/declining volumes",
+    "notes": "FY26: $47m adjusted EBITDA (flat YoY). Volumes declining (11.7PJ, -1.7% YoY in FY26; -4.5% in H1FY26) as the sector transitions away from gas; new connections slowing sharply (720 in FY26 vs 1,300 in FY25). A structurally declining but still regulated, cash-generative business."
+   },
+   {
+    "name": "Other (VTS, HRV, Vector Fibre, Bluecurrent JV share)",
+    "percent": -1,
+    "trend": "mixed",
+    "notes": "Small, non-reportable segment; often near break-even to slightly negative on an adjusted EBITDA basis in recent periods. Bluecurrent (50% JV with QIC, advanced metering) is cash-flow positive and paying growing distributions ($55m FY26) but reports a net loss at the NPAT line from debt-funded growth, meter depreciation and contract amortisation, which flows through Vector's 'share of associates' P&L line."
+   }
+  ],
+  "customer_type": "Effectively B2B2C — Vector's direct customers are electricity and gas retailers who use its distribution network to reach end consumers; ultimate economic bearers of network charges are Auckland households and businesses. Also has direct B2B/B2C exposure through Vector Technology Solutions, HRV (home ventilation), and Vector Fibre.",
+  "geographic_mix": "100% Auckland region for the core regulated networks (electricity: Wellsford to central Papakura plus islands; gas: wider Auckland region). Bluecurrent JV also operates metering assets in Australia."
+ },
+ "competitive_position": {
+  "main_competitors": [
+   "No direct competitor for the core Auckland electricity/gas distribution networks — these are regulated natural-monopoly infrastructure with no realistic prospect of a parallel network being built",
+   "Other NZ regulated electricity distribution businesses (EDBs) as regulatory/political benchmarks rather than direct competitors: Powerco, Orion, Wellington Electricity, Unison, Aurora Energy, Northpower",
+   "Bluecurrent JV competes with other advanced metering providers (e.g. Intellihub) in NZ and Australia",
+   "Vector Technology Solutions/cyber security services competes with other technology/managed-services vendors for electricity distribution business clients",
+   "HRV competes in the home ventilation/heat pump market against other home comfort providers"
+  ],
+  "market_position": "Sole regulated distributor for the Auckland electricity and gas networks — a structural, government-sanctioned monopoly rather than a market-share position. Vector is one of the largest EDBs in New Zealand by regulated asset base and connection count, reflecting Auckland's status as NZ's largest city.",
+  "moat_factors": [
+   {
+    "factor": "Regulatory natural monopoly",
+    "strength": "strong",
+    "description": "Electricity and gas distribution networks are licensed, capital-intensive natural monopolies; duplicating physical network infrastructure in Auckland is not economically or practically feasible. Revenue is protected by the Commerce Commission's price-quality regulation, which guarantees a regulated return on the asset base rather than exposing Vector to market competition for volume."
+   },
+   {
+    "factor": "Regulated asset base and rate-of-return mechanism",
+    "strength": "strong",
+    "description": "The DPP framework provides revenue certainty over five-year cycles once set. The current DPP4 (1 April 2025 - 31 March 2030) reset delivered materially higher allowable revenue reflecting the current higher interest rate/inflation environment, directly lifting adjusted EBITDA (+$88m in FY26 electricity EBITDA growth attributed largely to the reset)."
+   },
+   {
+    "factor": "Scale and Auckland growth exposure",
+    "strength": "moderate",
+    "description": "As Auckland is NZ's largest and fastest-growing city, Vector benefits from structural connection growth (new subdivisions, population growth, electrification of transport/industry, data centre demand) that smaller regional EDBs do not enjoy to the same degree."
+   },
+   {
+    "factor": "Entrust majority ownership stability",
+    "strength": "moderate",
+    "description": "75.1% ownership by Entrust (a permanent community trust structure) provides long-term ownership stability and insulates Vector from hostile takeover or short-term activist pressure, but also means governance and capital allocation (e.g. dividend policy) must balance Entrust beneficiary cash distributions against network investment needs."
+   }
+  ],
+  "weaknesses": [
+   "Revenue and earnings are ultimately capped by the Commerce Commission regulatory settings, not organic market growth or pricing power — upside from strong Auckland growth can be partially clawed back at the next reset",
+   "No genuine diversification: with metering and gas trading sold, Vector is now overwhelmingly a single-city (Auckland), single-regulator earnings stream, concentrating regulatory and Auckland-specific (e.g. natural disaster, storm/cyclone) risk",
+   "Sub-scale non-regulated 'Other' segment (VTS/HRV/Fibre) has not yet demonstrated it can be a meaningful earnings contributor and has recently been shrinking/loss-making",
+   "Structural capex intensity means the business is persistently a net cash consumer before financing, requiring ongoing access to debt (and potentially equity) markets on reasonable terms",
+   "Political/public sentiment risk around network reliability (storm outages, e.g. Auckland Anniversary floods/Cyclone Gabrielle in 2023) and rising consumer electricity bills, given Vector's charges flow through to household power bills at a time of cost-of-living pressure"
+  ]
+ },
+ "growth_drivers": [
+  "Auckland population and economic growth driving new electricity and gas connections (642,134 electricity connections at FY26, +1.6% YoY; ~13,000 new connections added in FY26)",
+  "Electrification of transport (EVs) and industry: 48,434+ EVs registered in Auckland as of FY24 and rising; Vector is investing in smart/managed EV charging (Dynamic Operating Envelope) to defer costly network reinforcement",
+  "Data centre demand: Vector expects up to 500MW of new demand from data centres connecting to the Auckland network over the next five years — a large, concentrated new load category requiring significant capex but also revenue growth",
+  "Long-term Asset Management Plan (AMP26): a flagged $10 billion, 20-year investment programme for the Auckland electricity network (c.$4.5bn invested over the past decade, a further $5.4bn planned FY2026-FY2036), roughly half earmarked for growth connections (new homes, businesses, large loads like data centres) and half for renewal/resilience",
+  "DPP4 regulatory reset (effective 1 April 2025, 5-year term to March 2030) locking in higher allowable returns reflecting the current higher interest-rate and inflation environment, plus full pass-through of Transpower transmission cost increases",
+  "Growing Bluecurrent (50% JV, advanced metering data services) distributions as the metering business scales in NZ and Australia ($55m distribution received in FY26, up from ~$52m in FY25)",
+  "Vector Technology Solutions: cyber security and digital/data services offered to other NZ electricity distribution businesses (six external EDB customers as at FY2024) — an early-stage adjacent growth avenue leveraging Vector's networks expertise",
+  "Distributed energy resources (solar, batteries) and demand orchestration (Symphony strategy) creating new network services and potentially deferring/reducing the capital intensity of meeting peak demand growth"
+ ],
+ "risks": {
+  "business": [
+   {
+    "risk": "Network reliability and resilience under extreme weather",
+    "severity": "high",
+    "description": "Auckland is exposed to increasingly severe storm events (e.g. the 2023 Auckland Anniversary floods and Cyclone Gabrielle); Vector has previously breached extreme-event outage quality standards (Warkworth area, FY24). Major outage events generate significant public and political scrutiny, potential compensation/penalty exposure, and reputational damage, while resilience capex often competes with growth capex for funding priority."
+   },
+   {
+    "risk": "Concentration in a single regulated network/single city",
+    "severity": "moderate",
+    "description": "With metering and gas trading divested, virtually all of Vector's earnings now derive from the Auckland electricity (and to a lesser extent gas) distribution networks. There is no geographic or regulatory diversification to offset an adverse outcome from any single Commerce Commission decision or Auckland-specific event."
+   },
+   {
+    "risk": "Gas distribution structural decline",
+    "severity": "moderate",
+    "description": "Gas connection growth has turned negative to flat (new connections down from 1,300 in FY25 to 720 in FY26; volumes down 1.7-4.5% YoY across recent periods) as electrification and decarbonisation reduce reliance on gas. While currently still profitable and regulated, the segment's terminal value and future regulatory treatment (e.g. asset stranding, accelerated depreciation) are uncertain over a multi-decade horizon; Vector already recorded a $60m gas distribution impairment in FY2024."
+   },
+   {
+    "risk": "Bluecurrent/Other segment underperformance",
+    "severity": "low",
+    "description": "The 50%-owned Bluecurrent JV reported a net loss (NPAT contribution of -$24.9m in FY2024) despite being cash-flow positive, driven by debt-funded growth and meter depreciation/contract amortisation. Continued reliance on debt funding for JV growth could pressure Vector's share of associate earnings and carrying value ($594m as at H1FY26) if the metering market becomes more competitive or growth slows."
+   }
+  ],
+  "financial": [
+   {
+    "risk": "Structural capex-funding gap requiring continuous debt issuance",
+    "severity": "high",
+    "description": "Gross capex has structurally and materially exceeded operating cash flow for years, and management has now guided record capex of $605-635m for FY2027 (up from $544m in FY2026) as part of a flagged $5.4bn network investment programme through FY2036. This capex supercycle must be funded predominantly by new debt (net capex was $353m in FY26, +36% YoY), progressively increasing economic net debt (NZ$2.28bn at FY26, up from NZ$2.16bn a year earlier) and gearing (39% at FY26, though well down from the 57-59% range of FY2021-22 following metering/gas trading sale proceeds)."
+   },
+   {
+    "risk": "Interest rate exposure on a large and growing debt book",
+    "severity": "moderate",
+    "description": "With economic net debt of ~$2.28bn (rising toward $2.5bn+ implied by capex guidance) and finance costs a material P&L line, Vector is directly exposed to NZ and offshore interest rate movements on both floating and refinanced fixed-rate debt. Ironically, the current DPP4 regulatory settings reward Vector with a higher allowed return specifically because of the elevated interest rate environment — creating a partial (but not perfect or contemporaneous) natural hedge between funding cost and allowed revenue."
+   },
+   {
+    "risk": "Dividend policy relinked to cash flow (Feb 2025) constrains payout growth",
+    "severity": "low",
+    "description": "The Board revised the dividend policy in February 2025 to link distributions to cash flow generation across the five-year DPP regulatory cycle rather than a fixed per-share growth trajectory. While intended to align payouts with actual cash generation given the capex supercycle, this could mean flatter or less predictable dividend growth for minority shareholders than under the prior policy, particularly in years of peak capex."
+   },
+   {
+    "risk": "Credit rating dependency",
+    "severity": "low",
+    "description": "Vector carries an S&P long-term credit rating of BBB+ (outlook has moved between stable and positive across 2024-2026 commentary). Maintaining investment-grade metrics is important given reliance on wholesale bond and USPP markets to fund the capex programme; a ratings downgrade would raise funding costs at exactly the point capex needs are increasing."
+   }
+  ],
+  "regulatory": [
+   {
+    "risk": "Five-yearly DPP reset risk (next reset ~2030 for electricity)",
+    "severity": "high",
+    "description": "Nearly all of Vector's core earnings power is determined by the Commerce Commission's periodic Default Price-Quality Path resets. While the current DPP4 (1 April 2025 - 31 March 2030) is favourable, reflecting higher allowed returns from elevated interest rates and inflation, this represents a structural risk that could reverse at the next reset if interest rates or the Commission's methodology change, or if the Commission tightens allowed returns/quality standards in response to affordability or reliability pressures."
+   },
+   {
+    "risk": "Consumer affordability and political pressure on network charges",
+    "severity": "moderate",
+    "description": "Vector's own management has publicly called for wider energy market/regulatory reform, citing cost-of-living pressures on customers from rising lines charges (which the Commission has agreed to 'smooth' over the DPP4 period rather than allow one-off shocks). Sustained public and political pressure over electricity affordability could result in tighter future regulatory settings or ad hoc government intervention."
+   },
+   {
+    "risk": "Gas distribution regulatory treatment amid energy transition",
+    "severity": "moderate",
+    "description": "As NZ and Auckland decarbonise, future gas distribution price-quality regulation could increasingly reflect stranded-asset risk, accelerated depreciation allowances, or reduced allowed returns, as regulators and policymakers grapple with a shrinking customer base funding a fixed network."
+   },
+   {
+    "risk": "EV charging and distributed energy resource standards",
+    "severity": "low",
+    "description": "Vector has lobbied for mandated 'smart' EV charging standards to avoid costly reactive network reinforcement; failure to secure timely regulatory support for demand orchestration could force more expensive, less efficient capital investment to manage electrification-driven peak demand."
+   }
+  ],
+  "macro": [
+   {
+    "risk": "NZ interest rate and monetary policy environment",
+    "severity": "moderate",
+    "description": "As a heavily debt-funded, capital-intensive utility, Vector's funding costs move with NZ (and to an extent global) interest rates. The DPP4 settings provide a partial offsetting mechanism (higher allowed returns when rates/inflation are elevated) but with a lag, since allowed WACC is set at the start of each five-year period rather than continuously updated."
+   },
+   {
+    "risk": "Auckland/NZ economic growth and construction cost inflation",
+    "severity": "moderate",
+    "description": "Vector's growth capex and connection growth are directly tied to Auckland's population and construction activity; a prolonged NZ economic downturn or construction sector slowdown would reduce new-connection growth and capital contribution revenue. Simultaneously, general cost inflation in materials, contractor labour, and specialist engineering skills increases the cost of delivering the capex programme."
+   },
+   {
+    "risk": "Data centre demand uncertainty",
+    "severity": "moderate",
+    "description": "The flagged 500MW of prospective data centre demand over five years is a major driver behind Vector's elevated capex guidance, but individual data centre projects can be delayed, downsized, or relocated based on global capital allocation decisions by hyperscalers, creating a risk that Vector over- or under-invests relative to actual realised demand."
+   }
+  ],
+  "execution": [
+   {
+    "risk": "New CEO transition",
+    "severity": "moderate",
+    "description": "Long-serving CEO Simon Mackenzie (in the role since 2008) stepped down in 2025 after leading the metering and gas trading divestitures and the Symphony strategy; Chris Blenkiron (previously CEO of Rio Tinto's Tiwai smelter, with a manufacturing/building-products background rather than utilities/networks) commenced as Group CEO in December 2025. A strategic review under the new CEO, with outcomes to be detailed at the September 2026 shareholder meeting, introduces some uncertainty as to whether capital allocation priorities, the pace of the AMP26 investment programme, or the 'Other' segment portfolio (VTS/HRV/Fibre) could change."
+   },
+   {
+    "risk": "Delivering a record, escalating capex programme",
+    "severity": "moderate",
+    "description": "Guided gross capex of $605-635m for FY2027 (a new record, up from $544m in FY2026, which was itself up 16% YoY) requires Vector to significantly scale contractor capacity, project management, and supply chains simultaneously, in a tight NZ construction/engineering labour market, while maintaining service reliability and cost discipline that ultimately determine future regulatory outcomes and consumer/political goodwill."
+   }
+  ]
+ },
+ "macro_factors": {
+  "industry_outlook": "NZ electricity distribution is a structurally growing but heavily regulated sector, driven by decarbonisation/electrification (EVs, industrial electrification), Auckland-specific population growth, and a new wave of large-load demand from data centres. Regulatory settings (Commerce Commission DPPs) are currently constructive for distribution businesses given the higher-rate environment baked into DPP4, but the sector faces persistent political and consumer scrutiny over electricity affordability. Gas distribution is in slow structural decline nationally as decarbonisation policy discourages new gas connections.",
+  "cyclicality": "Low-to-moderate. Regulated network revenue is largely insulated from economic cycles (essential service, monopoly, cost pass-through), but growth capex/connection revenue, discretionary segments (HRV, Vector Fibre), and financing costs have some sensitivity to the broader NZ economic and construction cycle.",
+  "interest_rate_sensitivity": "High and two-sided. Higher rates increase Vector's own finance costs on a large and growing debt book, but the DPP regulatory framework explicitly incorporates prevailing interest rates/WACC into the allowed revenue calculation at each five-year reset (DPP4 set from 1 April 2025 reflects a higher-rate environment), providing a structural, if lagged, offsetting mechanism unusual among NZX-listed companies.",
+  "currency_exposure": "Low direct FX exposure — predominantly a NZD-denominated business; some USPP (US private placement) debt may carry hedged foreign-currency exposure, and the Bluecurrent JV has some Australian dollar exposure through its Australian metering operations.",
+  "key_input_costs": [
+   "Transpower transmission charges (pass-through cost recovered via revenue, but subject to Transpower's own regulatory reset cycle)",
+   "Construction and engineering contractor costs for network build/renewal (materials, skilled labour) amid a tight NZ construction market",
+   "Debt/interest costs given the scale of the capex programme and reliance on wholesale bond, bank facility, USPP and retail bond markets",
+   "Regulatory compliance and asset management costs"
+  ]
+ },
+ "recent_developments": [
+  {
+   "date": "2026-08",
+   "event": "FY2026 full-year results (year ended 30 June 2026) released 18 August 2026: revenue from continuing operations $1,004m (+12% YoY); adjusted EBITDA $482m (+20% YoY); NPAT $240m (+55% YoY, partly aided by absence of the prior year's $60m/$37m gas distribution impairment); EPS NZ$0.24 (up from NZ$0.15). Gross capex a record $544m (+16% YoY); net capex $353m (+36% YoY). Full-year dividend 26.00 cps (up from 25.00 cps), final dividend 13.50 cps, payout ratio ~70% (lower end of guidance band). Economic net debt $2.28bn; gearing 39% (down from the 57-59% range of FY2021-22, following the metering and gas trading sale proceeds)."
+  },
+  {
+   "date": "2026-08",
+   "event": "FY2027 guidance issued: adjusted EBITDA $540-560m (+12-16% growth); gross capex $605-635m — a new record, reflecting record Auckland network investment including data centre connections; capital contributions guided lower at $160-190m on project timing. Management flagged a strategic review (efficiency, disciplined capital execution) to be detailed at the September 2026 shareholder/AGM meeting."
+  },
+  {
+   "date": "2026-08",
+   "event": "Vector confirmed a long-term Asset Management Plan (AMP26) flagging a $10 billion, 20-year investment programme in the Auckland electricity network ($4.5bn invested over the past decade; a further $5.4bn planned FY2026-FY2036), roughly half of which supports Auckland growth connections (including up to 500MW of prospective data centre demand over five years) and half supports renewal/resilience."
+  },
+  {
+   "date": "2026-02",
+   "event": "H1 FY2026 (six months to 31 December 2025) results: NPAT from continuing operations $113m (down ~4% YoY on a $118m base); adjusted EBITDA $240m (+19% YoY), driven by the DPP4 electricity reset (effective 1 April 2025) which lifted electricity adjusted EBITDA to $220m (+28%). Gross capex $223m (down 15% YoY in H1, guided to lift in H2). Interim dividend 12.50 cps declared. S&P credit rating reaffirmed BBB+ with (per the company's own presentation) a stable outlook. FY2026 full-year adjusted EBITDA guidance tightened to $470-490m, gross capex guidance tightened to $500-540m (from $520-590m) and capital contributions to $180-215m (from $180-230m)."
+  },
+  {
+   "date": "2025-12",
+   "event": "Chris Blenkiron commenced as Group Chief Executive, succeeding long-serving CEO Simon Mackenzie (in the role since 2008, who led the metering and gas trading divestitures and Symphony strategy). Blenkiron previously led Rio Tinto's Tiwai Point aluminium smelter and had prior leadership roles at BlueScope in manufacturing/building products — a notable change from a utilities/networks executive background."
+  },
+  {
+   "date": "2025-02",
+   "event": "H1 FY2025 result (six months to 31 December 2024): NPAT from continuing operations $118m; adjusted EBITDA $202m (+16% YoY). Board approved a revised dividend policy relinking distributions to cash flow, intended to align with the Commerce Commission's five-yearly DPP regulatory cycle rather than a fixed growth trajectory. Sale of Ongas and the 60.25% Liquigas shareholding completed 31 January 2025, finalising exit from gas trading; new segment structure (electricity, gas distribution, other) adopted."
+  },
+  {
+   "date": "2024-11",
+   "event": "Commerce Commission published its final DPP4 (Default Price-Quality Path) determination for the 2025-2030 electricity distribution regulatory period, effective 1 April 2025, incorporating higher allowed returns reflecting the prevailing higher interest rate and inflation environment and continued pass-through of Transpower transmission costs, smoothed over the five-year period to avoid price shocks to consumers."
+  },
+  {
+   "date": "2024-08",
+   "event": "FY2024 annual results (year ended 30 June 2024): adjusted EBITDA from continuing operations $365.2m (+14%); NPAT (continuing operations) $79.9m, including a $60m impairment of the gas distribution business (driven by a lower regulatory return decision and higher interest rates); underlying profit excluding the impairment $139.9m. Full-year dividend 24 cps including a 1.75 cps special dividend. Gross capex $510.1m. Conditional sale of remaining gas trading businesses (Ongas, Liquigas) announced 26 July 2024 (after balance date), completing 31 January 2025."
+  }
+ ],
+ "guidance": {
+  "as_of": "FY2026 full-year results, released 2026-08-18",
+  "fiscal_year": "FY2027",
+  "items": [
+   {
+    "metric": "Adjusted EBITDA",
+    "target": "$540m to $560m",
+    "period": "FY2027",
+    "vs_prior": "new",
+    "notes": "Implies +12-16% growth on FY2026's $482m."
+   },
+   {
+    "metric": "Gross capital expenditure",
+    "target": "$605m to $635m",
+    "period": "FY2027",
+    "vs_prior": "raised",
+    "notes": "A new record level, up from $544m in FY2026 (+16% YoY); reflects Auckland growth, electrification and data centre connections."
+   },
+   {
+    "metric": "Capital contributions",
+    "target": "$160m to $190m",
+    "period": "FY2027",
+    "vs_prior": "lowered",
+    "notes": "Decline attributed to project timing rather than a change in underlying connection demand."
+   },
+   {
+    "metric": "Long-term network investment (AMP26)",
+    "target": "$5.4 billion cumulative",
+    "period": "FY2026-FY2036",
+    "vs_prior": "new",
+    "notes": "Part of a flagged $10 billion, 20-year Auckland electricity network investment programme; roughly half for growth (including up to 500MW of prospective data centre demand over 5 years), half for renewal/resilience."
+   }
+  ],
+  "prior_guidance_superseded": [
+   {
+    "metric": "Adjusted EBITDA",
+    "target": "$470m to $490m",
+    "period": "FY2026",
+    "vs_prior": "achieved ($482m actual, within range)",
+    "notes": "Issued at H1 FY2026 result (Feb 2026); superseded by actual FY2026 results in Aug 2026."
+   },
+   {
+    "metric": "Gross capex",
+    "target": "$500m to $540m",
+    "period": "FY2026",
+    "vs_prior": "achieved ($544m actual, slightly above range)",
+    "notes": "Tightened down from an initial $520-590m range issued in August 2025."
+   }
+  ],
+  "management_commentary": "Management (new CEO Chris Blenkiron, appointed December 2025) has emphasised record, escalating investment into the Auckland electricity network to meet growth, electrification and new large-load connections such as data centres, while flagging a strategic review focused on efficiency and disciplined capital execution to be detailed at the September 2026 shareholder meeting. The Board highlighted the favourable DPP4 regulatory reset (effective 1 April 2025) as the primary driver of the FY2026 EBITDA and NPAT step-up, and reiterated the cash-flow-linked dividend policy (revised February 2025) intended to balance shareholder distributions against the capex supercycle."
+ },
+ "bull_case": [
+  "Structural, government-sanctioned monopoly over the Auckland electricity and gas distribution networks, insulated from competitive volume loss and provided a regulated return on an expanding asset base",
+  "DPP4 reset (effective April 2025 to March 2030) has materially lifted allowable revenue and adjusted EBITDA (electricity segment EBITDA +25-28% YoY across FY26/H1FY26), reflecting the current higher interest rate/inflation environment and locking in five years of visibility",
+  "Powerful, multi-decade secular demand growth from Auckland population growth, transport/industrial electrification (EVs), and a new wave of data centre connections (up to 500MW of prospective demand flagged over five years) underpinning a $10bn, 20-year investment programme",
+  "Simplified, de-risked portfolio following the metering (FY2023, ~$1.7bn proceeds) and gas trading (FY2024) divestitures has materially reduced gearing (from 57-59% in FY2021-22 to 39% at FY2026) while retaining upside through the 50%-owned, growing Bluecurrent metering JV",
+  "Investment-grade credit rating (S&P BBB+) and demonstrated capital markets access (staggered bond/bank/USPP maturity profile through FY2036) support continued funding of the capex programme without necessarily requiring dilutive equity"
+ ],
+ "bear_case": [
+  "Structural capex supercycle: gross capex has persistently and increasingly exceeded operating cash flow (record $544m in FY2026, guided to a further record $605-635m in FY2027), requiring continuous new debt issuance and pushing economic net debt and gearing structurally higher over the medium term, with limited near-term visibility on when (or if) the investment programme moderates given the flagged $5.4bn plan through FY2036",
+  "Nearly all earnings power now depends on a single regulator's (Commerce Commission) five-yearly reset decisions for a single city's network — the current DPP4 settings are favourable specifically because of elevated interest rates and inflation, a tailwind that is not guaranteed to persist or repeat at the next reset (c.2030), while any adverse political intervention on consumer affordability grounds is a live risk given rising lines charges are already flowing through to Auckland household power bills",
+  "New, first-time-in-utilities CEO (Chris Blenkiron, from a mining/manufacturing background) is only months into the role and has flagged a strategic review with outcomes not yet disclosed — introducing uncertainty around capital allocation priorities, the future of the sub-scale 'Other' segment (VTS/HRV/Fibre), and continuity of the long-serving prior management team's Symphony strategy",
+  "Headline NPAT growth (+55% in FY2026) is significantly flattered by the absence of the prior year's one-off gas distribution impairment charges, and gas distribution itself faces slow structural volume decline (new connections down from 1,300 to 720 YoY in FY2026) with longer-term stranded-asset and regulatory uncertainty as NZ decarbonises",
+  "Data centre demand — a major plank of the elevated capex guidance — is inherently uncertain and subject to hyperscaler capital allocation decisions that can be delayed or downsized, creating risk that Vector's committed network investment outpaces realised connection revenue"
+ ]
+};
+
+const dcfData = {
+ "ticker": "VCT.NZ",
+ "company_name": "Vector Limited",
+ "valuation_date": "2026-09-19",
+ "current_price": 4.72,
+ "horizon_years": 10,
+ "inputs": {
+  "shares_outstanding": 1000.0,
+  "share_count_basis": "1,000,000,000 ordinary shares at 30-Jun-2026 (AR26 note 25.3; no options, no LTI, no convertibles). Held FLAT; SBC is nil so there is nothing to expense or dilute.",
+  "net_debt": 1520.1,
+  "net_debt_bridge": {
+   "face_value_borrowings": 2235.1,
+   "lease_liabilities": 52.3,
+   "cash_and_deposits": -5.4,
+   "economic_net_debt": 2282.0,
+   "less_bluecurrent_jv_50pct_incl_shareholder_loans": -700.0,
+   "less_current_income_tax_asset": -35.3,
+   "less_contingent_consideration_receivable": -26.6,
+   "net_debt_used_in_bridge": 1520.1,
+   "note": "Bluecurrent (carrying value $580.4m = 50% share of net assets 399.2 + shareholder loans 179.6 + FX 1.6) is EXCLUDED from adjusted EBITDA, so it enters the bridge at value (matching-asset rule, owner-fcf.md 7d). Valued at $700m = FY26 cash distributions to Vector of $55m (dividend 32.6 + loan interest 10.2 + loan repayment 12.1) capitalised at a 10% cost of equity with 2% growth; that is 1.2x carrying value and a 7.9% cash yield. Every +/-$100m on this line is +/-$0.10/share. The $35.3m prepaid tax asset will be consumed against FY27 cash tax, so the model runs a full 28% cash tax rate from FY27 and credits the asset here instead. Derivatives (net asset $11.4m) hedge the USPP face value already counted and are left out."
+  },
+  "total_debt": 2287.4,
+  "cash": 5.4,
+  "non_operating_assets": 761.9,
+  "last_fcf": 72.6,
+  "reported_fcf": 101.2,
+  "operating_cash_flow": 632.5,
+  "gross_capex_cash": 531.3,
+  "capital_contributions_cash": 191.5,
+  "net_capex": 339.8,
+  "last_revenue": 1004.4,
+  "last_adj_ebitda": 482.2,
+  "last_d_and_a": 233.0,
+  "sbc": 0.0,
+  "sbc_incl_equity_taxes": 0.0,
+  "sbc_pct_of_revenue": 0.0,
+  "sbc_pct_path": [
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "sbc_source": "AR26 remuneration report: STI only, no LTI plan; only an employee share purchase scheme reserve (immaterial). SBC treated as zero.",
+  "interest_income": 14.7,
+  "interest_income_note": "FY26 interest received $14.7m ($10.2m of it Bluecurrent shareholder-loan interest). NOT in the FCF base: adjusted EBITDA excludes all interest; the Bluecurrent loan is valued inside the $700m JV line and cash is netted in economic net debt.",
+  "buyback_cash": 0.0,
+  "annual_share_growth_pct": 0.0,
+  "projected_shares": [
+   1000.0,
+   1000.0,
+   1000.0,
+   1000.0,
+   1000.0,
+   1000.0,
+   1000.0,
+   1000.0,
+   1000.0,
+   1000.0
+  ],
+  "dividends_paid_fy26": 255.0,
+  "dividend_per_share_fy26": 0.26,
+  "price_as_of": "2026-09-18T05:00:01Z regular close (NZX); re-read 2026-09-19 via make dcf-context, no later session",
+  "balance_sheet_date": "2026-06-30",
+  "balance_sheet_source": "Vector Annual Report 2026 (year ended 30 June 2026, released 18-Aug-2026), balance sheet p.62, gearing note 25.3, cash flow p.63. Fetched from media.vector.co.nz on 2026-09-19; the research folder's latest annual was FY2024, so anchors were refreshed from the live filing.",
+  "guidance_fy27": {
+   "adjusted_ebitda": "540-560",
+   "gross_capex": "605-635",
+   "capital_contributions": "160-190",
+   "note": "FY27 adj EBITDA includes ~$54m of one-off revenue wash-up + IRIS adjustments (management, 18-Aug-2026). Modelled as FY27 revenue +9% then FY28 -1% as the wash-up drops out."
+  },
+  "currency": "NZD",
+  "quote_currency": "NZD",
+  "units": "millions",
+  "wacc": 6.75,
+  "wacc_rationale": "NZD-built: NZ 10y govt ~4.4% + beta 0.65 x ERP 5.5% = 8.0% cost of equity; pre-tax cost of debt ~5.3% (FY26 blended 4.6% on face debt, marginal higher) -> 3.8% post-tax; weights at market (equity $4.72bn / economic net debt $2.28bn = 32.6% debt) -> 6.6%, rounded to 6.75%. Same WACC in all three scenarios (risk lives in the driver paths, owner-fcf.md 7f). For reference the Commerce Commission's DPP4 allowed WACC is ~7%; a DCF discounted at the regulated WACC returns ~1.0x RAB by construction.",
+  "notes": [
+   "MODEL: component owner-FCF DCF (owner-fcf.md) with regulated-network adaptations; the dcf-methods routing table has no dedicated regulated-utility row, and the closest match (non-US operating company + section 7) is used with the RAB identity as the sanity cross-check. Not an AFFO/REIT model (Vector is an operating utility with EBITDA, not a fair-value property trust) and not a book-value model (NTA is not RAB).",
+   "REVENUE BASE = revenue excluding capital contributions ($1,004.4m FY26). CAPITAL CONTRIBUTIONS ($191.5m cash FY26) are netted against gross capex, mirroring Vector's own adjusted-EBITDA / net-capex framing. Reported EBITDA (673.1) and CSV EBITDA include contributions and must not be compared with adj EBITDA here.",
+   "CAPEX SUPERCYCLE: raw FCF is structurally negative/near zero because net capex (34% of revenue FY26, 41% FY27 guidance) exceeds D&A (23%). In a RAB regime that growth capex earns the regulated return, so revenue growth is tied to RAB growth (net capex - depreciation + CPI indexation, ~6-7%/yr nominal in DPP4) with an explicit DPP5 step in FY31 (base +9%, bull +12%, bear -5%). Terminal-year net capex is normalised to what 3% nominal growth needs (D&A 23.5% + ~1% real RAB growth = ~28% of revenue); leaving capex at the supercycle level while crediting only 3% growth is the classic way this ticker gets undervalued.",
+   "TAX: 28% NZ statutory on EBIT (adj EBITDA - D&A) in every year. FY26 cash tax paid was only $1.4m because a prepaid tax asset was being consumed; that asset ($35.3m remaining) is credited in the bridge rather than through a low first-year rate. Accelerated tax depreciation (deferred tax +$45m/yr) and the taxability of capital contributions (~$53m) roughly offset, so 28% on EBIT is within ~$10m of FY26's unlevered current tax.",
+   "LEASES: treatment (A) - lease liabilities ($52.3m) inside economic net debt; the ~$5.5m/yr lease cash cost is carried as +0.5pp inside the capex % path (no separate lease_cost_pct).",
+   "NCI: none since the Liquigas sale (equity 100% attributable). Bluecurrent is an equity-accounted JV, handled in the bridge.",
+   "HISTORY: FY2023 net income $1,715.8m is ~$1,510m metering disposal gain; FY24/FY25 carry $60.6m/$37.0m gas impairments; all pre-FY25 rows in the CSV include since-sold gas trading. Nothing before the FY26 continuing-operations base is extrapolated.",
+   "RAB CROSS-CHECK (estimate, not disclosed in the annual report): electricity RAB ~$4.2bn (Mar-2026) + gas ~$0.5bn = ~$4.7bn +/-10%. Market EV ex non-operating assets = $6.24bn = ~1.33x RAB, i.e. the market discounts Vector at ~6.0% or pays for outperformance/scarcity. Base-case network EV of ~$4.5bn is ~0.95x RAB, consistent with a 6.75% WACC against a ~7% regulated WACC less the value leakage from gas decline and DPP5 reset risk.",
+   "DIVIDEND: FY26 26.0cps ($255m) unimputed, 5.5% yield, ~3.5x the unlevered owner FCF - the payout is funded by the growing debt book while gearing (38.5%) has headroom to the ~45-50% band Vector ran pre-2023. Entrust's 75.1% holding makes the dividend politically sticky."
+  ],
+  "total_debt_note": "face value of borrowings 2,235.1 + lease liabilities 52.3 (AR26 note 25.3 / balance sheet). core_metrics total_debt is 2,306.9 = carrying value of borrowings 2,254.6 (incl. fair-value/hedge adjustments) + leases 52.3; the model uses face value, which is what economic net debt 2,282.0 is built on.",
+  "capital_contributions_revenue_basis": 190.9,
+  "last_revenue_note": "core_metrics FY2026 revenue 1,195.3 (incl. contributions) less kpis CapitalContributions 190.9 = 1,004.4",
+  "fcf_reconciliation": {
+   "reported_fcf_ocf_less_cash_capex": 101.2,
+   "add_interest_paid_unlevered": 102.5,
+   "less_interest_received": -14.7,
+   "less_bluecurrent_dividend_valued_in_bridge": -32.6,
+   "less_tax_normalisation_28pct_on_adj_ebit_vs_1_4_paid": -68.4,
+   "less_working_capital_timing_inflow": -15.4,
+   "owner_fcf_unlevered": 72.6,
+   "note": "AR26 cash flow statement p.63: OCF 632.5 = receipts 997.9 + contributions 191.5 + JV dividend 32.6 + interest received 14.7 - payments 500.3 - interest paid 102.5 - tax 1.4. Owner FCF = adj EBITDA 482.2 - 28% x adj EBIT 249.2 (69.8) - net capex (531.3 - 191.5 = 339.8) = 72.6. The 15.4 timing line is cash receipts+contributions-payments (689.1) over adj EBITDA+contributions (673.7). Lease payments 5.5 are financing under treatment (A) and enter via the forward capex path."
+  },
+  "data_verification_2026_09_19": "All anchors re-tied to core_metrics/kpis after the FY2025/FY2026 rows were loaded: revenue 1,195.3, adj EBITDA 482.2 (FY25 continuing 401.1), NPAT 240.2, OCF 632.5, capex 531.3, D&A 233.0, cash 5.4, EconomicNetDebt 2,282.0, CapitalContributions 190.9, InterestIncome 17.6 (received 14.7), CashTaxesPaid 1.4, DividendsPaid 255.0, SBC 0, buybacks 0, shares 1,000,000,000. No anchor moved versus v1.0, which was built from the same AR26 before the DB was populated."
+ },
+ "historical_growth": {
+  "revenue_3yr_cagr": 7.4,
+  "revenue_5yr_cagr": 7.3,
+  "adj_ebitda_3yr_cagr": 15.7,
+  "adj_ebitda_5yr_cagr": 11.1,
+  "eps_3yr_cagr": 33.3,
+  "eps_5yr_cagr": 15.0,
+  "equity_3yr_cagr": -2.9,
+  "equity_5yr_cagr": 9.2,
+  "fcf_3yr_cagr": null,
+  "fcf_5yr_cagr": null,
+  "owner_fcf_history": {
+   "FY2022": 61.3,
+   "FY2023": -25.8,
+   "FY2024": 5.7,
+   "FY2025": 94.6,
+   "FY2026": 59.4
+  },
+  "selected_growth_rate": 4.5,
+  "growth_rate_source": "regulatory building blocks: nominal RAB growth (net capex less regulatory depreciation, plus CPI indexation), decelerating to 3% terminal - not a historical CAGR",
+  "growth_divergence_warning": "Every historical CAGR is distorted: revenue/EBITDA/EPS 'CAGRs' are continuing-operations series (AR26 five-year summary, FY22-FY26, so the '5yr' slots are 4-year figures) and are dominated by the April-2025 DPP4 reset (+20% adj EBITDA in one year); EPS bases carry the FY24/FY25 gas impairments; equity CAGRs are broken by the $1.5bn FY23 metering gain (5yr +9.2%, 3yr -2.9%); owner FCF changes sign (FY23 -25.8, FY25 +93.6) so its CAGR is undefined. None of them is a forward growth rate.",
+  "notes": "Owner FCF history = adj EBITDA - 28% x adj EBIT - (gross capex - capital contributions), continuing ops; FY26 on the accrual capex basis (544 - 191) is 59.4 vs 72.6 on the cash basis used as last_fcf.",
+  "revenue_total_incl_discontinued_3yr_cagr": -6.3,
+  "revenue_total_incl_discontinued_5yr_cagr": -1.3,
+  "eps_reported_5yr_cagr": 4.5,
+  "db_series_note": "core_metrics Revenue/EPS include the metering (sold FY23) and gas trading (sold FY24-25) businesses, so the total-revenue CAGRs are negative (-6.3% 3yr, -1.3% 5yr) and describe divestment, not the network. The headline revenue/EBITDA/EPS CAGRs above are the AR26 five-year-summary continuing-operations series (FY22 902.9 -> FY26 1,195.3 incl. contributions; adj EBITDA 316.8 -> 482.2; NP continuing 137.3 -> 240.2); the '5yr' slots are four-year figures because the continuing series starts at FY22."
+ },
+ "assumptions": {
+  "bear": {
+   "growth_rates": [
+    8.5,
+    -2.0,
+    4.0,
+    4.0,
+    -5.0,
+    3.5,
+    3.5,
+    3.0,
+    3.0,
+    2.5
+   ],
+   "ebitda_margin_path": [
+    49.5,
+    47.0,
+    47.0,
+    46.5,
+    46.0,
+    46.0,
+    46.0,
+    46.0,
+    46.0,
+    46.0
+   ],
+   "sbc_pct_path": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "da_pct": 23.5,
+   "capex_pct_path": [
+    41.0,
+    40.0,
+    39.0,
+    38.0,
+    36.0,
+    34.0,
+    33.0,
+    32.0,
+    30.5,
+    29.5
+   ],
+   "capex_pct_note": "net capex (gross less capital contributions) plus ~0.5pp lease cash, as % of revenue ex-contributions",
+   "wc_capture_pct": 0.0,
+   "cash_tax_rate_path": [
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0
+   ],
+   "wacc": 6.75,
+   "terminal_growth": 2.5,
+   "terminal_cap_multiple": 30.0,
+   "terminal_cap_note": "30x unlevered FCF, not the 20x growth-compounder default: a regulated network's Gordon multiple at WACC 6.75%/g 3% is 27.5x and corresponds to ~1.0x RAB; a 20x cap would force an exit at ~0.75x RAB, below any observed NZ/AU network transaction. The cap only binds in the low-WACC/high-g corners of the sensitivity grid."
+  },
+  "base": {
+   "growth_rates": [
+    9.0,
+    -1.0,
+    5.0,
+    5.0,
+    9.0,
+    5.5,
+    5.0,
+    4.5,
+    4.0,
+    3.5
+   ],
+   "ebitda_margin_path": [
+    50.2,
+    48.0,
+    48.5,
+    48.5,
+    48.5,
+    48.5,
+    48.5,
+    48.5,
+    48.5,
+    48.5
+   ],
+   "sbc_pct_path": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "da_pct": 23.5,
+   "capex_pct_path": [
+    41.0,
+    39.0,
+    37.0,
+    36.0,
+    34.0,
+    32.0,
+    30.5,
+    29.0,
+    28.0,
+    27.0
+   ],
+   "capex_pct_note": "net capex (gross less capital contributions) plus ~0.5pp lease cash, as % of revenue ex-contributions",
+   "wc_capture_pct": 0.0,
+   "cash_tax_rate_path": [
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0
+   ],
+   "wacc": 6.75,
+   "terminal_growth": 3.0,
+   "terminal_cap_multiple": 30.0,
+   "terminal_cap_note": "30x unlevered FCF, not the 20x growth-compounder default: a regulated network's Gordon multiple at WACC 6.75%/g 3% is 27.5x and corresponds to ~1.0x RAB; a 20x cap would force an exit at ~0.75x RAB, below any observed NZ/AU network transaction. The cap only binds in the low-WACC/high-g corners of the sensitivity grid."
+  },
+  "bull": {
+   "growth_rates": [
+    9.5,
+    0.0,
+    6.0,
+    6.0,
+    12.0,
+    6.5,
+    6.0,
+    5.5,
+    5.0,
+    4.5
+   ],
+   "ebitda_margin_path": [
+    50.5,
+    48.5,
+    49.0,
+    49.5,
+    50.0,
+    50.0,
+    50.0,
+    50.0,
+    50.0,
+    50.0
+   ],
+   "sbc_pct_path": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "da_pct": 23.5,
+   "capex_pct_path": [
+    41.0,
+    39.0,
+    37.0,
+    35.0,
+    33.0,
+    31.0,
+    29.5,
+    28.0,
+    27.0,
+    26.0
+   ],
+   "capex_pct_note": "net capex (gross less capital contributions) plus ~0.5pp lease cash, as % of revenue ex-contributions",
+   "wc_capture_pct": 0.0,
+   "cash_tax_rate_path": [
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0
+   ],
+   "wacc": 6.75,
+   "terminal_growth": 3.25,
+   "terminal_cap_multiple": 30.0,
+   "terminal_cap_note": "30x unlevered FCF, not the 20x growth-compounder default: a regulated network's Gordon multiple at WACC 6.75%/g 3% is 27.5x and corresponds to ~1.0x RAB; a 20x cap would force an exit at ~0.75x RAB, below any observed NZ/AU network transaction. The cap only binds in the low-WACC/high-g corners of the sensitivity grid."
+  }
+ },
+ "scenario_narratives": {
+  "base": "DPP4 (to Mar-2030) plays out as set: FY27 revenue +9% including the ~$54m wash-up/IRIS one-off that then drops out (FY28 -1%), CPI+RAB growth of ~5% a year thereafter. Net capex runs at the guided ~$450m in FY27 (41% of revenue) and tapers to 28% by FY36 as the replacement wave passes and data-centre/EV growth capex normalises. DPP5 (Apr-2030) resets on a RAB ~25-30% larger at a similar ~7% WACC, giving a +9% revenue step in FY31. Adj EBITDA margin holds ~48.5% (opex inflation offset by scale). Gas distribution declines slowly inside the blend. WACC 6.75%, terminal growth 3% (CPI ~2% + ~1% real RAB growth).",
+  "bull": "Auckland electrification and the flagged 500MW of data-centre load arrive on schedule, the capex programme is delivered efficiently (IRIS rewards rather than penalties), the DPP5 reset lands with a high allowed WACC (rates stay ~4-4.5%) on the enlarged RAB (+12% FY31 step), and the new CEO's efficiency review lifts the margin to 50%. Capex intensity falls faster (27% by FY36) as demand-side orchestration (Symphony) defers reinforcement. Terminal growth 3.25%.",
+  "bear": "NZ rates fall back toward 2021 levels before the DPP5 reset, so the allowed return on the larger RAB is cut (FY31 -5% revenue step) while political pressure on Auckland lines charges tightens the path; capex over-runs and IRIS penalties leave part of the record capex programme unrecognised (capex stays 30%+ of revenue), opex inflation and storm/resilience costs compress the margin to 46%, gas distribution volumes decline faster than accelerated depreciation recovers. Terminal growth 2.5%."
+ },
+ "projections": {
+  "bear": {
+   "years": [
+    "FY2027E",
+    "FY2028E",
+    "FY2029E",
+    "FY2030E",
+    "FY2031E",
+    "FY2032E",
+    "FY2033E",
+    "FY2034E",
+    "FY2035E",
+    "FY2036E"
+   ],
+   "revenue": [
+    1089.8,
+    1068.0,
+    1110.7,
+    1155.1,
+    1097.4,
+    1135.8,
+    1175.5,
+    1210.8,
+    1247.1,
+    1278.3
+   ],
+   "adj_ebitda": [
+    539.4,
+    501.9,
+    522.0,
+    537.1,
+    504.8,
+    522.5,
+    540.7,
+    557.0,
+    573.7,
+    588.0
+   ],
+   "sbc": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "d_and_a": [
+    256.1,
+    251.0,
+    261.0,
+    271.5,
+    257.9,
+    266.9,
+    276.2,
+    284.5,
+    293.1,
+    300.4
+   ],
+   "cash_tax_rate": [
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0
+   ],
+   "cash_tax": [
+    79.3,
+    70.3,
+    73.1,
+    74.4,
+    69.1,
+    71.6,
+    74.1,
+    76.3,
+    78.6,
+    80.5
+   ],
+   "capex": [
+    446.8,
+    427.2,
+    433.2,
+    438.9,
+    395.1,
+    386.2,
+    387.9,
+    387.5,
+    380.4,
+    377.1
+   ],
+   "working_capital": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "fcf": [
+    13.3,
+    4.5,
+    15.8,
+    23.8,
+    40.6,
+    64.7,
+    78.8,
+    93.2,
+    114.7,
+    130.4
+   ],
+   "owner_fcf_margin": [
+    1.2,
+    0.4,
+    1.4,
+    2.1,
+    3.7,
+    5.7,
+    6.7,
+    7.7,
+    9.2,
+    10.2
+   ],
+   "discount_factors": [
+    0.9368,
+    0.8775,
+    0.822,
+    0.7701,
+    0.7214,
+    0.6758,
+    0.633,
+    0.593,
+    0.5555,
+    0.5204
+   ],
+   "pv_fcf": [
+    12.5,
+    3.9,
+    13.0,
+    18.3,
+    29.3,
+    43.7,
+    49.9,
+    55.3,
+    63.7,
+    67.9
+   ]
+  },
+  "base": {
+   "years": [
+    "FY2027E",
+    "FY2028E",
+    "FY2029E",
+    "FY2030E",
+    "FY2031E",
+    "FY2032E",
+    "FY2033E",
+    "FY2034E",
+    "FY2035E",
+    "FY2036E"
+   ],
+   "revenue": [
+    1094.8,
+    1083.8,
+    1138.0,
+    1194.9,
+    1302.5,
+    1374.1,
+    1442.8,
+    1507.8,
+    1568.1,
+    1623.0
+   ],
+   "adj_ebitda": [
+    549.6,
+    520.2,
+    551.9,
+    579.5,
+    631.7,
+    666.5,
+    699.8,
+    731.3,
+    760.5,
+    787.1
+   ],
+   "sbc": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "d_and_a": [
+    257.3,
+    254.7,
+    267.4,
+    280.8,
+    306.1,
+    322.9,
+    339.1,
+    354.3,
+    368.5,
+    381.4
+   ],
+   "cash_tax_rate": [
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0
+   ],
+   "cash_tax": [
+    81.8,
+    74.4,
+    79.7,
+    83.6,
+    91.2,
+    96.2,
+    101.0,
+    105.5,
+    109.8,
+    113.6
+   ],
+   "capex": [
+    448.9,
+    422.7,
+    421.1,
+    430.2,
+    442.8,
+    439.7,
+    440.1,
+    437.2,
+    439.1,
+    438.2
+   ],
+   "working_capital": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "fcf": [
+    18.9,
+    23.2,
+    51.2,
+    65.7,
+    97.7,
+    130.5,
+    158.7,
+    188.5,
+    211.7,
+    235.3
+   ],
+   "owner_fcf_margin": [
+    1.7,
+    2.1,
+    4.5,
+    5.5,
+    7.5,
+    9.5,
+    11.0,
+    12.5,
+    13.5,
+    14.5
+   ],
+   "discount_factors": [
+    0.9368,
+    0.8775,
+    0.822,
+    0.7701,
+    0.7214,
+    0.6758,
+    0.633,
+    0.593,
+    0.5555,
+    0.5204
+   ],
+   "pv_fcf": [
+    17.7,
+    20.4,
+    42.1,
+    50.6,
+    70.5,
+    88.2,
+    100.5,
+    111.8,
+    117.6,
+    122.5
+   ]
+  },
+  "bull": {
+   "years": [
+    "FY2027E",
+    "FY2028E",
+    "FY2029E",
+    "FY2030E",
+    "FY2031E",
+    "FY2032E",
+    "FY2033E",
+    "FY2034E",
+    "FY2035E",
+    "FY2036E"
+   ],
+   "revenue": [
+    1099.8,
+    1099.8,
+    1165.8,
+    1235.8,
+    1384.0,
+    1474.0,
+    1562.4,
+    1648.4,
+    1730.8,
+    1808.7
+   ],
+   "adj_ebitda": [
+    555.4,
+    533.4,
+    571.2,
+    611.7,
+    692.0,
+    737.0,
+    781.2,
+    824.2,
+    865.4,
+    904.3
+   ],
+   "sbc": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "d_and_a": [
+    258.5,
+    258.5,
+    274.0,
+    290.4,
+    325.3,
+    346.4,
+    367.2,
+    387.4,
+    406.7,
+    425.0
+   ],
+   "cash_tax_rate": [
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0,
+    28.0
+   ],
+   "cash_tax": [
+    83.1,
+    77.0,
+    83.2,
+    90.0,
+    102.7,
+    109.4,
+    115.9,
+    122.3,
+    128.4,
+    134.2
+   ],
+   "capex": [
+    450.9,
+    428.9,
+    431.3,
+    432.5,
+    456.7,
+    456.9,
+    460.9,
+    461.5,
+    467.3,
+    470.3
+   ],
+   "working_capital": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "fcf": [
+    21.3,
+    27.5,
+    56.7,
+    89.2,
+    132.6,
+    170.7,
+    204.4,
+    240.3,
+    269.7,
+    299.9
+   ],
+   "owner_fcf_margin": [
+    1.9,
+    2.5,
+    4.9,
+    7.2,
+    9.6,
+    11.6,
+    13.1,
+    14.6,
+    15.6,
+    16.6
+   ],
+   "discount_factors": [
+    0.9368,
+    0.8775,
+    0.822,
+    0.7701,
+    0.7214,
+    0.6758,
+    0.633,
+    0.593,
+    0.5555,
+    0.5204
+   ],
+   "pv_fcf": [
+    20.0,
+    24.1,
+    46.6,
+    68.7,
+    95.6,
+    115.3,
+    129.4,
+    142.5,
+    149.8,
+    156.1
+   ]
+  }
+ },
+ "valuation": {
+  "bear": {
+   "sum_pv_fcf": 357.4,
+   "terminal_value": 3144.6,
+   "terminal_value_gordon": 3144.6,
+   "terminal_value_cap": 3911.6,
+   "terminal_bound_by": "gordon",
+   "pv_terminal": 1636.4,
+   "enterprise_value": 1993.8,
+   "net_debt": 1520.1,
+   "equity_value": 473.7,
+   "intrinsic_value": 0.47,
+   "street_intrinsic_value": 0.47,
+   "upside": -90.0,
+   "terminal_pct_of_value": 82.1,
+   "implied_exit_multiple": 24.1,
+   "implied_ev_to_adj_ebitda_fy27": 3.7,
+   "implied_network_ev_to_rab_est": 0.42
+  },
+  "base": {
+   "sum_pv_fcf": 741.7,
+   "terminal_value": 6463.7,
+   "terminal_value_gordon": 6463.7,
+   "terminal_value_cap": 7059.8,
+   "terminal_bound_by": "gordon",
+   "pv_terminal": 3363.6,
+   "enterprise_value": 4105.3,
+   "net_debt": 1520.1,
+   "equity_value": 2585.2,
+   "intrinsic_value": 2.59,
+   "street_intrinsic_value": 2.59,
+   "upside": -45.1,
+   "terminal_pct_of_value": 81.9,
+   "implied_exit_multiple": 27.5,
+   "implied_ev_to_adj_ebitda_fy27": 7.5,
+   "implied_network_ev_to_rab_est": 0.87
+  },
+  "bull": {
+   "sum_pv_fcf": 948.1,
+   "terminal_value": 8846.5,
+   "terminal_value_gordon": 8846.5,
+   "terminal_value_cap": 8996.4,
+   "terminal_bound_by": "gordon",
+   "pv_terminal": 4603.5,
+   "enterprise_value": 5551.7,
+   "net_debt": 1520.1,
+   "equity_value": 4031.6,
+   "intrinsic_value": 4.03,
+   "street_intrinsic_value": 4.03,
+   "upside": -14.6,
+   "terminal_pct_of_value": 82.9,
+   "implied_exit_multiple": 29.5,
+   "implied_ev_to_adj_ebitda_fy27": 10.0,
+   "implied_network_ev_to_rab_est": 1.18
+  }
+ },
+ "entry_price": {
+  "hurdle_rate": 0.15,
+  "method": "15% IRR: PV of interim owner FCF at 15% + terminal value BUILT at 15% (min(Gordon@15%, 30x FCF_N)) discounted 10 years, less bridge net debt, per share; per scenario then probability-weighted.",
+  "bear": {
+   "years_to_terminal": 10,
+   "pv_interim_fcf_at_hurdle": 212.0,
+   "terminal_at_hurdle": 1069.2,
+   "terminal_bound_by": "gordon",
+   "pv_terminal_at_hurdle": 264.3,
+   "net_debt": 1520.1,
+   "entry_price": 0.0,
+   "entry_price_unfloored": -1.04,
+   "entry_discount_from_current": -100.0
+  },
+  "base": {
+   "years_to_terminal": 10,
+   "pv_interim_fcf_at_hurdle": 449.8,
+   "terminal_at_hurdle": 2019.9,
+   "terminal_bound_by": "gordon",
+   "pv_terminal_at_hurdle": 499.3,
+   "net_debt": 1520.1,
+   "entry_price": 0.0,
+   "entry_price_unfloored": -0.57,
+   "entry_discount_from_current": -100.0
+  },
+  "bull": {
+   "years_to_terminal": 10,
+   "pv_interim_fcf_at_hurdle": 573.5,
+   "terminal_at_hurdle": 2635.1,
+   "terminal_bound_by": "gordon",
+   "pv_terminal_at_hurdle": 651.4,
+   "net_debt": 1520.1,
+   "entry_price": 0.0,
+   "entry_price_unfloored": -0.3,
+   "entry_discount_from_current": -100.0
+  },
+  "weighted_entry_price": 0.0,
+  "weighted_entry_price_unfloored": -0.62,
+  "entry_price_note": "NO positive price meets a 15% hurdle in any scenario: at 15% the PV of ten years of thin supercycle FCF plus a terminal value built at 15% is below the $1.52bn bridge net debt, so the unfloored entry prices are negative. entry_price is floored at 0.00 and the unfloored figure retained. A regulated network geared ~35% cannot return 15% to equity from its allowed ~7% return; the required_return_table is the useful reading (9% -> $0.83, 6.75% -> base IV $2.59)."
+ },
+ "required_return_table": {
+  "scenario": "base",
+  "returns": [
+   6.75,
+   9,
+   10,
+   11,
+   12,
+   15
+  ],
+  "value_per_share": [
+   2.59,
+   0.83,
+   0.42,
+   0.12,
+   -0.12,
+   -0.57
+  ],
+  "note": "Each row rebuilds the terminal value at that row's rate (min(Gordon@r, 30x FCF_N)). 6.75% row = valuation.base.intrinsic_value; 15% row = entry_price.base.entry_price_unfloored. Market price NZ$4.72 exceeds the 6.75% row; it is reached only at a discount rate of roughly 6.0%."
+ },
+ "sensitivity": {
+  "scenario": "base",
+  "wacc_range": [
+   5.75,
+   6.25,
+   6.75,
+   7.25,
+   7.75
+  ],
+  "terminal_growth_range": [
+   2.0,
+   2.5,
+   3.0,
+   3.5,
+   4.0
+  ],
+  "matrix": [
+   [
+    2.93,
+    3.31,
+    3.31,
+    3.31,
+    3.31
+   ],
+   [
+    2.33,
+    2.75,
+    3.1,
+    3.1,
+    3.1
+   ],
+   [
+    1.85,
+    2.18,
+    2.59,
+    2.9,
+    2.9
+   ],
+   [
+    1.47,
+    1.72,
+    2.03,
+    2.42,
+    2.7
+   ],
+   [
+    1.15,
+    1.35,
+    1.59,
+    1.89,
+    2.27
+   ]
+  ],
+  "note": "WACC +/-1pp (not +/-2pp: a 4.75% nominal WACC is below the regulated allowed return and meaningless), terminal growth +/-1pp. Cells where the 30x cap binds are reported at the cap."
+ },
+ "probability_weighted": {
+  "weights": {
+   "bear": 0.25,
+   "base": 0.5,
+   "bull": 0.25
+  },
+  "weights_rationale": "25/50/25 rather than the 15/50/35 house default. Bear raised to 25%: essentially all earnings depend on one regulator's five-yearly reset and the next one (DPP5, Apr-2030) falls inside the explicit horizon; gas distribution is a slowly stranding asset; the dividend is debt-funded through a record capex programme. Bull cut to 25%: it needs rates to stay high into the DPP5 reset AND the data-centre load AND efficient delivery of $600m+/yr capex, three independent things.",
+  "weighted_iv": 2.42,
+  "street_weighted_iv": 2.42,
+  "band_position": null,
+  "band_note": "SBC is nil, so house and street bases coincide and the band collapses to a point; band_position is n/a rather than a degenerate 0%.",
+  "margin_of_safety_pct": -95.1
+ },
+ "market_context": {
+  "market_cap": 4720.0,
+  "enterprise_value_at_price": 7002.0,
+  "network_ev_at_price_ex_non_operating": 6240.1,
+  "ev_to_adj_ebitda_fy26": 14.5,
+  "ev_to_adj_ebitda_fy27_guidance_mid": 12.7,
+  "network_ev_to_rab_estimate": 1.33,
+  "rab_estimate_note": "RAB ~NZ$4.7bn (electricity ~4.2bn at Mar-2026 + gas ~0.5bn) is an analyst estimate from Vector's information disclosures trend and DPP4 building blocks; the FY26 annual report does not print it. Treat as +/-10%.",
+  "price_to_nta": 1.83,
+  "dividend_yield_pct": 5.5,
+  "pe_fy26_continuing": 19.7,
+  "price_implied_discount_rate_note": "The required-return table puts the NZ$4.72 price at an implied nominal WACC of roughly 6.0% on the base drivers, i.e. the market capitalises Vector at ~1.33x RAB. That premium is the scarcity/Entrust-control/inflation-hedge premium NZ regulated infrastructure has carried for a decade (compare AIA.NZ), not something the flows justify at a 6.75% WACC."
+ },
+ "valuation_philosophy": {
+  "summary": "Regulated-network owner-FCF DCF: the value of a RAB business at the regulated WACC is the RAB, so the model's job is to price the gap between the market's ~6% implied rate and a 6.75% cost of capital, plus the specific leakages (gas decline, DPP5 reset, debt-funded dividend) that make Vector worth a little less than its RAB.",
+  "key_judgments": [
+   "Revenue growth follows RAB growth, with the DPP5 reset made explicit in FY31 and terminal capex normalised to terminal growth",
+   "Capital contributions net against capex, never counted as revenue or EBITDA",
+   "Bluecurrent valued on cash distributions in the bridge because adjusted EBITDA excludes it",
+   "One WACC across scenarios; regulatory and stranding risk carried in the driver paths and the 25% bear weight"
+  ]
+ },
+ "reconciliation": {
+  "prior_version": {
+   "version": "1.0",
+   "valuation_date": "2026-09-19",
+   "price_then": 4.72,
+   "bear": 0.47,
+   "base": 2.59,
+   "bull": 4.03,
+   "weighted": 2.42,
+   "note": "v1.0 built earlier on 2026-09-19 directly from the AR26 PDF, before FY2025/FY2026 were loaded into core_metrics."
+  },
+  "new_version": {
+   "version": "1.1",
+   "bear": 0.47,
+   "base": 2.59,
+   "bull": 4.03,
+   "weighted": 2.42
+  },
+  "bridge": [
+   {
+    "item": "Prior weighted IV (v1.0, 2026-09-19, NZ$4.72)",
+    "value": 2.42
+   },
+   {
+    "item": "Anchor refresh: price unchanged (NZ$4.72, 18-Sep close; no NZX session since); economic net debt 2,282.0, shares 1,000m, FY26 adj EBITDA 482.2, contributions 190.9, D&A 233.0 all confirmed against core_metrics/kpis",
+    "value": 0.0
+   },
+   {
+    "item": "Driver change: none. FY27 guidance (adj EBITDA 540-560, gross capex 605-635, contributions 160-190, ~54 wash-up/IRIS) was already in v1.0; FY26 was an actual, not a forecast, in v1.0",
+    "value": 0.0
+   },
+   {
+    "item": "Methodology change: none (same component owner-FCF build, 6.75% WACC, 30x cap, bridge)",
+    "value": 0.0
+   },
+   {
+    "item": "Rounding on full-precision recompute",
+    "value": 0.0
+   },
+   {
+    "item": "New weighted IV",
+    "value": 2.42,
+    "note": "ties to probability_weighted.weighted_iv"
+   }
+  ],
+  "unchanged_by_design": [
+   {
+    "assumption": "Growth paths (base 9/-1/5/5/9/5.5/5/4.5/4/3.5)",
+    "why_unchanged": "tied to DPP4 revenue path + FY27 wash-up drop-out + DPP5 step; no new regulatory signal since v1.0",
+    "what_would_move_it": "Commerce Commission DPP5 issues paper / WACC determination (2029); FY27 H1 revenue print vs the +9% path"
+   },
+   {
+    "assumption": "Adj EBITDA margin 50.2% FY27 then 48.5%",
+    "why_unchanged": "FY27 guidance midpoint 550 reproduces exactly; FY26 actual 48.0%",
+    "what_would_move_it": "CEO strategic review outcomes (Sep-2026 shareholder meeting) quantifying opex savings"
+   },
+   {
+    "assumption": "Net capex path 41% -> 27% of revenue",
+    "why_unchanged": "FY27 guidance mid (620 - 175 + 5.5 lease = 450.5) = 41.1% reproduces; AMP26 $5.4bn FY26-36 = ~$490m/yr gross average, consistent with the taper",
+    "what_would_move_it": "AMP27 revising the 10-year envelope; FY27 actual contributions outside 160-190"
+   },
+   {
+    "assumption": "28% cash tax from FY27; 35.3 tax asset in bridge",
+    "why_unchanged": "AR26 note 17 confirms the 35.3 current asset and nil non-current",
+    "what_would_move_it": "FY27 cash tax paid materially below 28% of EBIT after the asset is consumed"
+   },
+   {
+    "assumption": "Bluecurrent at 700",
+    "why_unchanged": "FY26 distributions 55 (32.6 + 10.2 + 12.1) confirmed in deck p.14; carrying value 580.4 confirmed in note 16.1",
+    "what_would_move_it": "FY27 distribution guidance; any QIC/Vector sale process"
+   },
+   {
+    "assumption": "WACC 6.75%, terminal g 3.0/2.5/3.25, weights 25/50/25",
+    "why_unchanged": "no change in NZ 10y (~4.4%) or the regulated WACC reference since v1.0",
+    "what_would_move_it": "+/-50bp move in NZ 10y govt; DPP5 WACC signalling"
+   }
+  ]
+ },
+ "model_version": "1.1",
+ "price_refresh": {
+  "refreshed_at": "2026-09-19T07:03:06Z",
+  "price_source": "yahoo:regularMarketPrice",
+  "previous_price": 4.72,
+  "current_price": 4.72,
+  "drift_pct": 0.0,
+  "valuation_date": "2026-09-19",
+  "fields_updated": [
+   "valuation.base.upside"
+  ],
+  "prose_is_stale": true,
+  "prose_paths_quoting_previous_price": [
+   "inputs.wacc_rationale",
+   "required_return_table.note",
+   "market_context.price_implied_discount_rate_note",
+   "reconciliation.bridge[0].item",
+   "reconciliation.bridge[1].item"
+  ],
+  "dashboard_stale": false
+ },
+ "sanity_check": {
+  "ran": true,
+  "passed": true,
+  "model": "owner_fcf",
+  "basis": "SBC-adjusted on both sides (EPS less SBC/share; EBITDA less SBC), so these deliberately do not match GAAP screener multiples.",
+  "rules_evaluated": [
+   "pb",
+   "p_sales"
+  ],
+  "rules_not_evaluated": [
+   "pe",
+   "ev_ebitda"
+  ],
+  "fy_end_month": 6,
+  "fy_end_month_source": "learned from the annual filings",
+  "implied_multiples": {
+   "pe": null,
+   "pb": 0.7137,
+   "ev_ebitda": null,
+   "p_sales": 2.1668
+  },
+  "historical_averages_ex_outliers": {
+   "pe_avg": null,
+   "pe_max": null,
+   "pe_min": null,
+   "pb_avg": 1.4518,
+   "pb_max": 1.9135,
+   "pb_min": 0.9929,
+   "ev_ebitda_avg": null,
+   "ev_ebitda_max": null,
+   "ev_ebitda_min": null,
+   "p_sales_avg": 3.2804,
+   "p_sales_max": 4.1412,
+   "p_sales_min": 2.7909
+  },
+  "price_position_in_10yr_range": 0.8272,
+  "trip_reasons": [],
+  "diagnosis": [],
+  "historical_table": [
+   {
+    "period": "FY2019",
+    "price": 3.84,
+    "pe": null,
+    "pb": 1.6344,
+    "ev_ebitda": null,
+    "p_sales": 2.9121
+   },
+   {
+    "period": "FY2020",
+    "price": 3.89,
+    "pe": null,
+    "pb": 1.7214,
+    "ev_ebitda": null,
+    "p_sales": 3.0061
+   },
+   {
+    "period": "FY2021",
+    "price": 4.07,
+    "pe": null,
+    "pb": 1.7427,
+    "ev_ebitda": null,
+    "p_sales": 3.1813
+   },
+   {
+    "period": "FY2022",
+    "price": 4.65,
+    "pe": null,
+    "pb": 1.9135,
+    "ev_ebitda": null,
+    "p_sales": 3.4726
+   },
+   {
+    "period": "FY2023",
+    "price": 4.05,
+    "pe": null,
+    "pb": 1.0232,
+    "ev_ebitda": null,
+    "p_sales": 2.7909
+   },
+   {
+    "period": "FY2024",
+    "price": 3.75,
+    "pe": null,
+    "pb": 0.9929,
+    "ev_ebitda": null,
+    "p_sales": 3.0205
+   },
+   {
+    "period": "FY2025",
+    "price": 4.4,
+    "pe": null,
+    "pb": 1.2219,
+    "ev_ebitda": null,
+    "p_sales": 3.7186
+   },
+   {
+    "period": "FY2026",
+    "price": 4.95,
+    "pe": null,
+    "pb": 1.364,
+    "ev_ebitda": null,
+    "p_sales": 4.1412
+   }
+  ],
+  "computed_by": "scripts/sanity_check.py",
+  "computed_at": "2026-09-19T07:04:30.067675Z"
+ }
+};
+
+// Numbers the DCF cards must show at each scenario's own defaults. The
+// interactive model below is a generic 5-year Gordon toy; it scales these
+// anchors by the ratio it implies, it never replaces them.
+const dcfAnchors = {
+ "bear": {
+  "iv": 0.47,
+  "entry": 0.0
+ },
+ "base": {
+  "iv": 2.59,
+  "entry": 0.0
+ },
+ "bull": {
+  "iv": 4.03,
+  "entry": 0.0
+ }
+};
+
+// Chart configuration from the Spec, and the series pre-computed from the CSV.
+const chartSpecs = [
+ {
+  "id": "revenueChart",
+  "series": [
+   {
+    "label": "Revenue",
+    "column": "Revenue",
+    "kind": "bar"
+   },
+   {
+    "label": "YoY %",
+    "derive": "yoy:Revenue",
+    "kind": "line",
+    "axis": "y1",
+    "color": "warning"
+   }
+  ],
+  "y1_title": "YoY %"
+ },
+ {
+  "id": "marginsChart",
+  "series": [
+   {
+    "label": "Net margin",
+    "column": "NetMargin",
+    "kind": "line"
+   }
+  ],
+  "percent": true
+ },
+ {
+  "id": "profitChart",
+  "series": [
+   {
+    "label": "Net income",
+    "column": "NetIncome",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "ebitdaChart",
+  "series": [
+   {
+    "label": "EBITDA",
+    "column": "EBITDA",
+    "kind": "bar"
+   },
+   {
+    "label": "EBITDA %",
+    "derive": "ratio:EBITDA/Revenue",
+    "kind": "line",
+    "axis": "y1",
+    "color": "warning"
+   }
+  ],
+  "y1_title": "EBITDA %"
+ },
+ {
+  "id": "epsDpsChart",
+  "series": [
+   {
+    "label": "EPS",
+    "column": "EPS",
+    "kind": "bar"
+   },
+   {
+    "label": "Dividend per share",
+    "column": "DividendPerShare",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "fcfChart",
+  "series": [
+   {
+    "label": "Net income",
+    "column": "NetIncome",
+    "kind": "bar"
+   },
+   {
+    "label": "Reported FCF",
+    "column": "FreeCashFlow",
+    "kind": "bar"
+   },
+   {
+    "label": "Owner FCF (DCF)",
+    "dcf_path": "historical_growth.owner_fcf_history",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "ocfCapexChart",
+  "series": [
+   {
+    "label": "Operating cash flow",
+    "column": "OperatingCashFlow",
+    "kind": "bar"
+   },
+   {
+    "label": "CapEx",
+    "column": "CapEx",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "cashDebtChart",
+  "series": [
+   {
+    "label": "Cash &amp; equivalents",
+    "column": "CashAndEquivalents",
+    "kind": "bar"
+   },
+   {
+    "label": "Total debt",
+    "column": "TotalDebt",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "balanceChart",
+  "series": [
+   {
+    "label": "Total assets",
+    "column": "TotalAssets",
+    "kind": "line"
+   },
+   {
+    "label": "Shareholders' equity",
+    "column": "ShareholdersEquity",
+    "kind": "line"
+   },
+   {
+    "label": "Total liabilities",
+    "column": "TotalLiabilities",
+    "kind": "line"
+   }
+  ]
+ },
+ {
+  "id": "sbcChart",
+  "series": [
+   {
+    "label": "Shares outstanding (m)",
+    "column": "SharesOutstanding",
+    "kind": "line",
+    "axis": "y1"
+   }
+  ],
+  "y1_title": "shares (m)"
+ },
+ {
+  "id": "gaapVsAdjustedChart",
+  "series": [
+   {
+    "label": "Reported EBITDA (GAAP)",
+    "column": "EBITDA",
+    "kind": "bar"
+   },
+   {
+    "label": "Adjusted EBITDA",
+    "column": "EBITDABeforeSignificant",
+    "kind": "bar"
+   },
+   {
+    "label": "Adjusted EBITDA, continuing ops",
+    "column": "EBITDAContinuingBeforeSignificant",
+    "kind": "line"
+   }
+  ]
+ },
+ {
+  "id": "capexSupercycleChart",
+  "series": [
+   {
+    "label": "Operating cash flow",
+    "column": "OperatingCashFlow",
+    "kind": "bar"
+   },
+   {
+    "label": "Gross CapEx",
+    "column": "CapEx",
+    "kind": "bar"
+   }
+  ]
+ }
+];
+const chartData = {
+ "revenueChart": {
+  "annual": {
+   "labels": [
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     1318.6,
+     1294.0,
+     1279.3,
+     1339.0,
+     1451.1,
+     1241.5,
+     1183.2,
+     1195.3
+    ],
+    [
+     null,
+     -1.8656150462611794,
+     -1.1360123647604363,
+     4.666614554834679,
+     8.371919342793124,
+     -14.444214733650329,
+     -4.695932339911394,
+     1.0226504394861315
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     null,
+     null
+    ],
+    [
+     null,
+     null
+    ]
+   ]
+  }
+ },
+ "marginsChart": {
+  "annual": {
+   "labels": [
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     6.4,
+     7.5,
+     15.2,
+     12.0,
+     118.2,
+     7.3,
+     14.17,
+     20.1
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     null,
+     null
+    ]
+   ]
+  }
+ },
+ "profitChart": {
+  "annual": {
+   "labels": [
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     84.0,
+     97.3,
+     194.6,
+     160.9,
+     1715.8,
+     91.0,
+     167.7,
+     240.2
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     118.1,
+     113.0
+    ]
+   ]
+  }
+ },
+ "ebitdaChart": {
+  "annual": {
+   "labels": [
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     516.6,
+     573.8,
+     634.3,
+     672.5,
+     523.3,
+     601.0,
+     611.6,
+     673.1
+    ],
+    [
+     39.177915971484914,
+     44.34312210200927,
+     49.581802548268584,
+     50.22404779686334,
+     36.06229756736269,
+     48.409182440596055,
+     51.69033130493577,
+     56.31222287291894
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     336.3,
+     324.6
+    ],
+    [
+     null,
+     null
+    ]
+   ]
+  }
+ },
+ "epsDpsChart": {
+  "annual": {
+   "labels": [
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     0.083,
+     0.095,
+     0.193,
+     0.159,
+     1.714,
+     0.089,
+     0.167,
+     0.24
+    ],
+    [
+     0.165,
+     0.165,
+     0.1675,
+     0.1675,
+     0.2225,
+     0.2225,
+     0.25,
+     0.26
+    ]
+   ]
+  }
+ },
+ "fcfChart": {
+  "annual": {
+   "labels": [
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     84.0,
+     97.3,
+     194.6,
+     160.9,
+     1715.8,
+     91.0,
+     167.7,
+     240.2
+    ],
+    [
+     -70.3,
+     -79.1,
+     -17.1,
+     -40.0,
+     -121.9,
+     -43.6,
+     40.3,
+     101.2
+    ],
+    [
+     null,
+     null,
+     null,
+     61.3,
+     -25.8,
+     5.7,
+     94.6,
+     59.4
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     118.1,
+     113.0
+    ],
+    [
+     -24.0,
+     54.0
+    ],
+    [
+     null,
+     null
+    ]
+   ]
+  }
+ },
+ "ocfCapexChart": {
+  "annual": {
+   "labels": [
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     348.1,
+     397.3,
+     499.1,
+     518.8,
+     517.1,
+     445.1,
+     515.2,
+     632.5
+    ],
+    [
+     418.4,
+     476.4,
+     516.2,
+     558.8,
+     639.0,
+     488.7,
+     474.9,
+     531.3
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     237.0,
+     277.0
+    ],
+    [
+     261.0,
+     223.0
+    ]
+   ]
+  }
+ },
+ "cashDebtChart": {
+  "annual": {
+   "labels": [
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     27.6,
+     28.3,
+     17.4,
+     22.5,
+     537.0,
+     104.6,
+     23.3,
+     5.4
+    ],
+    [
+     2800.9,
+     3175.3,
+     3098.3,
+     3257.1,
+     2333.8,
+     2106.6,
+     2100.6,
+     2306.9
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     null,
+     null
+    ],
+    [
+     null,
+     null
+    ]
+   ]
+  }
+ },
+ "balanceChart": {
+  "annual": {
+   "labels": [
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     6061.0,
+     6380.9,
+     6519.5,
+     6812.2,
+     7527.6,
+     7125.6,
+     6922.3,
+     7157.1
+    ],
+    [
+     2349.4,
+     2259.7,
+     2335.4,
+     2430.1,
+     3958.0,
+     3776.7,
+     3600.9,
+     3629.0
+    ],
+    [
+     3711.6,
+     4121.2,
+     4184.1,
+     4382.1,
+     3569.6,
+     3348.9,
+     3321.4,
+     3528.1
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     null,
+     null
+    ],
+    [
+     null,
+     null
+    ],
+    [
+     null,
+     null
+    ]
+   ]
+  }
+ },
+ "sbcChart": {
+  "annual": {
+   "labels": [
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     999.973657,
+     999.973657,
+     999.973657,
+     999.973657,
+     999.973657,
+     999.973657,
+     999.973657,
+     1000.0
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     999.973657,
+     999.973657
+    ]
+   ]
+  }
+ },
+ "gaapVsAdjustedChart": {
+  "annual": {
+   "labels": [
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     516.6,
+     573.8,
+     634.3,
+     672.5,
+     523.3,
+     601.0,
+     611.6,
+     673.1
+    ],
+    [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     414.0,
+     482.2
+    ],
+    [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     401.1,
+     482.2
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     336.3,
+     324.6
+    ],
+    [
+     null,
+     null
+    ],
+    [
+     201.6,
+     239.7
+    ]
+   ]
+  }
+ },
+ "capexSupercycleChart": {
+  "annual": {
+   "labels": [
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     348.1,
+     397.3,
+     499.1,
+     518.8,
+     517.1,
+     445.1,
+     515.2,
+     632.5
+    ],
+    [
+     418.4,
+     476.4,
+     516.2,
+     558.8,
+     639.0,
+     488.7,
+     474.9,
+     531.3
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     237.0,
+     277.0
+    ],
+    [
+     261.0,
+     223.0
+    ]
+   ]
+  }
+ }
+};
+
+const metricDescriptions = {
+ "balanceSheet": {
+  "title": "Balance sheet",
+  "content": "<p><strong>Shareholders' equity<\/strong> is assets less liabilities; plotted against <strong>total liabilities<\/strong> to show leverage.<\/p><div class=\"metric-highlight\"><strong>For Vector Limited:<\/strong> equity that grows only through revaluations or share issues is not the same as retained earnings.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Liabilities growing faster than equity<\/li><li>Goodwill share of equity after acquisitions<\/li><\/ul>"
+ },
+ "cashDebt": {
+  "title": "Cash and debt",
+  "content": "<p><strong>Cash &amp; equivalents<\/strong> against <strong>total borrowings<\/strong> (leases excluded unless noted).<\/p><div class=\"metric-highlight\"><strong>For Vector Limited:<\/strong> the DCF's net-debt bridge uses these balances at the latest balance-sheet date. Vector's own regulatory leverage measure is <strong>economic net debt<\/strong> ($2,282.0m at FY2026, above this chart's face-value total debt because it includes lease liabilities), against which management targets a <strong>gearing ratio<\/strong> around 39% -- down from the 57-59% range of FY2021-22 after the metering and gas-trading disposal proceeds were used to pay down debt.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Net debt trend versus adjusted EBITDA, not GAAP EBITDA<\/li><li>Gearing drifting back up as the capex supercycle is funded<\/li><li>Refinancing dates and covenants (S&amp;P BBB+) in the filings<\/li><\/ul>"
+ },
+ "ebitda": {
+  "title": "EBITDA",
+  "content": "<p><strong>EBITDA<\/strong> is earnings before interest, tax, depreciation and amortisation -- an operating-cash proxy that ignores capital intensity.<\/p><div class=\"metric-highlight\"><strong>For Vector Limited:<\/strong> read it beside CapEx: a business that must reinvest most of its EBITDA is not as cash-generative as the margin suggests.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>EBITDA margin trend<\/li><li>Gap between EBITDA and operating cash flow (working capital)<\/li><\/ul>"
+ },
+ "epsDps": {
+  "title": "EPS and dividends",
+  "content": "<p><strong>EPS<\/strong> is net income per share; <strong>DPS<\/strong> is the cash dividend paid per share. Both are in major currency units.<\/p><div class=\"metric-highlight\"><strong>For Vector Limited:<\/strong> the payout ratio (DPS / EPS) shows how much of earnings is returned versus reinvested.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>EPS growth versus net income growth (dilution)<\/li><li>Dividends funded from earnings, not debt<\/li><\/ul>"
+ },
+ "gaapVsAdjusted": {
+  "title": "Reported vs Adjusted EBITDA",
+  "content": "<p><strong>Reported (GAAP) EBITDA<\/strong> is straight off the income statement. <strong>Adjusted EBITDA<\/strong> is Vector's own headline measure, excluding significant/one-off items such as impairments and disposal gains. <strong>Adjusted EBITDA, continuing ops<\/strong> additionally excludes the businesses Vector has sold.<\/p><div class=\"metric-highlight\"><strong>For Vector Limited:<\/strong> Vector sold its metering business in FY2023 (a ~$1.5bn gain, one-off) and its gas trading/distribution business in FY2024 (an impairment charge), so GAAP EBITDA and NPAT in those years say almost nothing about the ongoing regulated network business. FY2026 adjusted EBITDA of $482.2m (+20% YoY) is the number management guides on and that the DPP4 electricity reset (effective 1 April 2025) actually drove.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Growing gap between reported and adjusted EBITDA signals a one-off year, not a trend<\/li><li>Continuing-ops EBITDA is the only clean base for a forward growth rate post-divestiture<\/li><\/ul>"
+ },
+ "capexSupercycle": {
+  "title": "Network investment supercycle",
+  "content": "<p><strong>Gross CapEx<\/strong> is total cash spent on network assets before netting off customer contributions; <strong>operating cash flow<\/strong> shows how much of that spend is self-funded.<\/p><div class=\"metric-highlight\"><strong>For Vector Limited:<\/strong> Vector's Asset Management Plan (AMP26) flags a $10bn, 20-year Auckland network investment programme, with $5.4bn planned FY2026-FY2036 -- roughly half for growth connections (including up to 500MW of prospective data-centre demand) and half for renewal/resilience. Gross capex hit a record $531m in FY2026 and is guided to $605-635m in FY2027. Customers partly offset this: capital contributions were $190.9m in FY2026 (guided down to $160-190m in FY2027 on project timing), and Vector nets these against gross capex in its own segment reporting rather than treating them as revenue.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Gross capex consistently outrunning operating cash flow means external funding (debt) rises<\/li><li>Capital contributions guided lower means a larger share of the spend is self-funded via debt or retained cash<\/li><li>Regulatory allowed returns (DPP4, to March 2030) are what makes this capex investable rather than value-destructive<\/li><\/ul>"
+ },
+ "fcf": {
+  "title": "Free cash flow",
+  "content": "<p><strong>Reported FCF<\/strong> is operating cash flow less capital expenditure. <strong>Owner FCF<\/strong> (from the DCF) further deducts stock-based compensation, interest income and lease principal -- the cash an owner could actually take out.<\/p><div class=\"metric-highlight\"><strong>For Vector Limited:<\/strong> the gap between net income and owner FCF is the earnings-quality question the valuation is built on.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>FCF persistently below net income<\/li><li>Working-capital swings inflating one year's FCF<\/li><\/ul>"
+ },
+ "margins": {
+  "title": "Margins",
+  "content": "<p><strong>Gross margin<\/strong> is revenue less cost of revenue; <strong>operating margin<\/strong> deducts operating expenses; <strong>net margin<\/strong> is after interest and tax.<\/p><div class=\"metric-highlight\"><strong>For Vector Limited:<\/strong> the spread between gross and operating margin is the cost of running the business; a widening spread with flat gross margin means opex is growing faster than sales.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Direction of operating margin over several years, not one<\/li><li>One-offs (impairments, disposals) that distort net margin<\/li><\/ul>"
+ },
+ "ocfCapex": {
+  "title": "Operating cash flow and CapEx",
+  "content": "<p><strong>Operating cash flow<\/strong> is cash generated by operations; <strong>CapEx<\/strong> is cash invested in fixed and intangible assets.<\/p><div class=\"metric-highlight\"><strong>For Vector Limited:<\/strong> CapEx here is shown as stored (sign convention varies by ticker); the DCF splits it into stay-in-business and growth where disclosed.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>CapEx rising faster than revenue<\/li><li>OCF that diverges from EBITDA<\/li><\/ul>"
+ },
+ "profit": {
+  "title": "Profit lines",
+  "content": "<p><strong>Gross profit<\/strong> is revenue less cost of revenue; <strong>operating income<\/strong> deducts operating expenses; <strong>net income<\/strong> is after interest, tax and one-offs.<\/p><div class=\"metric-highlight\"><strong>For Vector Limited:<\/strong> the three lines together show where margin is made and lost between the top line and the bottom.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Operating income growing slower than gross profit (opex creep)<\/li><li>Net income far from operating income (interest, tax, one-offs)<\/li><\/ul>"
+ },
+ "revenue": {
+  "title": "Revenue",
+  "content": "<p><strong>Revenue<\/strong> is the top line: what customers paid for goods and services in the period, before any costs.<\/p><div class=\"metric-highlight\"><strong>For Vector Limited:<\/strong> the growth rate matters more than the level; compare it with the DCF's base-case growth path below.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Acceleration or deceleration in YoY growth<\/li><li>Whether growth is organic or acquired<\/li><li>Interim rows show seasonality<\/li><\/ul>"
+ },
+ "sbc": {
+  "title": "Stock-based compensation and share count",
+  "content": "<p><strong>Stock-based comp<\/strong> is the expense of equity awards; <strong>shares outstanding<\/strong> shows the dilution it causes net of buybacks.<\/p><div class=\"metric-highlight\"><strong>For Vector Limited:<\/strong> the DCF charges SBC as a cash cost and holds the share count flat, so this chart is the check on that assumption.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Share count rising while buybacks are advertised<\/li><li>SBC as a percentage of revenue<\/li><\/ul>"
+ }
+};
+
+// ============================================================
+// OVERVIEW & GUIDANCE
+// ============================================================
+function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function renderGuidance() {
+    const g = analysis.guidance;
+    const section = document.getElementById('guidanceSection');
+    if (!g || !g.items || g.items.length === 0) { section.style.display = 'none'; return; }
+    document.getElementById('guidanceAsOf').textContent = g.as_of || '';
+    document.getElementById('guidanceFY').textContent = g.fiscal_year || '';
+    document.getElementById('guidanceGrid').innerHTML = g.items.map(item => {
+        const vp = item.vs_prior ? String(item.vs_prior) : '';
+        const vsClass = vp ? (vp.toLowerCase().replace(/[^a-z]/g, '') || 'na') : 'new';
+        const vsLabel = vp ? (vp === 'n/a' ? 'N/A' : vp.charAt(0).toUpperCase() + vp.slice(1)) : 'New';
+        return `<div class="guidance-card">
+            <div class="guidance-metric">${esc(item.metric)}</div>
+            <div class="guidance-target">${esc(item.target)}</div>
+            <div class="guidance-period">${esc(item.period)}</div>
+            <span class="guidance-vs-prior ${vsClass}">${esc(vsLabel)}</span>
+            ${item.notes ? `<div class="guidance-notes">${esc(item.notes)}</div>` : ''}
+        </div>`;
+    }).join('');
+    const c = document.getElementById('guidanceCommentary');
+    if (g.management_commentary) { c.textContent = g.management_commentary; c.style.display = 'block'; }
+    else { c.style.display = 'none'; }
+}
+
+function renderOverview() {
+    const bm = analysis.business_model || {};
+    const cp = analysis.competitive_position || {};
+    const risks = analysis.risks || {};
+    const cats = { business: 'Business', financial: 'Financial', regulatory: 'Regulatory', macro: 'Macro', execution: 'Execution' };
+    const allRisks = [];
+    for (const k of Object.keys(risks)) {
+        (risks[k] || []).forEach(r => allRisks.push({ ...r, cat: cats[k] || k }));
+    }
+    const sevClass = s => s === 'high' ? 'risk-high' : s === 'moderate' || s === 'medium' ? 'risk-moderate' : 'risk-low';
+    const trendClass = t => /grow/i.test(t || '') ? 'trend-growing' : /declin/i.test(t || '') ? 'trend-declining' : 'trend-stable';
+    const list = xs => (xs || []).map(x => `<li>${esc(x)}</li>`).join('');
+    document.getElementById('overviewGrid').innerHTML = `
+        <div class="overview-card"><h3>Company Overview</h3><p>${esc(analysis.overview)}</p></div>
+        <div class="overview-card"><h3>Business Model</h3><p>${esc(bm.summary)}</p>
+            <ul>${(bm.revenue_streams || []).map(r => `<li class="revenue-stream"><span>${esc(r.name)} <span class="${trendClass(r.trend)}">(${esc(r.trend)})</span></span><span class="percent">${r.percent != null ? esc(r.percent) + '%' : ''}</span></li>`).join('')}</ul></div>
+        <div class="overview-card"><h3>Competitive Position</h3>
+            <p><strong>Competitors:</strong> ${esc((cp.main_competitors || []).join(', '))}</p>
+            ${cp.market_position ? `<p>${esc(cp.market_position)}</p>` : ''}
+            <p><strong>Moat factors:</strong></p>
+            <ul>${(cp.moat_factors || []).map(m => `<li><strong>${esc(m.factor)}</strong> (${esc(m.strength)}) &mdash; ${esc(m.description)}</li>`).join('')}</ul></div>
+        <div class="overview-card"><h3>Growth Drivers</h3><ul>${list(analysis.growth_drivers)}</ul></div>
+        <div class="overview-card risks"><h3>Key Risks</h3>
+            <ul>${allRisks.map(r => `<li><span class="${sevClass(r.severity)}">&#9679; ${esc(String(r.severity || '').toUpperCase())}</span> [${esc(r.cat)}] <strong>${esc(r.risk)}</strong> &mdash; ${esc(r.description)}</li>`).join('')}</ul></div>
+        <div class="overview-card bull"><h3>Bull Case</h3><ul>${list(analysis.bull_case)}</ul></div>
+        <div class="overview-card bear"><h3>Bear Case</h3><ul>${list(analysis.bear_case)}</ul></div>
+        <div class="overview-card"><h3>Recent Developments</h3>
+            <ul>${(analysis.recent_developments || []).map(d => `<li><strong>${esc(d.date)}:</strong> ${esc(d.event)}</li>`).join('')}</ul></div>`;
+}
+
+function toggleOverview() {
+    document.querySelector('.overview-toggle').classList.toggle('active');
+    document.getElementById('overviewContent').classList.toggle('active');
+}
+
+// ============================================================
+// CHARTS
+// ============================================================
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } } },
+    scales: {
+        x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+// Every chart gets its OWN scales object so a log toggle changes only that chart.
+function freshScales() {
+    return { x: { ...chartDefaults.scales.x }, y: { ...chartDefaults.scales.y } };
+}
+const colors = {
+    primary: '#00d4aa', secondary: '#00b894', tertiary: '#0984e3',
+    quaternary: '#6c5ce7', warning: '#fdcb6e', danger: '#ff6b6b'
+};
+const palette = [colors.primary, colors.warning, colors.tertiary, colors.quaternary, colors.danger, colors.secondary];
+
+const chartRegistry = {};
+const chartSeries = {};
+
+// A brighter 2px grid line before each Q1 so a fiscal year reads as one group.
+function scaleXFor(labels, kind) {
+    const x = { ...chartDefaults.scales.x };
+    if (kind === 'quarterly') {
+        x.grid = {
+            color: ctx => (labels[ctx.index] || '').startsWith('Q1') ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.05)',
+            lineWidth: ctx => (labels[ctx.index] || '').startsWith('Q1') ? 2 : 1
+        };
+    }
+    return x;
+}
+
+function toggleLogScale(canvasId, btn) {
+    const chart = chartRegistry[canvasId];
+    if (!chart) return;
+    const toLog = chart.options.scales.y.type !== 'logarithmic';
+    chart.options.scales.y.type = toLog ? 'logarithmic' : 'linear';
+    btn.classList.toggle('active', toLog);
+    chart.update();
+}
+
+function setPeriodView(canvasId, view, btn) {
+    const chart = chartRegistry[canvasId], s = chartSeries[canvasId];
+    if (!chart || !s || !s[view]) return;
+    chart.data.labels = s[view].labels;
+    s[view].data.forEach((d, i) => { if (chart.data.datasets[i]) chart.data.datasets[i].data = d; });
+    if (chart.options.scales.x) chart.options.scales.x = s[view].scaleX;
+    btn.parentNode.querySelectorAll('.view-toggle').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    chart.update();
+}
+
+function buildChart(spec) {
+    const cd = chartData[spec.id];
+    const el = document.getElementById(spec.id);
+    if (!cd || !el) return;
+    const annual = cd.annual;
+    const hasY1 = spec.series.some(s => s.axis === 'y1');
+    const kindOf = s => s.kind || spec.type || 'bar';
+    const hasBars = spec.series.some(s => kindOf(s) === 'bar');
+    const datasets = spec.series.map((s, i) => {
+        const color = colors[s.color] || palette[i % palette.length];
+        const kind = kindOf(s);
+        // Chart.js paints ascending `order`, so lines need a LOWER order than
+        // bars to land on top of them -- otherwise a YoY line hides behind its bars.
+        const ds = { type: kind, label: s.label, data: annual.data[i], yAxisID: s.axis || 'y',
+                     spanGaps: true, order: (kind === 'bar' ? 100 : 0) + i };
+        if (kind === 'bar') { ds.backgroundColor = color; ds.borderRadius = 4; }
+        else {
+            ds.borderColor = color; ds.backgroundColor = spec.fill ? color.replace(')', ',0.15)').replace('rgb', 'rgba') : color;
+            ds.tension = 0.3; ds.fill = !!spec.fill;
+            if (hasBars) {
+                // Over bars a hairline disappears: give it weight and dotted
+                // points haloed in the card background so it stays legible.
+                ds.borderWidth = 3;
+                ds.pointRadius = 3.5;
+                ds.pointBackgroundColor = color;
+                ds.pointBorderColor = 'rgba(22, 26, 46, 0.9)';
+                ds.pointBorderWidth = 1.5;
+                ds.pointHoverRadius = 5.5;
+            }
+        }
+        return ds;
+    });
+    const scales = freshScales();
+    scales.x = scaleXFor(annual.labels, 'annual');
+    if (spec.y_title) scales.y.title = { display: true, text: spec.y_title, color: '#888' };
+    if (hasY1) {
+        scales.y.position = 'left';
+        scales.y1 = { position: 'right', ticks: { color: '#888' }, grid: { display: false } };
+        if (spec.y1_title) scales.y1.title = { display: true, text: spec.y1_title, color: '#888' };
+    }
+    const chart = new Chart(el.getContext('2d'), {
+        data: { labels: annual.labels, datasets: datasets },
+        options: { ...chartDefaults, scales: scales }
+    });
+    chartRegistry[spec.id] = chart;
+    chartSeries[spec.id] = { annual: { labels: annual.labels, data: annual.data, scaleX: scales.x } };
+    if (cd.interim) {
+        chartSeries[spec.id].interim = {
+            labels: cd.interim.labels, data: cd.interim.data, scaleX: scaleXFor(cd.interim.labels, cd.interim.kind)
+        };
+    }
+}
+
+function initCharts() { chartSpecs.forEach(buildChart); }
+
+// ============================================================
+// MODALS
+// ============================================================
+function openModal(key) {
+    const m = metricDescriptions[key];
+    if (!m) return;
+    document.getElementById('modalTitle').textContent = m.title;
+    document.getElementById('modalBody').innerHTML = m.content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ============================================================
+// DCF VALUATION
+// ============================================================
+let currentScenario = 'base';
+
+// Display symbols for currencies whose ISO code is not what a reader
+// expects to see against a share price. Anything not listed renders as its
+// own code, which is the right answer for USD/EUR/AUD/NZD-style tickers.
+const CURRENCY_SYMBOLS = { hkd: 'HK$', rmb: 'RMB', cny: 'RMB', usd: 'US$', gbp: '\u00a3', jpy: '\u00a5' };
+function currencySymbol(code) {
+    if (!code) return null;
+    return CURRENCY_SYMBOLS[String(code).toLowerCase()] || String(code);
+}
+// PER-SHARE quantities (intrinsic value, weighted IV, entry price, current
+// price, every sensitivity cell) are denominated in the QUOTE currency,
+// because runEngine multiplies its model-currency result by quoteFxRate and
+// the analyst stores intrinsic_value in the quote currency too. The FLOWS
+// (owner FCF, net cash, the equity bridge) stay in inputs.currency and are
+// formatted by formatMoney, which is deliberately left alone. Labelling a
+// HKD share price "RMB192" is wrong by the 1.08 rate and invites a reader to
+// compare it against the RMB financials elsewhere on the page.
+function perShareCurrency() {
+    const inputs = (dcfData && dcfData.inputs) || {};
+    return currencySymbol(inputs.quote_currency) || currencySymbol(inputs.currency) || '$';
+}
+
+function fmtIV(v) {
+    const c = perShareCurrency();
+    if (v == null || !isFinite(v)) return '-';
+    const a = Math.abs(v);
+    const dp = a >= 100 ? 0 : a >= 10 ? 1 : a >= 1 ? 2 : 4;
+    return c + v.toFixed(dp);
+}
+
+function scenarioDefaults(sc) {
+    const a = dcfData.assumptions;
+    const cur = a[sc] || a.base;
+    const growth = (Array.isArray(cur.growth_rates) && cur.growth_rates.length)
+        ? cur.growth_rates[0] : dcfData.historical_growth.selected_growth_rate;
+    return {
+        growth: growth,
+        wacc: cur.wacc != null ? cur.wacc : a.base.wacc,
+        terminal: cur.terminal_growth != null ? cur.terminal_growth : a.base.terminal_growth
+    };
+}
+
+// ---- Valuation engine --------------------------------------------------
+// Reproduces the analyst's model from `assumptions[scenario]` so the sliders
+// recompute real numbers. Three families, detected from the fields present:
+//   component    : revenue path x (ebitda margin - sbc - lease - D&A) -> tax ->
+//                  + D&A - capex + wc capture on revenue change (owner-fcf.md s2)
+//   sum-of-parts : component OpCo leg (WACC) + a second embedded-lender leg
+//                  (assumptions[sc].monee: book_growth/roa_path/cost_of_equity,
+//                  discounted separately at its own cost of equity) + surplus
+//                  net cash, for models where one FCF stream cannot price a
+//                  credit book (dcf-methods sum-of-the-parts routing)
+//   fcf-margin   : revenue path x fcf margin path
+//   fcf-growth   : last_fcf compounded along the growth path
+// Each is validated at the scenario's own defaults against
+// valuation[scenario].intrinsic_value; a family that cannot reproduce the
+// JSON within ENGINE_TOL is not trusted and the page falls back to the
+// generic scaler below. Displayed numbers are always the JSON's own at
+// defaults; the engine supplies the ratio when the sliders move.
+const ENGINE_TOL = 0.015;
+const dcfEngineStatus = {};
+
+function asPath(v, n, fallback) {
+    if (Array.isArray(v) && v.length) {
+        const out = v.slice(0, n).map(Number);
+        while (out.length < n) out.push(out[out.length - 1]);
+        return out;
+    }
+    if (typeof v === 'number') return Array(n).fill(v);
+    return fallback == null ? null : Array(n).fill(fallback);
+}
+function firstOf(a, names) {
+    for (const k of names) if (a[k] != null) return a[k];
+    return null;
+}
+function growthPathOf(a) {
+    const g = firstOf(a, ['growth_rates', 'revenue_growth_pct_path', 'revenue_growth_rates', 'revenue_growth_pct', 'growth_rate']);
+    if (Array.isArray(g) && g.length) return g.map(Number);
+    if (typeof g === 'number') return Array(a.horizon_years || 5).fill(g);
+    return null;
+}
+function baseRevenueOf(sc, g0) {
+    const inputs = dcfData.inputs || {};
+    const proj = (dcfData.projections || {})[sc];
+    if (proj && Array.isArray(proj.revenue) && proj.revenue.length && isFinite(g0)) return proj.revenue[0] / (1 + g0 / 100);
+    for (const k of ['last_revenue', 'revenue', 'base_revenue']) if (inputs[k] != null) return Number(inputs[k]);
+    for (const k of Object.keys(inputs)) if (/^revenue_fy\d{4}$/.test(k)) return Number(inputs[k]);
+    return null;
+}
+// A separately-valued stream that the operating sliders deliberately do not
+// drive: a payment processor's merchant settlement float (ADYEN.AS) is valued
+// on its own interest spread, not on the operating growth path. It is a real
+// term in the equity bridge, so an engine that omits it undershoots and
+// silently falls back to the toy model. Read from valuation[sc] because that
+// is where the analyst records the already-discounted value.
+function sideStreamValue(sc) {
+    const v = (dcfData.valuation || {})[sc] || {};
+    const n = Number(firstOf(v, ['merchant_float_value', 'float_value', 'side_stream_value',
+                                'non_operating_assets']));
+    return isFinite(n) ? n : 0;
+}
+function engineFamily(sc) {
+    const a = (dcfData.assumptions || {})[sc];
+    if (!a) return null;
+    const g = growthPathOf(a);
+    if (!g) return null;
+    const hasMargin = firstOf(a, ['ebitda_margin_path', 'ebitda_margin_path_pct', 'ebitda_margin']) != null;
+    if (hasMargin && a.monee && baseRevenueOf(sc, g[0]) != null) return 'sum-of-parts';
+    if (hasMargin && baseRevenueOf(sc, g[0]) != null) return 'component';
+    if (firstOf(a, ['fcf_margin', 'fcf_margins', 'fcf_margin_path']) != null && baseRevenueOf(sc, g[0]) != null) return 'fcf-margin';
+    if ((dcfData.inputs || {}).last_fcf != null) return 'fcf-growth';
+    return null;
+}
+// Second, independently-discounted leg for sum-of-the-parts DCFs: an
+// embedded lender/insurer valued on distributable earnings (post-tax
+// earnings less a fixed share of loan/book growth retained as capital) at
+// its own cost of equity, not the OpCo WACC. Detected from assumptions[sc]
+// .monee = {book_growth[], roa_path[], capital_ratio_pct, cost_of_equity,
+// terminal_growth, exit_pe_cap}; book0 is backed out from
+// projections[sc].monee.loan_book_year_end[0] and the first book_growth
+// rate so the leg still works if the growth slider is not wired to it.
+function moneeLeg(sc) {
+    const a = (dcfData.assumptions || {})[sc] || {};
+    const m = a.monee;
+    const proj = ((dcfData.projections || {})[sc] || {}).monee;
+    if (!m || !proj || !Array.isArray(proj.loan_book_year_end) || !proj.loan_book_year_end.length) return null;
+    const bookGrowth = m.book_growth, roa = m.roa_path;
+    if (!Array.isArray(bookGrowth) || !Array.isArray(roa)) return null;
+    const n = bookGrowth.length;
+    const coe = Number(m.cost_of_equity);
+    const capRatio = Number(m.capital_ratio_pct || 0);
+    if (!isFinite(coe)) return null;
+    let book = proj.loan_book_year_end[0] / (1 + bookGrowth[0] / 100);
+    const distrib = [];
+    for (let i = 0; i < n; i++) {
+        const prev = book;
+        book *= (1 + bookGrowth[i] / 100);
+        const avgBook = (book + prev) / 2;
+        const earnings = avgBook * roa[i] / 100;
+        const retained = (book - prev) * capRatio / 100;
+        distrib.push(earnings - retained);
+    }
+    const tg = Number(m.terminal_growth), cap = Number(m.exit_pe_cap || 12);
+    const last = distrib[n - 1];
+    const gordon = (coe - tg) > 0 ? last * (1 + tg / 100) / ((coe - tg) / 100) : last * cap;
+    const tv = Math.max(0, Math.min(gordon, last * cap));
+    return { distrib: distrib, tv: tv, coe: coe, n: n };
+}
+// Shift the growth path by the slider delta at year 1, tapering to zero by
+// the final year so the long-run rate is untouched.
+function shiftedGrowth(path, startGrowth) {
+    if (startGrowth == null || !isFinite(startGrowth)) return path.slice();
+    const n = path.length, delta = startGrowth - path[0];
+    return path.map((g, i) => i === 0 ? startGrowth : g + delta * Math.max(0, 1 - i / Math.max(1, n - 1)));
+}
+// The engine builds value out of the PROJECTIONS, so its result is
+// denominated in the model currency (inputs.currency). The headline
+// `intrinsic_value` may be reported in the QUOTE currency instead -- for a
+// dual-listed filer the canonical-weighted-iv rule picks the currency the
+// primary listing trades in (9999.HK: RMB financials, HKD per-share values).
+// Comparing the two directly fails by exactly the FX rate and silently drops
+// every scenario to the toy model. The rate is derived from the JSON's OWN
+// paired intrinsic_value_<cur> keys rather than any hardcoded assumption, so
+// it stays correct when the analyst refreshes FX, and returns 1 whenever the
+// two currencies agree or the pair is absent.
+function quoteFxRate(sc) {
+    const v = ((dcfData.valuation || {})[sc] || {});
+    const inputs = dcfData.inputs || {};
+    const model = String(inputs.currency || '').toLowerCase();
+    const quote = String(inputs.quote_currency || '').toLowerCase();
+    if (!model || !quote || model === quote) return 1;
+    const iv = Number(v.intrinsic_value);
+    const modelIv = Number(v['intrinsic_value_' + model]);
+    if (isFinite(iv) && isFinite(modelIv) && modelIv !== 0) return iv / modelIv;
+    return 1;
+}
+function runEngine(sc, ov) {
+    const family = engineFamily(sc);
+    if (!family) return null;
+    const a = dcfData.assumptions[sc], inputs = dcfData.inputs || {};
+    const wacc = (ov && ov.wacc != null) ? ov.wacc : a.wacc;
+    const tg = (ov && ov.terminal != null) ? ov.terminal : a.terminal_growth;
+    if (wacc == null || tg == null) return null;
+    const growth = shiftedGrowth(growthPathOf(a), ov && ov.growth);
+    const n = growth.length;
+    const fcfs = [];
+    if (family === 'fcf-growth') {
+        let f = Number(inputs.last_fcf);
+        for (let i = 0; i < n; i++) { f *= (1 + growth[i] / 100); fcfs.push(f); }
+    } else {
+        let rev = baseRevenueOf(sc, growth[0]);
+        if (family === 'fcf-margin') {
+            const m = asPath(firstOf(a, ['fcf_margins', 'fcf_margin_path', 'fcf_margin']), n);
+            for (let i = 0; i < n; i++) { rev *= (1 + growth[i] / 100); fcfs.push(rev * m[i] / 100); }
+        } else {
+            const m = asPath(firstOf(a, ['ebitda_margin_path', 'ebitda_margin_path_pct', 'ebitda_margin']), n);
+            const sbc = asPath(firstOf(a, ['sbc_pct_path', 'sbc_pct']), n, 0);
+            const lease = asPath(firstOf(a, ['lease_cost_pct', 'lease_cost_pct_path', 'lease_principal_pct_path', 'lease_principal_pct']), n, 0);
+            const da = asPath(firstOf(a, ['da_pct_path', 'da_pct']), n, 0);
+            const capex = asPath(firstOf(a, ['capex_pct_path', 'capex_pct']), n, 0);
+            const tax = asPath(firstOf(a, ['cash_tax_rate_path', 'cash_tax_rate_path_pct', 'cash_tax_rate', 'tax_rate']), n, 0);
+            const wc = Number(firstOf(a, ['wc_capture_pct']) || 0);
+            for (let i = 0; i < n; i++) {
+                const prev = rev;
+                rev *= (1 + growth[i] / 100);
+                const ebit = rev * (m[i] - sbc[i] - lease[i] - da[i]) / 100;
+                const nopat = ebit - Math.max(0, ebit) * tax[i] / 100;
+                fcfs.push(nopat + rev * da[i] / 100 - rev * capex[i] / 100 + (rev - prev) * wc / 100);
+            }
+        }
+    }
+    const cap = Number(firstOf(a, ['terminal_cap_multiple', 'terminal_fcf_multiple_cap', 'terminal_multiple_cap']) || 20);
+    const last = fcfs[n - 1];
+    // Terminal value depends on the discount rate through the Gordon spread
+    // (r - g), so it must be rebuilt at whichever rate is doing the
+    // discounting -- WACC for the intrinsic value, the entry-price hurdle
+    // rate for the entry price. Reusing the WACC-built `tv` for the hurdle
+    // leg overstated every slider-moved entry price (SPN.NZ: $4.38 vs the
+    // correct $3.51 at defaults for the same reason).
+    const tvAt = (rate) => {
+        const g = (rate - tg) > 0 ? last * (1 + tg / 100) / ((rate - tg) / 100) : last * cap;
+        return Math.max(0, Math.min(g, last * cap));
+    };
+    const tv = tvAt(wacc);
+    const netDebt = Number(inputs.net_debt || 0);
+    const shares = (inputs.projected_shares && inputs.projected_shares.length >= n)
+        ? Number(inputs.projected_shares[n - 1]) : Number(inputs.shares_outstanding);
+    if (!shares) return null;
+    const pv = (rate) => fcfs.reduce((s, f, i) => s + f / Math.pow(1 + rate / 100, i + 1), 0);
+    if (family === 'sum-of-parts') {
+        // The Monee (or equivalent embedded-lender) leg is not driven by the
+        // OpCo sliders: its own book-growth/ROA/cost-of-equity path is a
+        // separate, unlisted-elsewhere model the growth/WACC/terminal
+        // sliders intentionally do not touch (see the DCF section note).
+        const leg = moneeLeg(sc);
+        if (!leg) return null;
+        const pvLeg = (rate) => leg.distrib.reduce((s, f, i) => s + f / Math.pow(1 + rate / 100, i + 1), 0);
+        const moneeEquity = pvLeg(leg.coe) + leg.tv / Math.pow(1 + leg.coe / 100, leg.n);
+        const surplusCash = -netDebt;
+        const ev = pv(wacc) + tv / Math.pow(1 + wacc / 100, n);
+        const equityValue = ev + moneeEquity + surplusCash;
+        const hurdle = ((dcfData.entry_price || {}).hurdle_rate || 0.15) * 100;
+        const tvHurdle = tvAt(hurdle);
+        const entryEquity = pv(hurdle) + tvHurdle / Math.pow(1 + hurdle / 100, n)
+            + pvLeg(hurdle) + leg.tv / Math.pow(1 + hurdle / 100, leg.n) + surplusCash;
+        const fxSop = quoteFxRate(sc);
+        return { family: family, iv: equityValue / shares * fxSop,
+                 entryPrice: entryEquity / shares * fxSop,
+                 fcfList: fcfs, growthRates: growth };
+    }
+    const ev = pv(wacc) + tv / Math.pow(1 + wacc / 100, n);
+    const hurdle = ((dcfData.entry_price || {}).hurdle_rate || 0.15) * 100;
+    const side = sideStreamValue(sc);
+    const tvHurdle = tvAt(hurdle);
+    const entry = (pv(hurdle) + tvHurdle / Math.pow(1 + hurdle / 100, n) + side - netDebt) / shares;
+    const fx = quoteFxRate(sc);
+    return { family: family, iv: (ev + side - netDebt) / shares * fx, entryPrice: entry * fx, fcfList: fcfs, growthRates: growth };
+}
+function validateEngines() {
+    for (const sc of ['base', 'bull', 'bear']) {
+        const r = runEngine(sc);
+        const target = ((dcfData.valuation || {})[sc] || {}).intrinsic_value;
+        const ok = !!(r && target && isFinite(r.iv) && Math.abs(r.iv - target) <= ENGINE_TOL * Math.abs(target));
+        dcfEngineStatus[sc] = { family: r ? r.family : null, ok: ok, iv: r ? r.iv : null, target: target };
+    }
+}
+
+// Generic 5-year Gordon model: the fallback when no engine family validates
+// (older JSONs without component fields). Only ever used as a ratio.
+function toyDCF(startGrowth, wacc, terminalGrowth) {
+    const years = 5;
+    const hurdle = 0.15;
+    const inputs = dcfData.inputs;
+    let pvFCF = 0, pvFCFHurdle = 0, projectedFCF = inputs.last_fcf;
+    const endGrowth = 10;
+    for (let i = 0; i < years; i++) {
+        const yearGrowth = startGrowth > endGrowth ? startGrowth - (startGrowth - endGrowth) * (i / 4) : startGrowth;
+        projectedFCF *= (1 + yearGrowth / 100);
+        pvFCF += projectedFCF / Math.pow(1 + wacc / 100, i + 1);
+        pvFCFHurdle += projectedFCF / Math.pow(1 + hurdle, i + 1);
+    }
+    const spread = Math.max(wacc / 100 - terminalGrowth / 100, 0.005);
+    const terminalValue = projectedFCF * (1 + terminalGrowth / 100) / spread;
+    const pvTerminal = terminalValue / Math.pow(1 + wacc / 100, years);
+    const enterpriseValue = pvFCF + pvTerminal;
+    const equityValue = enterpriseValue - (inputs.net_debt || 0);
+    const exitShares = (inputs.projected_shares && inputs.projected_shares.length >= years)
+        ? inputs.projected_shares[years - 1]
+        : inputs.shares_outstanding * Math.pow(1 + (inputs.annual_share_growth_pct || 0) / 100, years);
+    return { iv: equityValue / exitShares,
+             entryPrice: (pvFCFHurdle + terminalValue / Math.pow(1 + hurdle, years) - (inputs.net_debt || 0)) / exitShares };
+}
+
+// The model behind the sliders for one scenario: the validated engine, else the toy.
+function calculateDCF(sc, growth, wacc, terminal) {
+    const st = dcfEngineStatus[sc];
+    if (st && st.ok) {
+        const r = runEngine(sc, { growth: growth, wacc: wacc, terminal: terminal });
+        if (r && isFinite(r.iv)) return r;
+    }
+    return toyDCF(growth, wacc, terminal);
+}
+
+function canScale() {
+    const i = dcfData.inputs || {};
+    return i.last_fcf != null && (i.shares_outstanding != null || (i.projected_shares && i.projected_shares.length));
+}
+
+// Anchor the selected scenario's stored number (iv | entry) and scale it by
+// the model's ratio when the sliders leave that scenario's defaults.
+function anchored(field, growth, wacc, terminal) {
+    const stored = (dcfAnchors[currentScenario] || {})[field];
+    const d = scenarioDefaults(currentScenario);
+    const atDefaults = growth === d.growth && wacc === d.wacc && terminal === d.terminal;
+    if (stored != null && atDefaults) return stored;
+    const st = dcfEngineStatus[currentScenario];
+    if (!(st && st.ok) && !canScale()) return stored;
+    const key = field === 'iv' ? 'iv' : 'entryPrice';
+    const now = calculateDCF(currentScenario, growth, wacc, terminal)[key];
+    if (stored == null) return now;
+    // The entry price is returned STRAIGHT from the engine once a slider has
+    // moved, never scaled onto the stored number. Every DCF JSON written
+    // before the terminal-value-at-hurdle fix has a stored entry_price built
+    // with the WACC terminal value, so `stored * (now / ref)` re-injects the
+    // very bug the engine corrects -- on the TPW fixture a correct 2.943
+    // comes back out as 3.254.
+    //
+    // IV keeps its anchor: it is not what that fix changed, and anchoring
+    // stops a tab click nudging the headline number off the JSON.
+    if (key === 'entryPrice') return now;
+    const ref = calculateDCF(currentScenario, d.growth, d.wacc, d.terminal)[key];
+    if (!ref || !isFinite(ref) || !isFinite(now)) return stored;
+    return stored * (now / ref);
+}
+
+function isWeightedLive() {
+    const pw = dcfData.probability_weighted || {};
+    const w = pw.weights, a = dcfData.assumptions;
+    if (!w || !a || !a.base || !a.bull || !a.bear) return false;
+    // Two different things are needed before the weighted IV may be rescaled.
+    //
+    // `ok` is strict: the engine reproduced the stored IV within ENGINE_TOL. An
+    // engine can miss that and still be perfectly usable for a RATIO -- it only
+    // has to move the same way the model does -- so `ok` alone is too harsh and
+    // would freeze the sliders on dashboards that model fine.
+    //
+    // What must not happen is trusting an engine that modelled NOTHING. A
+    // finite-mine DCF (SMI.NZ) has no FCF projection to discount: family
+    // resolves null and the engine returns ~0.027 against a 1.011 target. The
+    // ratio stored * (now / ref) then divides two meaningless near-zero numbers,
+    // and once ref crosses zero the sign flips -- which published a +0.919
+    // weighted IV as NZD-5.59 (-1017%) while the header still read +51%.
+    //
+    // canScale() cannot stand in for this: it only says the inputs for a
+    // proportional rescale exist (last_fcf + shares), which a pre-revenue miner
+    // burning cash still satisfies.
+    const engineModels = ['base', 'bull', 'bear'].every(sc => {
+        const st = dcfEngineStatus[sc];
+        return st && st.family && isFinite(st.iv) && st.iv > 0;
+    });
+    if (!engineModels) return false;
+    const total = (w.bull || 0) + (w.base || 0) + (w.bear || 0);
+    return Math.abs(total - 1) <= 0.001;
+}
+
+// Probability-weighted IV: the stored weighted_iv at the selected scenario's
+// defaults (so a tab click never moves it), scaled by re-weighting all three
+// scenarios with the user's slider deltas applied to each.
+function weightedIV(growth, wacc, terminal) {
+    const pw = dcfData.probability_weighted || {};
+    const stored = pw.weighted_iv;
+    if (stored == null || !isWeightedLive()) return stored;
+    const d = scenarioDefaults(currentScenario);
+    if (growth === d.growth && wacc === d.wacc && terminal === d.terminal) return stored;
+    const w = pw.weights;
+    const at = (g, k, t) => {
+        let sum = 0;
+        for (const sc of ['bull', 'base', 'bear']) {
+            const sd = scenarioDefaults(sc);
+            const sg = sd.growth + (g - d.growth), sk = sd.wacc + (k - d.wacc), st = sd.terminal + (t - d.terminal);
+            sum += w[sc] * calculateDCF(sc, sg, Math.max(sk, st + 0.5), st).iv;
+        }
+        return sum;
+    };
+    const ref = at(d.growth, d.wacc, d.terminal);
+    if (!ref || !isFinite(ref)) return stored;
+    const now = at(growth, wacc, terminal);
+    if (!now || !isFinite(now)) return stored;
+    return stored * (now / ref);
+}
+
+function renderHeaderValuation() {
+    const el = document.getElementById('headerValuation');
+    if (!el) return;
+    const pw = dcfData.probability_weighted || {};
+    const wiv = pw.weighted_iv, price = dcfData.current_price;
+    if (wiv == null || price == null) return;
+    // A price must be denominated like the IV that divides it (WISE.L: GBp
+    // quote vs USD model). Suppress the chip rather than print -98%.
+    const ratio = wiv / price;
+    if (ratio > 20 || ratio < 0.05) return;
+    const up = (wiv - price) / price * 100;
+    const cls = up >= 0 ? 'positive' : 'negative', sign = up >= 0 ? '+' : '';
+    el.innerHTML = `<div class="hv-item"><span class="hv-label">Prob-Weighted IV</span><span class="hv-value">${fmtIV(wiv)}</span></div>
+        <div class="hv-item"><span class="hv-label">Current Price</span><span class="hv-value">${fmtIV(price)}</span></div>
+        <div class="hv-item"><span class="hv-label">Upside</span><span class="hv-value ${cls}">${sign}${up.toFixed(0)}%</span></div>`;
+    el.style.display = 'flex';
+}
+
+function formatMoney(n) {
+    const inputs = dcfData.inputs || {};
+    const currency = inputs.currency || '$';
+    const units = inputs.units === 'millions' ? 'M' : inputs.units === 'billions' ? 'B' : '';
+    if (n == null || !isFinite(n)) return '-';
+    if (Math.abs(n) >= 1000 && inputs.units === 'millions') return currency + (n / 1000).toFixed(1) + 'B';
+    return currency + n.toFixed(1) + units;
+}
+
+function renderDCFInputs() {
+    const inputs = dcfData.inputs || {};
+    document.getElementById('baseFCF').textContent = formatMoney(inputs.last_fcf);
+    const sbcEl = document.getElementById('sbcBreakdown');
+    if (inputs.sbc_source === 'unavailable') {
+        sbcEl.innerHTML = '<span style="color:#fdcb6e">&#9888; SBC not disclosed &mdash; FCF unadjusted, IV overstated</span>';
+    } else if (inputs.sbc != null && inputs.reported_fcf != null) {
+        const sbcAmt = inputs.sbc_incl_equity_taxes != null ? inputs.sbc_incl_equity_taxes : inputs.sbc;
+        let parts = `${formatMoney(inputs.reported_fcf)} reported − ${formatMoney(sbcAmt)} SBC`;
+        if (inputs.interest_income) parts += ` − ${formatMoney(inputs.interest_income)} interest`;
+        if (inputs.lease_principal_paid) parts += ` − ${formatMoney(inputs.lease_principal_paid)} leases`;
+        sbcEl.textContent = parts;
+    } else {
+        sbcEl.textContent = 'Starting point for projections';
+    }
+    const shares = inputs.shares_outstanding;
+    document.getElementById('sharesOut').textContent = shares == null ? '-'
+        : shares >= 1000 ? (shares / 1000).toFixed(2) + 'B' : shares.toFixed(1) + 'M';
+    const g = inputs.annual_share_growth_pct;
+    document.getElementById('dilutionNote').textContent = (g > 0)
+        ? `+${g.toFixed(1)}%/yr from non-SBC issuance` : 'Flat — SBC expensed in cash flows';
+    const netDebt = inputs.net_debt;
+    const ndEl = document.getElementById('netDebt');
+    ndEl.textContent = netDebt == null ? '-' : (netDebt < 0 ? '-' : '') + formatMoney(Math.abs(netDebt));
+    if (netDebt < 0) ndEl.style.color = '#00d4aa';
+    renderFCFProjections();
+}
+
+// The analyst's own projection when present; otherwise the toy model's path.
+function renderFCFProjections() {
+    const table = document.getElementById('fcfProjectionTable');
+    const proj = dcfData.projections && dcfData.projections[currentScenario];
+    let values = null, years = [];
+    const st = dcfEngineStatus[currentScenario];
+    if (st && st.ok) {
+        const s = sliderValues();
+        const r = runEngine(currentScenario, { growth: s.growth, wacc: s.wacc, terminal: s.terminal });
+        if (r) {
+            values = r.fcfList;
+            years = (proj && Array.isArray(proj.years) && proj.years.length === values.length)
+                ? proj.years : values.map((_, i) => 'Yr ' + (i + 1));
+        }
+    }
+    if (!values && proj && Array.isArray(proj.owner_fcf || proj.fcf)) {
+        values = proj.owner_fcf || proj.fcf;
+        years = Array.isArray(proj.years) ? proj.years : values.map((_, i) => 'Yr ' + (i + 1));
+    } else if (proj && Array.isArray(proj)) {
+        values = proj.map(p => p.owner_fcf != null ? p.owner_fcf : p.fcf);
+        years = proj.map((p, i) => p.year || p.fiscal_year || ('Yr ' + (i + 1)));
+    }
+    if (!values || !values.length) {
+        const startGrowth = parseFloat(document.getElementById('growthSlider').value);
+        let fcf = dcfData.inputs.last_fcf;
+        values = [];
+        for (let i = 0; i < 5; i++) {
+            const rate = startGrowth > 10 ? startGrowth - (startGrowth - 10) * (i / 4) : startGrowth;
+            fcf = fcf * (1 + rate / 100);
+            values.push(fcf);
+            years.push('Year ' + (i + 1));
+        }
+    }
+    const base = dcfData.inputs.last_fcf;
+    const cols = [['Base', base, null]].concat(values.map((v, i) => [years[i], v, i === 0 ? base : values[i - 1]]));
+    table.style.gridTemplateColumns = `repeat(${cols.length}, 1fr)`;
+    let html = cols.map(c => `<div class="fcf-projection-item header">${esc(c[0])}</div>`).join('');
+    html += cols.map(c => {
+        const g = (c[2] != null && c[2] !== 0 && c[1] != null) ? ((c[1] - c[2]) / Math.abs(c[2]) * 100) : null;
+        return `<div class="fcf-projection-item"><div class="fcf-value">${formatMoney(c[1])}</div>
+            <div class="growth-rate">${g == null ? '-' : (g >= 0 ? '+' : '') + g.toFixed(0) + '%'}</div></div>`;
+    }).join('');
+    table.innerHTML = html;
+}
+
+function sliderValues() {
+    return {
+        growth: parseFloat(document.getElementById('growthSlider').value),
+        wacc: parseFloat(document.getElementById('waccSlider').value),
+        terminal: parseFloat(document.getElementById('terminalSlider').value)
+    };
+}
+
+window.updateDCFDisplay = function() {
+    const s = sliderValues();
+    document.getElementById('growthValue').textContent = s.growth + '%';
+    document.getElementById('waccValue').textContent = s.wacc + '%';
+    document.getElementById('terminalValue').textContent = s.terminal + '%';
+    renderFCFProjections();
+
+    const iv = anchored('iv', s.growth, s.wacc, s.terminal);
+    const entry = anchored('entry', s.growth, s.wacc, s.terminal);
+    const price = dcfData.current_price;
+    document.getElementById('dcfIV').textContent = fmtIV(iv);
+    document.getElementById('dcfEntry').textContent = fmtIV(entry);
+    const upEl = document.getElementById('dcfUpside');
+    if (iv != null && price) {
+        const up = (iv - price) / price * 100;
+        upEl.textContent = (up >= 0 ? '+' : '') + up.toFixed(0) + '% ' + (up >= 0 ? 'upside' : 'downside');
+        upEl.className = 'dcf-change ' + (up >= 0 ? 'positive' : 'negative');
+    }
+    const wiv = weightedIV(s.growth, s.wacc, s.terminal);
+    document.getElementById('dcfWeighted').textContent = fmtIV(wiv);
+    const wUpEl = document.getElementById('dcfWeightedUpside');
+    if (wiv != null && price) {
+        const wUp = (wiv - price) / price * 100;
+        wUpEl.textContent = (wUp >= 0 ? '+' : '') + wUp.toFixed(0) + '% ' + (wUp >= 0 ? 'upside' : 'downside');
+        wUpEl.className = 'dcf-change ' + (wUp >= 0 ? 'positive' : 'negative');
+    }
+    renderAssumptions(s, iv, entry);
+};
+
+function renderAssumptions(s, iv, entry) {
+    const a = dcfData.assumptions[currentScenario] || {};
+    const items = [['Year 1 Growth', s.growth + '%']];
+    if (Array.isArray(a.growth_rates) && a.growth_rates.length > 1) {
+        items.push([`Year ${a.growth_rates.length} Growth`, a.growth_rates[a.growth_rates.length - 1] + '%']);
+    }
+    for (const k of Object.keys(a)) {
+        if (/margin/.test(k) && Array.isArray(a[k]) && a[k].length) {
+            items.push([k.replace(/_/g, ' ').replace(/ path$/, '') + ' (Y1 → end)', a[k][0] + '% → ' + a[k][a[k].length - 1] + '%']);
+            break;
+        }
+        if (/margin/.test(k) && typeof a[k] === 'number') { items.push([k.replace(/_/g, ' '), a[k] + '%']); break; }
+    }
+    items.push(['WACC', s.wacc + '%'], ['Terminal Growth', s.terminal + '%']);
+    if (a.terminal_cap_multiple) items.push(['Terminal cap', a.terminal_cap_multiple + 'x']);
+    items.push(['Intrinsic Value', fmtIV(iv)], ['Entry Price', fmtIV(entry)]);
+    document.getElementById('assumptionGrid').innerHTML = items.map(([l, v], i) =>
+        `<div class="assumption-item"><div class="label">${esc(l)}</div><div class="value"${i >= items.length - 2 ? ' style="color:#00d4aa"' : ''}>${esc(v)}</div></div>`).join('');
+}
+
+window.switchScenario = function(scenario) {
+    currentScenario = scenario;
+    document.querySelectorAll('.scenario-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.scenario === scenario);
+    });
+    const d = scenarioDefaults(scenario);
+    document.getElementById('growthSlider').value = d.growth;
+    document.getElementById('waccSlider').value = d.wacc;
+    document.getElementById('terminalSlider').value = d.terminal;
+    const nar = document.getElementById('scenarioNarrative');
+    const narratives = dcfData.scenario_narratives || {};
+    const text = narratives[scenario];
+    nar.textContent = typeof text === 'string' ? text : (text && text.summary) || '';
+    updateDCFDisplay();
+};
+
+function renderHistoricalGrowth() {
+    const growth = dcfData.historical_growth || {};
+    const selected = growth.growth_rate_source;
+    const keys = Object.keys(growth).filter(k => /cagr/.test(k) && typeof growth[k] === 'number');
+    document.getElementById('growthGrid').innerHTML = keys.map(k => {
+        const rate = growth[k];
+        const label = k.replace(/_cagr$/, '').replace(/_(\d+)yr/, ' $1Y').replace(/_/g, ' ');
+        return `<div class="growth-item ${k === selected ? 'selected' : ''}">
+            <div class="metric">${esc(label)}</div>
+            <div class="rate ${rate >= 0 ? 'positive' : 'negative'}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div></div>`;
+    }).join('');
+}
+
+// The grid is not always WACC x terminal growth: a multiple-exit model
+// (no Gordon terminal) ships e.g. coe_range x exit_multiple_range. Find the
+// two axes by shape -- rows match matrix.length, cols match the row width --
+// so any well-formed grid renders instead of being discarded.
+const SENS_AXES = {
+    wacc_range: { label: 'WACC', unit: '%', base: b => b.wacc },
+    coe_range: { label: 'Cost of equity', unit: '%', base: b => b.cost_of_equity ?? b.coe ?? b.wacc },
+    terminal_growth_range: { label: 'Term G', unit: '%', base: b => b.terminal_growth },
+    exit_multiple_range: { label: 'Exit multiple', unit: 'x', base: b => b.exit_multiple },
+    growth_range: { label: 'Growth', unit: '%', base: b => b.growth },
+};
+
+function pickSensAxis(sens, len, exclude) {
+    const keys = Object.keys(sens).filter(k =>
+        k !== exclude && Array.isArray(sens[k]) && sens[k].length === len && sens[k] !== sens.matrix);
+    // prefer a known axis name, else fall back to any range-shaped array
+    return keys.find(k => SENS_AXES[k]) || keys.find(k => /_range$/.test(k)) || null;
+}
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const table = document.getElementById('sensitivityMatrix');
+    const rows = sens && Array.isArray(sens.matrix) ? sens.matrix : null;
+    const rowKey = rows && rows.length ? pickSensAxis(sens, rows.length, null) : null;
+    const colKey = rowKey && Array.isArray(rows[0]) ? pickSensAxis(sens, rows[0].length, rowKey) : null;
+    if (!rowKey || !colKey) {
+        table.innerHTML = '<tr><td>No sensitivity grid in the DCF JSON</td></tr>';
+        return;
+    }
+    const price = dcfData.current_price;
+    const base = dcfData.assumptions.base || {};
+    const rowAx = SENS_AXES[rowKey] || { label: rowKey.replace(/_range$/, ''), unit: '', base: () => undefined };
+    const colAx = SENS_AXES[colKey] || { label: colKey.replace(/_range$/, ''), unit: '', base: () => undefined };
+    const rowBase = rowAx.base(base), colBase = colAx.base(base);
+    let html = `<tr><th>${rowAx.label} \\ ${colAx.label}</th>`
+        + sens[colKey].map(c => `<th>${c}${colAx.unit}</th>`).join('') + '</tr>';
+    sens[rowKey].forEach((rv, i) => {
+        html += `<tr><th>${rv}${rowAx.unit}</th>`;
+        (rows[i] || []).forEach((val, j) => {
+            const hl = rv === rowBase && sens[colKey][j] === colBase;
+            const cls = hl ? 'highlight' : (val >= price ? 'above-current' : 'below-current');
+            html += `<td class="${cls}">${fmtIV(val)}</td>`;
+        });
+        html += '</tr>';
+    });
+    table.innerHTML = html;
+}
+
+function philosophyLabel(key) {
+    const t = key.replace(/_/g, ' ').trim();
+    return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/* `valuation_philosophy` is a string on some DCF JSONs and a nested object on
+   others (52 of them). Interpolating the object rendered "[object Object]". */
+function philosophyParts(value, label) {
+    if (value === null || value === undefined || value === '') return [];
+    if (Array.isArray(value)) return value.flatMap(v => philosophyParts(v, label));
+    if (typeof value === 'object') {
+        return Object.keys(value).flatMap(k => philosophyParts(value[k], philosophyLabel(k)));
+    }
+    return [{ label: label, text: String(value) }];
+}
+
+function renderPhilosophy(value, el) {
+    if (!el) return;
+    const parts = philosophyParts(value, '');
+    if (!parts.length) { el.style.display = 'none'; return; }
+    const body = parts
+        .map(p => (p.label ? `<strong>${esc(p.label)}:</strong> ` : '') + esc(p.text))
+        .join('<br>');
+    el.innerHTML = `<strong>Valuation philosophy:</strong> ${body}`;
+}
+
+function initDCF() {
+    if (!dcfData || !dcfData.valuation || !dcfData.assumptions) return;
+    validateEngines();
+    const eng = document.getElementById('dcfEngineNote');
+    if (eng) {
+        const okAll = ['base', 'bull', 'bear'].every(sc => dcfEngineStatus[sc].ok);
+        eng.textContent = okAll
+            ? `Sliders re-run the ${dcfEngineStatus.base.family} model from the DCF's own assumptions.`
+            : 'Sliders scale the stored valuation with a generic model — the DCF JSON lacks the fields to rebuild it exactly.';
+    }
+    document.getElementById('dcfCurrent').textContent = fmtIV(dcfData.current_price);
+    renderPhilosophy(dcfData.valuation_philosophy, document.getElementById('dcfPhilosophy'));
+    const hg = dcfData.historical_growth || {};
+    if (hg.growth_divergence_warning) {
+        document.getElementById('growthWarning').style.display = 'flex';
+        document.getElementById('warningText').textContent = hg.growth_divergence_warning;
+    }
+    const wsub = document.getElementById('dcfWeightedSublabel');
+    const wts = (dcfData.probability_weighted || {}).weights;
+    if (wts) {
+        const pct = x => Math.round((x || 0) * 100);
+        let txt = `${pct(wts.bull)}% Bull / ${pct(wts.base)}% Base / ${pct(wts.bear)}% Bear`;
+        if (!isWeightedLive()) txt += ' — fixed from model';
+        wsub.textContent = txt;
+    }
+    renderHeaderValuation();
+    renderDCFInputs();
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    switchScenario('base');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+renderGuidance();
+renderOverview();
+initCharts();
+initDCF();
+</script>
+</body>
+</html>
