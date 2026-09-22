@@ -51,6 +51,9 @@ from dataclasses import dataclass, field
 import quotes
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
+# Written after a whole-corpus --apply pass; --daily skips the pass when it
+# says today. Gitignored (state/*.json is local run state).
+STAMP = REPO / "state" / "last_price_refresh.json"
 
 SCENARIOS = ("bear", "base", "bull")
 
@@ -547,6 +550,20 @@ def _researched(repo: pathlib.Path) -> list[str]:
                   if (p / "Reports" / f"{p.name}_DCF.json").exists())
 
 
+def refreshed_today(stamp: pathlib.Path, today: dt.date) -> bool:
+    """Has a whole-corpus refresh already been applied on `today`?"""
+    try:
+        return json.loads(stamp.read_text()).get("date") == today.isoformat()
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
+def write_stamp(stamp: pathlib.Path, today: dt.date) -> None:
+    stamp.parent.mkdir(parents=True, exist_ok=True)
+    stamp.write_text(json.dumps({"date": today.isoformat(),
+                                 "at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds")}) + "\n")
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--ticker", default="")
@@ -559,6 +576,8 @@ def main() -> int:
                    help="skip tickers whose price moved less than this")
     p.add_argument("--delay", type=float, default=DEFAULT_DELAY,
                    help="seconds between quotes (Yahoo rate-limits)")
+    p.add_argument("--daily", action="store_true",
+                   help="with --all: skip if a corpus refresh was already applied today")
     args = p.parse_args()
 
     if not args.ticker and not args.all:
@@ -566,6 +585,10 @@ def main() -> int:
 
     names = [args.ticker] if args.ticker else _researched(REPO)
     apply = args.apply and not args.check
+    today = dt.date.today()
+    if args.daily and args.all and refreshed_today(STAMP, today):
+        print(f"  prices already refreshed today ({STAMP.name}); skipping the corpus pass")
+        return 0
 
     updated = skipped = failed = 0
     stale_prose: list[str] = []
@@ -597,6 +620,8 @@ def main() -> int:
               "are not)")
     if not apply:
         print("  (--check: nothing written)")
+    elif args.all:
+        write_stamp(STAMP, today)
     return 0
 
 

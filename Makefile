@@ -49,8 +49,8 @@ run: ## Research the next few tickers, score them, report fixes, then rank every
 	@# valuation -- weighted_iv and entry_price are price-independent -- so
 	@# refreshing the derived upsides here keeps tickers off the ~$$6
 	@# research path when only the market moved.
-	@echo "==> refreshing drifted prices (free, no model)"
-	@$(MAKE) --no-print-directory refresh-price APPLY=1 || true
+	@echo "==> refreshing drifted prices (free, no model; at most once a day)"
+	@$(MAKE) --no-print-directory refresh-price APPLY=1 DAILY=1 || true
 	@# refresh-price rewrites EVERY drifted ticker, but the run only commits
 	@# the one it researches (commit_ticker stages research/$$TICKER alone), so
 	@# the rest stayed dirty indefinitely -- 133 DCFs were uncommitted on
@@ -122,10 +122,10 @@ commit-refreshed: ## Commit price-only DCF/dashboard rewrites left by refresh-pr
 	  && echo "committed price refresh across $$n DCF(s)"; \
 	fi
 
-refresh-price: ## Rewrite price-derived DCF numbers from live quotes (APPLY=1 to write)
+refresh-price: ## Rewrite price-derived DCF numbers from live quotes (APPLY=1 to write; DAILY=1 skips if done today)
 	@$(PY) $(SCRIPTS)/refresh_price.py \
 	  $(if $(APPLY),--apply,--check) \
-	  $(if $(TICKER),--ticker $(TICKER),--all)
+	  $(if $(TICKER),--ticker $(TICKER),--all) $(if $(DAILY),--daily,)
 
 screen: ## Rank every ticker by upside to weighted IV, at live prices
 	@echo "=================================================================="

@@ -13,9 +13,11 @@ flags those strings and never rewrites them.
 """
 
 import json
+import sys
 
 import pytest
 import refresh_price
+import refresh_price as rp
 
 
 def dcf_doc(price=17.52, **extra):
@@ -665,3 +667,51 @@ class TestPriceSymbolRedirect:
         result = refresh_price.refresh_ticker(repo, "BGI.NZ", apply=True)
         assert not result.ok
         assert "no quote" in result.reason
+
+
+class TestDailyGate:
+    """`make run` refreshes every DCF's price before researching anything:
+    195 quotes at 0.4s each, plus dashboard re-embeds, on every run. With
+    --daily the whole-corpus pass happens at most once per calendar day; an
+    explicit `make refresh-price` (no --daily) still always runs.
+    """
+
+    def test_first_run_of_the_day_refreshes_and_stamps(self, tmp_path, monkeypatch):
+        import datetime as dt
+        stamp = tmp_path / "last_price_refresh.json"
+        assert rp.refreshed_today(stamp, dt.date(2026, 9, 22)) is False
+        rp.write_stamp(stamp, dt.date(2026, 9, 22))
+        assert rp.refreshed_today(stamp, dt.date(2026, 9, 22)) is True
+        assert rp.refreshed_today(stamp, dt.date(2026, 9, 23)) is False
+
+    def test_a_corrupt_stamp_means_not_refreshed(self, tmp_path):
+        import datetime as dt
+        stamp = tmp_path / "last_price_refresh.json"
+        stamp.write_text("{nope")
+        assert rp.refreshed_today(stamp, dt.date(2026, 9, 22)) is False
+
+    def test_daily_flag_skips_the_corpus_without_a_single_quote(self, tmp_path, monkeypatch, capsys):
+        import datetime as dt
+        monkeypatch.setattr(rp, "STAMP", tmp_path / "last_price_refresh.json")
+        rp.write_stamp(rp.STAMP, dt.date.today())
+
+        def boom(*a, **k):
+            raise AssertionError("quoted despite the daily gate")
+        monkeypatch.setattr(rp, "refresh_ticker", boom)
+        monkeypatch.setattr(sys, "argv", ["refresh_price.py", "--all", "--apply", "--daily"])
+        assert rp.main() == 0
+        assert "already refreshed today" in capsys.readouterr().out
+
+    def test_daily_flag_runs_and_stamps_when_stale(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(rp, "STAMP", tmp_path / "last_price_refresh.json")
+        monkeypatch.setattr(rp, "_researched", lambda repo: [])
+        monkeypatch.setattr(sys, "argv", ["refresh_price.py", "--all", "--apply", "--daily"])
+        assert rp.main() == 0
+        assert rp.STAMP.exists()
+
+    def test_dry_run_never_stamps(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(rp, "STAMP", tmp_path / "last_price_refresh.json")
+        monkeypatch.setattr(rp, "_researched", lambda repo: [])
+        monkeypatch.setattr(sys, "argv", ["refresh_price.py", "--all", "--daily"])
+        assert rp.main() == 0
+        assert not rp.STAMP.exists()
