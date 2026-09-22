@@ -439,9 +439,9 @@ class TestTripRules:
     HIST: ClassVar[dict] = {"pe_avg": 10.0, "pb_max": 1.0,
                             "ev_ebitda_max": 8.0}
 
-    def trips(self, implied, hist=None, upside=0.0, price_pos=0.0):
+    def trips(self, implied, hist=None, upside=0.0, price_pos=0.0, rules=None):
         return sanity_check.trip_reasons(implied, hist or self.HIST,
-                                         upside, price_pos)
+                                         upside, price_pos, rules=rules)
 
     def test_pe_at_exactly_two_times_the_average_does_not_trip(self):
         assert self.trips({"pe": 20.0}) == []
@@ -462,6 +462,18 @@ class TestTripRules:
 
     def test_ev_ebitda_just_over_trips(self):
         assert "EV/EBITDA" in self.trips({"ev_ebitda": 12.01})[0]
+
+    def test_a_rule_set_restricts_which_rules_can_trip(self):
+        # AFFO family: P/B and the upside/position rule only.
+        rules = sanity_check.FAMILY_RULES["affo"]
+        assert self.trips({"pe": 99.0, "ev_ebitda": 99.0, "pb": 1.5}, rules=rules) == []
+        assert "P/B" in self.trips({"pe": 99.0, "pb": 1.51}, rules=rules)[0]
+        # Funds managers and banks on distributable earnings: P/E and P/B.
+        rules = sanity_check.FAMILY_RULES["earnings_at_coe"]
+        assert "P/E" in self.trips({"pe": 20.01, "ev_ebitda": 99.0}, rules=rules)[0]
+        assert sanity_check.FAMILY_RULES["owner_fcf"] == ("pe", "pb", "ev_ebitda", "p_sales", "upside_position")
+        assert "nav" in sanity_check.FAMILY_RULES
+        assert "risked_npv" not in sanity_check.FAMILY_RULES
 
     def test_upside_over_100_in_the_upper_half_of_the_range_trips(self):
         assert self.trips({}, upside=100.1, price_pos=0.51) != []
@@ -672,8 +684,38 @@ class TestNonFcfModels:
         path.write_text(json.dumps(doc, indent=2))
         block = sanity_check.check(repo, "ARG.NZ", today=TODAY)
         assert block["ran"] is True
+        # A REIT is graded on P/B against its own decade, never on P/E or
+        # EV/EBITDA: statutory NPAT is revaluation noise and EBITDA undefined.
+        assert block["model"] == "affo"
+        assert block["passed"] is True
+        assert block["rules_evaluated"] == ["pb"]
+        assert set(block["rules_not_applicable"]) == {"pe", "ev_ebitda", "p_sales"}
+        assert "checks_replaced" not in block
+
+    def test_a_reit_trips_on_price_to_book_alone(self, repo):
+        make_db(repo, "ARG.NZ")
+        make_prices(repo, "ARG.NZ")
+        make_dcf(repo, "ARG.NZ", intrinsic_value=80.0)      # 10x the fixture's IV
+        path = repo / "research" / "ARG.NZ" / "Reports" / "ARG.NZ_DCF.json"
+        doc = json.loads(path.read_text())
+        doc["valuation_model"] = "AFFO capitalization at cost of equity"
+        path.write_text(json.dumps(doc, indent=2))
+        block = sanity_check.check(repo, "ARG.NZ", today=TODAY)
+        assert block["passed"] is False
+        assert len(block["trip_reasons"]) >= 1
+        assert all("P/B" in r or "upside" in r for r in block["trip_reasons"])
+
+    def test_models_with_no_multiple_to_grade_keep_the_null_verdict(self, repo):
+        make_db(repo, "SMI.NZ")
+        make_prices(repo, "SMI.NZ")
+        make_dcf(repo, "SMI.NZ")
+        path = repo / "research" / "SMI.NZ" / "Reports" / "SMI.NZ_DCF.json"
+        doc = json.loads(path.read_text())
+        doc["valuation_model"] = "risked project NPV"
+        path.write_text(json.dumps(doc, indent=2))
+        block = sanity_check.check(repo, "SMI.NZ", today=TODAY)
         assert block["passed"] is None
-        assert "affo" in block["checks_replaced"]
+        assert "risked_npv" in block["checks_replaced"]
 
     def test_a_replaced_model_still_reports_the_history_it_could_compute(self, repo):
         make_db(repo, "ARG.NZ")

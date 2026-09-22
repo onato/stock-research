@@ -445,12 +445,38 @@ def price_position(price: float, series: list[tuple[dt.date, float]]) -> float |
     return (price - low) / (high - low)
 
 
+# Which trip rules a valuation family is graded on. A REIT on AFFO or a bank
+# on distributable earnings has no owner-FCF multiple to grade: statutory
+# NPAT is revaluation noise and EBITDA is undefined, so P/E and EV/EBITDA
+# would be arithmetic about nothing -- but a value implying a price-to-book
+# the market has never paid is exactly the trap the check exists for
+# (GPT.AX, GMG.AX, CHC.AX ran ungated on the engine route, 2026-09-23). A
+# family absent here (risked NPV, asset waterfall) gets no verdict at all.
+# `p_sales` is computed and reported wherever revenue means something; it
+# never trips.
+FAMILY_RULES: dict[str, tuple[str, ...]] = {
+    "owner_fcf": ("pe", "pb", "ev_ebitda", "p_sales", "upside_position"),
+    "unknown": ("pe", "pb", "ev_ebitda", "p_sales", "upside_position"),
+    "affo": ("pb", "upside_position"),
+    "nav": ("pb", "upside_position"),
+    "book_value": ("pe", "pb", "p_sales", "upside_position"),
+    "earnings_at_coe": ("pe", "pb", "p_sales", "upside_position"),
+}
+ALL_MULTIPLES = ("pe", "pb", "ev_ebitda", "p_sales")
+
+
 def trip_reasons(implied: dict[str, float | None],
                  historical: dict[str, float | None],
                  upside_pct: float | None,
-                 position: float | None) -> list[str]:
-    """8c.3. A missing number never trips -- absence is not evidence."""
+                 position: float | None,
+                 rules: tuple[str, ...] | None = None) -> list[str]:
+    """8c.3. A missing number never trips -- absence is not evidence. `rules`
+    (a FAMILY_RULES entry) limits which rules may fire; None means all."""
     reasons: list[str] = []
+    active = set(rules) if rules is not None else {"pe", "pb", "ev_ebitda", "upside_position"}
+    implied = {k: (v if k in active else None) for k, v in implied.items()}
+    if "upside_position" not in active:
+        upside_pct = None
 
     pe, pe_avg = implied.get("pe"), historical.get("pe_avg")
     if pe is not None and pe_avg is not None and pe > PE_MULTIPLE_OF_AVG * pe_avg:
@@ -678,10 +704,11 @@ def check(repo: pathlib.Path, ticker: str,
     # tickers were judged on P/B and P/Sales alone. A `passed: true`
     # reached on two rules must not read like one reached on four, so the
     # block records which rules had the inputs to run.
-    evaluated = [k for k in ("pe", "pb", "ev_ebitda", "p_sales")
-                 if implied.get(k) is not None]
-    skipped = [k for k in ("pe", "pb", "ev_ebitda", "p_sales")
-               if implied.get(k) is None]
+    family_rules = FAMILY_RULES.get(model, ())
+    gradable = [k for k in ALL_MULTIPLES if k in family_rules]
+    evaluated = [k for k in gradable if implied.get(k) is not None]
+    skipped = [k for k in gradable if implied.get(k) is None]
+    not_applicable = [k for k in ALL_MULTIPLES if k not in family_rules]
 
     block: dict[str, object] = {
         "ran": True,
@@ -703,13 +730,15 @@ def check(repo: pathlib.Path, ticker: str,
         "computed_at": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
     }
 
-    if model not in ("owner_fcf", "unknown"):
-        # A REIT's AFFO capitalization and an LIC's NAV model do not produce
-        # an earnings multiple to grade. A `false` here would be a verdict
-        # about arithmetic that was never performed.
+    if not_applicable:
+        block["rules_not_applicable"] = not_applicable
+    if model not in FAMILY_RULES:
+        # A risked project NPV or an asset waterfall does not produce a
+        # multiple to grade. A `false` here would be a verdict about
+        # arithmetic that was never performed.
         block["passed"] = None
         block["checks_replaced"] = (
-            f"model is {model}: P/E and EV/EBITDA trip rules do not apply; "
+            f"model is {model}: no multiples rule applies; "
             "the historical table is reported for context only")
         return block
 
@@ -724,7 +753,7 @@ def check(repo: pathlib.Path, ticker: str,
             "or no FY-end price aligned to it")
         return block
 
-    reasons = trip_reasons(implied, hist, upside, position)
+    reasons = trip_reasons(implied, hist, upside, position, rules=family_rules)
     block["trip_reasons"] = reasons
     block["passed"] = not reasons
     if reasons:
