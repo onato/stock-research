@@ -309,6 +309,15 @@ denomination mismatch. Prose that quotes the old price is listed under
 `price_refresh.prose_paths_quoting_previous_price` — fix those sentences only if the
 claim they make has flipped. Do not recompute any of this by hand.
 
+**If `{TICKER}_Drivers.json` exists, the DCF JSON is generated from it** (`make
+build-dcf`, owner-FCF component route). Any prose or driver you would otherwise edit in
+the DCF JSON — `data_sources.price`, narratives, `valuation_philosophy`, a sanity-check
+fix to a growth cap or WACC — goes into the Drivers file, then `make build-dcf
+TICKER={TICKER}` and re-run `refresh_price.py`/`sanity_check.py --apply` (they write
+the `price_refresh` and `sanity_check` blocks onto the generated file). A hand edit to
+the generated JSON is silently lost on the next build. Never edit `tests/` or
+`scripts/` to make an eval pass; report the failing check instead.
+
 ## Step 8c: DCF Sanity Check (Implied Multiples vs History)
 
 **Always run after Step 8b.** This step exists because DCF models can produce intrinsic values implying multiples the market has never paid. SEK.NZ (Seeka) was the canonical failure: a peak-FCF DCF produced IV $22.75 implying 30x P/E and 3.4x P/B, despite Seeka never trading above 0.99x P/B or 7.8x EV/EBITDA in 10 years.
@@ -390,7 +399,8 @@ In the dashboard, add a yellow warning banner above the DCF section explaining w
 </div>
 ```
 
-Also populate a `valuation_philosophy` block in the DCF JSON capturing the same explanation.
+Also populate a `valuation_philosophy` block capturing the same explanation — in
+`{TICKER}_Drivers.json` when it exists (then `make build-dcf`), else in the DCF JSON.
 
 ### Step 8c.7: Record the sanity check in the DCF JSON
 
