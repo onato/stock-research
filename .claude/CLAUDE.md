@@ -66,6 +66,19 @@ filing page, but the financial-parser agent already rescaled the value before wr
 for a company doing ~NZ$80m/yr); AGL.NZ, SUM.NZ and OCA.NZ are the same. Using it
 reintroduces the SEK.NZ bug.
 
+## Warehouse (cross-ticker DB)
+
+`make warehouse` rebuilds `state/research.duckdb` (gitignored, ~2s) from the committed
+files only: `Metrics.csv`, `DCF.json` + `Drivers.json`, `Analysis.json`, `Prices.csv`,
+`Corrections.jsonl`, `info.json`, `evals/ledger.jsonl`. Tables `companies`, `metrics`
+(+ `metrics_m` in millions, `latest_annual`), `kpis`, `dcf`, `dcf_scenarios`,
+`dcf_values` (every numeric key, lossless), `dcf_drivers` (one row per scenario-year),
+`analysis` and `dcf.doc` as JSON columns, `prices`, `ledger`, `corrections`,
+`build_info`, and the `screen` view. Rule: **judgment files are the source of truth
+(Drivers, Analysis, Corrections); every `.duckdb` is a build product** — change the
+schema and rebuild, never migrate, and never write to the warehouse by hand.
+`duckdb state/research.duckdb` to query.
+
 ## Cross-Ticker Screening
 
 `make screen-fundamentals EXCHANGE=NZX ARGS="--min-roe 0.15 --max-de 1"` filters every

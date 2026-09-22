@@ -27,7 +27,7 @@ LEADERBOARD ?= 15   # rows shown by `make screen`
 
 .DEFAULT_GOAL := help
 .PHONY: help run digest status screen integrity missing prune-stubs standardize-scale research facts evals evals-all dashboard-spec \
-        fix cost gaps exchange-eval facts-xbrl adjudicate fetch-asx fetch-filings dcf-context build-dcf check-dcf dashboard kpi-coverage screen-metrics check-currency ledger ledger-backfill queue-prune sanity-check \
+        fix cost gaps exchange-eval facts-xbrl adjudicate fetch-asx fetch-filings dcf-context build-dcf check-dcf warehouse dashboard kpi-coverage screen-metrics check-currency ledger ledger-backfill queue-prune sanity-check \
         screen-fundamentals backfill-units canonical-iv sync-portfolio commit-refreshed commit-scores \
         test test-country lint coverage typecheck
 
@@ -192,6 +192,9 @@ dcf-context: ## Print the DCF agent's inputs for one ticker: price, history pivo
 build-dcf: ## Build Reports/{T}_DCF.json + {T}_DCF_Model.xlsx from {T}_Drivers.json (no model)
 	@test -n "$(TICKER)" || { echo "usage: make build-dcf TICKER=APA.AX" >&2; exit 2; }
 	$(PY) $(SCRIPTS)/build_dcf.py $(TICKER)
+
+warehouse: ## Rebuild state/research.duckdb, the cross-ticker DB, from the committed Reports/ files (no model)
+	$(PY) $(SCRIPTS)/build_warehouse.py
 
 check-dcf: ## Re-derive a DCF.json from its own assumptions (TICKER=X, or ALL=1 for the corpus; no model)
 	@if [ -n "$(ALL)" ]; then $(PY) $(SCRIPTS)/build_dcf.py --check-all; \
