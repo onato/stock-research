@@ -20,7 +20,7 @@ does with capital. Then route:
 | Business | Model | Reference |
 |---|---|---|
 | Operating company: tech, SaaS, consumer internet, marketplaces | **Owner-FCF DCF**, scenario-weighted | `references/owner-fcf.md` |
-| Operating company, non-US or cyclical: industrials, consumer, keiretsu suppliers | **Owner-FCF DCF** + the section 7 adaptations (currency, leases, NCI, non-operating assets, SBC-zero) | `references/owner-fcf.md` |
+| Operating company, non-US or cyclical: industrials, consumer, keiretsu suppliers | **Owner-FCF DCF** + the adaptations (currency, leases, NCI, non-operating assets, SBC-zero) | `references/owner-fcf.md` + `references/owner-fcf-adaptations.md` |
 | REIT / property trust (IAS 40 fair-value, external manager) | **AFFO or distributable-profit capitalization at cost of equity** | below |
 | Bank, non-bank deposit taker, thrift | **Residual income on tangible book** | below |
 | Insurer, holdco, compounder-of-book | **BVPS compounding × exit P/B** | below |
@@ -36,14 +36,14 @@ also trades), value the parts separately and sum. Say in the JSON that you did.
 
 **Read `references/owner-fcf.md` in full before building.** It carries the SBC and
 interest adjustments, the component margin build, scenario construction and weighting,
-the DCF and entry-price formulas, the workbook spec, the non-US/cyclical adaptations
-and the method checklist.
+the DCF and entry-price formulas, the generated workbook and the method checklist.
 
 The engine is not US-tech-only. Non-US and cyclical operating companies use the same
-engine plus **section 7**, which covers currency-matched WACC, the single-lease-treatment
-rule, minority interests, the excluded-income/matching-asset rule, SBC-zero markets, and
-charging risk exactly once. Read section 7 before any such build — skipping it is worth
-four figures per share on a Japanese supplier.
+engine plus **`references/owner-fcf-adaptations.md`**, which covers currency-matched
+WACC, the single-lease-treatment rule, minority interests, the excluded-income/
+matching-asset rule, SBC-zero markets, and charging risk exactly once. Read it before
+any such build — skipping it is worth four figures per share on a Japanese supplier —
+and do not read it for a US tech name, where none of it applies.
 
 ## The non-FCF models
 

@@ -173,7 +173,9 @@ discount.
    name the model decision has usually been made and justified; switching models
    silently invalidates comparison against the prior valuation.
 3. Route via the table, then **read that model's reference file in full** — for
-   operating companies that is `.claude/skills/dcf-methods/references/owner-fcf.md`.
+   operating companies that is `.claude/skills/dcf-methods/references/owner-fcf.md`,
+   plus `owner-fcf-adaptations.md` only when the routing row or the file's section 7
+   says the ticker needs it (non-US, cyclical, leases, NCI, dual currency, SBC-zero).
 4. Record the model and the reason in `inputs.notes`.
 
 If the business straddles two rows, value the parts separately and sum, and say so.
@@ -205,8 +207,8 @@ Three things stay true whichever model you use:
   source, and a parity check against a dual listing where one exists), emit a
   currency-suffixed twin such as `weighted_iv_nzd`, and keep the **unsuffixed**
   `intrinsic_value` / `weighted_iv` in the **quote** currency so they are comparable to
-  `current_price`. See section 7(a) of `references/owner-fcf.md`; SMI.NZ is the worked
-  example.
+  `current_price`. See part (a) of `references/owner-fcf-adaptations.md`; SMI.NZ is the
+  worked example.
 
 
 ## Step 4: Output — drivers in, JSON and workbook out
