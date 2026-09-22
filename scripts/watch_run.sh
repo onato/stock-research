@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Watch a parallel research run: one tmux pane per ticker.
+# Watch a parallel research run: one pane per ticker, in herdr or tmux.
 #
 # `run_loop.sh -j 4` merges four traces into one terminal. Per-line tags make
 # the output attributable but not readable -- you cannot follow one ticker, and
@@ -15,9 +15,11 @@
 #
 # This only READS. Workers write $LOG_DIR/{TICKER}.stream and the panes tail
 # it, so the viewer can be opened late, closed, or skipped entirely without
-# touching a running batch. Nothing in the research path depends on tmux.
+# touching a running batch. Nothing in the research path depends on a
+# multiplexer.
 #
-# Ctrl-b z zooms the focused pane full-screen; Ctrl-b [ scrolls it.
+# Inside herdr (HERDR_ENV=1) the viewer is a herdr tab; otherwise it is tmux,
+# where Ctrl-b z zooms the focused pane full-screen and Ctrl-b [ scrolls it.
 
 set -uo pipefail
 
@@ -32,34 +34,70 @@ RECONCILE_INTERVAL=10       # seconds between reconciler polls
 STATUS_ONLY=0
 AUTO=0                      # 1 = tickers were discovered, so recycle panes
 RECONCILE_TARGET=""
+RECONCILE_ONCE=0            # 1 = a single reconciler pass (tests)
+# herdr panes inherit HERDR_ENV=1. They can also inherit a $TMUX from the
+# terminal herdr was started in, so herdr is checked first: that $TMUX names a
+# server this pane is not a client of, and often one that no longer exists.
+MUX=tmux
+[ "${HERDR_ENV:-}" = "1" ] && MUX=herdr
+
+# $TMUX is only a claim. It outlives its server (a shell that survived the
+# server, a pane of another multiplexer), and then every tmux call fails with
+# "no server running". It is live when the server answering on that socket is
+# the one it names.
+tmux_is_live() {
+  local pid
+  [ -n "${TMUX:-}" ] || return 1
+  pid="$(tmux display-message -p '#{pid}' 2>/dev/null)" || return 1
+  [ -n "$pid" ] && [ "$pid" = "$(printf '%s' "$TMUX" | cut -d, -f2)" ]
+}
+
 # Inside tmux, default to a window in the CURRENT session: a separate session
 # would take over the client and strand prefix-p. --session forces the old
 # behavior; outside tmux there is no current session, so a new one is the
 # only option.
 WINDOW_MODE=0
-[ -n "${TMUX:-}" ] && WINDOW_MODE=1
+FORCE_SESSION=0
 TICKERS=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --status-only) STATUS_ONLY=1; shift ;;
-    --window)      WINDOW_MODE=1; shift ;;
-    --session)     SESSION="$2"; WINDOW_MODE=0; shift 2 ;;
-    --new-session) WINDOW_MODE=0; shift ;;
-    --reconcile)   RECONCILE_TARGET="$2"; shift 2 ;;  # internal (status pane)
-    -h|--help)     sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --window)      MUX=tmux; shift ;;
+    --session)     MUX=tmux; SESSION="$2"; FORCE_SESSION=1; shift 2 ;;
+    --new-session) MUX=tmux; FORCE_SESSION=1; shift ;;
+    # Internal (status pane). The target says whose it is: tmux window ids
+    # are @N, herdr tab ids are w1:t2.
+    --reconcile|--reconcile-once)
+                   [ "$1" = "--reconcile-once" ] && RECONCILE_ONCE=1
+                   RECONCILE_TARGET="$2"
+                   case "$2" in @*) MUX=tmux ;; *) MUX=herdr ;; esac
+                   shift 2 ;;
+    -h|--help)     sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*)            echo "Unknown option: $1" >&2; exit 2 ;;
     *)             TICKERS+=("$1"); shift ;;
   esac
 done
 
-# Outside tmux a window cannot be created -- there is no client to attach it to.
-[ -z "${TMUX:-}" ] && WINDOW_MODE=0
-
-command -v tmux >/dev/null || {
-  echo "watch_run.sh needs tmux (brew install tmux)." >&2
-  echo "Without it, run_loop.sh still prints a tagged trace to stdout." >&2
-  exit 1; }
+if [ "$MUX" = "tmux" ] && [ -z "$RECONCILE_TARGET" ] \
+   && [ "$STATUS_ONLY" = "0" ]; then
+  command -v tmux >/dev/null || {
+    echo "watch_run.sh needs tmux (brew install tmux) or herdr." >&2
+    echo "Without it, run_loop.sh still prints a tagged trace to stdout." >&2
+    exit 1; }
+  # Outside a live tmux a window cannot be created -- there is no client to
+  # attach it to. A stale $TMUX is dropped so tmux stops trusting it too.
+  if tmux_is_live; then
+    [ "$FORCE_SESSION" = "0" ] && WINDOW_MODE=1
+  else
+    unset TMUX
+  fi
+fi
+if [ "$MUX" = "herdr" ]; then
+  command -v jq >/dev/null || {
+    echo "watch_run.sh needs jq to read herdr's JSON (brew install jq)." >&2
+    exit 1; }
+fi
 
 status_cmd() {
   printf '%s' "uv run --project '$REPO_ROOT' python3 \
@@ -82,7 +120,72 @@ in_list() {
 }
 
 # ---------------------------------------------------------------------------
-# reconcile_loop <window_id>
+# Multiplexer backends. The reconciler and the builder below only speak these
+# verbs; TARGET is a tmux window id (@N) or a herdr tab id (w1:t2).
+#
+#   mux_alive TARGET              does the viewer still exist?
+#   mux_panes TARGET              "PANE_ID TITLE" per pane, creation order
+#   mux_retarget PANE TICKER      point an existing pane at another ticker
+#   mux_add TARGET TICKER IDS...  new pane beside ticker panes IDS; prints id
+# ---------------------------------------------------------------------------
+tail_cmd() { printf "tail -F '%s/%s.stream'" "$LOG_DIR" "$1"; }
+
+tmux_alive() { tmux list-panes -t "$1" >/dev/null 2>&1; }
+tmux_panes() { tmux list-panes -t "$1" -F '#{pane_id} #{pane_title}'; }
+tmux_retarget() {
+  tmux respawn-pane -k -t "$1" "$(tail_cmd "$2")" 2>/dev/null || return 1
+  tmux select-pane -t "$1" -T "$2"
+}
+tmux_add() {
+  local target="$1" ticker="$2" new_id
+  new_id="$(tmux split-window -d -t "$target" -P -F '#{pane_id}' \
+              "$(tail_cmd "$ticker")")" || return 1
+  tmux select-pane -t "$new_id" -T "$ticker"
+  tmux select-layout -t "$target" tiled >/dev/null
+  printf '%s\n' "$new_id"
+}
+
+# herdr answers in JSON and its panes are shells, not commands: a pane is
+# pointed at a stream by typing the tail into it, and retargeted by Ctrl-C
+# plus a new tail. Nothing here takes focus (--no-focus), so unlike tmux
+# there is no focus to restore afterwards.
+herdr_alive() { herdr tab get "$1" >/dev/null 2>&1; }
+herdr_panes() {
+  herdr pane list --workspace "${1%%:*}" 2>/dev/null | jq -r --arg tab "$1" \
+    '.result.panes[] | select(.tab_id == $tab)
+     | "\(.pane_id) \(.label // "")"'
+}
+herdr_retarget() {
+  herdr pane send-keys "$1" ctrl+c >/dev/null 2>&1 || return 1
+  herdr pane run "$1" "clear; $(tail_cmd "$2")" >/dev/null || return 1
+  herdr pane rename "$1" "$2" >/dev/null
+}
+# herdr has no tiled layout, so the 2x2 grid is built by choosing what to
+# split: 1 pane -> split it right; 2 -> split the first down; 3 -> split the
+# second down.
+herdr_add() {
+  local ticker="$2" from dir new_id; shift 2
+  case $# in
+    1) from="$1"; dir=right ;;
+    2) from="$1"; dir=down ;;
+    3) from="$2"; dir=down ;;
+    *) return 1 ;;
+  esac
+  new_id="$(herdr pane split "$from" --direction "$dir" --cwd "$REPO_ROOT" \
+              --no-focus | jq -r '.result.pane.pane_id // empty')"
+  [ -n "$new_id" ] || return 1
+  herdr pane run "$new_id" "$(tail_cmd "$ticker")" >/dev/null
+  herdr pane rename "$new_id" "$ticker" >/dev/null
+  printf '%s\n' "$new_id"
+}
+
+mux_alive()    { "${MUX}_alive" "$@"; }
+mux_panes()    { "${MUX}_panes" "$@"; }
+mux_retarget() { "${MUX}_retarget" "$@"; }
+mux_add()      { "${MUX}_add" "$@"; }
+
+# ---------------------------------------------------------------------------
+# reconcile_loop <target>
 #
 # The batch outlives the panes: GNU parallel starts the next ticker the moment
 # one finishes, so a static viewer goes stale one ticker at a time. This loop
@@ -99,7 +202,7 @@ reconcile_loop() {
 
   while :; do
     # The viewer is gone; so are we.
-    tmux list-panes -t "$target" >/dev/null 2>&1 || exit 0
+    mux_alive "$target" || exit 0
 
     local active=()
     while IFS= read -r t; do
@@ -110,7 +213,7 @@ reconcile_loop() {
     while IFS=' ' read -r pid title; do
       [ "$title" = "batch status" ] && continue
       pane_ids+=("$pid"); pane_titles+=("$title")
-    done < <(tmux list-panes -t "$target" -F '#{pane_id} #{pane_title}')
+    done < <(mux_panes "$target")
 
     # Active tickers with no pane, freshest first.
     local missing=()
@@ -126,21 +229,19 @@ reconcile_loop() {
           || victims+=("${pane_ids[$i]}")
       done
 
-      # select-pane -T moves focus, so remember where the user was.
-      prev="$(tmux display-message -p -t "$target" '#{pane_id}' 2>/dev/null)"
+      # tmux's select-pane -T moves focus, so remember where the user was.
+      prev=""
+      [ "$MUX" = "tmux" ] && \
+        prev="$(tmux display-message -p -t "$target" '#{pane_id}' 2>/dev/null)"
       changed=0
       for a in "${missing[@]}"; do
         if [ ${#victims[@]} -gt 0 ]; then
           v="${victims[0]}"; victims=("${victims[@]:1}")
-          tmux respawn-pane -k -t "$v" \
-            "tail -F '$LOG_DIR/$a.stream'" 2>/dev/null || continue
-          tmux select-pane -t "$v" -T "$a"
+          mux_retarget "$v" "$a" || continue
           changed=1
         elif [ ${#pane_ids[@]} -lt "$MAX_PANES" ]; then
-          new_id="$(tmux split-window -d -t "$target" -P -F '#{pane_id}' \
-                      "tail -F '$LOG_DIR/$a.stream'")" || continue
-          tmux select-pane -t "$new_id" -T "$a"
-          tmux select-layout -t "$target" tiled >/dev/null
+          new_id="$(mux_add "$target" "$a" \
+                      ${pane_ids[@]+"${pane_ids[@]}"})" || continue
           pane_ids+=("$new_id")
           changed=1
         else
@@ -151,6 +252,7 @@ reconcile_loop() {
         tmux select-pane -t "$prev" 2>/dev/null
     fi
 
+    [ "$RECONCILE_ONCE" = "1" ] && return 0
     sleep "$RECONCILE_INTERVAL"
   done
 }
@@ -159,6 +261,9 @@ reconcile_loop() {
 # table in the foreground. Both die with the pane (kill-window SIGHUPs the
 # pane's process group), and the loop also exits once the window is gone.
 if [ -n "$RECONCILE_TARGET" ]; then
+  if [ "$RECONCILE_ONCE" = "1" ]; then
+    reconcile_loop "$RECONCILE_TARGET"; exit 0
+  fi
   reconcile_loop "$RECONCILE_TARGET" &
   exec uv run --project "$REPO_ROOT" python3 \
     "$REPO_ROOT/scripts/run_status.py" --watch
@@ -194,6 +299,49 @@ fi
 
 # tail -F (not -f) survives the truncation research_ticker does at start.
 first="${TICKERS[0]}"
+
+if [ "$MUX" = "herdr" ]; then
+  # A TAB in the current workspace, for the reason tmux gets a window: the
+  # shell that launched the viewer stays one tab away. A previous viewer's
+  # tab is replaced, as kill-window does below.
+  ws="${HERDR_WORKSPACE_ID:?HERDR_ENV=1 but no HERDR_WORKSPACE_ID}"
+  while IFS= read -r old_tab; do
+    [ -n "$old_tab" ] && herdr tab close "$old_tab" >/dev/null
+  done < <(herdr tab list --workspace "$ws" | jq -r --arg l "$WINDOW_NAME" \
+             '.result.tabs[] | select(.label == $l) | .tab_id')
+
+  created="$(herdr tab create --workspace "$ws" --cwd "$REPO_ROOT" \
+               --label "$WINDOW_NAME" --no-focus)"
+  target="$(printf '%s' "$created" | jq -r '.result.tab.tab_id // empty')"
+  pane_id="$(printf '%s' "$created" | jq -r '.result.root_pane.pane_id // empty')"
+  [ -n "$target" ] && [ -n "$pane_id" ] || {
+    echo "herdr tab create failed: $created" >&2; exit 1; }
+
+  # The status strip first, across the full width under the ticker grid
+  # (--ratio is the share the ORIGINAL pane keeps).
+  status_id="$(herdr pane split "$pane_id" --direction down --ratio 0.72 \
+                 --cwd "$REPO_ROOT" --no-focus \
+               | jq -r '.result.pane.pane_id // empty')"
+  herdr pane rename "$status_id" "batch status" >/dev/null
+
+  herdr pane run "$pane_id" "$(tail_cmd "$first")" >/dev/null
+  herdr pane rename "$pane_id" "$first" >/dev/null
+  ticker_panes=("$pane_id")
+  for t in "${TICKERS[@]:1}"; do
+    new_id="$(herdr_add "$target" "$t" "${ticker_panes[@]}")" || continue
+    ticker_panes+=("$new_id")
+  done
+
+  # In auto mode the status pane also hosts the reconciler (see below).
+  if [ "$AUTO" = "1" ]; then
+    pane_cmd="'$REPO_ROOT/scripts/watch_run.sh' --reconcile $target"
+  else
+    pane_cmd="$(status_cmd)"
+  fi
+  herdr pane run "$status_id" "$pane_cmd" >/dev/null
+  herdr tab focus "$target" >/dev/null
+  exit 0
+fi
 
 if [ "$WINDOW_MODE" = "1" ]; then
   # Inside tmux: build a WINDOW in the current session. `switch-client` to a
