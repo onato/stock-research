@@ -103,9 +103,25 @@ def write_db(ticker: str, core: list[dict[str, Any]], kpis: list[tuple[str, str,
     return db
 
 
+USAGE = ("Usage: load_existing.py TICKER [TICKER...] | --all | --report\n"
+         "  Rebuilds the named tickers' DuckDBs from their committed Metrics CSVs.\n"
+         "  --all rebuilds every ticker (kpis rows not in the CSV are lost);\n"
+         "  --report shows alias coverage and writes nothing.")
+
+
 def main() -> int:
+    flags = [a for a in sys.argv[1:] if a.startswith("--")]
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    report_only = "--report" in sys.argv
+    unknown = [f for f in flags if f not in ("--all", "--report")]
+    if unknown:
+        print(f"unknown option {' '.join(unknown)}\n{USAGE}", file=sys.stderr)
+        return 2
+    report_only = "--report" in flags
+    if not args and not report_only and "--all" not in flags:
+        # A bare run rebuilt all ~210 caches on 2026-09-23 and deleted every
+        # DB-only kpis row. Touching the corpus must be asked for by name.
+        print(f"no tickers given; pass --all to rebuild every ticker\n{USAGE}", file=sys.stderr)
+        return 2
 
     if args:
         paths = []

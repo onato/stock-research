@@ -234,10 +234,10 @@ class TestMain:
         assert not (d / "Reports" / "SYN.duckdb").exists()
         assert "no databases written" in capsys.readouterr().out
 
-    def test_no_args_globs_every_metrics_csv(self, make_ticker, monkeypatch):
+    def test_all_globs_every_metrics_csv(self, make_ticker, monkeypatch):
         d1 = load_syn(make_ticker, "AAA.NZ")
         d2 = load_syn(make_ticker, "BBB.NZ")
-        assert run_main(monkeypatch) == 0
+        assert run_main(monkeypatch, "--all") == 0
         assert (d1 / "Reports" / "AAA.NZ.duckdb").exists()
         assert (d2 / "Reports" / "BBB.NZ.duckdb").exists()
 
@@ -275,3 +275,29 @@ class TestReplayCorrections:
         assert con.execute("SELECT net_income FROM core_metrics").fetchone()[0] == 7.018
         assert con.execute("SELECT count(*) FROM corrections").fetchone()[0] == 1
         con.close()
+
+
+class TestCliGuard:
+    """`load_existing.py --help` (2026-09-23) dropped the unknown flag, saw no
+    tickers, and rebuilt every ticker DB from its CSV -- deleting the kpis rows
+    the parser had only ever written to the caches. A corpus-wide rebuild
+    must be asked for by name, and an unknown flag must stop, not be ignored.
+    """
+
+    def test_unknown_flag_is_refused(self, monkeypatch, capsys):
+        monkeypatch.setattr(sys, "argv", ["load_existing.py", "--help"])
+        assert L.main() == 2
+        err = capsys.readouterr().err
+        assert "--help" in err
+        assert "Usage" in err
+
+    def test_bare_invocation_needs_all(self, monkeypatch, capsys):
+        monkeypatch.setattr(sys, "argv", ["load_existing.py"])
+        assert L.main() == 2
+        assert "--all" in capsys.readouterr().err
+
+    def test_report_alone_is_still_read_only_over_the_corpus(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(L, "REPO", tmp_path)
+        (tmp_path / "research").mkdir()
+        monkeypatch.setattr(sys, "argv", ["load_existing.py", "--report"])
+        assert L.main() == 0
