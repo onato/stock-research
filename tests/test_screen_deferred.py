@@ -142,9 +142,29 @@ class TestEvaluate:
         assert not sd.evaluate(stats(pe=50.0), "Industrials").deferred
         assert sd.evaluate(stats(pe=50.1), "Industrials").deferred
 
-    def test_a_loss_maker_is_not_deferred_on_pe(self):
-        # No earnings is a growth story or a trough, not a ridiculous price.
-        assert not sd.evaluate(stats(pe=None, netinc=-50.0), "Technology").deferred
+    def test_a_loss_maker_is_deferred_as_such(self):
+        # Stephen (2026-09-22): companies with no earnings go last too. The
+        # verdict names the cause, not a P/E it does not have.
+        s = sd.evaluate(stats(pe=None, netinc=-50.0), "Technology")
+        assert s.reasons == ("loss-making",)
+        assert s.net_income == -50.0
+
+    def test_no_pe_alone_is_missing_data_not_a_loss(self):
+        # CSL.AX (2026-09-22 live run) printed P/E n/a while earning
+        # billions. Only a negative net income says "no earnings".
+        assert not sd.evaluate(stats(pe=None, netinc=None), "Technology").deferred
+        assert not sd.evaluate(stats(pe=None, netinc=4.0e9), "Technology").deferred
+
+    def test_loss_making_is_sector_blind(self):
+        assert sd.evaluate(stats(pe=None, netinc=-1.0), "Financials").reasons == \
+            ("loss-making",)
+        assert sd.evaluate(stats(pe=None, netinc=-1.0), None).reasons == \
+            ("loss-making",)
+
+    def test_a_loss_maker_is_not_also_flagged_on_pe(self):
+        # The site sometimes prints a negative P/E for a loss-maker.
+        s = sd.evaluate(stats(pe=-12.0, netinc=-50.0), "Technology")
+        assert s.reasons == ("loss-making",)
 
     def test_pe_rule_ignores_sector(self):
         assert sd.evaluate(stats(pe=99.0), "Financials").reasons == ("P/E 99.0",)
@@ -204,9 +224,9 @@ class TestEvaluate:
         # CXO.AX (2026-09-22 live run): no debt at all, EBIT negative, so the
         # site prints cover -21.6x. That is the loss-maker case, which the
         # P/E rule already declines to defer; the debt rule must agree.
-        s = sd.evaluate(stats(interestCoverage=-21.6, debtEquity=0.0),
-                        "Materials")
-        assert s.reasons == ()
+        s = sd.evaluate(stats(interestCoverage=-21.6, debtEquity=0.0,
+                              netinc=-30.0, pe=None), "Materials")
+        assert s.reasons == ("loss-making",)
 
     def test_negative_equity_does_not_fire_de(self):
         # Buyback-driven negative equity (AutoZone, Home Depot) shows as a
@@ -362,15 +382,25 @@ class TestScreenTicker:
 
 
 class TestAge:
-    def test_only_stale_entries_are_redone(self):
+    def _fresh_block(self, root, ticker):
+        d = root / "research" / ticker
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "info.json").write_text(json.dumps(
+            {"screen": {"defer": [], **dict.fromkeys(sd.RULE_FIELDS, 1.0)}}))
+
+    def test_only_stale_entries_are_redone(self, tmp_path):
+        for t in ("OLD", "NEW"):
+            self._fresh_block(tmp_path, t)
         state = {"done": {"OLD": "2020-01-01", "NEW": "2099-01-01"},
                  "failed": {}}
-        assert sd.pending_by_age(["OLD", "NEW", "X"], state, max_age=180) == \
-            ["OLD", "X"]
+        assert sd.pending_by_age(["OLD", "NEW", "X"], state, max_age=180,
+                                 root=tmp_path) == ["OLD", "X"]
 
-    def test_no_max_age_means_done_is_done(self):
+    def test_no_max_age_means_done_is_done(self, tmp_path):
+        self._fresh_block(tmp_path, "OLD")
         state = {"done": {"OLD": "2020-01-01"}, "failed": {}}
-        assert sd.pending_by_age(["OLD", "X"], state, max_age=None) == ["X"]
+        assert sd.pending_by_age(["OLD", "X"], state, max_age=None,
+                                 root=tmp_path) == ["X"]
 
 
 class TestPacingIsShared:
@@ -392,3 +422,34 @@ class TestCandidateOrder:
         (q / "zzz_other.txt").write_text("OTHER\n")
         (q / "eu_priority.txt").write_text("EU1\n")
         assert sd.candidates(tmp_path) == ["EU1", "NZ1", "ADR1", "OTHER"]
+
+
+class TestStaleBlocksAreRescreened:
+    """A block written under an older rule set is re-screened, not trusted.
+
+    The loss-making rule landed (2026-09-22) while the first overnight loop
+    was mid-batch, so ~100 tickers carried blocks that never saw it. Their
+    blocks lack `net_income`, the field that rule reads; that absence is the
+    tell, and it is general: any future field a rule needs marks older
+    blocks stale the same way.
+    """
+
+    def _block(self, root, ticker, **fields):
+        d = root / "research" / ticker
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "info.json").write_text(json.dumps({"screen": fields}))
+
+    def test_a_block_missing_a_rule_field_is_pending(self, tmp_path):
+        self._block(tmp_path, "OLD", pe=20.0, defer=[])
+        self._block(tmp_path, "NEW", defer=[],
+                    **dict.fromkeys(sd.RULE_FIELDS, 1.0))
+        state = {"done": {"OLD": "2026-09-22", "NEW": "2026-09-22"}, "failed": {}}
+        assert sd.pending_by_age(["OLD", "NEW"], state, max_age=None,
+                                 root=tmp_path) == ["OLD"]
+
+    def test_a_done_ticker_with_no_block_at_all_is_pending(self, tmp_path):
+        # Done in the state file but nothing on disk: a dry run, or a lost
+        # write. Either way there is nothing to trust.
+        state = {"done": {"GONE": "2026-09-22"}, "failed": {}}
+        assert sd.pending_by_age(["GONE"], state, max_age=None,
+                                 root=tmp_path) == ["GONE"]

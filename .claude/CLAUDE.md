@@ -141,9 +141,10 @@ Two screens run over the *unresearched* queue, both record into
 - **`make screen-ethics`** says *never*: the six categories Stephen won't hold.
   It only records (`ethics` block); promotion to `state/never_interested.txt` is a
   human step because keyword false positives are systematic.
-- **`make screen-deferred`** says *later*: trailing P/E > 50, or for non-financials
-  D/E > 2x, net debt/EBITDA > 5x, or interest cover < 2x (loss-makers are not
-  deferred; banks/insurers/REITs are exempt from the debt rules). `APPLY=1` writes
+- **`make screen-deferred`** says *later*: loss-making (net income < 0), trailing
+  P/E > 50, or for non-financials D/E > 2x, net debt/EBITDA > 5x, or interest
+  cover < 2x (banks/insurers/REITs are exempt from the debt rules; a missing P/E
+  alone is missing data, not a loss). `APPLY=1` writes
   the `screen` block and regenerates **`state/deferred.txt`** (generated, committed,
   same `TICKER  reason` grammar as never_interested). The selector then orders
   new → deferred-new → stale refreshes; holdings/watchlist are never deferred and

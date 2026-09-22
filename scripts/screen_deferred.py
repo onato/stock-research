@@ -10,7 +10,9 @@ stockanalysis.com statistics page for each one and writes
 
 Rules (agreed 2026-09-22):
 
-    P/E            > 50     trailing; a loss-maker has no P/E and is NOT deferred
+    Net income     < 0      "loss-making" -- no earnings goes last too
+    P/E            > 50     trailing; a company with no P/E and no loss is
+                            missing data, not deferred (CSL.AX prints n/a)
     Debt / Equity  > 2.0x   non-financials only
     Net debt/EBITDA> 5x     non-financials only; computed from net cash, the
                             site's gross Debt/EBITDA is the fallback
@@ -24,7 +26,8 @@ permanent list is state/never_interested.txt, and that stays a human call.
 
 Missing data never defers. A page with no numbers, a ratio the site prints
 as n/a, an unknown sector when a debt rule would fire -- each leaves the
-ticker where it was. Precision over recall, as in screen_ethics: a wrongly
+ticker where it was. "No P/E" is not "no earnings": only a negative net
+income is a loss-maker. Precision over recall, as in screen_ethics: a wrongly
 deferred good company sinks to the back of a 1,400-name queue nobody re-reads.
 
 Banks, insurers and REITs are exempt from the debt rules: a bank IS leverage.
@@ -32,8 +35,8 @@ The sector comes from info.json when the repo already knows it, otherwise
 from the company page -- fetched only when a debt rule would fire, so the
 extra request is spent on the minority of high-debt names.
 
-Negative interest cover is negative EBIT -- a loss-maker, same as no P/E --
-and never fires the cover rule. Negative equity never fires the D/E rule. Buyback-driven negative equity
+Negative interest cover is negative EBIT -- a loss-maker, already deferred
+as such -- and never fires the cover rule. Negative equity never fires the D/E rule. Buyback-driven negative equity
 (AutoZone, Home Depot) prints as a negative D/E; that is not too much debt,
 and the net-debt and interest-cover rules still see a genuinely over-geared
 company.
@@ -193,6 +196,7 @@ def is_financial(sector: str | None) -> bool:
 class Screen:
     pe: float | None
     forward_pe: float | None
+    net_income: float | None
     debt_equity: float | None
     net_debt_ebitda: float | None
     interest_coverage: float | None
@@ -240,14 +244,19 @@ def debt_reasons(stats: dict[str, float | None]) -> tuple[str, ...]:
 def evaluate(stats: dict[str, float | None], sector: str | None) -> Screen:
     """Apply the rules. Debt rules need a known, non-financial sector."""
     reasons: list[str] = []
-    pe = stats.get("pe")
-    if pe is not None and pe > MAX_PE:
+    pe, netinc = stats.get("pe"), stats.get("netinc")
+    if netinc is not None and netinc < 0:
+        # Sector-blind, and it stands in for the P/E rule: the site prints
+        # a negative or n/a P/E for a loss-maker, neither of which is a price.
+        reasons.append("loss-making")
+    elif pe is not None and pe > MAX_PE:
         reasons.append(f"P/E {pe:.1f}")
     if sector and not is_financial(sector):
         reasons.extend(debt_reasons(stats))
     return Screen(
         pe=pe,
         forward_pe=stats.get("peForward"),
+        net_income=netinc,
         debt_equity=stats.get("debtEquity"),
         net_debt_ebitda=net_debt_to_ebitda(stats),
         interest_coverage=stats.get("interestCoverage"),
@@ -313,8 +322,9 @@ _HEADER = """\
 # (queue/priority.txt) are never deferred, and `make run TICKER=X` ignores
 # this file. The permanent list is state/never_interested.txt.
 #
-# Rules: P/E > {pe:g}; for non-financials D/E > {de:g}x, net debt/EBITDA >
-# {nd:g}x, interest cover < {ic:g}x. Data: {source} statistics pages.
+# Rules: loss-making (net income < 0); P/E > {pe:g}; for non-financials
+# D/E > {de:g}x, net debt/EBITDA > {nd:g}x, interest cover < {ic:g}x.
+# Data: {source} statistics pages.
 #
 # TICKER  reason
 """
@@ -375,18 +385,34 @@ def candidates(root: pathlib.Path = ROOT) -> list[str]:
     return out
 
 
+# Fields a rule reads. A block without one was written under an older rule
+# set and is re-screened rather than trusted.
+RULE_FIELDS: tuple[str, ...] = ("pe", "net_income", "debt_equity",
+                                "net_debt_ebitda", "interest_coverage")
+
+
+def block_is_stale(root: pathlib.Path, ticker: str) -> bool:
+    screen = _read_json(root / "research" / ticker / "info.json").get("screen")
+    if not isinstance(screen, dict):
+        return True
+    return any(f not in screen for f in RULE_FIELDS)
+
+
 def pending_by_age(tickers: list[str], state: dict[str, dict[str, str]],
-                   max_age: int | None) -> list[str]:
-    """`pending`, plus done entries older than `max_age` days when given.
-    Numbers drift: a P/E of 60 a year ago says little today."""
-    todo = pending(tickers, state)
-    if max_age is None:
-        return todo
-    cutoff = (dt.date.today() - dt.timedelta(days=max_age)).isoformat()
+                   max_age: int | None, root: pathlib.Path = ROOT) -> list[str]:
+    """`pending`, plus done entries whose block predates the current rules,
+    plus done entries older than `max_age` days when given (numbers drift:
+    a P/E of 60 a year ago says little today)."""
+    todo = set(pending(tickers, state))
     done = state.get("done", {})
-    stale = [t for t in tickers if t in done and done[t] < cutoff]
-    seen = set(todo)
-    return [t for t in tickers if t in seen or t in stale]
+    cutoff = ((dt.date.today() - dt.timedelta(days=max_age)).isoformat()
+              if max_age is not None else None)
+    def redo(t: str) -> bool:
+        if t not in done:
+            return False
+        return block_is_stale(root, t) or (cutoff is not None and done[t] < cutoff)
+
+    return [t for t in tickers if t in todo or redo(t)]
 
 
 # --------------------------------------------------------------------------
