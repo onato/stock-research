@@ -282,155 +282,35 @@ Create matrix of prices across:
 
 ## 6. Excel workbook
 
-**The workbook must be built from FORMULAS, never pasted values**, so the user can flex
-any driver and watch the valuation move. It must also implement **the same model as the
-JSON** — the component build of section 2, on a 10-year horizon, with the Gordon/cap
-terminal value. A workbook that quietly runs a simpler flat-growth model than the JSON
-is worse than no workbook: it disagrees with the published intrinsic value and the user
-cannot tell which is right.
+**Generated, not written.** `make build-dcf TICKER={TICKER}` emits
+`{TICKER}_DCF_Model.xlsx` from the same Drivers file that produced the JSON, so the
+two cannot disagree. Do not write an openpyxl generator, and do not paste values over
+the workbook: edit the Drivers file and rebuild.
 
-Build with `openpyxl`. Write the generator to
-`/tmp/generate_dcf_excel_{TICKER}.py` and emit
-`./research/{ticker}/Reports/{TICKER}_DCF_Model.xlsx`.
+What the generated workbook contains, for the reader:
 
-### Tab order and contents
+- **`Model_Info`** — provenance: ticker, dates, price, currency, engine version, the
+  Drivers file it was built from.
+- **`Reconciliation`** (updates only) — prior vs new per-share values and the bridge.
+- **`Actuals`** — the annual rows of the Metrics CSV.
+- **`Assumptions`** — every driver path per scenario (blue = editable input): growth,
+  EBITDA margin, SBC %, lease %, D&A %, capex %, cash tax; WACC, terminal growth, cap
+  multiple, working-capital capture, weight. Plus price, final share count, net debt,
+  equity bridge, hurdle rate, base revenue, FX.
+- **`DCF_Bear` / `DCF_Base` / `DCF_Bull`** — the section-2 component build as live
+  formulas linked to `Assumptions`: revenue → EBITDA → SBC and lease charges → D&A →
+  EBIT → cash tax (never credited on a loss) → NOPAT → D&A add-back → capex → working
+  capital → unlevered owner FCF → discount factors → PV; then the section-4 valuation
+  block (`TV = MAX(0, MIN(Gordon, cap x FCF_N))`, EV, bridge, equity, value per share
+  at `$B$38`), the street memo (`$B$43`), and the hurdle entry price with its own
+  terminal value rebuilt at the hurdle (`$B$47`).
+- **`Valuation`** — the scenario table, `SUMPRODUCT` weighting, street weighted value,
+  band position, weighted entry price, the required-return table and the WACC x g grid,
+  each cell in closed form over the base-case FCF row.
 
-1. **`Model_Info`** — provenance. Mandatory; no workbook ships without it. Must carry:
-   version and what it supersedes; who built it (agent, model, date, at whose request);
-   data vintage with a named source and date per anchor (price + timestamp, balance
-   sheet, share count, guidance); each methodology choice with a one-line rationale;
-   whose judgment the scenario drivers are and when they were set; what to refresh after
-   the next print; and the cell-colour legend. Write it so a cold future session — human
-   or agent — can pick the file up safely. State that the figures go stale.
-
-2. **`Reconciliation`** (updates only) — prior version's per-share values hardcoded and
-   labelled with their date and price, the live current values as links, and the $/share
-   reconciliation bridge (see `../SKILL.md`). Mark bridge figures as approximate; live cells are
-   authoritative.
-
-3. **`Actuals`** — reported history and current guidance, all hardcoded, each row with a
-   source note. Balance-sheet snapshot, diluted-share table, buyback status.
-
-4. **`Assumptions`** — globals (WACC, D&A %, capex %, WC capture %, net cash + date,
-   diluted shares, price + timestamp, TV cap), each with a note; then terminal growth
-   and probability weight per scenario with a `=SUM()` check that the weights make 100%;
-   then the scenario narrative paragraphs.
-
-5. **`DCF_Bear` / `DCF_Base` / `DCF_Bull`** — one tab each, identical structure (below).
-
-6. **`FCF_Quality`** — reported FCF reconciled to owner FCF for every historical year:
-   ```
-   Free cash flow (company definition)
-     less: SBC incl. equity-award taxes
-     less: interest income
-   = Owner FCF
-     Reported FCF margin  /  Owner FCF margin
-   Memo: deferred-revenue increase inside OCF, as % of reported FCF
-   Memo: cash tax rate, flagged when abnormal
-   ```
-   This makes the adjustment auditable at a glance and shows how much of headline FCF is
-   working-capital timing rather than earnings.
-
-7. **`Valuation`** — summary, hurdle entry prices, required-return table, sensitivity grid.
-
-### DCF tab row map
-
-Every scenario tab is laid out identically, so formulas are portable and the three can be
-compared row by row. Column B is FY0 actual; columns C..L are the ten forecast years.
-
-| Row | Content | Type |
-|-----|---------|------|
-| 3 | Year headers: FY0 as `2025A`, then ten `E` years | header |
-| 4 | Year index 0..10 (the discounting exponent) | helper |
-| 5 | Revenue growth YoY | **driver** |
-| 6 | Revenue — B hardcoded FY0, then `=prior*(1+growth)` | formula |
-| 7 | Adj EBITDA margin | **driver** |
-| 8 | Adjusted EBITDA `=rev*margin` | formula |
-| 9 | SBC % of revenue | **driver** |
-| 10 | SBC $ `=-rev*sbc%` (negative) | formula |
-| 11 | Owner EBITDA `=EBITDA+SBC` | formula |
-| 12 | D&A `=-rev*Assumptions!da%` | link |
-| 13 | EBIT, SBC expensed `=11+12` | formula |
-| 14 | Cash tax rate (negative = benefit) | **driver** |
-| 15 | NOPAT `=13*(1-14)` | formula |
-| 16 | add back D&A `=-12` | formula |
-| 17 | less capex `=-rev*Assumptions!capex%` | link |
-| 18 | add WC `=Assumptions!wc_capture*(rev - prior rev)` | link |
-| 19 | **Unlevered owner FCF** `=15+16+17+18` | formula |
-| 20 | Discount factor `=1/(1+WACC)^index` | link |
-| 21 | PV of FCF `=19*20` | formula |
-| 23 | Memo: FCF before SBC (company-style) `=19-10` | formula |
-| 24 | Memo: implied owner-FCF margin `=19/6` | formula |
-| 26-39 | Valuation block (below) | formulas |
-| 41-43 | Street-basis memo (below) | formulas |
-
-**Only four rows per tab are hardcoded drivers: 5, 7, 9, 14.** Everything else flows from
-them. That is the property that makes the workbook usable — the user flexes a margin path
-and the whole valuation, entry price and sensitivity grid move together.
-
-Valuation block, rows 26-39: sum of PV; terminal growth (link to Assumptions); terminal
-FCF `=L19*(1+g)`; Gordon TV; cap TV `=cap*L19`; **TV used `=MAX(0,MIN(gordon, cap))`**; implied
-exit multiple `=TV/L19`; PV of TV `=TV*L20`; EV; add net cash; equity value; diluted
-shares (link); **value per share** (highlight this cell); upside vs price.
-
-Street memo, rows 41-43: PV of explicit-period SBC as
-`=SUMPRODUCT(-C10:L10/(1+WACC)^C4:L4)`; PV of terminal SBC as Gordon on `-L10`; street
-value per share `=(equity + both)/shares`.
-
-### Valuation tab
-
-- **Scenario table**: value per share (green links to each `DCF_*!$B$38`), upside vs
-  price, probability (links to Assumptions), street value per share (links to `$B$43`).
-- **Probability-weighted value** `=SUMPRODUCT(values, weights)`; margin of safety
-  `=1-price/weighted`; the street weighted value alongside; and **band position**
-  `=(price - house)/(street - house)` — 0% = house floor, 100% = street ceiling.
-- **Required-return table** (base case): value per share at r ∈ {9, 10, 11, 12, 15}% and
-  the model's own WACC. Each cell recomputes the full DCF in closed form so it responds
-  to driver edits:
-  ```
-  =(SUMPRODUCT(FCFrow/(1+r)^indexrow) + MAX(0,MIN(Gordon, cap*terminalFCF))/(1+r)^10
-    + net_cash) / shares
-  ```
-- **15%-hurdle entry row**: the same closed form at r = 0.15 for each scenario, then
-  probability-weighted → the model's buy-below price. Repeat on the street basis by
-  adding the SBC PV terms at 15%.
-- **WACC × terminal-growth grid** on the base case (WACC rows spanning ±1pp around the
-  house rate, g columns 2-4%), each cell the same closed form guarded by
-  `=IF(r>g, ..., "n/a")`. Highlight the house pair.
-
-### Build rules that have caused real errors
-
-- **Text cells must never begin with `=`.** LibreOffice parses them as formulas and the
-  recalc errors out. Start every note with a word.
-- **Sheet names contain no spaces** — that keeps cross-sheet references unquoted and the
-  closed-form formulas readable.
-- **Never paste a value over a formula.** If a number needs to be an input, make it a
-  labelled blue input cell on Assumptions and link to it.
-- Cell conventions, applied consistently and documented in Model_Info: **blue** =
-  hardcoded input, **yellow fill** = key lever, **black** = formula, **green** =
-  cross-sheet link.
-
-### Verification protocol — required before declaring done
-
-1. Recalculate the workbook and require **zero formula errors**. Zero is the floor, not
-   the goal:
-   ```bash
-   soffice --headless --convert-to xlsx --outdir /tmp/recalc \
-     ./research/{ticker}/Reports/{TICKER}_DCF_Model.xlsx
-   python3 -c "
-   import openpyxl,sys
-   wb=openpyxl.load_workbook('/tmp/recalc/{TICKER}_DCF_Model.xlsx',data_only=True)
-   errs=[(ws.title,c.coordinate,c.value) for ws in wb for row in ws.iter_rows()
-         for c in row if isinstance(c.value,str) and c.value.startswith('#')]
-   print('errors:',len(errs)); [print(e) for e in errs[:20]]; sys.exit(1 if errs else 0)"
-   ```
-2. Re-open with `data_only=True` and **hand-check against the JSON**: year-1 owner FCF,
-   each scenario's value per share, and the probability-weighted figure. The workbook and
-   `{TICKER}_DCF.json` must agree to within rounding. If they disagree, one of them is
-   wrong — find out which before shipping, and do not paper over it by editing whichever
-   is easier to change.
-3. Check at least one sensitivity-grid corner by hand.
-
+Every driver edit on `Assumptions` flows through to every value. The build recalculates
+the workbook headlessly in its own tests (LibreOffice, zero formula errors, scenario
+values tie to the JSON), so you do not run a recalc yourself.
 
 ## 7. Non-US and cyclical adaptations
 

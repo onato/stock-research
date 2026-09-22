@@ -73,9 +73,11 @@ comparison against the prior valuation.
 
 ## Output contract
 
-Whatever the model, the agent writes the same `{TICKER}_DCF.json` shape so the dashboard
+Whatever the model, the result is the same `{TICKER}_DCF.json` shape so the dashboard
 and screener keep working: three scenarios with intrinsic values, probability weights
 summing to 1.0, a canonical `probability_weighted.weighted_iv` denominated in the
 **quote** currency, and an entry price. `.claude/agents/dcf-analyst.md` owns that
-contract. A non-FCF model fills the same fields — it just derives them differently, and
-`inputs.notes` must say which model was used and why.
+contract. On the owner-FCF component route the agent writes `{TICKER}_Drivers.json` and
+`make build-dcf` derives the JSON and the workbook (`scripts/dcf_engine.py`, the
+dashboard's slider engine in Python). A non-FCF model fills the same fields by hand — it
+just derives them differently, and `inputs.notes` must say which model was used and why.

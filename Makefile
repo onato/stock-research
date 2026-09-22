@@ -27,7 +27,7 @@ LEADERBOARD ?= 15   # rows shown by `make screen`
 
 .DEFAULT_GOAL := help
 .PHONY: help run digest status screen integrity missing prune-stubs standardize-scale research facts evals evals-all dashboard-spec \
-        fix cost gaps exchange-eval facts-xbrl adjudicate fetch-asx fetch-filings dcf-context dashboard kpi-coverage screen-metrics check-currency ledger ledger-backfill queue-prune sanity-check \
+        fix cost gaps exchange-eval facts-xbrl adjudicate fetch-asx fetch-filings dcf-context build-dcf check-dcf dashboard kpi-coverage screen-metrics check-currency ledger ledger-backfill queue-prune sanity-check \
         screen-fundamentals backfill-units canonical-iv sync-portfolio commit-refreshed commit-scores \
         test test-country lint coverage typecheck
 
@@ -188,6 +188,15 @@ sanity-check: ## Historical vs implied multiples for a DCF (TICKER=X [APPLY=1]; 
 dcf-context: ## Print the DCF agent's inputs for one ticker: price, history pivot, KPIs, component lines (no model)
 	@test -n "$(TICKER)" || { echo "usage: make dcf-context TICKER=TPW.AX" >&2; exit 2; }
 	$(PY) $(SCRIPTS)/dcf_context.py $(TICKER)
+
+build-dcf: ## Build Reports/{T}_DCF.json + {T}_DCF_Model.xlsx from {T}_Drivers.json (no model)
+	@test -n "$(TICKER)" || { echo "usage: make build-dcf TICKER=APA.AX" >&2; exit 2; }
+	$(PY) $(SCRIPTS)/build_dcf.py $(TICKER)
+
+check-dcf: ## Re-derive a DCF.json from its own assumptions (TICKER=X, or ALL=1 for the corpus; no model)
+	@if [ -n "$(ALL)" ]; then $(PY) $(SCRIPTS)/build_dcf.py --check-all; \
+	else test -n "$(TICKER)" || { echo "usage: make check-dcf TICKER=APA.AX | ALL=1" >&2; exit 2; }; \
+	$(PY) $(SCRIPTS)/build_dcf.py $(TICKER) --check; fi
 
 facts: ## Rebuild the DuckDB facts table for one ticker (fast, no model)
 	@test -n "$(TICKER)" || { echo "usage: make facts TICKER=AGL.NZ" >&2; exit 2; }

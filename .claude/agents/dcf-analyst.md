@@ -1,6 +1,6 @@
 ---
 name: dcf-analyst
-description: Creates DCF valuation model with Base/Bull/Bear scenarios and generates Excel spreadsheet
+description: Judges the DCF drivers (Base/Bull/Bear) for a ticker and builds the DCF JSON and Excel model from them via make build-dcf
 tools: Read, Write, Bash, Glob
 model: fable
 ---
@@ -174,7 +174,10 @@ If the business straddles two rows, value the parts separately and sum, and say 
 
 Follow the method file you just read. It owns the projection mechanics, the scenario
 construction and weighting, the discounting, the entry price, the sensitivity grid, the
-workbook, and its own quality checklist.
+workbook, and its own quality checklist. On the owner-FCF component route your build is
+the **driver paths** -- the arithmetic that turns them into values is `make build-dcf`
+(Step 4); you may sanity-check a year-one FCF in your head, but do not write code to
+project or discount.
 
 Three things stay true whichever model you use:
 
@@ -198,20 +201,109 @@ Three things stay true whichever model you use:
   example.
 
 
-## Step 4: Output JSON
+## Step 4: Output — drivers in, JSON and workbook out
 
-**The dashboard re-runs your model from this JSON.** `scripts/build_dashboard.py`
-rebuilds the valuation in the page's sliders from `assumptions[scenario]` and validates
-it against `valuation[scenario].intrinsic_value` at build time (`slider engine: component
-base:ok bull:ok bear:ok`). For that to work every scenario must carry the component
-fields the engine reads — `growth_rates`, `ebitda_margin_path`, `sbc_pct_path`,
-`da_pct` (or `da_pct_path`), `capex_pct` (or `capex_pct_path`), `wc_capture_pct`,
-`cash_tax_rate_path`, `wacc`, `terminal_growth`, `terminal_cap_multiple` — plus
-`projections[scenario].revenue` so the revenue base is recoverable, and any lease charge
-as `lease_cost_pct`. DUOL, PINS, CPNG and TPW.AX validate exactly; a build that prints
+**On the owner-FCF component route (most operating companies) you do not write the
+DCF JSON, a model script or a workbook.** You write the drivers and run the build:
+
+```bash
+# 1. write ./research/{ticker}/Reports/{TICKER}_Drivers.json (contract below)
+make build-dcf TICKER={TICKER}
+```
+
+`build-dcf` turns the Drivers file into `{TICKER}_DCF.json` (projections, terminal
+values, entry prices at the hurdle, required-return table, sensitivity grid, house and
+street bases, probability weighting, `band_position`) and `{TICKER}_DCF_Model.xlsx` (the
+same model as live formulas). It is the dashboard's slider engine in Python, so the
+result validates by construction; it prints each scenario's value, the weighted IV and
+`engine check: base:ok bull:ok bear:ok`. A refused Drivers file names every missing or
+misspelt field — fix the file and rebuild. Never write Python to compute a DCF, never
+write the JSON by hand on this route, and never edit the generated JSON: change the
+driver and rebuild. On SDL.NZ and the .AX batch (2026-09) the agent wrote ~48k chars of
+throwaway model/JSON/Excel code per ticker on the most expensive model in the pipeline;
+that work is now the script's.
+
+### `{TICKER}_Drivers.json` contract
+
+Percent paths are in percent (`4.0` = 4%), one entry per forecast year (the length of
+`growth_rates` sets the horizon; shorter paths repeat their last value). Money is in
+millions of `inputs.currency`. `hurdle_rate` is a fraction.
+
+```json
+{
+  "ticker": "APA.AX", "company_name": "APA Group", "valuation_date": "2026-09-22",
+  "current_price": 10.83, "model": "owner_fcf_dcf_component",
+
+  "inputs": {
+    "base_revenue": 2977.0,            // FY0 revenue the growth path compounds from
+    "shares_outstanding": 1330.0,      // fully diluted, millions
+    "projected_shares": [1330.0, ...], // optional; else built from annual_share_growth_pct
+    "annual_share_growth_pct": 0.0,
+    "net_debt": 12659.0, "total_debt": 14295.0, "cash": 1636.0,
+    "last_fcf": 403.0, "reported_fcf": 407.0,
+    "sbc": 4.0, "sbc_incl_equity_taxes": 4.0, "interest_income": 0, "sbc_source": "...",
+    "buyback_cash": 0.0,
+    "currency": "AUD", "quote_currency": "AUD", "fx_rate": 1.0,   // fx_rate REQUIRED when they differ (model -> quote)
+    "units": "millions", "fy0": "FY2026", "fiscal_year_end": "30 June",
+    "price_as_of": "...", "balance_sheet_date": "2026-06-30", "share_count_date": "2026-06-30",
+    "wacc_rationale": "...", "lease_treatment": "...", "nci_treatment": "...", "notes": "..."
+  },
+
+  "equity_bridge": [                   // optional: items added to EV after the flows (+ adds, - deducts)
+    {"item": "Surplus land at book", "value": 120.0, "note": "FY26 AR note 14"}
+  ],
+
+  "historical_growth": { "...": "as today; selected_growth_rate is a percent" },
+
+  "assumptions": {
+    "base": {
+      "growth_rates":       [4.0, 4.0, 4.0, 4.0, 3.5, 3.0, 2.5, 2.5, 2.5, 2.5],
+      "ebitda_margin_path": [72.4, 72.8, 73.0, 73.2, 73.4, 73.5, 73.5, 73.5, 73.5, 73.5],
+      "sbc_pct_path":       [0.134, ...],
+      "lease_cost_pct_path": [0.0, ...],   // optional; lease charge inside EBIT
+      "da_pct_path":        [34.0, 33.0, ...],
+      "capex_pct_path":     [31.0, 31.0, 30.0, ...],
+      "cash_tax_rate_path": [33.0, ...],
+      "wc_capture_pct": 0.0,
+      "wacc": 7.0, "terminal_growth": 2.5, "terminal_cap_multiple": 18,
+      "narrative": "optional"
+    },
+    "bull": { "...": "same keys" },
+    "bear": { "...": "same keys" }
+  },
+  "scenario_narratives": { "base": "...", "bull": "...", "bear": "..." },
+  "probability_weighted": { "weights": {"bear": 0.25, "base": 0.5, "bull": 0.25},
+                            "weights_rationale": "..." },
+  "entry_price": { "hurdle_rate": 0.15 },
+  "valuation_philosophy": { "summary": "...", "key_risks_to_valuation": ["..."] },
+  "data_sources": { "price": "...", "financials": "...", "qualitative": "..." },
+
+  "reconciliation": {                  // UPDATES ONLY; the build fills new_version
+    "prior_version": {"valuation_date": "...", "price_then": 0, "bear": 0, "base": 0, "bull": 0, "weighted": 0},
+    "bridge": [{"item": "Prior weighted IV", "value": 0}, {"item": "...", "value": 0}]
+  }
+}
+```
+
+Only the canonical driver names above are accepted inside `assumptions.*` (plus
+`horizon_years`, `narrative`, `note(s)`, `rationale` and any `*_note` / `*_rationale` /
+`*_source` annotation). Everything else in the file passes through to the DCF JSON
+unchanged, so put your rationale, anchors and vintages where the template above puts
+them.
+
+**Every other route** (AFFO capitalisation, NAV/NTA, residual income, BVPS compounding,
+scenario/asset models, sum-of-parts with an embedded lender) still writes the DCF JSON
+directly in the shape below, filling the same top-level fields. **The dashboard re-runs
+the model from that JSON.** `scripts/build_dashboard.py` rebuilds the valuation in the
+page's sliders from `assumptions[scenario]` and validates it against
+`valuation[scenario].intrinsic_value` at build time (`slider engine: component base:ok
+bull:ok bear:ok`). For that to work every scenario must carry the component fields the
+engine reads — `growth_rates`, `ebitda_margin_path`, `sbc_pct_path`, `da_pct_path`,
+`capex_pct_path`, `wc_capture_pct`, `cash_tax_rate_path`, `wacc`, `terminal_growth`,
+`terminal_cap_multiple` — plus `projections[scenario].revenue` so the revenue base is
+recoverable, and any lease charge as `lease_cost_pct_path`. A build that prints
 `FALLBACK` means the numbers in the JSON were not produced by the assumptions you
 recorded — fix the JSON, do not ship it.
-
 
 Write to `./research/{ticker}/Reports/{TICKER}_DCF.json`:
 
@@ -425,9 +517,12 @@ of model:
 - [ ] Deliberately-unchanged assumptions stated as such, with what evidence would move them
 
 **Deliverables**
-- [ ] JSON output is valid and complete; all formulas use consistent units (millions
-      recommended)
+- [ ] Owner-FCF component route: `make build-dcf` ran clean (`engine check: base:ok
+      bull:ok bear:ok`); no hand-written JSON, model script or workbook
+- [ ] Other routes: JSON output is valid and complete; all formulas use consistent units
+      (millions recommended)
 - [ ] `probability_weighted.weighted_iv` is present and denominated in the **quote**
       currency (dual-currency tickers: see `scripts/canonical_iv.py`)
-- [ ] Workbook recalculates with zero formula errors and agrees with the JSON
+- [ ] Workbook present: generated by `build-dcf` on the component route; on other routes
+      it recalculates with zero formula errors and agrees with the JSON
 - [ ] The method file's own checklist completed
