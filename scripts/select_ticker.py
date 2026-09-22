@@ -91,28 +91,46 @@ def read_tickers(path: Path) -> list[str]:
     return out
 
 
-def never_interested() -> set[str]:
-    """Tickers state/never_interested.txt says to leave alone.
+def _ticker_file(path: Path) -> set[str]:
+    """Tickers named in a `TICKER  reason` file; comments and blanks skipped.
 
-    The screener has always honoured this file, but the selector did not, so
-    an excluded company still cost a full research run before being dropped at
-    ranking time. Read fresh on every call rather than cached at import: a
-    long-lived process must see a ticker added mid-run.
-
-    Format is `TICKER  reason`; comments and blank lines are skipped.
+    A missing file names nothing: no file is not an error, it is an empty
+    list. Read fresh on every call rather than cached at import, so a
+    long-lived process sees a ticker added mid-run.
     """
-    path = REPO_ROOT / "state" / "never_interested.txt"
     out: set[str] = set()
     try:
         text = path.read_text()
     except OSError:
-        return out          # no file excludes nothing
+        return out
     for raw in text.splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
         out.add(line.split()[0])
     return out
+
+
+def never_interested() -> set[str]:
+    """Tickers state/never_interested.txt says to leave alone.
+
+    The screener has always honoured this file, but the selector did not, so
+    an excluded company still cost a full research run before being dropped at
+    ranking time.
+    """
+    return _ticker_file(REPO_ROOT / "state" / "never_interested.txt")
+
+
+def deferred() -> set[str]:
+    """Tickers state/deferred.txt says to research AFTER the rest.
+
+    Written by screen_deferred.py (`make screen-deferred APPLY=1`) for
+    companies on a ridiculous P/E or carrying far too much debt. Unlike
+    never_interested this is an ordering, not an exclusion: pick_new reaches
+    them once every ordinary new ticker has been researched, and
+    `make run TICKER=X` ignores it entirely.
+    """
+    return _ticker_file(REPO_ROOT / "state" / "deferred.txt")
 
 
 def has_reports(ticker: str) -> bool:
@@ -162,13 +180,26 @@ def queue_sources() -> list[tuple[str, list[str]]]:
 
 
 def pick_new(exclude: Iterable[str] = ()) -> str | None:
+    """First unresearched queued ticker, deferred names last.
+
+    Two passes over the same sources: the first skips anything in
+    state/deferred.txt, the second takes the deferred ones in queue order. A
+    holding or watchlist name (the priority source) is never deferred --
+    whatever its numbers say, Stephen owns or is watching it.
+    """
     exclude = set(exclude) | never_interested()
-    for _, tickers in queue_sources():
-        for ticker in tickers:
-            if ticker in exclude:
-                continue
-            if not has_reports(ticker):
-                return ticker
+    later = deferred()
+    sources = queue_sources()
+    for skip_deferred in (True, False):
+        for name, tickers in sources:
+            exempt = name == PRIORITY_FILE
+            for ticker in tickers:
+                if ticker in exclude:
+                    continue
+                if skip_deferred and not exempt and ticker in later:
+                    continue
+                if not has_reports(ticker):
+                    return ticker
     return None
 
 

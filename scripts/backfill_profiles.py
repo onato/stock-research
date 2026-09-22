@@ -133,6 +133,12 @@ def parse_profile(page: str) -> dict[str, str]:
         return {}
     out = {"business_summary": " ".join(paras)[:2000]}
 
+    # The page embeds `sector:{value:"Materials",url:...}` for its own nav.
+    # merge_info always listed `sector`; this is what finally supplies it.
+    ms = re.search(r'sector:\{value:"([^"]{2,60})"', page)
+    if ms:
+        out["sector"] = html_mod.unescape(ms.group(1)).strip()
+
     # The h1 is the literal string "Company Description" on the live site, so
     # the name comes from <title>: "Ambev (ABEV) Company Profile & Description".
     for pat in (r"<title>([^<]{3,160})</title>",

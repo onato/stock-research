@@ -28,7 +28,7 @@ LEADERBOARD ?= 15   # rows shown by `make screen`
 .DEFAULT_GOAL := help
 .PHONY: help run digest status screen integrity missing prune-stubs standardize-scale research facts evals evals-all dashboard-spec \
         fix cost gaps exchange-eval facts-xbrl adjudicate fetch-asx fetch-filings dcf-context build-dcf check-dcf warehouse dashboard kpi-coverage screen-metrics check-currency ledger ledger-backfill queue-prune sanity-check \
-        screen-fundamentals backfill-units canonical-iv sync-portfolio commit-refreshed commit-scores \
+        screen-fundamentals backfill-units canonical-iv sync-portfolio commit-refreshed commit-scores screen-deferred screen-deferred-report \
         test test-country lint coverage typecheck
 
 help: ## Show this help
@@ -291,6 +291,18 @@ screen-ethics: ## Flag queued tickers on the six ethical exclusions (APPLY=1 to 
 
 screen-ethics-report: ## Summary of recorded ethical flags
 	@$(PY) $(SCRIPTS)/screen_ethics.py --report
+
+# The AFTERWARDS list. Ethics says never; this says later: a ridiculous P/E
+# or far too much debt sends a queued ticker behind every ordinary new one.
+# Paced like backfill-profiles (same host); overnight:
+#   scripts/backfill_profiles_loop.sh --script screen_deferred.py --until 0630
+screen-deferred: ## Defer queued tickers on P/E and debt (APPLY=1 to write; LIMIT=n; TICKER=x; MAX_AGE=days)
+	$(PY) $(SCRIPTS)/screen_deferred.py $(if $(TICKER),--ticker $(TICKER),) \
+	  $(if $(LIMIT),--limit $(LIMIT),) $(if $(MAX_AGE),--max-age $(MAX_AGE),) \
+	  $(if $(APPLY),--apply,$(if $(TICKER),,--dry-run))
+
+screen-deferred-report: ## The afterwards list and why each ticker is on it
+	@$(PY) $(SCRIPTS)/screen_deferred.py --report
 
 fix: ## Hand-correct a metric DB-first with provenance (TICKER= ARGS='--period FY2022 --set revenue=1' SOURCE='file:line' APPLY=1)
 	$(PY) $(SCRIPTS)/fix_metric.py $(TICKER) $(ARGS) --source "$(SOURCE)" $(if $(APPLY),--apply,)

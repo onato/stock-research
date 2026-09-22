@@ -20,6 +20,11 @@
 #   scripts/backfill_profiles_loop.sh --batch 50       # smaller batches
 #   scripts/backfill_profiles_loop.sh --until 0630     # stop at a wall time
 #   scripts/backfill_profiles_loop.sh --max-batches 4  # bounded
+#   scripts/backfill_profiles_loop.sh --script screen_deferred.py   # same crawl, other screen
+#
+# --script names any scripts/*.py with the same contract: --status prints
+# "remaining N", --limit N does a batch, --commit commits it, exit 3 means
+# rate-limited. screen_deferred.py is the other one today.
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -29,6 +34,7 @@ BATCH=100
 UNTIL=""
 MAX_BATCHES=0          # 0 = unbounded
 PAUSE=30               # between batches; a breather the host never asked for
+SCRIPT=backfill_profiles.py
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -36,6 +42,7 @@ while [ $# -gt 0 ]; do
     --until)       UNTIL="$2"; shift 2 ;;
     --max-batches) MAX_BATCHES="$2"; shift 2 ;;
     --pause)       PAUSE="$2"; shift 2 ;;
+    --script)      SCRIPT="$2"; shift 2 ;;
     -h|--help)     sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)             echo "unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -44,7 +51,7 @@ done
 EXIT_RATE_LIMITED=3
 n=0
 START="$(date '+%F %T')"
-echo "=== profile backfill loop started $START (batch $BATCH) ==="
+echo "=== $SCRIPT loop started $START (batch $BATCH) ==="
 
 while true; do
   # --until names a MORNING wall time, and an overnight run starts the evening
@@ -65,7 +72,7 @@ while true; do
   fi
 
   # How much is left? When nothing is, we are finished.
-  remaining="$(uv run python3 scripts/backfill_profiles.py --status 2>/dev/null \
+  remaining="$(uv run python3 "scripts/$SCRIPT" --status 2>/dev/null \
                 | awk '/remaining/ {for (i=1;i<=NF;i++) if ($i=="remaining") print $(i+1)}')"
   if [ -z "$remaining" ] || [ "$remaining" -eq 0 ] 2>/dev/null; then
     echo "=== queue exhausted after $n batch(es) ==="
@@ -74,7 +81,11 @@ while true; do
 
   n=$((n + 1))
   echo "--- batch $n ($remaining remaining) $(date '+%T') ---"
-  uv run python3 scripts/backfill_profiles.py --limit "$BATCH" --commit
+  # screen_deferred.py is a dry run unless told to write.
+  extra=""
+  [ "$SCRIPT" = "screen_deferred.py" ] && extra="--apply"
+  # shellcheck disable=SC2086
+  uv run python3 "scripts/$SCRIPT" --limit "$BATCH" --commit $extra
   rc=$?
 
   if [ "$rc" -eq "$EXIT_RATE_LIMITED" ]; then

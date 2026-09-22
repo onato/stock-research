@@ -13,7 +13,8 @@ half a dozen fake tickers.
 
 This applies the same policy to an explicit list, so both paths behave the
 same way. Ordering matches select_ticker's: unresearched first (in the order
-supplied), then researched-but-stale, oldest valuation first.
+supplied), then unresearched-but-deferred (state/deferred.txt), then
+researched-but-stale, oldest valuation first.
 
 Usage:
   filter_tickers.py [--limit N] [--stale-days N] [--force] TICKER...
@@ -81,6 +82,21 @@ def is_skipped(repo: pathlib.Path, ticker: str) -> bool:
         return False
 
 
+def is_deferred(repo: pathlib.Path, ticker: str) -> bool:
+    """True when the deferred screen flagged this ticker (info.json
+    `screen.defer` non-empty: a ridiculous P/E or far too much debt).
+
+    An ordering, not an exclusion -- see `eligible`. Malformed metadata never
+    defers, for the same reason it never skips.
+    """
+    path = repo / "research" / ticker / "info.json"
+    try:
+        screen = json.loads(path.read_text()).get("screen") or {}
+        return bool(screen.get("defer"))
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return False
+
+
 def age_days(repo: pathlib.Path, ticker: str) -> int | None:
     """How old this ticker's research is, or None if it has none.
 
@@ -130,6 +146,7 @@ def eligible(repo: pathlib.Path | str, tickers: list[str], *,
         clean.append(ticker)
 
     fresh: list[str] = []
+    deferred: list[str] = []
     stale: list[tuple[int, str]] = []
     for ticker in clean:
         # --force is a deliberate override, so it beats the skip flag too.
@@ -137,7 +154,13 @@ def eligible(repo: pathlib.Path | str, tickers: list[str], *,
             continue
         age = age_days(repo, ticker)
         if age is None:
-            fresh.append(ticker)          # never researched: highest priority
+            # Never researched: highest priority -- unless the deferred
+            # screen put it on the afterwards list, in which case it follows
+            # every ordinary new ticker. --force keeps the supplied order.
+            if not force and is_deferred(repo, ticker):
+                deferred.append(ticker)
+            else:
+                fresh.append(ticker)
         elif force or age >= stale_days:
             # --force is an explicit override, so it beats this gate too.
             if (require_new_filings and not force
@@ -147,7 +170,7 @@ def eligible(repo: pathlib.Path | str, tickers: list[str], *,
 
     # Oldest valuation first among refreshes; supplied order among new ones.
     stale.sort(key=lambda pair: (-pair[0], pair[1]))
-    out = fresh + [ticker for _, ticker in stale]
+    out = fresh + deferred + [ticker for _, ticker in stale]
     return out[:limit] if limit > 0 else out
 
 

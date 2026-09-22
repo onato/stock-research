@@ -479,3 +479,49 @@ class TestNeverInterestedIsSkipped:
         assert "LMT" not in got
         assert "BATS.L" not in got
         assert "DUOL" in got
+
+
+class TestDeferredComesLast:
+    """state/deferred.txt is an "afterwards" list, not an exclusion.
+
+    The deferred screen (screen_deferred.py) puts tickers with a ridiculous
+    P/E or far too much debt there. They are still researched -- after every
+    ordinary new ticker, before stale refreshes -- and a holding or watchlist
+    name is never deferred, whatever its numbers say.
+    """
+
+    def _defer(self, repo, body):
+        (repo / "state").mkdir(exist_ok=True)
+        (repo / "state" / "deferred.txt").write_text(body)
+
+    def test_pick_new_prefers_a_non_deferred_ticker(self, st_repo):
+        write_queue(st_repo, "q.txt", ["DEF", "NEW"])
+        self._defer(st_repo, "# GENERATED\nDEF  P/E 80.0\n")
+        assert st.pick_new() == "NEW"
+
+    def test_a_deferred_ticker_is_picked_once_the_rest_are_done(self, st_repo):
+        write_queue(st_repo, "q.txt", ["DEF", "NEW"])
+        self._defer(st_repo, "DEF  P/E 80.0\n")
+        assert st.pick_new(exclude={"NEW"}) == "DEF"
+
+    def test_deferred_new_comes_before_stale_refreshes(self, st_repo):
+        write_queue(st_repo, "q.txt", ["DEF", "NEW"])
+        self._defer(st_repo, "DEF  P/E 80.0\n")
+        give_dcf(st_repo, "STALE", "2020-01-01")
+        assert st.pick_batch(3) == ["NEW", "DEF", "STALE"]
+
+    def test_a_holding_is_never_deferred(self, st_repo):
+        write_queue(st_repo, "priority.txt", ["DEF  # held"])
+        write_queue(st_repo, "q.txt", ["NEW"])
+        self._defer(st_repo, "DEF  D/E 4.0x\n")
+        assert st.pick_new() == "DEF"
+
+    def test_a_missing_file_defers_nothing(self, st_repo):
+        write_queue(st_repo, "q.txt", ["DEF", "NEW"])
+        assert st.pick_new() == "DEF"
+
+    def test_never_interested_still_wins(self, st_repo):
+        write_queue(st_repo, "q.txt", ["DEF"])
+        self._defer(st_repo, "DEF  P/E 80.0\n")
+        (st_repo / "state" / "never_interested.txt").write_text("DEF  weapons\n")
+        assert st.pick_new() is None

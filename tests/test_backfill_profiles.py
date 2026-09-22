@@ -91,6 +91,18 @@ class TestParseProfile:
     def test_empty_page_yields_nothing_rather_than_junk(self):
         assert bp.parse_profile("<html><body></body></html>") == {}
 
+    def test_reads_the_sector_when_the_page_carries_one(self):
+        # merge_info always listed `sector`, but nothing ever extracted it;
+        # the ethical screen's SECTOR_PATTERNS and the deferred screen's
+        # financials exemption both read it.
+        page = self.PAGE.replace("</body>",
+            '<script>{sector:{value:"Consumer Staples",url:"stocks/sector/'
+            'consumer-staples"}}</script></body>')
+        assert bp.parse_profile(page)["sector"] == "Consumer Staples"
+
+    def test_no_sector_key_when_the_page_has_none(self):
+        assert "sector" not in bp.parse_profile(self.PAGE)
+
 
 class TestRateLimiting:
     """The pacing IS the feature; a fast run gets this machine blocked."""

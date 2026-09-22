@@ -133,6 +133,26 @@ years, which is what `periods.is_annual` exists to say. `export_csv.sort_key` de
 to `periods.sort_key` (an older token-loop version mis-sorted `Q# FY####`; fixed in
 1ff31759).
 
+## Queue Pre-Screens (before a ticker costs a research run)
+
+Two screens run over the *unresearched* queue, both record into
+`research/{T}/info.json`, and they answer different questions:
+
+- **`make screen-ethics`** says *never*: the six categories Stephen won't hold.
+  It only records (`ethics` block); promotion to `state/never_interested.txt` is a
+  human step because keyword false positives are systematic.
+- **`make screen-deferred`** says *later*: trailing P/E > 50, or for non-financials
+  D/E > 2x, net debt/EBITDA > 5x, or interest cover < 2x (loss-makers are not
+  deferred; banks/insurers/REITs are exempt from the debt rules). `APPLY=1` writes
+  the `screen` block and regenerates **`state/deferred.txt`** (generated, committed,
+  same `TICKER  reason` grammar as never_interested). The selector then orders
+  new → deferred-new → stale refreshes; holdings/watchlist are never deferred and
+  `make run TICKER=X` ignores the list. Missing data never defers.
+
+Both read stockanalysis.com (Yahoo 429s this machine), paced by
+`backfill_profiles.py`; run overnight with
+`scripts/backfill_profiles_loop.sh --script screen_deferred.py --until 0630`.
+
 ## Parser Architecture (open/closed)
 
 `scripts/build_facts.py` is only the CLI facade. Parsing lives in `scripts/parsers/`:

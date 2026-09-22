@@ -257,3 +257,41 @@ class TestCli:
     def test_nothing_eligible_prints_nothing(self, repo, monkeypatch, capsys):
         researched(repo, "DONE.NZ", days_old=0)
         assert self._run(monkeypatch, capsys, repo, "DONE.NZ") == []
+
+
+class TestDeferred:
+    """A ticker the deferred screen flagged is researched after the rest.
+
+    The flag lives in info.json (`screen.defer`, written by screen_deferred.py);
+    state/deferred.txt is derived from it. An explicit list gets the same
+    "afterwards" treatment the queue does: new, then deferred-new, then stale.
+    """
+
+    def _defer(self, repo, ticker, reasons=("P/E 80.0",)):
+        d = repo / "research" / ticker
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "info.json").write_text(json.dumps({"screen": {"defer": list(reasons)}}))
+
+    def test_deferred_sorts_after_new_and_before_stale(self, repo):
+        self._defer(repo, "DEF.NZ")
+        researched(repo, "STALE.NZ", days_old=200)
+        got = filter_tickers.eligible(repo, ["DEF.NZ", "STALE.NZ", "NEW.NZ"],
+                                      stale_days=45)
+        assert got == ["NEW.NZ", "DEF.NZ", "STALE.NZ"]
+
+    def test_an_empty_defer_list_is_not_a_deferral(self, repo):
+        self._defer(repo, "OK.NZ", reasons=())
+        assert filter_tickers.eligible(repo, ["OK.NZ", "NEW.NZ"]) == \
+            ["OK.NZ", "NEW.NZ"]
+
+    def test_force_keeps_the_supplied_order(self, repo):
+        self._defer(repo, "DEF.NZ")
+        assert filter_tickers.eligible(repo, ["DEF.NZ", "NEW.NZ"], force=True) == \
+            ["DEF.NZ", "NEW.NZ"]
+
+    def test_an_unparseable_info_json_does_not_defer(self, repo):
+        d = repo / "research" / "ODD.NZ"
+        d.mkdir(parents=True)
+        (d / "info.json").write_text("{not json")
+        assert filter_tickers.eligible(repo, ["ODD.NZ", "NEW.NZ"]) == \
+            ["ODD.NZ", "NEW.NZ"]
