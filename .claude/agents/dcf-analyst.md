@@ -293,6 +293,14 @@ millions of `inputs.currency`. `hurdle_rate` is a fraction.
 }
 ```
 
+**Do not quote the numeric price in prose.** `current_price` and `inputs.price_as_of`
+carry it; a sentence like "regularMarketPrice 29.765 at 03:48Z" in `data_sources.price`
+or a narrative goes stale the moment `refresh_price.py` moves the number, and the
+orchestrator then either hand-edits the generated JSON (lost on the next build) or
+leaves a `dcf_prose_price_stale` warning on the eval (8 of 12 tickers, 2026-09-22).
+Write "Yahoo Finance chart API at `inputs.price_as_of`; 52-week range 20.23-35.26"
+and let the fields carry the number.
+
 This contract is complete. Do not search the repo for documentation, fixtures or other
 tickers' Drivers files to learn it (APA.AX 2026-09-22: six turns of `grep -rl
 Drivers.json`, `ls tests/fixtures`, re-reading this prompt). If `make build-dcf`

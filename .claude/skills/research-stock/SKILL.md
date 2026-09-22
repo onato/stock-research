@@ -79,9 +79,21 @@ or when it exits 1 — on TPW.AX the scraper burned 31 turns, and on SMI.NZ 3.5
 minutes, doing by hand what this does in one call. US filers have no adapter here:
 they take the SEC XBRL route (Step 4).
 
-**If PDFs already exist:** Check the IR website for any NEW reports (quarters/years) published since last download. Only download missing reports.
+**Run `make fetch-filings` whether or not PDFs already exist.** It skips files that
+are present and only fills gaps, so it is free on a complete folder and is the only
+way to know the folder *is* complete. A ticker researched before the fetcher existed
+may hold a thin set (DTL.AX had 10 files, FY2019 on) — the fetcher found 15 more.
 
-**If no PDFs exist:** Download full history.
+**The filing set must be final before any agent is spawned.** Filings discovered after
+Step 5b has run cost a re-run of the parser, the qualitative analyst and the DCF
+analyst: DTL.AX (2026-09-22) ran all three twice and cost $14.46 against a $7.57
+mean. Step 5c checks the count; if it is thin, fix the set there, not after Step 8.
+
+**If PDFs already exist:** after the fetcher, check the IR website only for what it
+reports missing (a presentation, an oddly titled report).
+
+**If no PDFs exist:** the fetcher downloads the full history; use the ir-scraper only
+for what it could not reach.
 
 **IMPORTANT: Download as much historical data as available. Target 10 years for both annual AND quarterly data.**
 
@@ -213,9 +225,20 @@ python3 scripts/run_evals.py "$ARGUMENTS"
 ```
 
 This is a **gate, not a report**. Steps 6-8 cost real money (a full run is
-$3.50–$4.91), and every one of them is built on this CSV — a DCF computed
-from a broken extraction is expensive and worthless. Read the output before
+~$7.50), and every one of them is built on this CSV — a DCF computed from a
+broken extraction is expensive and worthless. Read the output before
 continuing.
+
+**Coverage first.** Before reading the eval, count the filings:
+
+```bash
+ls research/$ARGUMENTS/Extracted/ | grep -c Annual; ls research/$ARGUMENTS/Extracted/ | grep -c -E 'HalfYear|Quarterly'
+```
+
+Fewer than 8 annuals for a company listed that long means the set is thin: run
+`make fetch-filings TICKER=$ARGUMENTS` now (idempotent) and, if it adds files, re-run
+Step 4 and Step 5a before Step 5b. Do not proceed to the agents intending to "add
+history later" — every agent would have to run again.
 
 **Stop and fix the extraction if you see any of these:**
 
