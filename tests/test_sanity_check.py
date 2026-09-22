@@ -622,6 +622,7 @@ class TestNonFcfModels:
         ("NAV-per-unit compounding with exit price-to-NAV", "nav"),
         ("Book-value compounding (BVPS growth x exit Price/Book)", "book_value"),
         ("residual income on tangible book", "book_value"),
+        ("residual_income_on_tangible_book", "book_value"),
         ("discounted_distributable_earnings_at_cost_of_equity", "earnings_at_coe"),
         ("risked project-NPV, pre-revenue gold developer", "risked_npv"),
         ("asset_scenario_shell_value", "asset_waterfall"),

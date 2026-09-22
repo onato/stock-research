@@ -174,3 +174,150 @@ class TestStapledREITFundManagerSplitPromotion:
         make_db(patch_repo, "SYN",
                 ["GrossRentalIncome", "ManagementFeeIncome"])
         assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+
+
+class TestFinanceReceivablesPromotion:
+    """An integrated auto retailer's embedded loan book must reach the CSV.
+
+    Turners Automotive Group (TRA.NZ) bundles Auto Retail with a directly
+    originated consumer/commercial Finance book (Oxford Finance): gross
+    Finance Receivables grew 27% YoY to $566m in FY2026 on a new public
+    securitisation warehouse, the key driver behind the Finance segment.
+    It was absent from PROMOTE_KPIS despite 7 populated periods (FY2021
+    through H1 FY2026) sitting unreachable in the `kpis` table.
+    """
+
+    def test_finance_receivables_is_promoted(self, patch_repo):
+        make_db(patch_repo, "SYN", ["FinanceReceivables"])
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        assert schema.promote_header("FinanceReceivables") == "FinanceReceivables"
+
+
+class TestGeneralInsurerRatiosPromotion:
+    """A general insurer's health metrics live in `kpis`, not core_metrics.
+
+    Tower (TWR.NZ) reports combined operating ratio, BAU claims ratio and
+    management expense ratio every period -- the standard health metrics
+    for a general insurer -- plus gross written premium, net earned premium,
+    insurance service result, underlying profit after tax, large event
+    claims and its own diluted share count. None of the ten were reachable
+    from the CSV, so H1 FY2026's claims-ratio normalisation and large-event
+    spike (the story behind the profit decline) had no chart to sit in.
+    """
+
+    def test_insurer_kpis_are_promoted(self, patch_repo):
+        names = [
+            "GrossWrittenPremium", "CombinedOperatingRatio", "BAUClaimsRatio",
+            "ManagementExpenseRatio", "NetEarnedPremium", "InsuranceServiceResult",
+            "UnderlyingProfitAfterTax", "LargeEventClaims",
+            "DividendPerShareDeclared", "SharesDiluted",
+        ]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestTradeSaaSUnitEconomicsPromotion:
+    """A pre-profitability SaaS company's per-customer economics and
+    retention must reach the CSV.
+
+    TradeWindow (TWL.NZ) discloses segment-level average revenue per
+    customer for shippers and freight forwarders (both compounding 20%+
+    per period) and a customer retention rate that swung from 97% to 87%
+    to 89% across recent periods -- the core value-driver and churn-risk
+    story for a loss-making SaaS business. ShareIssuanceProceeds is the
+    financing counterpart: a serial-dilution history is a named risk.
+    None of the four were reachable from the CSV.
+    """
+
+    def test_saas_unit_economics_are_promoted(self, patch_repo):
+        names = [
+            "ARPCShippers", "ARPCFreightForwarders", "CustomerRetentionRate",
+            "ShareIssuanceProceeds",
+        ]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestRetailerOnlineAndSameStoreSalesPromotion:
+    """A bricks-and-mortar retailer's channel mix and like-for-like growth.
+
+    The Warehouse Group (WHS.NZ) discloses online sales as a percentage of
+    group sales and same-store (like-for-like) sales growth every interim
+    period -- the two numbers that separate genuine demand growth from the
+    store-count changes already visible in StoreCount. Both were absent
+    from PROMOTE_KPIS, so a shrinking store footprint (88 -> 85 stores)
+    had no accompanying like-for-like or online-mix chart to explain it.
+    """
+
+    def test_retail_unit_economics_are_promoted(self, patch_repo):
+        names = ["OnlineSalesPct", "SameStoreSalesGrowth"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestGentailerPromotion:
+    """A gentailer's generation output and retail customer accounts.
+
+    AGL Energy (AGL.AX) discloses electricity generation volume (GWh) --
+    declining as the coal fleet (Bayswater, Loy Yang A) retires toward its
+    2030-2035 closures -- and total customer services (retail energy/telco
+    accounts, in millions). Both were absent from PROMOTE_KPIS, so neither
+    reached the CSV despite seven and eight populated periods respectively.
+    """
+
+    def test_gentailer_operating_kpis_are_promoted(self, patch_repo):
+        names = ["GenerationVolume", "CustomerServices"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+
+
+class TestTestingLabSegmentAndUnderlyingPromotion:
+    """A testing/inspection group's two-segment split and non-IFRS measures.
+
+    ALS Limited (ALQ.AX) restructured from three reporting segments to two
+    -- Commodities (~39% of FY2026 revenue) and Life Sciences (~61%) -- so
+    the split is only available for FY2025/FY2026 and their half-years, not
+    comparable further back. Management and the qualitative analysis both
+    anchor on ALS's own non-IFRS "underlying" measures (e.g. "underlying
+    NPAT +25.8% to A$381.2m" in FY26), distinct from statutory NPAT/EBIT/
+    EBITDA/EPS. All six names were absent from PROMOTE_KPIS, so neither the
+    segment mix nor the statutory-vs-underlying gap could reach the CSV.
+    """
+
+    def test_segment_and_underlying_kpis_are_promoted(self, patch_repo):
+        names = ["SegmentRevenueCommodities", "SegmentRevenueLifeSciences",
+                  "UnderlyingEBIT", "UnderlyingEBITDA", "UnderlyingEPS",
+                  "UnderlyingNPAT"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestPackagingSegmentAndAdjustedMeasuresPromotion:
+    """A global packaging group's two-segment split and non-GAAP measures.
+
+    Amcor plc (AMC.AX) reports two reporting segments -- Flexibles and
+    Rigid Packaging -- and, after the Berry Global merger, GAAP results
+    depressed by integration/transaction costs make its own non-GAAP
+    Adjusted EBIT/EBITDA/Net Income/Free Cash Flow the figures management
+    and analysts actually anchor run-rate profitability on. All six names
+    were absent from PROMOTE_KPIS despite being populated in `kpis`.
+    """
+
+    def test_segment_and_adjusted_kpis_are_promoted(self, patch_repo):
+        names = ["SegmentRevenueFlexibles", "SegmentRevenueRigidPackaging",
+                  "AdjustedEBIT", "AdjustedEBITDA", "AdjustedNetIncome",
+                  "AdjustedFreeCashFlow"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n

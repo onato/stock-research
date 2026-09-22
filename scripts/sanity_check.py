@@ -129,7 +129,7 @@ MODEL_PATTERNS: list[tuple[str, str]] = [
     ("risked_npv", r"risked[- ]?(?:project[- ]?)?npv|pre[- ]revenue|resource ounces"),
     ("asset_waterfall", (r"waterfall|asset[- _]scenario|shell value|"
                          r"receivership|liquidation|creditor")),
-    ("book_value", (r"\bbvps\b|book[- _]value compounding|residual income|"
+    ("book_value", (r"\bbvps\b|book[- _]value compounding|residual[- _]income|"
                     r"price[- ]to[- ]book|\bp/b\b compounding")),
     ("nav", r"\bnav\b|\bnta\b|net asset value|net tangible asset"),
     ("earnings_at_coe", (r"cost[- _]of[- _]equity|distributable[- _]earnings|"

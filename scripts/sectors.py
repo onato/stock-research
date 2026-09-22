@@ -22,7 +22,8 @@ BUCKETS = ("reit", "lic_nav", "bank", "retirement_ora", "miner_prerevenue",
 _MODEL_RULES: list[tuple[str, str]] = [
     (r"\baffo\b|reit", "reit"),
     (r"\bnav\b|net asset value|net tangible assets per unit|nta[- ]based", "lic_nav"),
-    ((r"bvps|book[- ]value|residual income|earnings[_ -]based[_ -]cost[_ -]of[_ -]equity|"
+    ((r"bvps|book[_ -]value|tangible[_ -]book|residual[_ -]income|"
+      r"earnings[_ -]based[_ -]cost[_ -]of[_ -]equity|"
       r"distributable[_ -]earnings|dividend[_ -]discount"), "bank"),
     (r"risked|project[- ]npv", "miner_prerevenue"),
     (r"\bora\b|underlying profit.*(village|retirement)|retirement", "retirement_ora"),

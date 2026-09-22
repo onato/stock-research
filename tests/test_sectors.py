@@ -21,6 +21,7 @@ class TestModelLabelWins:
         assert sectors.bucket("", "Book-value compounding (BVPS growth x exit P/B)") == "bank"
         assert sectors.bucket("", "earnings_based_cost_of_equity") == "bank"
         assert sectors.bucket("", "discounted_distributable_earnings_at_cost_of_equity") == "bank"
+        assert sectors.bucket("", "residual_income_on_tangible_book") == "bank"
 
     def test_risked_project_npv_is_a_prerevenue_miner(self):
         assert sectors.bucket("Gold Mining / Exploration & Development", "risked-project-npv") == "miner_prerevenue"

@@ -98,8 +98,9 @@ def test_the_corpus_is_all_on_one_scale():
 # Companies that genuinely changed reporting currency mid-history. The break
 # is real data, not a defect: Ebos Group moved from NZD to AUD at FY2019 and
 # its revenue series is continuous across the change. Wise did the same
-# GBP -> USD in FY2024.
-CURRENCY_SWITCHERS = {"EBO.NZ", "WISE.L"}
+# GBP -> USD in FY2024. Appen (APX.AX) switched AUD -> USD effective 1 Jan
+# 2021, applied retrospectively in its own filings.
+CURRENCY_SWITCHERS = {"EBO.NZ", "WISE.L", "APX.AX"}
 
 
 @pytest.mark.slow

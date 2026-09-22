@@ -187,6 +187,76 @@ PROMOTE_KPIS: dict[str, str] = {
     "SubscriptionRevenue": "SubscriptionRevenue",
     "NetRevenueRetention": "NetRevenueRetention",
     "ChurnRate": "ChurnRate",
+    "CustomerRetentionRate": "CustomerRetentionRate",
+    # Segment-level average revenue per customer (TradeWindow, TWL.NZ):
+    # shippers and freight forwarders are priced and adopt modules
+    # differently, so a single blended ARPC would hide which segment is
+    # actually driving the per-customer expansion story.
+    "ARPCShippers": "ARPCShippers",
+    "ARPCFreightForwarders": "ARPCFreightForwarders",
+    # Cash raised from new share issuance in the period -- a financing
+    # figure, not an operating KPI, but load-bearing for a company whose
+    # dilution history is a named risk (TWL.NZ has raised via placement/SPP
+    # in nearly every year since IPO).
+    "ShareIssuanceProceeds": "ShareIssuanceProceeds",
+    # Segment revenue (WasteCo Group, WCO.NZ): three operating lines --
+    # waste collection, sweeping services, industrial cleaning -- reverse-
+    # listed into a shell in FY2023, so a single blended Revenue column
+    # hides which segment is driving growth (sweeping services roughly
+    # doubled FY2025->FY2026 while waste collection grew ~10%).
+    "WasteCollectionRevenue": "WasteCollectionRevenue",
+    "SweepingServicesRevenue": "SweepingServicesRevenue",
+    "IndustrialCleaningRevenue": "IndustrialCleaningRevenue",
+    # Testing/inspection two-segment split (ALS Limited, ALQ.AX): the group
+    # restructured from three reporting segments to two -- Commodities and
+    # Life Sciences -- so the split is only available for FY2025/FY2026 and
+    # their half-years. Underlying* are ALS's own non-IFRS measures that
+    # management and analysts anchor on, distinct from statutory NPAT/EBIT/
+    # EBITDA/EPS.
+    "SegmentRevenueCommodities": "SegmentRevenueCommodities",
+    "SegmentRevenueLifeSciences": "SegmentRevenueLifeSciences",
+    # Healthcare/Industrial two-segment split (Ansell Limited, ANN.AX): both
+    # segments grow revenue and expand EBIT margin at different rates, so a
+    # single blended Revenue/EBIT column hides which segment is driving the
+    # investment case.
+    "HealthcareRevenue": "HealthcareRevenue",
+    "IndustrialRevenue": "IndustrialRevenue",
+    "HealthcareEBIT": "HealthcareEBIT",
+    "IndustrialEBIT": "IndustrialEBIT",
+    "HealthcareEBITMargin": "HealthcareEBITMargin",
+    "IndustrialEBITMargin": "IndustrialEBITMargin",
+    "HealthcareOrganicGrowth": "HealthcareOrganicGrowth",
+    "IndustrialOrganicGrowth": "IndustrialOrganicGrowth",
+    "OrganicRevenueGrowth": "OrganicRevenueGrowth",
+    "AdjustedEBITMargin": "AdjustedEBITMargin",
+    "AdjustedEPS": "AdjustedEPS",
+    # Customer concentration (Appen Limited, APX.AX): top-5-customer share of
+    # revenue is a named high-severity business risk -- historically
+    # dependent on a handful of big-tech accounts, and the abrupt loss of
+    # Google's global services contract in FY2024 is the case study.
+    "TopFiveCustomerConcentration": "TopFiveCustomerConcentration",
+    "UnderlyingEBIT": "UnderlyingEBIT",
+    "UnderlyingEBITDA": "UnderlyingEBITDA",
+    "UnderlyingEPS": "UnderlyingEPS",
+    "UnderlyingNPAT": "UnderlyingNPAT",
+    # Order book / backlog (defense shipbuilder Austal Limited, ASB.AX):
+    # forward-revenue visibility for a company that books multi-year
+    # contracts -- material given competing takeover bids for its US
+    # shipyard turn on that pipeline. WithOptions includes unexercised
+    # contract options disclosed separately from the firm order book.
+    "OrderBook": "OrderBook",
+    "OrderBookWithOptions": "OrderBookWithOptions",
+    # Five-segment revenue split (Breville Group, BRG.AX): the FY report
+    # discloses revenue by APAC, Americas, EMEA, Global Product and
+    # Distribution rather than a single blended Revenue line, and the mix is
+    # shifting -- Americas overtook the rest of ROW combined by FY2026 while
+    # Distribution has been flat-to-declining -- so a single Revenue column
+    # hides which region is actually driving group growth.
+    "SegmentRevenueAPAC": "SegmentRevenueAPAC",
+    "SegmentRevenueAmericas": "SegmentRevenueAmericas",
+    "SegmentRevenueEMEA": "SegmentRevenueEMEA",
+    "SegmentRevenueGlobalProduct": "SegmentRevenueGlobalProduct",
+    "SegmentRevenueDistribution": "SegmentRevenueDistribution",
     # Property / financial sector staples
     "AFFO": "AFFO",
     "AISC": "AISC",                       # gold miners: all-in sustaining cost per oz
@@ -196,7 +266,101 @@ PROMOTE_KPIS: dict[str, str] = {
     "Occupancy": "Occupancy",
     "WALT": "WALT",
     "AUM": "AUM",
+    # A wealth manager's own named "Total AUM" figure (AMP.AX: Platforms,
+    # Superannuation & Investments, NZ Wealth Management) -- kept as its own
+    # column rather than aliased into the generic AUM above, mirroring the
+    # qualified-ARR pattern: a company's headline AUM series must not
+    # collapse with a segment or peer AUM figure reported alongside it.
+    "TotalAUM": "TotalAUM",
     "NetInterestMargin": "NetInterestMargin",
+    # Bank-quality core metrics (Westpac Banking Corporation, WBC.NZ): the
+    # metrics analysts actually judge a bank on -- net interest margin,
+    # capital adequacy, and return on (tangible) equity -- plus the income
+    # mix and per-share book value the residual-income-on-tangible-book DCF
+    # is anchored to. DividendPayoutRatio and SpecialDividendPerShare
+    # matter because FY2024 paid a 15c special dividend on top of the
+    # regular DPS series, which would otherwise look like a payout spike.
+    "NIM": "NIM",
+    "CET1Ratio": "CET1Ratio",
+    "ROE": "ROE",
+    "ROTE": "ROTE",
+    "BookValuePerShare": "BookValuePerShare",
+    "NetInterestIncome": "NetInterestIncome",
+    "NonInterestIncome": "NonInterestIncome",
+    "DividendPayoutRatio": "DividendPayoutRatio",
+    "SpecialDividendPerShare": "SpecialDividendPerShare",
+    # ANZ Group Holdings (ANZ.AX): the cash-earnings measure management
+    # guides to and is judged on (distinct from statutory NetIncome), the
+    # credit-cycle swing line (impairment charge/release), the balance-sheet
+    # growth pair (deposit funding vs the loan book it funds), and the cost
+    # line the cost-to-income ratio runs off.
+    "CashProfit": "CashProfit",
+    "CreditImpairmentCharge": "CreditImpairmentCharge",
+    "CustomerDeposits": "CustomerDeposits",
+    "NetLoansAndAdvances": "NetLoansAndAdvances",
+    "OperatingExpenses": "OperatingExpenses",
+    # Bendigo and Adelaide Bank (BEN.AX): the bank's own preferred profit
+    # measure (cash earnings, distinct from statutory NetIncome), the
+    # efficiency ratio it runs its cost base against, the credit-cycle swing
+    # line, the balance-sheet growth pair (deposit funding vs the loan book
+    # it funds), the statutory profitability ratio, and the two APRA
+    # regulatory-capital/liquidity ratios alongside CET1Ratio.
+    "CashEarnings": "CashEarnings",
+    "CostToIncomeRatio": "CostToIncomeRatio",
+    "CreditExpenses": "CreditExpenses",
+    "Deposits": "Deposits",
+    "NetLoans": "NetLoans",
+    "ReturnOnEquity": "ReturnOnEquity",
+    "RiskWeightedAssets": "RiskWeightedAssets",
+    "LiquidityCoverageRatio": "LiquidityCoverageRatio",
+    "NetStableFundingRatio": "NetStableFundingRatio",
+    # Bank of Queensland (BOQ.AX): the gross loan book and total deposit
+    # base -- the funding/lending pair the balance sheet runs on -- plus
+    # cash EPS, the per-share measure management and the DCF lean on given
+    # the FY2025 statutory/cash NPAT divergence (goodwill impairment).
+    "GrossLoansAndAdvances": "GrossLoansAndAdvances",
+    "TotalDeposits": "TotalDeposits",
+    "CashEPS": "CashEPS",
+    # An operating company's embedded consumer/commercial loan book (Turners
+    # Automotive Group's Oxford Finance) -- the size driving its Finance
+    # segment, distinct from a pure lender's balance sheet.
+    "FinanceReceivables": "FinanceReceivables",
+    # General insurer health metrics (Tower, TWR.NZ). Combined operating
+    # ratio (claims + management expense ratio, both as % of net earned
+    # premium) is the standard solvency/profitability read for a general
+    # insurer; BAU claims ratio strips large/one-off events out of the
+    # combined ratio so a spike from a single event (H1 FY2026's $18.5m of
+    # large event claims vs $3.0m H1 FY2025) doesn't read as underlying
+    # deterioration. Underlying profit after tax is the company's own
+    # headline measure, distinct from statutory NPAT.
+    "GrossWrittenPremium": "GrossWrittenPremium",
+    "NetEarnedPremium": "NetEarnedPremium",
+    "CombinedOperatingRatio": "CombinedOperatingRatio",
+    "BAUClaimsRatio": "BAUClaimsRatio",
+    "ManagementExpenseRatio": "ManagementExpenseRatio",
+    "InsuranceServiceResult": "InsuranceServiceResult",
+    # Pre-revenue JV lithium developer (Argosy Minerals, AGY.AX): Argosy
+    # cannot fund the Rincon project alone and holds it through an
+    # equal-board equity-accounted JV (Puna Mining S.A.), so the funding
+    # relationship -- cumulative advances made and the JV's carrying value
+    # -- is the balance-sheet story in place of revenue/margin, and the
+    # impairment/reversal swings on that carrying value (not operations)
+    # dominate reported net income.
+    "AdvancesToPunaMining": "AdvancesToPunaMining",
+    "JVInvestmentPunaMining": "JVInvestmentPunaMining",
+    "ExplorationAndEvaluationAssets": "ExplorationAndEvaluationAssets",
+    "ImpairmentExpense": "ImpairmentExpense",
+    "ImpairmentReversal": "ImpairmentReversal",
+    # Gentailer operating drivers (AGL Energy, AGL.AX): electricity
+    # generation volume (GWh) tracks the coal fleet's decline toward its
+    # 2030-2035 closures, and customer services (retail energy/telco
+    # accounts, millions) is the base the margin/churn story is built on.
+    "GenerationVolume": "GenerationVolume",
+    "CustomerServices": "CustomerServices",
+    "UnderlyingProfitAfterTax": "UnderlyingProfitAfterTax",
+    "LargeEventClaims": "LargeEventClaims",
+    "DividendPerShareDeclared": "DividendPerShareDeclared",
+    "SharesDiluted": "SharesDiluted",
     # Stapled REIT + external funds manager two-leg split (SPG.NZ): the
     # property owner's gross rental income versus the manager's fee
     # income earned on AUM it does not own. Consolidated Revenue blends
@@ -238,6 +402,14 @@ PROMOTE_KPIS: dict[str, str] = {
     # SKO.NZ's FY2026 revenue) it is the concentration risk itself.
     "TravelPlatformBookingRevenue": "TravelPlatformBookingRevenue",
     "ExpensePlatformRevenue": "ExpensePlatformRevenue",
+    # Residential land developer operating drivers (Winton Land, WIN.NZ):
+    # settled units is the core volume series behind Revenue, and the
+    # contracted pre-sale book is the forward-revenue-visibility signal --
+    # both collapsed alongside the NZ housing downturn (units 565->266 FY23-
+    # FY25; pre-sales $239.8m Dec-25 -> $27.4m Jun-26).
+    "SettledUnits": "SettledUnits",
+    "PreSaleBook": "PreSaleBook",
+    "AvgRevenuePerUnit": "AvgRevenuePerUnit",
     "SupplierCommissionsRevenue": "SupplierCommissionsRevenue",
     "ServicesRevenue": "ServicesRevenue",
     "OtherRevenue": "OtherRevenue",
@@ -283,6 +455,81 @@ PROMOTE_KPIS: dict[str, str] = {
     "ContainerCargoTonnes": "ContainerCargoTonnes",
     "ContainerVolumeTEU": "ContainerVolumeTEU",
     "NormalisedNPAT": "NormalisedNPAT",
+    # Cinema software vendor's SaaS transition and two-segment split
+    # (VGL.NZ). SaaS/Recurring/NonRecurring revenue is the company's own
+    # disclosure of the on-prem-license-to-cloud migration, and the
+    # Cinema/Film segment split is ~80/20 of FY2025 revenue -- neither is
+    # visible in the consolidated Revenue line. ContributionMargin is
+    # management's own operating-leverage measure below gross profit.
+    "SaaSRevenue": "SaaSRevenue",
+    "RecurringRevenue": "RecurringRevenue",
+    "NonRecurringRevenue": "NonRecurringRevenue",
+    "CinemaSegmentRevenue": "CinemaSegmentRevenue",
+    "FilmSegmentRevenue": "FilmSegmentRevenue",
+    "ContributionMargin": "ContributionMargin",
+    # Bricks-and-mortar retailer channel mix and like-for-like growth
+    # (The Warehouse Group, WHS.NZ). Online sales as a percentage of group
+    # sales and same-store sales growth are the two numbers that separate
+    # genuine demand growth from a changing store footprint (StoreCount
+    # fell 88 -> 85 over FY2024-FY2025).
+    "OnlineSalesPct": "OnlineSalesPct",
+    "SameStoreSalesGrowth": "SameStoreSalesGrowth",
+    # Global packaging group's two-segment split and non-GAAP measures
+    # (Amcor plc, AMC.AX). Flexibles and Rigid Packaging are the company's
+    # two reporting segments. After the Berry Global merger, GAAP EBIT/
+    # EBITDA/Net Income/FCF are depressed by integration and transaction
+    # costs, so management's own Adjusted measures -- not the statutory
+    # figures -- are what run-rate profitability is judged on.
+    "SegmentRevenueFlexibles": "SegmentRevenueFlexibles",
+    "SegmentRevenueRigidPackaging": "SegmentRevenueRigidPackaging",
+    "AdjustedEBIT": "AdjustedEBIT",
+    "AdjustedEBITDA": "AdjustedEBITDA",
+    "AdjustedNetIncome": "AdjustedNetIncome",
+    "AdjustedFreeCashFlow": "AdjustedFreeCashFlow",
+    # Stapled-security energy infrastructure operator (APA Group, APA.AX).
+    # DistributionPerSecurity and FreeCashFlowPerSecurity are the per-
+    # security cash measures income investors actually track, distinct
+    # from statutory EPS since APA distributes more than statutory
+    # earnings. NetIncomeExSignificant strips one-off gains/impairments
+    # (e.g. the H1 FY2024 $1,051m Goldfields Gas Pipeline remeasurement
+    # gain) that otherwise swamp statutory net income. RevenueExPassThrough
+    # excludes pass-through gas/electricity costs recovered dollar-for-
+    # dollar from customers. TotalDrawnDebt is APA's own gearing metric
+    # (nets deferred borrowing costs and FX), the figure it quotes for
+    # leverage rather than the raw balance-sheet borrowings field.
+    "DistributionPerSecurity": "DistributionPerSecurity",
+    "FreeCashFlowPerSecurity": "FreeCashFlowPerSecurity",
+    "NetIncomeExSignificant": "NetIncomeExSignificant",
+    "RevenueExPassThrough": "RevenueExPassThrough",
+    "TotalDrawnDebt": "TotalDrawnDebt",
+    # Market-infrastructure operator (ASX Limited, ASX.AX). The four
+    # reporting segments -- Listings, Markets, Securities & Payments, and
+    # Technology & Data -- are what the revenue mix story is told through,
+    # not a single blended Revenue line. TotalCashMarketTrades/Value,
+    # TotalFuturesContracts, NewListings and ListedEntities are ASX's own
+    # disclosed operating-activity volumes (Chairman's report/investor
+    # presentation), the throughput drivers behind the trading and listing
+    # fee lines -- not something derivable from the financial statements.
+    "SegmentRevenueListings": "SegmentRevenueListings",
+    "SegmentRevenueMarkets": "SegmentRevenueMarkets",
+    "SegmentRevenueSecuritiesPayments": "SegmentRevenueSecuritiesPayments",
+    "SegmentRevenueTechnologyData": "SegmentRevenueTechnologyData",
+    "TotalCashMarketTrades": "TotalCashMarketTrades",
+    "TotalCashMarketValue": "TotalCashMarketValue",
+    "TotalFuturesContracts": "TotalFuturesContracts",
+    "NewListings": "NewListings",
+    "ListedEntities": "ListedEntities",
+    # E&P reserve/production disclosures (Beach Energy, BPT.AX): a
+    # depleting-reserve producer's forward path is driven by these, not by
+    # the income statement -- 2P reserves nearly halved FY22->FY26 (283 ->
+    # 156 MMboe) while Production held roughly flat, which is exactly the
+    # divergence the reserve-life and contingent-resources columns exist to
+    # show alongside it.
+    "Production": "Production",
+    "Reserves2P": "Reserves2P",
+    "ContingentResources2C": "ContingentResources2C",
+    "ReserveLifeYears": "ReserveLifeYears",
+    "DividendsDeclaredPerShare": "DividendsDeclaredPerShare",
 }
 
 # Owner-FCF components and core-column duplicates. Listed explicitly so a
@@ -363,9 +610,29 @@ KPI_ALIASES: dict[str, str] = {
     "occupancy": "Occupancy",
     "walt": "WALT",
     "aum": "AUM",
+    "totalaum": "TotalAUM",
     "netinterestmargin": "NetInterestMargin",
     "grossrentalincome": "GrossRentalIncome",
     "managementfeeincome": "ManagementFeeIncome",
+    "cashprofit": "CashProfit",
+    "creditimpairmentcharge": "CreditImpairmentCharge",
+    "customerdeposits": "CustomerDeposits",
+    "netloansandadvances": "NetLoansAndAdvances",
+    "operatingexpenses": "OperatingExpenses",
+    "healthcarerevenue": "HealthcareRevenue",
+    "industrialrevenue": "IndustrialRevenue",
+    "healthcareebit": "HealthcareEBIT",
+    "industrialebit": "IndustrialEBIT",
+    "healthcareebitmargin": "HealthcareEBITMargin",
+    "industrialebitmargin": "IndustrialEBITMargin",
+    "healthcareorganicgrowth": "HealthcareOrganicGrowth",
+    "industrialorganicgrowth": "IndustrialOrganicGrowth",
+    "organicrevenuegrowth": "OrganicRevenueGrowth",
+    "adjustedebitmargin": "AdjustedEBITMargin",
+    "adjustedeps": "AdjustedEPS",
+    "grossloansandadvances": "GrossLoansAndAdvances",
+    "totaldeposits": "TotalDeposits",
+    "casheps": "CashEPS",
 }
 
 

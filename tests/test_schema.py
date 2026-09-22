@@ -112,6 +112,13 @@ class TestPromotableKpiVocabulary:
         assert schema.promote_header("ActiveCustomers") == "ActiveCustomers"
         assert schema.promote_header("MarketingExpense") == "MarketingExpense"
 
+    def test_promotes_order_book(self):
+        """Defense shipbuilder backlog (Austal Limited, ASB.AX): order book
+        is the forward-revenue-visibility metric for a company that books
+        multi-year contracts, distinct from in-period Revenue."""
+        assert schema.promote_header("OrderBook") == "OrderBook"
+        assert schema.promote_header("OrderBookWithOptions") == "OrderBookWithOptions"
+
     def test_unknown_kpi_name_is_not_promoted(self):
         """Opt-in, not opt-out: an unrecognised name stays out of the CSV."""
         assert schema.promote_header("WaferShipments") is None
@@ -245,6 +252,22 @@ class TestRedefinedKpiSeries:
         assert schema.promote_header("ARR") == "ARR"
 
 
+class TestTotalAUMPromotion:
+    """AMP.AX reports 'Total AUM' as its own named KPI, distinct from the
+    generic AUM alias -- a wealth manager's platform/super fee revenue is
+    driven off this exact figure, so it must land in its own CSV column
+    rather than being dropped as unmapped."""
+
+    def test_total_aum_promotes_to_its_own_column(self):
+        assert schema.promote_header("TotalAUM") == "TotalAUM"
+
+    def test_snake_case_total_aum_promotes(self):
+        assert schema.promote_header("total_aum") == "TotalAUM"
+
+    def test_total_aum_does_not_collapse_into_plain_aum(self):
+        assert schema.normalize_kpi("TotalAUM") != schema.normalize_kpi("AUM")
+
+
 class TestPeriodColumns:
     """core_metrics carries the parsed period beside the label, so SQL can
     order chronologically and pick annual rows without re-parsing strings
@@ -316,3 +339,69 @@ class TestPromotedMinerKpis:
         """All-in sustaining cost is the gold miner's comparability anchor;
         SMI.NZ's PFS figure was stored in kpis and never reached the CSV."""
         assert schema.promote_header("AISC") == "AISC"
+
+
+class TestPromotedBankBalanceSheetKpis:
+    """ANZ Group Holdings (ANZ.AX) disclosures the NIM/CET1/ROE bank-quality
+    columns don't cover: the cash-earnings measure management guides to, the
+    credit cycle (impairment charge), balance-sheet growth (deposits and net
+    loans), and the cost line the cost-to-income story runs off. All five sat
+    in `kpis` unmapped to any CSV column."""
+
+    def test_bank_balance_sheet_kpis_promote(self):
+        assert schema.promote_header("CashProfit") == "CashProfit"
+        assert schema.promote_header("CreditImpairmentCharge") == "CreditImpairmentCharge"
+        assert schema.promote_header("CustomerDeposits") == "CustomerDeposits"
+        assert schema.promote_header("NetLoansAndAdvances") == "NetLoansAndAdvances"
+        assert schema.promote_header("OperatingExpenses") == "OperatingExpenses"
+
+    def test_snake_case_bank_balance_sheet_kpis_promote(self):
+        assert schema.promote_header("credit_impairment_charge") == "CreditImpairmentCharge"
+        assert schema.promote_header("customer_deposits") == "CustomerDeposits"
+        assert schema.promote_header("net_loans_and_advances") == "NetLoansAndAdvances"
+
+
+class TestPromotedBoqLoanBookAndCashEpsKpis:
+    """Bank of Queensland (BOQ.AX): the gross loan book and total deposit
+    base -- the funding/lending pair a bank's balance sheet runs on, distinct
+    from the CustomerDeposits/NetLoansAndAdvances columns other banks already
+    populate -- plus cash EPS, the per-share measure management and the DCF
+    lean on given the FY2025 statutory/cash NPAT divergence (goodwill
+    impairment). All three sat in `kpis` unmapped to any CSV column."""
+
+    def test_boq_loan_book_and_cash_eps_kpis_promote(self):
+        assert schema.promote_header("GrossLoansAndAdvances") == "GrossLoansAndAdvances"
+        assert schema.promote_header("TotalDeposits") == "TotalDeposits"
+        assert schema.promote_header("CashEPS") == "CashEPS"
+
+    def test_snake_case_boq_loan_book_and_cash_eps_kpis_promote(self):
+        assert schema.promote_header("gross_loans_and_advances") == "GrossLoansAndAdvances"
+        assert schema.promote_header("total_deposits") == "TotalDeposits"
+        assert schema.promote_header("cash_eps") == "CashEPS"
+
+
+class TestPromotedAnsellSegmentKpis:
+    """Ansell Limited (ANN.AX) reports two segments -- Healthcare and
+    Industrial -- that grow revenue and expand EBIT margin at different
+    rates; a blended Revenue/EBIT column hides which segment drives the
+    investment case, so both segments' revenue, EBIT, EBIT margin and
+    organic growth need their own CSV columns."""
+
+    def test_segment_kpis_promote(self):
+        assert schema.promote_header("HealthcareRevenue") == "HealthcareRevenue"
+        assert schema.promote_header("IndustrialRevenue") == "IndustrialRevenue"
+        assert schema.promote_header("HealthcareEBIT") == "HealthcareEBIT"
+        assert schema.promote_header("IndustrialEBIT") == "IndustrialEBIT"
+        assert schema.promote_header("HealthcareEBITMargin") == "HealthcareEBITMargin"
+        assert schema.promote_header("IndustrialEBITMargin") == "IndustrialEBITMargin"
+        assert schema.promote_header("HealthcareOrganicGrowth") == "HealthcareOrganicGrowth"
+        assert schema.promote_header("IndustrialOrganicGrowth") == "IndustrialOrganicGrowth"
+
+    def test_group_level_kpis_promote(self):
+        assert schema.promote_header("OrganicRevenueGrowth") == "OrganicRevenueGrowth"
+        assert schema.promote_header("AdjustedEBITMargin") == "AdjustedEBITMargin"
+        assert schema.promote_header("AdjustedEPS") == "AdjustedEPS"
+
+    def test_snake_case_segment_kpis_promote(self):
+        assert schema.promote_header("healthcare_revenue") == "HealthcareRevenue"
+        assert schema.promote_header("industrial_ebit_margin") == "IndustrialEBITMargin"
