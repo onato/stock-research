@@ -190,8 +190,8 @@ def report(result: Result, criteria: Criteria) -> None:
         print("    (none)")
 
     if result.fy_basis:
-        print(f"\n  FY-BASIS ({len(result.fy_basis)}) -- no true TTM available; "
-              f"pass --allow-fy-basis to include\n")
+        print(f"\n  FY-BASIS ({len(result.fy_basis)}) -- latest year is stale (an interim is "
+              f"overdue) or year-end unknown; pass --allow-fy-basis to include\n")
         for row in result.fy_basis:
             print(_row_line(row))
 

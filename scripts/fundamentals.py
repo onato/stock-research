@@ -26,8 +26,10 @@ Every value that cannot be computed is None with a reason string attached, so
 the screener can say why a ticker dropped out instead of silently omitting it.
 """
 
+import datetime as dt
 import json
 import pathlib
+import re
 import sys
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -37,10 +39,19 @@ import periods
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
-TtmBasis = Literal["4Q", "FY+H1", "FY", "NONE"]
+# "FY-TTM" is a completed year that is the newest period with no interim yet
+# due: the trailing twelve months. "FY" is the same year once an interim
+# should have been filed -- stale, or not extracted -- and callers hold it back.
+TtmBasis = Literal["4Q", "FY+H1", "FY-TTM", "FY", "NONE"]
 
 # Ordered weakest-last: a ticker is only as trustworthy as its softest field.
-_BASIS_RANK: dict[str, int] = {"4Q": 0, "FY+H1": 1, "FY": 2, "NONE": 3}
+_BASIS_RANK: dict[str, int] = {"4Q": 0, "FY+H1": 1, "FY-TTM": 2, "FY": 3, "NONE": 4}
+
+# Months after the fiscal year-end by which the next interim should have been
+# reported: a half-year ends 6 months in and is filed ~3 months later; a first
+# quarter ends 3 months in and is filed ~6 weeks later.
+INTERIM_DUE_MONTHS = {"half": 9, "quarter": 4}
+INTERIM_DUE_EXTRA_DAYS = {"half": 0, "quarter": 15}
 
 # Money and count columns pulled from the view. Per-share and percentage
 # columns are deliberately absent -- see the `eps` note above.
@@ -204,11 +215,50 @@ def _prior_ttm(values: dict[str, float], basis: TtmBasis) -> float | None:
     Mixing a TTM numerator with an FY denominator fabricates growth, so the
     prior period must use the identical basis or the comparison is refused.
     """
+    want: TtmBasis = "FY" if basis == "FY-TTM" else basis
     _, current_basis, anchor = _ttm_resolved(values)
-    if anchor is None or basis == "NONE" or current_basis != basis:
+    if anchor is None or basis == "NONE" or current_basis != want:
         return None
-    value, _ = _ttm_at(values, anchor - 1, want=basis)
+    value, _ = _ttm_at(values, anchor - 1, want=want)
     return value
+
+
+def interim_due(fiscal_year: int, fiscal_year_end: str | None, quarterly: bool) -> dt.date | None:
+    """The date by which the first interim after fiscal `fiscal_year` should
+    have been filed, from info.json's MM-DD year-end; None if unparseable."""
+    m = re.fullmatch(r"\s*(\d{1,2})-(\d{1,2})\s*", fiscal_year_end or "")
+    if not m:
+        return None
+    try:
+        end = dt.date(fiscal_year, int(m.group(1)), int(m.group(2)))
+    except ValueError:
+        return None
+    kind = "quarter" if quarterly else "half"
+    months = end.month + INTERIM_DUE_MONTHS[kind]
+    year, month = end.year + (months - 1) // 12, (months - 1) % 12 + 1
+    target_last = _last_day(year, month)
+    # A year-end on the last day of its month stays a month-end (30 June -> 31 March).
+    day = target_last if end.day == _last_day(end.year, end.month) else min(end.day, target_last)
+    return dt.date(year, month, day) + dt.timedelta(days=INTERIM_DUE_EXTRA_DAYS[kind])
+
+
+def _last_day(year: int, month: int) -> int:
+    nxt = dt.date(year + (month == 12), month % 12 + 1, 1)
+    return (nxt - dt.timedelta(days=1)).day
+
+
+def _year_currency(values_by_key: dict[str, dict[str, float]], anchor: int, quarterly: bool,
+                   fiscal_year_end: str | None, today: dt.date, reasons: list[str]) -> bool:
+    """Is a completed FY `anchor` still the trailing twelve months today?"""
+    due = interim_due(anchor, fiscal_year_end, quarterly)
+    if due is None:
+        reasons.append("fy-end-unknown")
+        return False
+    if today > due:
+        label = f"Q1 FY{anchor + 1}" if quarterly else f"H1 FY{anchor + 1}"
+        reasons.append(f"interim-overdue:{label} expected by {due.isoformat()}")
+        return False
+    return True
 
 
 def _cagr(values: dict[str, float], years: int,
@@ -263,9 +313,13 @@ def _growth_rate_pct(dcf: dict[str, Any] | None) -> float | None:
 
 
 def compute(ticker: str, rows: list[dict[str, Any]],
-            dcf: dict[str, Any] | None = None) -> Fundamentals:
-    """Derive every screening field for one ticker."""
+            dcf: dict[str, Any] | None = None, fiscal_year_end: str | None = None,
+            today: dt.date | None = None) -> Fundamentals:
+    """Derive every screening field for one ticker. `fiscal_year_end` (MM-DD,
+    from info.json) and `today` decide whether a completed year that is the
+    newest period still counts as the trailing twelve months."""
     reasons: list[str] = []
+    today = today or dt.date.today()
 
     if not rows:
         return Fundamentals(ticker, reasons=("no-core-metrics",))
@@ -305,6 +359,17 @@ def compute(ticker: str, rows: list[dict[str, Any]],
     computed = [b for b in (rev_basis, ni_basis, fcf_basis) if b != "NONE"]
     basis: TtmBasis = (max(computed, key=lambda b: _BASIS_RANK[b])
                        if computed else "NONE")
+    if basis == "FY":
+        # The completed year is the newest period. Current until the next
+        # interim falls due; the data alone cannot tell "not yet filed" from
+        # "filed but not extracted", so the calendar decides.
+        anchor = max((a for a in (_ttm_resolved(v)[2] for v in (rev, ni, fcf)) if a is not None),
+                     default=None)
+        quarterly = any(p.startswith("Q") for p in rev | ni | fcf)
+        if anchor is not None and _year_currency({}, anchor, quarterly, fiscal_year_end, today, reasons):
+            basis = "FY-TTM"
+            rev_basis = "FY-TTM" if rev_basis == "FY" else rev_basis
+            ni_basis = "FY-TTM" if ni_basis == "FY" else ni_basis
 
     rev_cagr, rev_total = _cagr(rev, 5, reasons, "revenue")
     eps_cagr, eps_total = _cagr(ni, 5, reasons, "net_income")
@@ -416,9 +481,9 @@ def load_dcf(repo: pathlib.Path, ticker: str) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
-def load_all(repo: pathlib.Path) -> dict[str, tuple[list[dict[str, Any]], dict[str, Any] | None]]:
-    """{ticker: (metrics_m rows, DCF document or None)} for every researched
-    ticker in the warehouse."""
+def load_all(repo: pathlib.Path) -> dict[str, tuple[list[dict[str, Any]], dict[str, Any] | None, str | None]]:
+    """{ticker: (metrics_m rows, DCF document or None, fiscal year-end MM-DD)}
+    for every researched ticker in the warehouse."""
     import duckdb
 
     db = repo / WAREHOUSE
@@ -428,7 +493,7 @@ def load_all(repo: pathlib.Path) -> dict[str, tuple[list[dict[str, Any]], dict[s
     con = duckdb.connect(str(db), read_only=True)
     try:
         researched = con.execute(
-            "SELECT ticker FROM companies WHERE has_metrics OR has_dcf").fetchall()
+            "SELECT ticker, fiscal_year_end FROM companies WHERE has_metrics OR has_dcf").fetchall()
         metrics = con.execute(
             f"SELECT ticker, period, currency, {cols} FROM metrics_m ORDER BY ticker").fetchall()
         docs = con.execute("SELECT ticker, doc FROM dcf").fetchall()
@@ -437,10 +502,10 @@ def load_all(repo: pathlib.Path) -> dict[str, tuple[list[dict[str, Any]], dict[s
     names = ["period", "currency", *NUMERIC]
     # Every researched ticker gets an entry, so one with a DCF but no metrics
     # is reported as unscreenable rather than silently absent.
-    out: dict[str, tuple[list[dict[str, Any]], dict[str, Any] | None]] = {
-        t: ([], None) for (t,) in researched}
+    out: dict[str, tuple[list[dict[str, Any]], dict[str, Any] | None, str | None]] = {
+        t: ([], None, fye) for t, fye in researched}
     for ticker, *rest in metrics:
-        out.setdefault(ticker, ([], None))[0].append(dict(zip(names, rest, strict=True)))
+        out.setdefault(ticker, ([], None, None))[0].append(dict(zip(names, rest, strict=True)))
     for ticker, doc in docs:
         if ticker not in out:
             continue
@@ -448,20 +513,20 @@ def load_all(repo: pathlib.Path) -> dict[str, tuple[list[dict[str, Any]], dict[s
             data = json.loads(doc) if isinstance(doc, str) else None
         except ValueError:
             data = None
-        out[ticker] = (out[ticker][0], data if isinstance(data, dict) else None)
+        out[ticker] = (out[ticker][0], data if isinstance(data, dict) else None, out[ticker][2])
     return out
 
 
 def scan(repo: pathlib.Path | None = None, suffix: str | None = None,
-         tickers: set[str] | None = None) -> list[Fundamentals]:
+         tickers: set[str] | None = None, today: dt.date | None = None) -> list[Fundamentals]:
     """Derive fundamentals for every ticker with metrics in the warehouse,
     freshly each call."""
     root = repo or REPO
     out: list[Fundamentals] = []
-    for ticker, (rows, dcf) in sorted(load_all(root).items()):
+    for ticker, (rows, dcf, fye) in sorted(load_all(root).items()):
         if suffix and not ticker.endswith(suffix):
             continue
         if tickers and ticker not in tickers:
             continue
-        out.append(compute(ticker, rows, dcf))
+        out.append(compute(ticker, rows, dcf, fiscal_year_end=fye, today=today))
     return out

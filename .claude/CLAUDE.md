@@ -92,9 +92,13 @@ ticker caches and a fresh checkout screened nothing. Rules the derivations enfor
 
 - **TTM is reconstructed, not assumed.** NZX filers report half-yearly, so a TTM is
   `FY(Y-1) + H1(Y) − H1(Y-1)`, not a sum of four quarters. A completed `FY(Y)` beats
-  that reconstruction (which ends six months earlier) but is tagged `FY-BASIS` —
-  no interim confirms nothing has moved since — and excluded from PASS unless
-  `--allow-fy-basis`.
+  that reconstruction (which ends six months earlier) and counts as the trailing
+  twelve months (`FY-TTM`) **until the next interim falls due** — year-end + 9 months
+  for half-yearly reporters, + 4½ for quarterly, from `info.json`'s `fiscal_year_end`.
+  After that it is `FY-BASIS` with an `interim-overdue:` reason (stale, or the newer
+  filing was never extracted) and excluded from PASS unless `--allow-fy-basis`; an
+  unknown year-end is `FY-BASIS` too (`fy-end-unknown`). The data alone cannot tell
+  "not yet filed" from "filed but not extracted"; the calendar can.
 - **Prefer `ttm_net_income / shares_outstanding` over the `eps` column cross-ticker.**
   EPS is in major units on every ticker since 2026-09-08 (ten cents-printers were
   rescaled through `make fix`; SMI.NZ is derived on the restated share basis) and

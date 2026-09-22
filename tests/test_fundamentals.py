@@ -9,6 +9,8 @@ are built from real corpus shapes rather than round synthetic figures:
     in GBP pence against USD financials.
 """
 
+import datetime as dt
+
 import fundamentals
 import pytest
 
@@ -419,3 +421,63 @@ class TestTtmBasisIsTheWeakest:
             ("H1-2026", {"revenue": 275.2}),
         )
         assert fundamentals.compute("T", r, dcf=None).ttm_basis == "FY"
+
+
+class TestCompletedYearStaleness:
+    """A completed FY that is the newest period is the trailing twelve months
+    only until the next interim is due. The data cannot tell "nothing newer
+    has been filed" from "the newer filing was not extracted"; the calendar
+    can. June year-end, FY2026 filed: H1 FY2027 is due around March 2027.
+    """
+
+    ROWS = (
+        ("FY2025", {"revenue": 3179.0, "net_income": 129.0}),
+        ("H1 FY2025", {"revenue": 1621.0, "net_income": 34.0}),
+        ("H1 FY2026", {"revenue": 1614.0, "net_income": 95.0}),
+        ("FY2026", {"revenue": 2977.0, "net_income": 234.0}),
+    )
+
+    def test_before_the_interim_is_due_the_year_is_a_true_ttm(self):
+        f = fundamentals.compute("APA.AX", rows(*self.ROWS), dcf=None,
+                                 fiscal_year_end="06-30", today=dt.date(2026, 9, 22))
+        assert f.ttm_basis == "FY-TTM"
+        assert f.ttm_revenue == pytest.approx(2977.0)
+        # Prior period on the same basis: FY2025.
+        assert f.revenue_growth_1y == pytest.approx(2977.0 / 3179.0 - 1)
+        assert not any(r.startswith("interim-overdue") for r in f.reasons)
+
+    def test_once_the_interim_is_overdue_the_year_is_stale(self):
+        f = fundamentals.compute("APA.AX", rows(*self.ROWS), dcf=None,
+                                 fiscal_year_end="06-30", today=dt.date(2027, 4, 15))
+        assert f.ttm_basis == "FY"
+        assert "interim-overdue:H1 FY2027 expected by 2027-03-31" in f.reasons
+
+    def test_quarterly_reporters_expect_a_quarter_sooner(self):
+        r = rows(("FY2025", {"revenue": 100.0}), ("Q4 FY2025", {"revenue": 26.0}),
+                 ("Q1 FY2025", {"revenue": 24.0}), ("Q2 FY2025", {"revenue": 25.0}),
+                 ("Q3 FY2025", {"revenue": 25.0}))
+        f = fundamentals.compute("X", r, dcf=None, fiscal_year_end="12-31", today=dt.date(2026, 4, 1))
+        assert f.ttm_basis == "4Q"           # four quarters beat the year label
+        r2 = rows(("FY2025", {"revenue": 100.0}), ("Q3 FY2025", {"revenue": 25.0}))
+        soon = fundamentals.compute("X", r2, dcf=None, fiscal_year_end="12-31", today=dt.date(2026, 4, 1))
+        late = fundamentals.compute("X", r2, dcf=None, fiscal_year_end="12-31", today=dt.date(2026, 6, 15))
+        assert soon.ttm_basis == "FY-TTM"
+        assert late.ttm_basis == "FY"
+        assert "interim-overdue:Q1 FY2026 expected by 2026-05-15" in late.reasons
+
+    def test_unknown_year_end_stays_conservative(self):
+        f = fundamentals.compute("APA.AX", rows(*self.ROWS), dcf=None, today=dt.date(2026, 9, 22))
+        assert f.ttm_basis == "FY"
+        assert "fy-end-unknown" in f.reasons
+
+    def test_an_interim_after_the_year_is_untouched(self):
+        r = rows(*self.ROWS, ("H1 FY2027", {"revenue": 1700.0, "net_income": 100.0}))
+        f = fundamentals.compute("APA.AX", r, dcf=None, fiscal_year_end="06-30", today=dt.date(2027, 4, 15))
+        assert f.ttm_basis == "FY+H1"
+        assert f.ttm_revenue == pytest.approx(2977.0 + 1700.0 - 1614.0)
+
+    def test_due_date_helper(self):
+        due = fundamentals.interim_due
+        assert due(2026, "06-30", quarterly=False) == dt.date(2027, 3, 31)
+        assert due(2025, "12-31", quarterly=True) == dt.date(2026, 5, 15)
+        assert due(2026, "30 June", quarterly=False) is None

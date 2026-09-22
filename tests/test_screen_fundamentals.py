@@ -95,6 +95,11 @@ class TestUnscreenable:
 
 
 class TestFyBasis:
+    def test_a_current_completed_year_passes(self):
+        # FY-TTM: the year is the newest period and no interim is due yet.
+        rows = [fund("SKL.NZ", **{**PASSING, "ttm_basis": "FY-TTM"})]
+        assert [r.ticker for r in sf.select(rows, sf.Criteria(min_roe=0.15)).passed] == ["SKL.NZ"]
+
     def test_fy_basis_is_excluded_by_default(self):
         rows = [fund("TAH.NZ", **{**PASSING, "ttm_basis": "FY"})]
         result = sf.select(rows, sf.Criteria(min_roe=0.15))

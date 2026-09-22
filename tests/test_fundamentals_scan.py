@@ -23,7 +23,8 @@ def repo(tmp_path_factory):
     root = tmp_path_factory.mktemp("repo")
     apa = root / "research" / "APA.AX" / "Reports"
     apa.mkdir(parents=True)
-    (apa.parent / "info.json").write_text(json.dumps({"name": "APA Group", "sector": "Energy"}))
+    (apa.parent / "info.json").write_text(json.dumps({"name": "APA Group", "sector": "Energy",
+                                                        "fiscal_year_end": "06-30"}))
     drivers = json.loads((FIX / "dcf" / "APA_Drivers.json").read_text())
     (apa / "APA.AX_DCF.json").write_text(json.dumps(dcf_engine.build(drivers)))
     (apa / "APA.AX_Metrics.csv").write_text(
@@ -57,10 +58,23 @@ class TestScan:
         apa = rows["APA.AX"]
         assert apa.currency == "AUD"
         assert apa.ttm_revenue == pytest.approx(2977.0)
-        assert apa.ttm_basis == "TTM" or apa.ttm_basis == "FY"
+        assert apa.ttm_basis in ("FY", "FY-TTM")   # depends on the real date; pinned below
+
         assert apa.debt_to_equity == pytest.approx(14087 / 2699, rel=1e-3)
         # Price and growth proxy come from the DCF document held in the warehouse.
         assert apa.peg is not None
+
+    def test_fiscal_year_end_reaches_the_staleness_check(self, repo):
+        import datetime as dt
+        fresh = next(r for r in fundamentals.scan(repo, today=dt.date(2026, 9, 22)) if r.ticker == "APA.AX")
+        stale = next(r for r in fundamentals.scan(repo, today=dt.date(2027, 6, 1)) if r.ticker == "APA.AX")
+        assert fresh.ttm_basis == "FY-TTM"
+        assert stale.ttm_basis == "FY"
+        assert any(r.startswith("interim-overdue:H1 FY2027") for r in stale.reasons)
+        # KMD.NZ has no fiscal_year_end in info.json: conservative.
+        kmd = next(r for r in fundamentals.scan(repo, today=dt.date(2026, 9, 22)) if r.ticker == "KMD.NZ")
+        assert kmd.ttm_basis == "FY"
+        assert "fy-end-unknown" in kmd.reasons
 
     def test_thousands_are_scaled_to_millions(self, repo):
         kmd = next(r for r in fundamentals.scan(repo) if r.ticker == "KMD.NZ")
