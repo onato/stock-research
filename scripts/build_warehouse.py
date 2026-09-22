@@ -379,13 +379,15 @@ def build(root: pathlib.Path, out: pathlib.Path, research: pathlib.Path | None =
     for d in sorted(p for p in research.iterdir() if p.is_dir()):
         t = d.name
         info_p = d / "info.json"
-        if not info_p.exists():
+        rep = d / "Reports"
+        if not info_p.exists() and not rep.is_dir():
             continue
         try:
-            info = json.loads(info_p.read_text())
+            info = json.loads(info_p.read_text()) if info_p.exists() else {}
         except (json.JSONDecodeError, OSError):
             info = {}
-        rep = d / "Reports"
+        if not isinstance(info, dict):
+            info = {}
         files = {k: rep / f"{t}_{k}" for k in ("Metrics.csv", "DCF.json", "Drivers.json", "Analysis.json",
                                               "Prices.csv", "Corrections.jsonl")}
         have = {k: p.exists() for k, p in files.items()}

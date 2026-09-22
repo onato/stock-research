@@ -5,9 +5,11 @@ canonical schema, so the DuckDB reads, argument parsing and report rendering
 are exercised rather than mocked.
 """
 
+import csv
 import json
 
 import backfill_units
+import build_warehouse
 import duckdb
 import fundamentals
 import pytest
@@ -16,10 +18,12 @@ import screen_fundamentals as sf
 
 
 class _Repo:
-    """A temp repo root that can be given tickers backed by real DuckDBs.
+    """A temp repo root that can be given tickers backed by real DuckDBs and
+    the committed Metrics CSV the warehouse is built from.
 
     Behaves as the path itself for the `/` operator and str(), so tests can
-    pass it straight to --root.
+    pass it straight to --root. `add` rebuilds the warehouse, so a scan sees
+    every ticker added so far.
     """
 
     def __init__(self, root):
@@ -47,8 +51,16 @@ class _Repo:
                 f"INSERT INTO core_metrics ({', '.join(cols)}) "
                 f"VALUES ({', '.join('?' * len(cols))})", args)
         con.close()
+        headers = {n: h for n, _, h in schema.CORE_COLUMNS}
+        cols = sorted({c for _, vals in rows for c in vals})
+        with (reports / f"{ticker}_Metrics.csv").open("w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["Period", *[headers[c] for c in cols], "Units", "Currency"])
+            for period, vals in rows:
+                w.writerow([period, *[vals.get(c, "") for c in cols], units or "", currency])
         if dcf is not None:
             (reports / f"{ticker}_DCF.json").write_text(json.dumps(dcf))
+        build_warehouse.build(self.root, self.root / "state" / "research.duckdb")
         return reports
 
 
@@ -141,12 +153,18 @@ class TestScreenerCli:
         assert "HLG.NZ" in out
         assert "SEK.NZ" not in out
 
-    def test_an_unreadable_db_is_reported_not_fatal(self, repo, capsys):
-        reports = repo / "research" / "BROKEN.NZ" / "Reports"
+    def test_a_researched_ticker_without_metrics_is_reported_not_dropped(self, repo, capsys):
+        # A DCF but no Metrics CSV: the warehouse knows the ticker, the
+        # screen cannot evaluate it, and it must say so rather than vanish.
+        reports = repo / "research" / "NOCSV.NZ" / "Reports"
         reports.mkdir(parents=True)
-        (reports / "BROKEN.NZ.duckdb").write_text("not a database")
+        (reports / "NOCSV.NZ_DCF.json").write_text(json.dumps(HLG_DCF))
+        (reports.parent / "info.json").write_text("{}")
+        build_warehouse.build(repo.root, repo.root / "state" / "research.duckdb")
         assert sf.main(["--root", str(repo), "--min-roe", "0.15"]) == 1
-        assert "BROKEN.NZ" in capsys.readouterr().out
+        out = capsys.readouterr().out
+        assert "NOCSV.NZ" in out
+        assert "no-core-metrics" in out
 
 
 class TestScanIo:
@@ -160,6 +178,7 @@ class TestScanIo:
     def test_a_malformed_dcf_is_ignored_not_fatal(self, repo):
         reports = repo.add("HLG.NZ", HLG)
         (reports / "HLG.NZ_DCF.json").write_text("{not json")
+        build_warehouse.build(repo.root, repo.root / "state" / "research.duckdb")
         assert fundamentals.load_dcf(repo.root, "HLG.NZ") is None
         assert fundamentals.scan(repo.root)[0].ttm_revenue == pytest.approx(505.9)
 

@@ -50,6 +50,21 @@ class TestTtmFyPlusH1:
         assert basis == "FY"          # falls back, does not fabricate
         assert value == pytest.approx(12266.9)
 
+    def test_a_completed_year_beats_its_own_reconstruction(self):
+        """FY(Y-1) + H1(Y) - H1(Y-1) is the twelve months to H1(Y). Once FY(Y)
+        has been filed it is six months newer, and the reconstruction must
+        not be preferred to it (APA.AX 2026-09-22: 3,172 reported as TTM
+        revenue against a filed FY2026 of 2,977)."""
+        r = rows(
+            ("FY2025", {"revenue": 3179.0}),
+            ("H1 FY2025", {"revenue": 1621.0}),
+            ("H1 FY2026", {"revenue": 1614.0}),
+            ("FY2026", {"revenue": 2977.0}),
+        )
+        value, basis = fundamentals.ttm(r, "revenue")
+        assert value == pytest.approx(2977.0)
+        assert basis == "FY"
+
     def test_hyphen_and_space_spellings_reconcile(self):
         """`FY2025` + `H1-2026` - `H1-2025` must work like the FY spellings."""
         r = rows(
@@ -357,7 +372,8 @@ class TestGrowthOffANegativeBase:
             ("FY2024", {"net_income": 8.751}),
             ("H1 FY2024", {"net_income": 17.052}),
             ("H1 FY2025", {"net_income": 37.769}),
-            ("FY2025", {"net_income": 31.961}),
+            # No FY2025 yet: the H1-anchored reconstruction is the newest
+            # window (a filed FY2025 would supersede it, on the FY basis).
         )
         f = fundamentals.compute("SEK.NZ", r, dcf=None)
         # ttm = 8.751 + 37.769 - 17.052 = 29.468 (positive)

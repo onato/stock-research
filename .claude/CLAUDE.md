@@ -85,13 +85,16 @@ schema and rebuild, never migrate, and never write to the warehouse by hand.
 researched ticker on TTM, growth, ROE, D/E and PEG. It is a different question from
 `make screen`, which ranks by DCF upside from the `_DCF.json` files.
 
-Everything is derived fresh from `metrics_normalized` on each run; there is no cached
-screening table. Three rules the derivations exist to enforce:
+Everything is derived fresh on each run from the warehouse's `metrics_m` view and the
+`dcf` documents (`make screen-fundamentals` rebuilds `state/research.duckdb` first, ~2s),
+so the screen sees exactly what is committed; until 2026-09-22 it read the gitignored
+ticker caches and a fresh checkout screened nothing. Rules the derivations enforce:
 
 - **TTM is reconstructed, not assumed.** NZX filers report half-yearly, so a TTM is
-  `FY(Y-1) + H1(Y) − H1(Y-1)`, not a sum of four quarters. Where no true TTM is
-  available the row falls back to the latest FY and is tagged `FY-BASIS`, excluded
-  from PASS unless `--allow-fy-basis`.
+  `FY(Y-1) + H1(Y) − H1(Y-1)`, not a sum of four quarters. A completed `FY(Y)` beats
+  that reconstruction (which ends six months earlier) but is tagged `FY-BASIS` —
+  no interim confirms nothing has moved since — and excluded from PASS unless
+  `--allow-fy-basis`.
 - **Prefer `ttm_net_income / shares_outstanding` over the `eps` column cross-ticker.**
   EPS is in major units on every ticker since 2026-09-08 (ten cents-printers were
   rescaled through `make fix`; SMI.NZ is derived on the restated share basis) and

@@ -263,7 +263,7 @@ exchange-eval: ## Extraction coverage per exchange (free, no model calls)
 screen-metrics: ## Compare core metrics across tickers, normalized (PERIOD=FY2024)
 	$(PY) $(SCRIPTS)/screen_metrics.py --period $(or $(PERIOD),FY2024) $(if $(METRIC),--metric $(METRIC),)
 
-screen-fundamentals: ## Screen on TTM/growth/ROE/D-E/PEG (EXCHANGE=NZX ARGS="--min-roe 0.15")
+screen-fundamentals: warehouse ## Screen on TTM/growth/ROE/D-E/PEG (EXCHANGE=NZX ARGS="--min-roe 0.15")
 	$(PY) $(SCRIPTS)/screen_fundamentals.py $(if $(EXCHANGE),--exchange $(EXCHANGE),) \
 	  $(if $(SUFFIX),--suffix $(SUFFIX),) $(ARGS)
 

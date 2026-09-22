@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Derive comparable fundamentals for one ticker from its normalised metrics.
 
-Reads `metrics_normalized`, never `core_metrics`: the view is the only surface
-where money columns share a scale. Tickers are opened one database at a time
-and unioned client-side, because the view references `core_metrics` unqualified
-and ATTACHing several catalogs makes that name ambiguous (see schema.py).
+Reads the warehouse's `metrics_m` view (state/research.duckdb, `make
+warehouse`), never a raw table: the view is the only surface where money
+columns share a scale. The warehouse is built from the committed Metrics CSVs
+and DCF JSONs, so the screen sees exactly what is committed -- until
+2026-09-22 it opened every ticker's gitignored cache DB instead, and a fresh
+checkout screened nothing.
 
 Three corpus hazards shape the arithmetic here, all of which produce plausible
 wrong answers rather than obvious ones:
@@ -115,42 +117,54 @@ def _latest_year(values: dict[str, float]) -> int | None:
     return max(years) if years else None
 
 
-def _ttm_at(values: dict[str, float], year: int) -> tuple[float | None, TtmBasis]:
-    """Trailing twelve months ending in fiscal `year`, by the strongest path."""
-    # 1. Four quarters of the year, or the trailing four across its boundary.
+def _ttm_paths(values: dict[str, float], year: int) -> list[tuple[float, TtmBasis]]:
+    """Every way to build the trailing twelve months ending in fiscal `year`,
+    strongest first: four quarters; the completed year (the twelve months to
+    year-end, newer than a reconstruction that ends at its own H1 -- but tagged
+    FY, since no interim confirms nothing has moved since); FY(Y-1) + H1(Y)
+    - H1(Y-1) for half-yearly reporters."""
+    out: list[tuple[float, TtmBasis]] = []
     quarters = [values.get(f"Q{i} FY{year}") for i in (1, 2, 3, 4)]
     if all(q is not None for q in quarters):
-        return sum(q for q in quarters if q is not None), "4Q"
+        out.append((sum(q for q in quarters if q is not None), "4Q"))
+    else:
+        present = [i for i in (1, 2, 3, 4) if values.get(f"Q{i} FY{year}") is not None]
+        if present:
+            # Walk back from the newest quarter, allowing a year rollover, and
+            # require four consecutive quarters with no hole.
+            window: list[float] = []
+            qi, yr = max(present), year
+            while len(window) < 4:
+                v = values.get(f"Q{qi} FY{yr}")
+                if v is None:
+                    break
+                window.append(v)
+                qi -= 1
+                if qi == 0:
+                    qi, yr = 4, yr - 1
+            if len(window) == 4:
+                out.append((sum(window), "4Q"))
 
-    present = [i for i in (1, 2, 3, 4) if values.get(f"Q{i} FY{year}") is not None]
-    if present:
-        # Walk back from the newest quarter, allowing a year rollover, and
-        # require four consecutive quarters with no hole.
-        window: list[float] = []
-        qi, yr = max(present), year
-        while len(window) < 4:
-            v = values.get(f"Q{qi} FY{yr}")
-            if v is None:
-                break
-            window.append(v)
-            qi -= 1
-            if qi == 0:
-                qi, yr = 4, yr - 1
-        if len(window) == 4:
-            return sum(window), "4Q"
+    full = values.get(f"FY{year}")
+    if full is not None:
+        out.append((full, "FY"))
 
-    # 2. Half-yearly reporters: FY(Y-1) + H1(Y) - H1(Y-1).
     prior_fy = values.get(f"FY{year - 1}")
     this_h1 = values.get(f"H1 FY{year}")
     prior_h1 = values.get(f"H1 FY{year - 1}")
     if prior_fy is not None and this_h1 is not None and prior_h1 is not None:
-        return prior_fy + this_h1 - prior_h1, "FY+H1"
+        out.append((prior_fy + this_h1 - prior_h1, "FY+H1"))
+    return out
 
-    # 3. The latest full year, which is not a TTM -- callers must tag it.
-    full = values.get(f"FY{year}")
-    if full is not None:
-        return full, "FY"
 
+def _ttm_at(values: dict[str, float], year: int,
+            want: TtmBasis | None = None) -> tuple[float | None, TtmBasis]:
+    """Trailing twelve months ending in fiscal `year` by the strongest path,
+    or by the one path `want` names (a prior-period comparison must use the
+    same basis as the current one)."""
+    for value, basis in _ttm_paths(values, year):
+        if want is None or basis == want:
+            return value, basis
     return None, "NONE"
 
 
@@ -193,8 +207,8 @@ def _prior_ttm(values: dict[str, float], basis: TtmBasis) -> float | None:
     _, current_basis, anchor = _ttm_resolved(values)
     if anchor is None or basis == "NONE" or current_basis != basis:
         return None
-    value, prior_basis = _ttm_at(values, anchor - 1)
-    return value if prior_basis == basis else None
+    value, _ = _ttm_at(values, anchor - 1, want=basis)
+    return value
 
 
 def _cagr(values: dict[str, float], years: int,
@@ -386,28 +400,12 @@ def to_major_unit(price: float, quote_currency: str | None) -> tuple[float, str 
     return price / divisor, major
 
 
-def load_rows(db: pathlib.Path) -> list[dict[str, Any]]:
-    """Read metrics_normalized from one ticker database, read-only."""
-    import duckdb
-
-    cols = ", ".join(NUMERIC)
-    con = duckdb.connect(str(db), read_only=True)
-    try:
-        res = con.execute(
-            f"SELECT period, currency, {cols} FROM metrics_normalized").fetchall()
-    finally:
-        con.close()
-    names = ["period", "currency", *NUMERIC]
-    return [dict(zip(names, r, strict=True)) for r in res]
+WAREHOUSE = pathlib.Path("state") / "research.duckdb"
 
 
 def load_dcf(repo: pathlib.Path, ticker: str) -> dict[str, Any] | None:
-    """The ticker's DCF, or None if absent or unreadable.
-
-    A malformed DCF must not abort a whole-corpus scan, so a parse failure is
-    the same as a missing file: the ticker simply loses its price and growth
-    proxy and says so in its reasons.
-    """
+    """The ticker's DCF file, or None if absent or unreadable (backfill_units
+    reads the file directly; the screen reads the warehouse's copy)."""
     path = repo / "research" / ticker / "Reports" / f"{ticker}_DCF.json"
     if not path.exists():
         return None
@@ -418,21 +416,52 @@ def load_dcf(repo: pathlib.Path, ticker: str) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
+def load_all(repo: pathlib.Path) -> dict[str, tuple[list[dict[str, Any]], dict[str, Any] | None]]:
+    """{ticker: (metrics_m rows, DCF document or None)} for every researched
+    ticker in the warehouse."""
+    import duckdb
+
+    db = repo / WAREHOUSE
+    if not db.exists():
+        raise FileNotFoundError(f"{db} does not exist: run `make warehouse` first")
+    cols = ", ".join(NUMERIC)
+    con = duckdb.connect(str(db), read_only=True)
+    try:
+        researched = con.execute(
+            "SELECT ticker FROM companies WHERE has_metrics OR has_dcf").fetchall()
+        metrics = con.execute(
+            f"SELECT ticker, period, currency, {cols} FROM metrics_m ORDER BY ticker").fetchall()
+        docs = con.execute("SELECT ticker, doc FROM dcf").fetchall()
+    finally:
+        con.close()
+    names = ["period", "currency", *NUMERIC]
+    # Every researched ticker gets an entry, so one with a DCF but no metrics
+    # is reported as unscreenable rather than silently absent.
+    out: dict[str, tuple[list[dict[str, Any]], dict[str, Any] | None]] = {
+        t: ([], None) for (t,) in researched}
+    for ticker, *rest in metrics:
+        out.setdefault(ticker, ([], None))[0].append(dict(zip(names, rest, strict=True)))
+    for ticker, doc in docs:
+        if ticker not in out:
+            continue
+        try:
+            data = json.loads(doc) if isinstance(doc, str) else None
+        except ValueError:
+            data = None
+        out[ticker] = (out[ticker][0], data if isinstance(data, dict) else None)
+    return out
+
+
 def scan(repo: pathlib.Path | None = None, suffix: str | None = None,
          tickers: set[str] | None = None) -> list[Fundamentals]:
-    """Derive fundamentals for every researched ticker, freshly each call."""
+    """Derive fundamentals for every ticker with metrics in the warehouse,
+    freshly each call."""
     root = repo or REPO
     out: list[Fundamentals] = []
-    for db in sorted(root.glob("research/*/Reports/*.duckdb")):
-        ticker = db.parent.parent.name
+    for ticker, (rows, dcf) in sorted(load_all(root).items()):
         if suffix and not ticker.endswith(suffix):
             continue
         if tickers and ticker not in tickers:
             continue
-        try:
-            rows = load_rows(db)
-        except Exception as exc:  # a corrupt or view-less DB must not kill the run
-            out.append(Fundamentals(ticker, reasons=(f"db-unreadable:{type(exc).__name__}",)))
-            continue
-        out.append(compute(ticker, rows, load_dcf(root, ticker)))
+        out.append(compute(ticker, rows, dcf))
     return out
