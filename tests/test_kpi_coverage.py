@@ -373,3 +373,21 @@ class TestPoolingCapitalEfficiencyPromotion:
         assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
         for n in names:
             assert schema.promote_header(n) == n
+
+
+class TestPropertyDeveloperVolumePromotion:
+    """A residential developer's settlement-based volume measures.
+
+    Cedar Woods Properties (CWP.AX) recognises revenue on settlement, not
+    accrual, so lot/unit sales, settlements and the presold-but-not-yet-
+    settled dollar book (Presales) are the forward indicators management
+    and the market watch. All three were absent from PROMOTE_KPIS despite
+    being populated in `kpis`.
+    """
+
+    def test_developer_volume_kpis_are_promoted(self, patch_repo):
+        names = ["NetSalesLots", "Presales", "Settlements"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n

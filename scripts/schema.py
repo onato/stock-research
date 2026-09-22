@@ -559,6 +559,20 @@ PROMOTE_KPIS: dict[str, str] = {
     "Despatches_CoatedProductsAmericas": "Despatches_CoatedProductsAmericas",
     "NetProfitAttributable": "NetProfitAttributable",
     "UnderlyingEBITROIC": "UnderlyingEBITROIC",
+    # Residential land/property developer volume measures (Cedar Woods
+    # Properties, CWP.AX): unlike a REIT this business recognises revenue on
+    # settlement, not accrual, so lot/unit counts and the presold-but-not-
+    # yet-settled dollar book are the forward indicators management and the
+    # market watch -- Presales ($830m at 30 June 2026) is the single biggest
+    # forward-revenue-coverage number in the FY26 result.
+    "NetSalesLots": "NetSalesLots",
+    "Presales": "Presales",
+    "Settlements": "Settlements",
+    # REIT net tangible assets per security (Dexus, DXS.AX and similar):
+    # the traded price's discount/premium to NTA per security is the
+    # valuation anchor for stapled property trusts, reported every
+    # half-year alongside the interim/annual result.
+    "NetTangibleAssetsPerSecurity": "NetTangibleAssetsPerSecurity",
 }
 
 # Owner-FCF components and core-column duplicates. Listed explicitly so a
