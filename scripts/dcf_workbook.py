@@ -14,11 +14,22 @@ required-return table and the WACC x g grid in closed form.
 Rates are stored as PERCENTS (as in the JSON) and divided by 100 in the
 formulas. Text cells never begin with '=' and sheet names carry no spaces:
 LibreOffice's headless recalc, which the tests run, fails on either.
+
+openpyxl writes formulas without cached values, so a freshly written book is
+blank in every previewer (Finder Quick Look, GitHub, mail clients) until a
+spreadsheet recalculates it. `recalc()` runs LibreOffice headless over the
+file in place when it is installed, which caches every value and keeps the
+formulas; `build_dcf` calls it after every write. Model_Info also carries
+the methodology, data sources and scenario narratives (pitfalls.md 12): the
+reader of the .xlsx never opens the JSON.
 """
 
 from __future__ import annotations
 
 import pathlib
+import shutil
+import subprocess
+import tempfile
 from typing import Any
 
 import openpyxl
@@ -51,6 +62,57 @@ def _kv(ws: Worksheet, rows: list[tuple[str, Any]], start: int = 1) -> None:
         ws.cell(row=start + i, column=2, value=v)
 
 
+def _text(v: Any) -> str | None:
+    """A JSON block as one readable cell: dicts as 'key: value' lines, lists
+    joined with '; '. Never starts with '=' (LibreOffice would parse it)."""
+    if v is None:
+        return None
+    if isinstance(v, dict):
+        out = "\n".join(f"{k}: {_text(x)}" for k, x in v.items())
+    elif isinstance(v, list):
+        out = "; ".join(str(_text(x)) for x in v)
+    else:
+        out = str(v)
+    return ("'" + out) if out.startswith("=") else out
+
+
+def _provenance_rows(dcf: dict[str, Any]) -> list[tuple[str, Any]]:
+    rows: list[tuple[str, Any]] = []
+    if dcf.get("valuation_philosophy") is not None:
+        rows.append(("Methodology", _text(dcf["valuation_philosophy"])))
+    if dcf.get("wacc_rationale") is not None:
+        rows.append(("WACC rationale", _text(dcf["wacc_rationale"])))
+    if dcf.get("data_sources") is not None:
+        rows.append(("Data sources", _text(dcf["data_sources"])))
+    raw = dcf.get("scenario_narratives")
+    narratives: dict[str, Any] = raw if isinstance(raw, dict) else {}
+    assumptions: dict[str, Any] = dcf.get("assumptions") or {}
+    for sc in SCENARIOS:
+        text = narratives.get(sc) or (assumptions.get(sc) or {}).get("narrative")
+        if text:
+            rows.append((f"Scenario narrative: {sc}", _text(text)))
+    return rows
+
+
+def recalc(path: pathlib.Path, timeout: int = 180) -> bool:
+    """Recalculate the workbook in place with LibreOffice headless so every
+    formula carries a cached value. Returns False (file untouched) when
+    LibreOffice is not installed or the conversion fails."""
+    if shutil.which("soffice") is None:
+        return False
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            subprocess.run(["soffice", "--headless", "--convert-to", "xlsx", "--outdir", tmp, str(path)],
+                           check=True, capture_output=True, timeout=timeout)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
+            return False
+        out = pathlib.Path(tmp) / path.name
+        if not out.exists():
+            return False
+        shutil.copyfile(out, path)
+    return True
+
+
 def _model_info(ws: Worksheet, dcf: dict[str, Any]) -> None:
     inputs = dcf.get("inputs", {})
     eng = dcf.get("engine", {})
@@ -64,9 +126,10 @@ def _model_info(ws: Worksheet, dcf: dict[str, Any]) -> None:
         ("Built at", eng.get("built_at")), ("Drivers file", eng.get("drivers")),
         ("Convention", ("Percents stored as percents; formulas divide by 100. Blue = input, "
                         "green = link, black = formula.")),
+        *_provenance_rows(dcf),
     ])
-    ws.column_dimensions["A"].width = 22
-    ws.column_dimensions["B"].width = 80
+    ws.column_dimensions["A"].width = 26
+    ws.column_dimensions["B"].width = 100
 
 
 def _reconciliation(ws: Worksheet, rec: dict[str, Any]) -> None:

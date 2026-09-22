@@ -85,10 +85,12 @@ def build(ticker: str) -> int:
     out_json.write_text(json.dumps(dcf, indent=2, ensure_ascii=False) + "\n")
     out_xlsx = dcf_workbook.write(dcf, reports / f"{ticker}_DCF_Model.xlsx",
                                   history=annual_history(reports / f"{ticker}_Metrics.csv"))
+    recalculated = dcf_workbook.recalc(out_xlsx)
 
     v, pw, ep = dcf["valuation"], dcf["probability_weighted"], dcf["entry_price"]
     quote = dcf["inputs"].get("quote_currency") or dcf["inputs"].get("currency") or ""
-    print(f"{ticker}: {out_json.name} + {out_xlsx.name}")
+    print(f"{ticker}: {out_json.name} + {out_xlsx.name}"
+          + ("" if recalculated else "  (values not cached: LibreOffice recalc unavailable)"))
     for sc in SCENARIO_ORDER:
         print(f"  {sc} {v[sc]['intrinsic_value']} {quote} (street {v[sc]['street_intrinsic_value']}, "
               f"TV {v[sc]['terminal_value_bound']}, entry {ep[sc]['entry_price']})")

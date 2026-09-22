@@ -138,3 +138,48 @@ class TestRecalc:
         assert got["Weighted 15% hurdle entry price"] == pytest.approx(dcf["entry_price"]["weighted_entry_price"], abs=0.01)
         assert got["Value per share at 15%"] == pytest.approx(dcf["entry_price"]["base"]["entry_price"], abs=0.01)
         assert got["Value per share at 10%"] == pytest.approx(dcf["required_return_table"]["value_per_share"][2], abs=0.01)
+
+
+class TestProvenance:
+    """pitfalls.md 12: no workbook ships without methodology, sources and the
+    scenario narratives -- the reader of the .xlsx never sees the JSON."""
+
+    def _rows(self, book):
+        ws = book["Model_Info"]
+        return {str(ws.cell(row=r, column=1).value): ws.cell(row=r, column=2).value
+                for r in range(1, ws.max_row + 1) if ws.cell(row=r, column=1).value}
+
+    def test_model_info_carries_the_scenario_narratives(self, book):
+        got = self._rows(book)
+        assert "FY27 lands at the guidance midpoint" in got["Scenario narrative: base"]
+        assert got["Scenario narrative: bear"]
+        assert got["Scenario narrative: bull"]
+
+    def test_model_info_carries_methodology_and_sources(self, book):
+        got = self._rows(book)
+        assert isinstance(got["Methodology"], str)
+        assert len(got["Methodology"]) > 10
+        assert isinstance(got["Data sources"], str)
+        assert len(got["Data sources"]) > 10
+
+    def test_provenance_rows_never_begin_with_equals(self, book):
+        for k, v in self._rows(book).items():
+            assert not str(v).startswith("="), k
+
+
+class TestRecalcHelper:
+    def test_recalc_is_a_noop_without_libreoffice(self, book_path, tmp_path, monkeypatch):
+        p = tmp_path / book_path.name
+        shutil.copy(book_path, p)
+        monkeypatch.setattr(shutil, "which", lambda name: None)
+        assert dcf_workbook.recalc(p) is False
+
+    @pytest.mark.skipif(shutil.which("soffice") is None, reason="LibreOffice not installed")
+    def test_recalc_caches_values_and_keeps_formulas(self, book_path, tmp_path, dcf):
+        p = tmp_path / book_path.name
+        shutil.copy(book_path, p)
+        assert openpyxl.load_workbook(p, data_only=True)["DCF_Base"]["B38"].value is None
+        assert dcf_workbook.recalc(p) is True
+        cached = openpyxl.load_workbook(p, data_only=True)["DCF_Base"]["B38"].value
+        assert cached == pytest.approx(dcf["valuation"]["base"]["intrinsic_value"], abs=0.01)
+        assert str(openpyxl.load_workbook(p)["DCF_Base"]["B38"].value).startswith("=")

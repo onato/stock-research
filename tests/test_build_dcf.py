@@ -103,3 +103,11 @@ class TestDashboardGate:
         assert status is not None
         assert {sc: status[sc]["ok"] for sc in ("base", "bull", "bear")} == {"base": True, "bull": True, "bear": True}
         assert status["base"]["family"] == "component"
+
+
+class TestRecalc:
+    def test_build_recalculates_the_workbook_it_wrote(self, repo, monkeypatch):
+        calls = []
+        monkeypatch.setattr(build_dcf.dcf_workbook, "recalc", lambda p: calls.append(p) or True)
+        assert build_dcf.main(["APA.AX"]) == 0
+        assert calls == [repo / "research" / "APA.AX" / "Reports" / "APA.AX_DCF_Model.xlsx"]
