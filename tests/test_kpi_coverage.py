@@ -321,3 +321,55 @@ class TestPackagingSegmentAndAdjustedMeasuresPromotion:
         assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
         for n in names:
             assert schema.promote_header(n) == n
+
+
+class TestSteelmakerSegmentAndDespatchPromotion:
+    """A diversified steelmaker's five-segment EBIT and volume split.
+
+    BlueScope Steel (BSL.AX) reports five segments -- Australian Steel
+    Products, North Star BlueScope (US), New Zealand & Pacific Steel,
+    Building Products Asia/NA and Coated Products Americas -- with North
+    Star now the largest single EBIT contributor, only disclosed for
+    FY2025/FY2026. Despatch volumes (kt) are the segments' own throughput
+    measure. NetProfitAttributable excludes the ~10-15% non-controlling
+    interest that NetIncome includes, and UnderlyingEBITROIC is BlueScope's
+    own return-on-invested-capital measure. All eleven names were absent
+    from PROMOTE_KPIS despite being populated in `kpis`.
+    """
+
+    def test_segment_and_despatch_kpis_are_promoted(self, patch_repo):
+        names = ["SegmentEBIT_AustralianSteelProducts",
+                 "SegmentEBIT_NorthStarBlueScope",
+                 "SegmentEBIT_NewZealandPacificSteel",
+                 "SegmentEBIT_BuildingProductsAsiaNA",
+                 "SegmentEBIT_CoatedProductsAmericas",
+                 "Despatches_AustralianSteelProducts",
+                 "Despatches_NorthStarBlueScope",
+                 "Despatches_BuildingProductsAsiaNA",
+                 "Despatches_CoatedProductsAmericas",
+                 "NetProfitAttributable", "UnderlyingEBITROIC"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestPoolingCapitalEfficiencyPromotion:
+    """A pallet/crate/container pooling group's headline capital measures.
+
+    Brambles Limited (BXB.AX) reports Return on Capital Invested (ROCI) as
+    its own headline capital-efficiency KPI, measured against Average
+    Capital Invested (the pooling equipment plus working capital base), and
+    discloses the Irrecoverable Pooling Equipment Provision (IPEP) -- its
+    distinctive pallet/crate loss charge -- as a separate expense line. All
+    three names were absent from PROMOTE_KPIS despite being populated in
+    `kpis`.
+    """
+
+    def test_pooling_kpis_are_promoted(self, patch_repo):
+        names = ["ReturnOnCapitalInvested", "AverageCapitalInvested",
+                  "IPEPExpense"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n

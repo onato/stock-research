@@ -378,6 +378,15 @@ PROMOTE_KPIS: dict[str, str] = {
     "UnderlyingProfit": "UnderlyingProfit",
     "NPAT": "NPAT",
     "NetAssets": "NetAssets",
+    # Pallet/crate/container pooling group capital-efficiency measures
+    # (Brambles Limited, BXB.AX): Return on Capital Invested (ROCI) is the
+    # company's own headline KPI, measured against Average Capital Invested
+    # (the pooling equipment plus working-capital base); the Irrecoverable
+    # Pooling Equipment Provision (IPEP) is Brambles' distinctive
+    # pallet/crate loss charge, disclosed separately from depreciation.
+    "ReturnOnCapitalInvested": "ReturnOnCapitalInvested",
+    "AverageCapitalInvested": "AverageCapitalInvested",
+    "IPEPExpense": "IPEPExpense",
     "CareFeesAndVillageServices": "CareFeesAndVillageServices",
     "DeferredManagementFees": "DeferredManagementFees",
     "NewSalesORA": "NewSalesORA",
@@ -530,6 +539,26 @@ PROMOTE_KPIS: dict[str, str] = {
     "ContingentResources2C": "ContingentResources2C",
     "ReserveLifeYears": "ReserveLifeYears",
     "DividendsDeclaredPerShare": "DividendsDeclaredPerShare",
+    # Diversified steel manufacturer (BlueScope Steel, BSL.AX): five
+    # reporting segments -- Australian Steel Products, North Star BlueScope
+    # (US), New Zealand & Pacific Steel, Building Products Asia/NA and
+    # Coated Products Americas -- with North Star now the largest single
+    # EBIT contributor. Only disclosed for FY2025/FY2026 so far. Despatch
+    # volumes (kt) are the segments' own throughput measure, distinct from
+    # the dollar revenue line. NetProfitAttributable excludes the ~10-15%
+    # non-controlling interest that NetIncome includes; UnderlyingEBITROIC
+    # is BlueScope's own return-on-invested-capital measure.
+    "SegmentEBIT_AustralianSteelProducts": "SegmentEBIT_AustralianSteelProducts",
+    "SegmentEBIT_NorthStarBlueScope": "SegmentEBIT_NorthStarBlueScope",
+    "SegmentEBIT_NewZealandPacificSteel": "SegmentEBIT_NewZealandPacificSteel",
+    "SegmentEBIT_BuildingProductsAsiaNA": "SegmentEBIT_BuildingProductsAsiaNA",
+    "SegmentEBIT_CoatedProductsAmericas": "SegmentEBIT_CoatedProductsAmericas",
+    "Despatches_AustralianSteelProducts": "Despatches_AustralianSteelProducts",
+    "Despatches_NorthStarBlueScope": "Despatches_NorthStarBlueScope",
+    "Despatches_BuildingProductsAsiaNA": "Despatches_BuildingProductsAsiaNA",
+    "Despatches_CoatedProductsAmericas": "Despatches_CoatedProductsAmericas",
+    "NetProfitAttributable": "NetProfitAttributable",
+    "UnderlyingEBITROIC": "UnderlyingEBITROIC",
 }
 
 # Owner-FCF components and core-column duplicates. Listed explicitly so a
