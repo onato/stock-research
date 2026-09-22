@@ -6,12 +6,17 @@
 Sections: the live price (Yahoo, with its timestamp and 52-week range), the
 ticker's memory line (the model decision, if one was made before), the
 history pivot from metrics_normalized (millions of the reporting currency),
-the kpis table, and the owner-FCF component lines grepped from the annual
+the kpis table, the owner-FCF component lines grepped from the annual
 filings with file:line pointers -- interest income, lease principal, SBC,
-buybacks, D&A, capex, tax paid, diluted shares, dividends, NCI.
+buybacks, D&A, capex, tax paid, shares (on issue, weighted, diluted),
+dividends, NCI, underlying earnings, net debt and its parts -- and the
+outlook/guidance paragraphs of the latest annual, interim and presentation.
 
 The agent used to spend half its turns rediscovering these; the numbers
-themselves are still its call (units, which line is the right one).
+themselves are still its call (units, which line is the right one). The
+component list is what the dcf-analyst was measured grepping for (TPW.AX
+2026-08-26, then the .AX batch of 2026-09-21: nine filing greps and five
+sed windows per run, 72k chars back, all on the latest annual).
 """
 
 from __future__ import annotations
@@ -41,18 +46,46 @@ COMPONENTS: list[tuple[str, re.Pattern[str]]] = [
     ("lease_principal", re.compile(r"^\s*(?:payment of |repayment of )?(?:the )?principal (?:portion|elements?) of lease"
                                    r"|^\s*repayments? of lease liabilit", re.IGNORECASE)),
     ("lease_interest", re.compile(r"^\s*interest (?:on|paid on) lease liabilit", re.IGNORECASE)),
-    ("sbc", re.compile(r"^\s*(?:equity-settled |cash-settled )?share-based payments?(?: expense| transactions)?\b"
-                       r"|^\s*stock-based compensation", re.IGNORECASE)),
+    ("sbc", re.compile(r"^\s*(?:equity[- ]settled |cash[- ]settled )?(?:share|security|securities)-based payments?"
+                       r"(?: expense| transactions)?\b|^\s*stock-based compensation", re.IGNORECASE)),
     ("buybacks", re.compile(r"^\s*(?:payments? for )?(?:share|shares|stock) (?:buy-?back|repurchase)"
                             r"|^\s*repurchases? of (?:common|ordinary) (?:stock|shares)|^\s*purchase of treasury", re.IGNORECASE)),
     ("depreciation_amortisation", re.compile(r"^\s*(?:total )?depreciation and amorti[sz]ation\b", re.IGNORECASE)),
     ("capex_ppe", re.compile(r"^\s*(?:payments? for|purchases? of) (?:property, plant|plant and equipment)", re.IGNORECASE)),
     ("capex_intangibles", re.compile(r"^\s*(?:payments? for|purchases? of) intangible", re.IGNORECASE)),
     ("income_tax_paid", re.compile(r"^\s*income tax(?:es)? paid\b", re.IGNORECASE)),
-    ("dividends_paid", re.compile(r"^\s*dividends? paid\b", re.IGNORECASE)),
-    ("diluted_shares", re.compile(r"^\s*weighted average number of (?:ordinary )?shares.*diluted", re.IGNORECASE)),
+    ("dividends_paid", re.compile(r"^\s*(?:dividends?|distributions?) paid\b", re.IGNORECASE)),
+    ("dps", re.compile(r"^\s*(?:dividends?|distributions?) per (?:ordinary )?(?:share|security)\b", re.IGNORECASE)),
+    # Diluted before basic: the basic pattern matches the diluted line too.
+    ("diluted_shares", re.compile(r"^\s*weighted average number of (?:ordinary )?(?:shares|securities).*diluted", re.IGNORECASE)),
+    ("weighted_avg_shares", re.compile(r"^\s*weighted average number of (?:ordinary )?(?:shares|securities)\b", re.IGNORECASE)),
+    ("shares_on_issue", re.compile(r"^\s*(?:number of )?(?:ordinary )?(?:shares|securities) on issue\b"
+                                   r"|^\s*number of (?:ordinary )?(?:shares|securities)\b", re.IGNORECASE)),
     ("nci", re.compile(r"^\s*non-controlling interests?\b", re.IGNORECASE)),
+    ("underlying_earnings", re.compile(r"^\s*underlying (?:ebitda|ebit|npat|net profit|profit|earnings)\b", re.IGNORECASE)),
+    ("significant_items", re.compile(r"^\s*significant items\b", re.IGNORECASE)),
+    ("net_debt", re.compile(r"^\s*(?:total )?net debt\b", re.IGNORECASE)),
+    ("borrowings", re.compile(r"^\s*(?:total )?(?:borrowings|interest[- ]bearing (?:liabilities|loans and borrowings|debt)|bank loans)\b", re.IGNORECASE)),
+    ("lease_liabilities", re.compile(r"^\s*(?:total )?lease liabilities\b", re.IGNORECASE)),
+    ("interest_paid", re.compile(r"^\s*(?:interest|finance costs?) paid\b|^\s*net finance costs?\b", re.IGNORECASE)),
+    ("income_tax_expense", re.compile(r"^\s*income tax (?:expense|benefit)\b|^\s*effective (?:income )?tax rate\b", re.IGNORECASE)),
 ]
+PER_COMPONENT_PER_FILE = 3      # three lines per component per file is plenty
+
+# Guidance: a window of lines around an outlook/guidance mention that also
+# names a fiscal period and a figure. Climate-report "Guidance" and
+# credit-rating "outlook Stable" carry neither.
+GUIDANCE_KEY_RE = re.compile(r"\b(?:guidance|outlook)\b", re.IGNORECASE)
+# Period tokens with the year in a group: FY27, FY2027, fiscal 2027, 1H27,
+# H1 FY27, 2027. Two-digit years are 20xx.
+GUIDANCE_PERIOD_RE = re.compile(r"\bFY ?(\d{4}|\d{2})\b|\bfiscal (?:year )?(20\d\d)\b"
+                                r"|\b(?:1H|2H|H1|H2) ?(?:FY ?)?(\d{4}|\d{2})\b|\b(20[2-3]\d)\b")
+GUIDANCE_FIGURE_RE = re.compile(r"[$€£¥]\s?[\d,]+|\d[\d,]*(?:\.\d+)?\s?(?:million|billion|m\b|bn\b|cents|%|per cent)", re.IGNORECASE)
+NOISE_LINE_RE = re.compile(r"^\s*for personal use only\s*$|annual report\b.*\d+\s*$", re.IGNORECASE)
+GUIDANCE_BEFORE, GUIDANCE_AFTER = 2, 8
+GUIDANCE_HORIZON = 3            # years ahead; 2030/2050 targets are not guidance
+MAX_GUIDANCE_WINDOWS = 8
+MAX_GUIDANCE_LINES = 24
 NUM_RE = re.compile(r"\(?-?\d[\d,]*(?:\.\d+)?\)?")
 NOTE_REF_RE = re.compile(r"\(?\s*(?:refer(?:s)? to )?notes?\s+\d+[a-z]?\s*\)?", re.IGNORECASE)
 
@@ -105,6 +138,73 @@ def grep_components(text: str) -> list[Hit]:
                 hits.append(Hit(name, i, re.sub(r"\s{2,}", "  ", ln.strip()), nums))
             break
     return hits
+
+
+@dataclass(frozen=True)
+class Window:
+    line_no: int
+    text: str
+
+
+def _years(text: str) -> set[int]:
+    out = set()
+    for m in GUIDANCE_PERIOD_RE.finditer(text):
+        tok = next(g for g in m.groups() if g)
+        out.add(int(tok) if len(tok) == 4 else 2000 + int(tok))
+    return out
+
+
+def grep_guidance(text: str, after_year: int | None = None) -> list[Window]:
+    """Outlook/guidance paragraphs, as the agent read them with sed after
+    grepping. Overlapping windows merge, so a heading followed by the
+    guidance sentence and the distribution sentence is one paragraph.
+
+    Guidance names a period one to three years after the one being
+    reported, so with the filing's fiscal year known, "in line with guidance"
+    about the year just closed is dropped (on APA.AX FY2026 such
+    retrospective mentions filled the window cap before the Outlook section
+    was reached), and so is a 2030 emissions target (BHP.AX, AD.AS: ~11k
+    chars of sustainability prose each)."""
+    lines = text.split("\n")
+    spans: list[list[int]] = []
+    for i, ln in enumerate(lines):
+        if not GUIDANCE_KEY_RE.search(ln):
+            continue
+        lo, hi = max(0, i - GUIDANCE_BEFORE), min(len(lines), i + GUIDANCE_AFTER + 1)
+        if spans and lo <= spans[-1][1]:
+            spans[-1][1] = min(hi, spans[-1][0] + MAX_GUIDANCE_LINES)
+        else:
+            spans.append([lo, hi])
+    out: list[Window] = []
+    for lo, hi in spans:
+        kept = [re.sub(r"\s{2,}", "  ", x.strip()) for x in lines[lo:hi]
+                if x.strip() and not NOISE_LINE_RE.search(x)]
+        body = "\n".join(kept)
+        years = _years(body)
+        forward = years if after_year is None else {
+            y for y in years if after_year < y <= after_year + GUIDANCE_HORIZON}
+        if forward and GUIDANCE_FIGURE_RE.search(body):
+            out.append(Window(lo + 1, body))
+        if len(out) >= MAX_GUIDANCE_WINDOWS:
+            break
+    return out
+
+
+def _file_period(path: pathlib.Path) -> str:
+    return path.stem.rsplit("_", 1)[-1]
+
+
+def guidance_files(extracted: pathlib.Path) -> list[tuple[pathlib.Path, int | None]]:
+    """The latest annual, latest interim and latest presentation, each with
+    its fiscal year: guidance is restated in each, and older ones are
+    superseded."""
+    out = []
+    for kinds in (("Annual",), ("HalfYear", "Quarterly"), ("Presentation",)):
+        found = [p for k in kinds for p in extracted.glob(f"*_{k}_*.txt")]
+        if found:
+            latest = max(found, key=lambda p: periods.sort_key(_file_period(p)))
+            out.append((latest, periods.parse(_file_period(latest)).fiscal_year))
+    return out
 
 
 def render_history(rows: list[dict[str, object]], cols: list[str]) -> str:
@@ -210,10 +310,20 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\n### {f.name}")
         seen: dict[str, int] = {}
         for h in hits:
-            if seen.get(h.name, 0) >= 3:      # three per component per file is plenty
+            if seen.get(h.name, 0) >= PER_COMPONENT_PER_FILE:
                 continue
             seen[h.name] = seen.get(h.name, 0) + 1
             print(f"{h.name:26s} {h.line_no:6d}: {h.line[:110]}")
+
+    print("\n## Outlook / guidance in the latest filings (file:line -- windows around each mention)")
+    for f, fy in guidance_files(base / "Extracted"):
+        wins = grep_guidance(f.read_text(errors="replace"), after_year=fy)
+        if not wins:
+            continue
+        print(f"\n### {f.name}")
+        for w in wins:
+            print(f"--- line {w.line_no}")
+            print(w.text)
     return 0
 
 

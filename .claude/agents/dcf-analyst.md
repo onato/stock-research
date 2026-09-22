@@ -61,11 +61,16 @@ those scripts, and none of it changed the valuation.
 else. It prints in one call what used to take half the turns of a build: the live
 Yahoo price with timestamp and 52-week range, the ticker's memory line (the model
 decision, if one exists), the full `metrics_normalized` history pivot, the `kpis`
-table, and the owner-FCF component lines (interest income, lease principal and
-interest, SBC, buybacks, D&A, capex, tax paid, diluted shares, dividends, NCI) with
-`file:line` pointers into the annual filings. The numbers are still your call — the
-lines are pointers, in the filing's own units — but do not re-grep for them and do not
-re-fetch the price unless the printed one is stale or after-hours.
+table, the owner-FCF component lines (interest income, lease principal and
+interest, SBC, buybacks, D&A, capex, tax paid, shares on issue / weighted average /
+diluted, dividends and DPS, NCI, underlying EBITDA/NPAT, significant items, net debt,
+borrowings, lease liabilities, interest paid, income tax expense) with `file:line`
+pointers into the annual filings, and the outlook/guidance paragraphs of the latest
+annual, interim and presentation. The numbers are still your call — the lines are
+pointers, in the filing's own units — but do not re-grep for them, do not `sed` the
+filing to re-read a paragraph the guidance section already printed, and do not
+re-fetch the price unless the printed one is stale or after-hours. Only open a filing
+for something this output does not carry (a segment table, a capex split by project).
 
 Read `.claude/skills/dcf-methods/SKILL.md` and the routed reference file **once each**;
 on TPW.AX the reference was `cat`-ed twice (36k chars each time).
