@@ -6,7 +6,7 @@ an SBC-zero market, or a quote currency that differs from the reporting currency
 A US tech or consumer-internet build needs none of it. It is section 7 of
 `owner-fcf.md`, kept apart so the ~8k characters are not in context on every run.
 
-The engine above was built on US tech. It transfers to industrials, cyclicals and
+The engine in `owner-fcf.md` was built on US tech. It transfers to industrials, cyclicals and
 non-US filers, but six things change. Each one below is a real error that was made and
 caught — the first three in the Toyota Boshoku and Tokai Rika work of 14-Aug-2026, where
 a third-party model and the house model got them wrong independently.
@@ -97,7 +97,7 @@ Calibrate: modelled FY0 NOPAT must tie to reported **attributable** net income w
 non-operating noise. If it doesn't, the leakage rate is wrong.
 
 **(d) Excluded income needs its matching asset.** This is the interest-income rule of
-section 1, generalized: **every income stream stripped from the flows means its source
+`owner-fcf.md` section 1, generalized: **every income stream stripped from the flows means its source
 asset goes into the bridge at value, and every asset added to the bridge means its
 income leaves the flows.** Stripping dividend income while omitting the
 cross-shareholding and investment-securities portfolio deleted ~¥390+/share of real
