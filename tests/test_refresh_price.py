@@ -715,3 +715,26 @@ class TestDailyGate:
         monkeypatch.setattr(sys, "argv", ["refresh_price.py", "--all", "--daily"])
         assert rp.main() == 0
         assert not rp.STAMP.exists()
+
+
+class TestProseNeedlesAreWholeNumbers:
+    """A round price must not match inside a longer number.
+
+    GMG.AX (2026-09-23) closed at 26.0: the needle "26" matched "2026" in
+    valuation_date, fy0, every FY label and engine.built_at, so 38 paths
+    were reported as quoting the price -- and the orchestrator went looking
+    for prose to fix that was not there.
+    """
+
+    def test_a_round_price_does_not_match_a_year(self):
+        doc = {"valuation_date": "2026-09-23", "inputs": {"fy0": "FY2026"},
+               "note": "closed at $26 on the day", "narr": "revenue 126.4m in FY26, capex A$26m",
+               "also": "priced at 26.0 versus 26.05 yesterday", "built": "2026-09-23T04:26:00Z"}
+        paths = rp.find_prose_paths(doc, rp.price_spellings(26.0))
+        assert paths == ["note", "also"]
+
+    def test_decimal_prices_still_match_their_spellings(self):
+        doc = {"a": "quoted at $17.52", "b": "17.5 at the close", "c": "$1,234.50 print",
+               "d": "the 17.525 average", "e": "up 117.52"}
+        assert rp.find_prose_paths(doc, rp.price_spellings(17.52)) == ["a"]   # 17.5 is a different print
+        assert rp.find_prose_paths(doc, rp.price_spellings(1234.5)) == ["c"]

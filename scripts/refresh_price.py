@@ -118,9 +118,17 @@ def find_prose_paths(node: object, needles: set[str],
     elif isinstance(node, list):
         for i, value in enumerate(node):
             found += find_prose_paths(value, needles, f"{path}[{i}]")
-    elif isinstance(node, str) and any(n in node for n in needles):
+    elif isinstance(node, str) and _quotes_any(node, needles):
         found.append(path)
     return found
+
+
+def _quotes_any(text: str, needles: set[str]) -> bool:
+    """Does `text` contain a needle as a whole number -- not as the tail of
+    a year ("26" in "2026"), a fiscal label ("26" in "FY26"), the head of a
+    longer price ("26" in "26.05"), a quantity ("26m"), a clock time
+    ("04:26:00Z") or inside another figure ("17.52" in "117.52")?"""
+    return any(re.search(rf"(?<![\w.,:]){re.escape(n)}(?![\w:]|[.,]\d)", text) for n in needles)
 
 
 def _round(value: float) -> float:

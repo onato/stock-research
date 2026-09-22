@@ -295,6 +295,15 @@ millions of `inputs.currency`. `hurdle_rate` is a fraction.
 }
 ```
 
+**`model` must name the method, not the engine.** When you run a non-owner-FCF
+capitalisation through the Drivers route -- an AFFO or Operating-Profit stream at the
+cost of equity with net debt held at zero (GPT.AX, GMG.AX, CHC.AX) -- set `model` to
+that method in words -- `"REIT AFFO capitalisation at cost of equity (engine route)"`,
+with spaces, not underscores -- never leave the engine's default
+`owner_fcf_dcf_component`. `scripts/sanity_check.py` picks its multiples rules from
+this label by word matching (`affo`, `cost of equity`, `nav`): left as owner-FCF, a
+REIT is graded on P/E and EV/EBITDA.
+
 **Do not quote the numeric price in prose.** `current_price` and `inputs.price_as_of`
 carry it; a sentence like "regularMarketPrice 29.765 at 03:48Z" in `data_sources.price`
 or a narrative goes stale the moment `refresh_price.py` moves the number, and the
