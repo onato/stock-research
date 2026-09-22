@@ -58,6 +58,7 @@ from typing import Any
 
 import dcf_fields as F
 import periods
+import schema
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 TEMPLATE = pathlib.Path(__file__).resolve().parent / "templates" / "dashboard.html"
@@ -564,9 +565,48 @@ def _js(obj: Any) -> str:
     return json.dumps(obj, ensure_ascii=False, indent=1).replace("</", "<\\/")
 
 
+def normalise_units(cols: list[str], rows: list[dict[str, str]],
+                    csv_text: str) -> tuple[list[dict[str, str]], str]:
+    """Rows and CSV text with money columns and the share count in millions.
+
+    A whole-dollar or thousands filer (CUV.AX, VSL.NZ before its fix) must
+    read on the page the way its DCF does. Each row is scaled by its own
+    Units cell (schema.UNIT_FACTORS); a row with no or unknown units is left
+    as it is -- never an assumed scale. Untouched input returns the original
+    text, so the embedded csvData stays verbatim in the common case."""
+    money = {c for c in cols if schema.normalize(c) in schema.MONEY_COLUMNS
+             or schema.normalize(c) == "shares_outstanding"}
+    changed = False
+    out: list[dict[str, str]] = []
+    for r in rows:
+        k = schema.UNIT_FACTORS.get(str(r.get("Units") or "").strip().lower())
+        if k is None or k == 1.0 or not money:
+            out.append(dict(r))
+            continue
+        new = dict(r)
+        for c in money:
+            v = num(r.get(c))
+            if v is not None:
+                new[c] = f"{v * k:.6f}".rstrip("0").rstrip(".")
+        new["Units"] = "millions"
+        out.append(new)
+        changed = True
+    if not changed:
+        return out, csv_text
+    buf = io.StringIO()
+    w = csv.DictWriter(buf, fieldnames=cols, lineterminator="\n")
+    w.writeheader()
+    w.writerows(out)
+    return out, buf.getvalue()
+
+
 def render(ticker: str, spec: dict[str, Any], csv_text: str,
            analysis: dict[str, Any], dcf: dict[str, Any] | None) -> str:
     cols, rows = read_csv(csv_text)
+    rows, scaled_text = normalise_units(cols, rows, csv_text)
+    if scaled_text is not csv_text:
+        csv_text = scaled_text
+        spec = {**spec, "units": "m"}
     validate_spec(spec, set(cols))
     data = chart_data(spec, rows, dcf)
     company = str(analysis.get("company_name") or analysis.get("name") or ticker)

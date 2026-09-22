@@ -1098,3 +1098,54 @@ class TestPenceQuote:
         assert "£" not in got["sens"]
         # Flows stay in the model currency.
         assert got["baseFcf"].startswith(("US$", "USD")), got["baseFcf"]
+
+
+class TestUnitsNormalised:
+    """A whole-dollar or thousands CSV is rendered in millions, like the DCF.
+
+    CUV.AX (2026-09-22) files in whole dollars (Units=absolute); its cards read
+    "A$94,024,398.0m" beside an owner FCF of "A$22.5m" from the DCF. Money
+    columns and the share count are scaled per row by the Units column; per-share
+    and percentage columns are left alone; unknown units are never assumed.
+    """
+
+    CSV_ABS = ("Period,Revenue,NetIncome,EPS,GrossMargin,SharesOutstanding,Units,Currency\n"
+               "FY2025,95017570,36172518,0.71,60.0,50747000,absolute,AUD\n"
+               "FY2026,94024398,33916819,0.67,61.0,50747000,absolute,AUD\n")
+
+    def test_kpi_cards_read_in_millions(self, spec, analysis):
+        spec = {**spec, "currency": "A$", "units": "m", "sections": [],
+                "kpis": [{"label": "Revenue", "column": "Revenue", "change": "yoy"}]}
+        page = bd.render("CUV.AX", spec, self.CSV_ABS, analysis, None)
+        assert "A$94.0m" in page
+        assert "94,024,398" not in page
+        assert "-1.0% YoY" in page
+
+    def test_embedded_csv_and_chart_data_are_scaled(self, spec, analysis):
+        spec = {**spec, "kpis": []}
+        cols, rows = bd.read_csv(self.CSV_ABS)
+        scaled, text = bd.normalise_units(cols, rows, self.CSV_ABS)
+        assert scaled[1]["Revenue"] == "94.024398"
+        assert scaled[1]["SharesOutstanding"] == "50.747"
+        assert scaled[1]["EPS"] == "0.67"
+        assert scaled[1]["GrossMargin"] == "61.0"
+        assert scaled[1]["Units"] == "millions"
+        assert "94.024398" in text
+        assert "absolute" not in text
+
+    def test_thousands_scale_and_relabel(self, spec):
+        csv = "Period,Revenue,Units,Currency\nFY2026,731546,thousands,NZD\n"
+        cols, rows = bd.read_csv(csv)
+        scaled, _ = bd.normalise_units(cols, rows, csv)
+        assert scaled[0]["Revenue"] == "731.546"
+        spec = {**spec, "units": "k", "sections": [], "kpis": [{"label": "Revenue", "column": "Revenue"}]}
+        page = bd.render("X", spec, csv, {"company_name": "X"}, None)
+        assert "731.5m" in page
+        assert "731,546.0k" not in page
+
+    def test_millions_and_unknown_units_are_untouched(self):
+        csv = "Period,Revenue,Units,Currency\nFY2026,731.5,millions,NZD\nFY2025,700,,NZD\n"
+        cols, rows = bd.read_csv(csv)
+        scaled, text = bd.normalise_units(cols, rows, csv)
+        assert [r["Revenue"] for r in scaled] == ["700", "731.5"] or [r["Revenue"] for r in scaled] == ["731.5", "700"]
+        assert text == csv

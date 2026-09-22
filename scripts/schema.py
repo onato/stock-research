@@ -55,6 +55,22 @@ CORE_COLUMNS: list[tuple[str, str, str]] = [
 ]
 
 CORE_NAMES: list[str] = [c[0] for c in CORE_COLUMNS]
+
+# Columns whose stored value is in the row's `units` scale (money and the share
+# count, which the filings print on the same scale). Per-share and percentage
+# columns are scale-free. The metrics_normalized view, the warehouse and the
+# dashboard all scale exactly this set to millions.
+MONEY_COLUMNS: list[str] = [
+    "revenue", "cost_of_revenue", "gross_profit", "operating_income", "ebitda", "net_income",
+    "operating_cash_flow", "capex", "free_cash_flow", "shareholders_equity", "total_assets",
+    "total_liabilities", "total_debt", "cash_and_equivalents", "stock_based_comp",
+    "ebitda_before_significant", "revenue_continuing", "ebitda_continuing_before_significant",
+    "ebit_continuing_before_significant",
+]
+UNIT_FACTORS: dict[str, float] = {
+    "absolute": 1e-6, "absolute dollars": 1e-6, "units": 1e-6, "dollars": 1e-6,
+    "thousands": 1e-3, "millions": 1.0, "billions": 1e3,
+}
 CSV_HEADERS: list[str] = [c[2] for c in CORE_COLUMNS]
 
 # Parsed from `period` by periods.py and stored beside it, so SQL can order
@@ -257,9 +273,34 @@ PROMOTE_KPIS: dict[str, str] = {
     "SegmentRevenueEMEA": "SegmentRevenueEMEA",
     "SegmentRevenueGlobalProduct": "SegmentRevenueGlobalProduct",
     "SegmentRevenueDistribution": "SegmentRevenueDistribution",
+    # Four-segment revenue/EBIT split post-Construction-divestiture
+    # (Fletcher Building, FBU.AX): Light Building Products, Heavy Building
+    # Materials, Distribution and Residential & Development are the
+    # continuing segments from FY2026, and profitability by segment is more
+    # informative than revenue alone for a company that just exited its
+    # money-losing Construction arm. SignificantItems is a recurring
+    # one-off-charge line (largest -644m NZD in FY2025, Iplex Pro-fit pipe
+    # defects and Australian construction losses) that has hit nearly every
+    # year -- a genuine pattern, not noise to hide.
+    "SegmentRevenueHeavyBuildingMaterials": "SegmentRevenueHeavyBuildingMaterials",
+    "SegmentRevenueLightBuildingProducts": "SegmentRevenueLightBuildingProducts",
+    "SegmentRevenueResidentialAndDevelopment": "SegmentRevenueResidentialAndDevelopment",
+    "SegmentEBITDistribution": "SegmentEBITDistribution",
+    "SegmentEBITHeavyBuildingMaterials": "SegmentEBITHeavyBuildingMaterials",
+    "SegmentEBITLightBuildingProducts": "SegmentEBITLightBuildingProducts",
+    "SegmentEBITResidentialAndDevelopment": "SegmentEBITResidentialAndDevelopment",
+    "SignificantItems": "SignificantItems",
     # Property / financial sector staples
     "AFFO": "AFFO",
     "AISC": "AISC",                       # gold miners: all-in sustaining cost per oz
+    "GoldProduction": "GoldProduction",
+    "CopperProduction": "CopperProduction",
+    "GoldPriceAchieved": "GoldPriceAchieved",
+    "GoldProduction_Cowal": "GoldProduction_Cowal",
+    "GoldProduction_ErnestHenry": "GoldProduction_ErnestHenry",
+    "GoldProduction_Mungari": "GoldProduction_Mungari",
+    "GoldProduction_Northparkes": "GoldProduction_Northparkes",
+    "GoldProduction_RedLake": "GoldProduction_RedLake",
     "AFFOPerShare": "AFFOPerShare",
     "NAVPerShare": "NAVPerShare",
     "NTAPerShare": "NTAPerShare",

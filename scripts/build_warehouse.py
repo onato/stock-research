@@ -42,11 +42,7 @@ DEFAULT_OUT = REPO / "state" / "research.duckdb"
 DEFAULT_LEDGER = REPO / "evals" / "ledger.jsonl"
 SCENARIOS = ("bear", "base", "bull")
 
-MONEY = ["revenue", "cost_of_revenue", "gross_profit", "operating_income", "ebitda", "net_income",
-         "operating_cash_flow", "capex", "free_cash_flow", "shareholders_equity", "total_assets",
-         "total_liabilities", "total_debt", "cash_and_equivalents", "stock_based_comp",
-         "ebitda_before_significant", "revenue_continuing", "ebitda_continuing_before_significant",
-         "ebit_continuing_before_significant"]
+MONEY = schema.MONEY_COLUMNS
 CORE_NUMERIC = [n for n, t, _ in schema.CORE_COLUMNS if t == "DOUBLE"]
 
 DDL = f"""
