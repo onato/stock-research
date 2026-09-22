@@ -219,3 +219,13 @@ class TestCli:
     def test_missing_csv_is_an_error(self, tmp_path, monkeypatch, capsys):
         (tmp_path / "research" / "NOPE" / "Reports").mkdir(parents=True)
         assert run_main(monkeypatch, tmp_path, "NOPE") == 1
+
+
+class TestPenceDescriptor:
+    def test_pence_quote_keeps_its_case_in_the_descriptor(self, tmp_path):
+        repo = make_ticker_files(tmp_path, dcf={"inputs": {"currency": "USD", "quote_currency": "GBp"},
+                                                "valuation_date": "2026-09-22"})
+        spec = DS.default_spec("SYN", repo)
+        assert "reported in USD" in spec["descriptor"]
+        assert "quoted in GBp (pence)" in spec["descriptor"]
+        assert "GBP" not in spec["descriptor"]

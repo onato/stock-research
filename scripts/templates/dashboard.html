@@ -1128,8 +1128,16 @@ let currentScenario = 'base';
 // expects to see against a share price. Anything not listed renders as its
 // own code, which is the right answer for USD/EUR/AUD/NZD-style tickers.
 const CURRENCY_SYMBOLS = { hkd: 'HK$', rmb: 'RMB', cny: 'RMB', usd: 'US$', gbp: '\u00a3', jpy: '\u00a5' };
+// Minor-unit quote codes are case-sensitive: GBp (pence) is not GBP (pounds).
+// A per-share figure in pence takes a 'p' suffix; lowercasing GBp to gbp
+// rendered WISE.L's 920p as "\u00a3920", 100x the real price.
+const PENCE_CODES = { GBp: 'p', GBX: 'p', ZAc: 'c' };
+function penceSuffix(code) {
+    return code ? (PENCE_CODES[String(code)] || null) : null;
+}
 function currencySymbol(code) {
     if (!code) return null;
+    if (penceSuffix(code)) return '';
     return CURRENCY_SYMBOLS[String(code).toLowerCase()] || String(code);
 }
 // PER-SHARE quantities (intrinsic value, weighted IV, entry price, current
@@ -1142,7 +1150,9 @@ function currencySymbol(code) {
 // compare it against the RMB financials elsewhere on the page.
 function perShareCurrency() {
     const inputs = (dcfData && dcfData.inputs) || {};
-    return currencySymbol(inputs.quote_currency) || currencySymbol(inputs.currency) || '$';
+    const quote = currencySymbol(inputs.quote_currency);   // '' for a pence quote, null if unset
+    if (quote !== null) return quote;
+    return currencySymbol(inputs.currency) || '$';
 }
 
 function fmtIV(v) {
@@ -1150,7 +1160,9 @@ function fmtIV(v) {
     if (v == null || !isFinite(v)) return '-';
     const a = Math.abs(v);
     const dp = a >= 100 ? 0 : a >= 10 ? 1 : a >= 1 ? 2 : 4;
-    return c + v.toFixed(dp);
+    const inputs = (dcfData && dcfData.inputs) || {};
+    const suffix = penceSuffix(inputs.quote_currency) || '';
+    return c + v.toFixed(dp) + suffix;
 }
 
 function scenarioDefaults(sc) {

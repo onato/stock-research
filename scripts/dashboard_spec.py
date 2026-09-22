@@ -39,6 +39,7 @@ DESCRIPTIONS = pathlib.Path(__file__).resolve().parent / "templates" / "metric_d
 MIN_POINTS = 3          # a series needs this many populated rows to earn a chart
 MAX_KPIS = 8
 
+PENCE_CODES = ("GBp", "GBX", "ZAc")
 CURRENCY_SYMBOLS = {
     "USD": "$", "NZD": "NZ$", "AUD": "A$", "EUR": "€", "GBP": "£", "GBX": "p",
     "HKD": "HK$", "JPY": "¥", "CNY": "RMB", "RMB": "RMB", "CAD": "C$", "SEK": "kr",
@@ -221,7 +222,9 @@ def default_spec(ticker: str, repo: pathlib.Path | None = None) -> dict[str, Any
     raw_inputs = (dcf or {}).get("inputs")
     inputs: dict[str, Any] = raw_inputs if isinstance(raw_inputs, dict) else {}
     ccy = str(inputs.get("currency") or (dcf or {}).get("currency") or _mode(rows, "Currency") or "").upper()
-    quote = str(inputs.get("quote_currency") or "").upper()
+    quote_raw = str(inputs.get("quote_currency") or "")
+    # Minor-unit codes are case-sensitive: GBp is pence, GBP is pounds.
+    quote = f"{quote_raw} (pence)" if quote_raw in PENCE_CODES else quote_raw.upper()
     units_raw = (_mode(rows, "Units") or "millions").lower()
     units = {"thousands": "k", "billions": "bn"}.get(units_raw, "m")
 

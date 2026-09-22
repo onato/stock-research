@@ -1061,3 +1061,40 @@ console.log(JSON.stringify({{
         """Untouched sliders must echo the JSON, or the page contradicts it."""
         got = self._entry(tmp_path, moved=False)
         assert got["anchored"] == pytest.approx(got["stored"], abs=0.001)
+
+
+class TestPenceQuote:
+    """WISE.L is modelled in USD and quoted in GBp (pence). The engine stores
+    every per-share figure in pence, so the page must say 920p, never
+    "£920": the lowercase-code lookup turned GBp into the pound symbol and
+    rendered a 100x-wrong price against a real £ elsewhere on the page."""
+
+    def probe(self, html, tmp_path, js_expr):
+        js = tmp_path / "dash.js"
+        js.write_text(bd.node_harness(inline_script(html))
+                      + f"\nconsole.log(JSON.stringify({js_expr}));\n")
+        r = subprocess.run(["node", str(js)], capture_output=True, text=True, check=False)
+        assert r.returncode == 0, r.stderr
+        return json.loads(r.stdout.strip().splitlines()[-1])
+
+    def test_per_share_strings_use_a_pence_suffix(self, spec, analysis, csv_text, tmp_path):
+        dcf = load("WISE_DCF.json")
+        html = bd.render("WISE.L", spec, csv_text, analysis, dcf)
+        got = self.probe(html, tmp_path, """({
+            iv: __el('dcfIV').textContent,
+            entry: __el('dcfEntry').textContent,
+            weighted: __el('dcfWeighted').textContent,
+            current: __el('dcfCurrent').textContent,
+            header: __el('headerValuation').innerHTML,
+            sens: __el('sensitivityMatrix').innerHTML,
+            baseFcf: __el('baseFCF').textContent
+        })""")
+        for key in ("iv", "entry", "weighted", "current"):
+            assert got[key].endswith("p"), f"{key} rendered {got[key]!r}, expected a pence suffix"
+            assert "£" not in got[key]
+        assert got["current"] == "864p"
+        assert "864p" in got["header"]
+        assert "£" not in got["header"]
+        assert "£" not in got["sens"]
+        # Flows stay in the model currency.
+        assert got["baseFcf"].startswith(("US$", "USD")), got["baseFcf"]
