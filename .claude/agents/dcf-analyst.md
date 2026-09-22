@@ -15,13 +15,21 @@ that fits the company rather than carrying every method in this prompt.
 ## Step 0: Fresh build or update?
 
 ```bash
-ls ./research/{ticker}/Reports/{TICKER}_DCF.json
+ls ./research/{ticker}/Reports/{TICKER}_Drivers.json ./research/{ticker}/Reports/{TICKER}_DCF.json
 ```
 
-**A prior DCF exists → this is an UPDATE, not a rebuild.** Read it first, in full,
-before touching anything. Its scenario driver paths are prior judgments — usually the
-user's — and the single most damaging thing you can do is silently re-derive them from
-scratch and present the result as if nothing changed.
+**A prior DCF exists → this is an UPDATE, not a rebuild.** Read the prior judgments
+first, before touching anything. **Read `{TICKER}_Drivers.json` when it exists** — it
+is the source the DCF JSON was generated from, and one-fifth the size. Only when there
+is no Drivers file (a legacy, hand-built DCF) read the DCF JSON, and then only its
+`inputs`, `assumptions`, `probability_weighted`, `scenario_narratives`,
+`valuation_philosophy` and `entry_price.hurdle_rate`: `projections`, `valuation`,
+`entry_price.*`, `sensitivity` and `required_return_table` are derived and will be
+regenerated, so reading them is 30k chars of context for nothing. Do not go looking for
+a deleted DCF in git history; a missing file means a fresh build. The scenario driver
+paths are prior judgments — usually the user's — and the single most damaging thing you
+can do is silently re-derive them from scratch and present the result as if nothing
+changed.
 
 On an update:
 
@@ -284,6 +292,11 @@ millions of `inputs.currency`. `hurdle_rate` is a fraction.
   }
 }
 ```
+
+This contract is complete. Do not search the repo for documentation, fixtures or other
+tickers' Drivers files to learn it (APA.AX 2026-09-22: six turns of `grep -rl
+Drivers.json`, `ls tests/fixtures`, re-reading this prompt). If `make build-dcf`
+refuses the file, its message names the field; fix that field.
 
 Only the canonical driver names above are accepted inside `assumptions.*` (plus
 `horizon_years`, `narrative`, `note(s)`, `rationale` and any `*_note` / `*_rationale` /

@@ -71,6 +71,9 @@ COMPONENTS: list[tuple[str, re.Pattern[str]]] = [
     ("income_tax_expense", re.compile(r"^\s*income tax (?:expense|benefit)\b|^\s*effective (?:income )?tax rate\b", re.IGNORECASE)),
 ]
 PER_COMPONENT_PER_FILE = 3      # three lines per component per file is plenty
+RECENT_ANNUALS = 3              # files that get every component; older ones get only...
+HISTORY_COMPONENTS = ("interest_income", "lease_principal", "sbc", "buybacks", "dividends_paid")
+HISTORY_PER_COMPONENT = 2       # ...the owner-FCF adjustments, for the history series
 
 # Guidance: a window of lines around an outlook/guidance mention that also
 # names a fiscal period and a figure. Climate-report "Guidance" and
@@ -194,6 +197,31 @@ def _file_period(path: pathlib.Path) -> str:
     return path.stem.rsplit("_", 1)[-1]
 
 
+def select_hits(hits: list[Hit], recent: bool) -> list[Hit]:
+    """The lines worth printing from one annual file. A recent file gets up
+    to three lines of every component; an older one only the owner-FCF
+    adjustment lines the history series needs. APA.AX's nine annuals
+    printed 31k chars before this budget (2026-09-22)."""
+    cap = PER_COMPONENT_PER_FILE if recent else HISTORY_PER_COMPONENT
+    seen: dict[str, int] = {}
+    out = []
+    for h in hits:
+        if not recent and h.name not in HISTORY_COMPONENTS:
+            continue
+        if seen.get(h.name, 0) >= cap:
+            continue
+        seen[h.name] = seen.get(h.name, 0) + 1
+        out.append(h)
+    return out
+
+
+def component_files(extracted: pathlib.Path) -> list[tuple[pathlib.Path, bool]]:
+    """Annual filings oldest first, flagged recent for the latest few."""
+    files = sorted(extracted.glob("*_Annual_*.txt"), key=lambda p: periods.sort_key(_file_period(p)))
+    cutoff = max(0, len(files) - RECENT_ANNUALS)
+    return [(p, i >= cutoff) for i, p in enumerate(files)]
+
+
 def guidance_files(extracted: pathlib.Path) -> list[tuple[pathlib.Path, int | None]]:
     """The latest annual, latest interim and latest presentation, each with
     its fiscal year: guidance is restated in each, and older ones are
@@ -302,17 +330,14 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(f"\n(no DuckDB at {db}; read the Metrics CSV)")
 
-    print("\n## Component lines in annual filings (file:line -- units as printed)")
-    for f in sorted((base / "Extracted").glob("*Annual*.txt"), key=lambda x: x.name):
-        hits = grep_components(f.read_text(errors="replace"))
+    print("\n## Component lines in annual filings (file:line -- units as printed;"
+          f" latest {RECENT_ANNUALS} in full, older years owner-FCF adjustments only)")
+    for f, recent in component_files(base / "Extracted"):
+        hits = select_hits(grep_components(f.read_text(errors="replace")), recent)
         if not hits:
             continue
         print(f"\n### {f.name}")
-        seen: dict[str, int] = {}
         for h in hits:
-            if seen.get(h.name, 0) >= PER_COMPONENT_PER_FILE:
-                continue
-            seen[h.name] = seen.get(h.name, 0) + 1
             print(f"{h.name:26s} {h.line_no:6d}: {h.line[:110]}")
 
     print("\n## Outlook / guidance in the latest filings (file:line -- windows around each mention)")

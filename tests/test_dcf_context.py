@@ -219,3 +219,37 @@ class TestFilingSelection:
         assert [(p.name, y) for p, y in dcf_context.guidance_files(tmp_path)] == [
             ("X_Annual_FY2026.txt", 2026), ("X_HalfYear_H1-FY2026.txt", 2026),
             ("X_Presentation_H1-2026.txt", 2026)]
+
+
+class TestComponentBudget:
+    """APA.AX's component section was 31k chars over nine annual files (the
+    dcf-analyst read it in two chunks, 2026-09-22). The FY0 build needs the
+    latest filings in full; older years only feed the owner-FCF history,
+    which needs the adjustment lines -- interest income, lease principal,
+    SBC, buybacks, dividends -- not the balance sheet.
+    """
+
+    def _hits(self):
+        names = ["interest_income", "lease_principal", "sbc", "buybacks", "dividends_paid",
+                 "net_debt", "borrowings", "capex_ppe", "underlying_earnings", "nci"]
+        return [dcf_context.Hit(n, i * 10 + j, f"{n} line {j}", [1.0])
+                for i, n in enumerate(names) for j in range(4)]
+
+    def test_recent_files_keep_three_lines_per_component(self):
+        kept = dcf_context.select_hits(self._hits(), recent=True)
+        assert sum(1 for h in kept if h.name == "net_debt") == 3
+        assert sum(1 for h in kept if h.name == "sbc") == 3
+
+    def test_older_files_keep_only_owner_fcf_adjustments(self):
+        kept = dcf_context.select_hits(self._hits(), recent=False)
+        assert {h.name for h in kept} == {"interest_income", "lease_principal", "sbc", "buybacks",
+                                          "dividends_paid"}
+        assert sum(1 for h in kept if h.name == "sbc") == 2
+
+    def test_the_latest_three_annuals_are_recent(self, tmp_path):
+        for y in (2019, 2022, 2023, 2024, 2025, 2026):
+            (tmp_path / f"X_Annual_FY{y}.txt").write_text("x")
+        files = dcf_context.component_files(tmp_path)
+        assert [(p.name[-9:-4], recent) for p, recent in files] == [
+            ("Y2019", False), ("Y2022", False), ("Y2023", False),
+            ("Y2024", True), ("Y2025", True), ("Y2026", True)]
