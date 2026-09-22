@@ -833,6 +833,27 @@ class TestEntryPriceHurdleConsistency:
         assert r
         assert r[0]["status"] == "skip", r
 
+    def test_equity_bridge_adjustment_skips(self):
+        """BVS.AX deducts a $67.3m post-balance-date dividend (declared,
+        unpaid at FY-end, price already ex-div) via an `equity_bridge` entry
+        beyond net_debt. The Gordon recomputation only knows net_debt, so it
+        is off by the bridge amount on every scenario -- not a model error,
+        just an adjustment the check does not model. Must skip, not fail."""
+        fcf = [76.8, 80.8, 83.6, 82.2, 80.6, 81.6, 84.0, 86.5, 88.6, 90.8]
+        d = self._dcf(0.0, wacc=10.0, tg=2.5, cap=15, fcf=fcf)
+        d["inputs"] = {"shares_outstanding": 448.3, "net_debt": -50.296}
+        pv = sum(f / 1.15 ** (i + 1) for i, f in enumerate(fcf))
+        gordon = fcf[-1] * 1.025 / (0.15 - 0.025)
+        tv = min(gordon, fcf[-1] * 15)
+        exp = (pv + tv / 1.15 ** 10 - (-50.296) - 67.3) / 448.3
+        d["entry_price"]["base"]["entry_price"] = round(exp, 2)
+        d["equity_bridge"] = [{"item": "post-balance-date dividend", "value": -67.3}]
+        card = E.Card()
+        E.check_entry_price_hurdle(d, card)
+        r = [c for c in card.checks if c["id"] == "dcf_entry_price_hurdle"]
+        assert r
+        assert r[0]["status"] == "skip", r
+
     def test_book_value_model_with_dividend_flows_skips(self):
         """RYM.NZ discounts DIVIDENDS to an exit P/B on a BVPS path. Its entry
         prices are already correct at the hurdle, but comparing them against a

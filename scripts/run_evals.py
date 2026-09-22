@@ -656,6 +656,14 @@ def check_entry_price_hurdle(dcf: dict[str, Any], card: Card) -> None:
     if hurdle > 1:
         hurdle /= 100.0
 
+    # A post-balance-date equity_bridge item (BVS.AX: a declared-but-unpaid
+    # dividend, price already ex-div) moves equity value by an amount the
+    # net_debt-only Gordon recomputation cannot see. Not a model error.
+    if dcf.get("equity_bridge"):
+        card.add("dcf_entry_price_hurdle", "skip",
+                 "equity_bridge adjustment outside net_debt -- not comparable")
+        return
+
     inputs = dcf.get("inputs") or {}
     shares = F.num(inputs.get("shares_outstanding"))
     net_debt = F.num(inputs.get("net_debt"))
