@@ -48,10 +48,13 @@ PAGES_RE = re.compile(r"<span class=\"page\">\s*(\d+)")
 ROW_SPLIT = re.compile(r"<tr>", re.IGNORECASE)
 PDF_URL_RE = re.compile(r'name="pdfURL"\s+value="([^"]+)"')
 
-ANNUAL_RE = re.compile(r"appendix 4e|annual report|full[- ]year (?:financial )?(?:report|statements)",
+ANNUAL_RE = re.compile(r"appendix 4e|annual report"
+                       r"|full[- ]year (?:financial )?(?:report|statements)"
+                       r"|full year results.*financial year ended",
                        re.IGNORECASE)
 HALF_RE = re.compile(r"appendix 4d|half[- ]?year(?:ly)? (?:financial )?(?:report|statements|accounts)"
-                     r"|interim (?:financial )?report", re.IGNORECASE)
+                     r"|interim (?:financial )?report"
+                     r"|half year results for (?:the )?period (?:ended|to)", re.IGNORECASE)
 NOT_REPORT_RE = re.compile(r"presentation|trading update|notice of|proxy|appendix 4g|appendix 3",
                            re.IGNORECASE)
 

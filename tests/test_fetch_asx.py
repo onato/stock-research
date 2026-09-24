@@ -53,6 +53,15 @@ class TestClassify:
         ("Notice of Annual General Meeting/Proxy Form", None),
         ("Appendix 4G", None),
         ("Appendix 3Y", None),
+        # Origin Energy (ORG.AX) titles its full financial report this way
+        # instead of "annual report" / "full-year financial report" --
+        # 197-222 pages, the real statements, not the 4-5 page press release.
+        ("Full Year Results - Financial Year Ended 30 June 2024", "Annual"),
+        ("2024 Full Year Results", None),                 # the press release
+        ("ORG Half Year Results for the period ended 31 December 2023", "HalfYear"),
+        ("Origin Reports Half Year Results", None),       # the press release
+        ("ORG Half Year Results for period ended 31 December 2022", "HalfYear"),
+        ("ORG Half Year Results for period to 31 December 2021", "HalfYear"),
     ])
     def test_titles(self, title, kind):
         assert fetch_asx.classify(title) == kind
