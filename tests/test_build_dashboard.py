@@ -1149,3 +1149,53 @@ class TestUnitsNormalised:
         scaled, text = bd.normalise_units(cols, rows, csv)
         assert [r["Revenue"] for r in scaled] == ["700", "731.5"] or [r["Revenue"] for r in scaled] == ["731.5", "700"]
         assert text == csv
+
+
+class TestPlainTextEntities:
+    """Titles and labels are plain text, escaped once by the renderer.
+
+    The shipped spec templates (and 150+ agent-written specs) pre-escaped them
+    as `&amp;`, which the renderer escaped again, so every dashboard read
+    "Operating Cash Flow &amp;amp; CapEx" -- and the series labels and modal
+    titles, which reach the page via JSON and textContent, showed `&amp;`."""
+
+    def _entity_spec(self, spec):
+        s = json.loads(json.dumps(spec))
+        sec = s["sections"][0]
+        sec["title"] = "Cash Flow &amp; Balance Sheet"
+        ch = sec["charts"][0]
+        ch["title"] = "Operating Cash Flow &amp; CapEx"
+        ch["series"][0]["label"] = "Cash &amp; equivalents"
+        ch["y_title"] = "R&amp;D"
+        s["kpis"][0]["label"] = "Sales &amp; Marketing"
+        key = ch["help"]
+        s["metric_descriptions"][key]["title"] = "OCF &amp; CapEx"
+        return s
+
+    def test_pre_escaped_entities_render_once(self, spec, analysis, dcf, csv_text):
+        s = self._entity_spec(spec)
+        page = bd.render("TEST", s, csv_text, analysis, dcf)
+        assert "&amp;amp;" not in page
+        assert "<h3>Operating Cash Flow &amp; CapEx</h3>" in page
+        assert "Cash Flow &amp; Balance Sheet</h2>" in page
+        assert "Sales &amp; Marketing</div>" in page
+
+    def test_json_embedded_text_is_decoded(self, spec, analysis, dcf, csv_text):
+        s = self._entity_spec(spec)
+        page = bd.render("TEST", s, csv_text, analysis, dcf)
+        script = inline_script(page)
+        assert '"Cash & equivalents"' in script
+        assert '"R&D"' in script
+        assert '"OCF & CapEx"' in script
+        assert '"Cash &amp; equivalents"' not in script
+
+    def test_templates_store_plain_text(self):
+        root = Path(__file__).parents[1] / "scripts" / "templates" / "dashboard_specs"
+        for p in root.glob("*.json"):
+            s = json.loads(p.read_text())
+            texts = [sec.get("title", "") for sec in s.get("sections", [])]
+            texts += [ch.get("title", "") for sec in s.get("sections", []) for ch in sec.get("charts", [])]
+            texts += [se.get("label", "") for sec in s.get("sections", [])
+                      for ch in sec.get("charts", []) for se in ch.get("series", [])]
+            texts += [k.get("label", "") for k in s.get("kpis", [])]
+            assert not [t for t in texts if "&amp;" in t], p.name

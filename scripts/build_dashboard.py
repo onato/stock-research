@@ -600,8 +600,36 @@ def normalise_units(cols: list[str], rows: list[dict[str, str]],
     return out, buf.getvalue()
 
 
+def plain_text(spec: dict[str, Any]) -> dict[str, Any]:
+    """The spec with its plain-text fields' HTML entities decoded.
+
+    Titles, labels and notes are text: the renderer escapes them once, and the
+    ones embedded as JSON reach the page via Chart.js and textContent. Specs
+    written with `&amp;` (every shipped template until 2026-09-25) therefore
+    rendered "&amp;amp;" and a literal "&amp;" in legends and modal titles.
+    The HTML-bearing fields (descriptor, subtitle, annotation, content,
+    base_sublabel, model_approach_note) are left alone."""
+    def dec(d: dict[str, Any], *keys: str) -> dict[str, Any]:
+        return {**d, **{k: html.unescape(d[k]) for k in keys if isinstance(d.get(k), str)}}
+
+    out = dict(spec)
+    out["kpis"] = [dec(k, "label", "note", "value", "change") for k in spec.get("kpis", [])]
+    out["sections"] = [
+        {**dec(sec, "title"),
+         "charts": [{**dec(ch, "title", "y_title", "y1_title"),
+                     "series": [dec(s, "label") for s in ch.get("series", [])]}
+                    for ch in sec.get("charts", [])]}
+        for sec in spec.get("sections", [])]
+    out["metric_descriptions"] = {k: dec(v, "title") if isinstance(v, dict) else v
+                                  for k, v in spec.get("metric_descriptions", {}).items()}
+    if isinstance(spec.get("dcf"), dict):
+        out["dcf"] = dec(spec["dcf"], "base_fcf_label", "growth_hint", "current_price_note")
+    return out
+
+
 def render(ticker: str, spec: dict[str, Any], csv_text: str,
            analysis: dict[str, Any], dcf: dict[str, Any] | None) -> str:
+    spec = plain_text(spec)
     cols, rows = read_csv(csv_text)
     rows, scaled_text = normalise_units(cols, rows, csv_text)
     if scaled_text is not csv_text:
