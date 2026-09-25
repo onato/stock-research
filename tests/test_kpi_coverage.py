@@ -391,3 +391,64 @@ class TestPropertyDeveloperVolumePromotion:
         assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
         for n in names:
             assert schema.promote_header(n) == n
+
+
+class TestDemergerContinuingOpsPromotion:
+    """Continuing vs discontinued operations around a demerger.
+
+    Tabcorp Holdings (TAH.AX) demerged The Lottery Corporation in May 2022:
+    FY2022 statutory NetIncome (A$6,775.9m) is dominated by a one-off
+    A$6,894.3m gain on demerger booked to discontinued operations, while
+    continuing operations actually lost A$118.4m that year. Both names were
+    absent from PROMOTE_KPIS, so a dashboard could only show the statutory
+    NetIncome column, which reads FY2022 as a blowout profit year rather
+    than the demerger event it was.
+    """
+
+    def test_continuing_and_discontinued_ops_are_promoted(self, patch_repo):
+        names = ["NetIncomeContinuing", "DiscontinuedOpsProfit"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestMultiBannerRetailerSegmentPromotion:
+    """A four-banner specialty retailer's segment revenue/EBITDA split.
+
+    Super Retail Group (SUL.AX) reports four banners -- Supercheap Auto,
+    Rebel, BCF and Macpac -- each with its own revenue and EBITDA line, plus
+    an Australia/New Zealand geographic split. FY26 diverges sharply by
+    banner (BCF weak on algae-bloom/coastal disruption, Macpac hit by a mild
+    winter, SCA/Rebel solid), a story the consolidated totals hide. All ten
+    names were absent from PROMOTE_KPIS, so the banner mix could not reach
+    the CSV or a chart.
+    """
+
+    def test_banner_segment_and_geo_kpis_are_promoted(self, patch_repo):
+        names = ["SegmentRevenue_SCA", "SegmentRevenue_Rebel",
+                  "SegmentRevenue_BCF", "SegmentRevenue_Macpac",
+                  "SegmentEBITDA_SCA", "SegmentEBITDA_Rebel",
+                  "SegmentEBITDA_BCF", "SegmentEBITDA_Macpac",
+                  "RevenueAustralia", "RevenueNewZealand"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestCapitalReturnPromotion:
+    """One-off return-of-capital distributions (Wesfarmers, WES.AX).
+
+    Unlike ordinary dividends, a capital return is a return-of-capital
+    transaction to shareholders -- WES.AX paid A$2,267m in FY2022 and
+    A$1,249m in FY2026 -- and is a large enough non-recurring outflow that
+    it explains why book-value/equity CAGR looks negative despite healthy
+    earnings. It was absent from PROMOTE_KPIS, so the dashboard could only
+    show ordinary dividends and this driver was invisible.
+    """
+
+    def test_capital_return_is_promoted(self, patch_repo):
+        make_db(patch_repo, "SYN", ["CapitalReturn"])
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        assert schema.promote_header("CapitalReturn") == "CapitalReturn"

@@ -192,6 +192,10 @@ PROMOTE_KPIS: dict[str, str] = {
     # Marketing cost lines
     "MarketingExpense": "MarketingExpense",
     "MarketingPctRevenue": "MarketingPctRevenue",
+    # Oil & gas non-IFRS profitability measure (earnings before interest,
+    # tax, depreciation, amortisation AND exploration expense) -- distinct
+    # from the generic EBITDA column (Santos, STO.AX)
+    "EBITDAX": "EBITDAX",
     # Recurring revenue. A company that REDEFINES its ARR needs the old and
     # new series in separate columns -- Adobe reported Digital Media ARR
     # ($19.20bn) through FY2025 and Total Adobe ARR ($26.06bn) from FY2026,
@@ -319,6 +323,13 @@ PROMOTE_KPIS: dict[str, str] = {
     "GoldProduction_Northparkes": "GoldProduction_Northparkes",
     "GoldProduction_RedLake": "GoldProduction_RedLake",
     "AFFOPerShare": "AFFOPerShare",
+    # Continuing vs discontinued operations (Tabcorp Holdings, TAH.AX):
+    # the May-2022 Lottery Corporation demerger put a one-off A$6,894.3m
+    # gain-on-demerger through FY2022 statutory NetIncome, which reads as
+    # organic earnings unless continuing-ops profit is charted alongside it
+    # -- continuing operations actually lost A$118.4m that year.
+    "NetIncomeContinuing": "NetIncomeContinuing",
+    "DiscontinuedOpsProfit": "DiscontinuedOpsProfit",
     "NAVPerShare": "NAVPerShare",
     "NTAPerShare": "NTAPerShare",
     "Occupancy": "Occupancy",
@@ -409,6 +420,14 @@ PROMOTE_KPIS: dict[str, str] = {
     "ExplorationAndEvaluationAssets": "ExplorationAndEvaluationAssets",
     "ImpairmentExpense": "ImpairmentExpense",
     "ImpairmentReversal": "ImpairmentReversal",
+    # Almond grower/processor (Select Harvests, SHV.AX): the IAS 41
+    # biological-asset fair-value swing on almond trees/crop is a major,
+    # non-cash driver of reported earnings volatility -- it flipped FY2023
+    # to an operating loss (-$74.5m) and swung +$58.8m in FY2025. Lease
+    # principal repaid is the IFRS-16 financing outflow behind the orchard
+    # and processing-plant lease fleet, distinct from OCF/CapEx.
+    "BiologicalFairValueAdjustment": "BiologicalFairValueAdjustment",
+    "LeasePrincipalPaid": "LeasePrincipalPaid",
     # Gentailer operating drivers (AGL Energy, AGL.AX): electricity
     # generation volume (GWh) tracks the coal fleet's decline toward its
     # 2030-2035 closures, and customer services (retail energy/telco
@@ -631,6 +650,27 @@ PROMOTE_KPIS: dict[str, str] = {
     # valuation anchor for stapled property trusts, reported every
     # half-year alongside the interim/annual result.
     "NetTangibleAssetsPerSecurity": "NetTangibleAssetsPerSecurity",
+    # Four-banner specialty retailer segment split (Super Retail Group,
+    # SUL.AX): Supercheap Auto, Rebel, BCF and Macpac each disclose their
+    # own revenue and EBITDA, plus an Australia/New Zealand geographic
+    # split. FY26 diverges sharply by banner (BCF weak on algae-bloom/
+    # coastal disruption, Macpac hit by a mild winter, SCA/Rebel solid) --
+    # a story the consolidated totals hide.
+    "SegmentRevenue_SCA": "SegmentRevenue_SCA",
+    "SegmentRevenue_Rebel": "SegmentRevenue_Rebel",
+    "SegmentRevenue_BCF": "SegmentRevenue_BCF",
+    "SegmentRevenue_Macpac": "SegmentRevenue_Macpac",
+    "SegmentEBITDA_SCA": "SegmentEBITDA_SCA",
+    "SegmentEBITDA_Rebel": "SegmentEBITDA_Rebel",
+    "SegmentEBITDA_BCF": "SegmentEBITDA_BCF",
+    "SegmentEBITDA_Macpac": "SegmentEBITDA_Macpac",
+    "RevenueAustralia": "RevenueAustralia",
+    "RevenueNewZealand": "RevenueNewZealand",
+    # One-off return-of-capital distributions (Wesfarmers, WES.AX): unlike
+    # ordinary dividends, these are return-of-capital transactions to
+    # shareholders (A$2,267m in FY2022, A$1,249m in FY2026) that explain why
+    # book-value/equity CAGR looks negative despite healthy earnings.
+    "CapitalReturn": "CapitalReturn",
 }
 
 # Owner-FCF components and core-column duplicates. Listed explicitly so a
