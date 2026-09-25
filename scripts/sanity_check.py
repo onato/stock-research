@@ -251,7 +251,7 @@ def _db_annual_rows(db: pathlib.Path) -> list[dict[str, object]]:
     import duckdb
     con = duckdb.connect(str(db), read_only=True)
     try:
-        cols = ["period", *METRIC_COLUMNS]
+        cols = ["period", "currency", *METRIC_COLUMNS]
         got = con.execute(
             f"select {', '.join(cols)} from metrics_normalized").fetchall()
     finally:
@@ -267,7 +267,8 @@ def _csv_annual_rows(path: pathlib.Path) -> list[dict[str, object]]:
     """
     rows: list[dict[str, object]] = []
     for raw in csv.DictReader(path.read_text().splitlines()):
-        row: dict[str, object] = {"period": (raw.get("Period") or "").strip()}
+        row: dict[str, object] = {"period": (raw.get("Period") or "").strip(),
+                                  "currency": (raw.get("Currency") or "").strip() or None}
         for header, value in raw.items():
             column = normalize(header)
             if column is None or column not in METRIC_COLUMNS:
@@ -384,15 +385,36 @@ def multiples(price: float | None, row: dict[str, object]) -> dict[str, float | 
 
 def historical_table(rows: list[dict[str, object]],
                      series: list[tuple[dt.date, float]], month: int,
-                     fx_rate: float | None = None) -> list[dict[str, object]]:
-    """One entry per FY: the anchor price and the four multiples."""
+                     fx_rate: float | None = None,
+                     quote_currency: str | None = None) -> list[dict[str, object]]:
+    """One entry per FY: the anchor price and the four multiples.
+
+    `fx_rate` converts `quote_currency` -> the ticker's LATEST reporting
+    currency (the direction `inputs.fx_rate` is defined in). That is only
+    the right conversion for a row whose own currency differs from
+    `quote_currency` -- WTC.AX switched its reporting currency from AUD to
+    USD partway through its history, and its AUD-era rows sit in the same
+    currency as the AUD quote already. Applying the AUD->USD rate to those
+    rows' prices as well as the USD-era ones double-converts them: a flat
+    multiplier previously inflated every pre-switch multiple by the FX
+    factor. Each row is converted only when ITS OWN `currency` differs from
+    `quote_currency`; a row with no recorded currency falls back to the
+    ticker-level behaviour (converted, same as before) since that was the
+    only signal available for it.
+    """
     table: list[dict[str, object]] = []
     for row in rows:
         period = str(row.get("period") or "")
         parsed = periods.parse(period)
         year = parsed.fiscal_year
         price = fy_end_price(series, year, month) if year is not None else None
-        if price is not None and fx_rate is not None:
+        row_currency = row.get("currency")
+        row_currency = row_currency.strip() if isinstance(row_currency, str) else None
+        needs_convert = (
+            row_currency is None or
+            quote_currency is None or
+            row_currency != quote_currency)
+        if price is not None and fx_rate is not None and needs_convert:
             price *= fx_rate
         entry: dict[str, object] = {"period": period,
                                     "price": round(price, 6) if price is not None else None}
@@ -679,7 +701,7 @@ def check(repo: pathlib.Path, ticker: str,
     month, fy_source = fy_end_month(repo, ticker)
     series = price_series(repo, ticker, today=today)
     rows = annual_rows(repo, ticker)
-    table = historical_table(rows, series, month, convert)
+    table = historical_table(rows, series, month, convert, quoted)
     hist = averages(table)
 
     model = model_family(doc)

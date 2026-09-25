@@ -100,7 +100,7 @@ def test_the_corpus_is_all_on_one_scale():
 # its revenue series is continuous across the change. Wise did the same
 # GBP -> USD in FY2024. Appen (APX.AX) switched AUD -> USD effective 1 Jan
 # 2021, applied retrospectively in its own filings.
-CURRENCY_SWITCHERS = {"EBO.NZ", "WISE.L", "APX.AX"}
+CURRENCY_SWITCHERS = {"EBO.NZ", "WISE.L", "APX.AX", "WTC.AX"}
 
 
 @pytest.mark.slow

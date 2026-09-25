@@ -52,13 +52,14 @@ def make_db(repo, ticker, rows=None, units="millions", extra_periods=()):
     for r in (rows if rows is not None else ROWS):
         period, rev, ebitda, ni, eq, debt, cash, shares, sbc = r[:9]
         fcf = r[9] if len(r) > 9 else None
+        currency = r[10] if len(r) > 10 else "NZD"
         con.execute(
             "INSERT INTO core_metrics (period, revenue, ebitda, net_income, "
             "shareholders_equity, total_debt, cash_and_equivalents, "
             "shares_outstanding, stock_based_comp, free_cash_flow, units, "
             "currency) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             [period, rev, ebitda, ni, eq, debt, cash, shares, sbc, fcf,
-             units, "NZD"])
+             units, currency])
     for period in extra_periods:
         con.execute(
             "INSERT INTO core_metrics (period, revenue, units) VALUES (?,?,?)",
@@ -811,6 +812,34 @@ class TestCurrencyGuard:
         make_dcf(repo, "WISE.L", currency="GBP", quote_currency="GBp")
         with pytest.raises(sanity_check.DenominationError):
             sanity_check.check(repo, "WISE.L", today=TODAY)
+
+    def test_a_mid_history_currency_switch_does_not_double_convert(self, repo):
+        """WTC.AX switched its reporting currency from AUD to USD partway
+        through its history (H1 FY2025 on). The DCF's inputs.currency is
+        the LATEST reporting currency (USD), and fx_rate is AUD->USD for
+        the live quote. Applying that single fx_rate to every historical
+        year double-converts the AUD-era rows: an AUD price divided by an
+        AUD-denominated EPS needs no conversion at all, only the USD-era
+        rows do. A flat multiplier here previously inflated every AUD-era
+        multiple by the FX factor -- a P/E of 24 read back as 34."""
+        rows = [
+            ("FY2023", 550.0, 110.0, 55.0, 440.0, 100.0, 20.0, 100.0, 10.0, 30.0, "AUD"),
+            ("FY2024", 600.0, 120.0, 60.0, 480.0, 100.0, 20.0, 100.0, 10.0, 32.0, "AUD"),
+            ("FY2025", 433.0, 86.7, 43.3, 347.0, 72.3, 14.5, 100.0, 7.2, 23.1, "USD"),
+        ]
+        make_db(repo, "WTC.AX", rows=rows)
+        make_prices(repo, "WTC.AX")
+        # quote AUD, latest reporting currency USD, 0.65 AUD->USD.
+        make_dcf(repo, "WTC.AX", currency="USD", quote_currency="AUD",
+                 fx_rate=0.65)
+        block = sanity_check.check(repo, "WTC.AX", today=TODAY)
+        table = {r["period"]: r for r in block["historical_table"]}
+        # FY2024: AUD row, AUD quote -- no conversion. Price 6.00 stays 6.00,
+        # same PE as the matching-currency SEK.NZ fixture would give.
+        assert table["FY2024"]["price"] == pytest.approx(6.00)
+        assert table["FY2024"]["pe"] == pytest.approx(12.0)
+        # FY2025: USD row, AUD quote -- converted at 0.65.
+        assert table["FY2025"]["price"] == pytest.approx(7.00 * 0.65)
 
 
 class TestBlockShape:
