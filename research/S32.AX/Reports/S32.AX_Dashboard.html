@@ -1,0 +1,4849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>South32 Limited (S32.AX) Financial Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 20px;
+}
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+}
+.header h1 {
+    font-size: 2.5rem;
+    background: linear-gradient(90deg, #00d4aa, #00b894);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+}
+.header p {
+    color: #888;
+    font-size: 1.1rem;
+}
+/* Headline valuation chip — fills the wide, otherwise-empty header strip so the
+   number the reader should act on is visible without scrolling to the DCF. */
+.header-valuation {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 14px 32px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.hv-item {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+.hv-label {
+    font-size: 0.75rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.hv-value {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #e0e0e0;
+}
+.hv-value.positive { color: #00d4aa; }
+.hv-value.negative { color: #ff6b6b; }
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.kpi-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.kpi-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 212, 170, 0.2);
+}
+.kpi-value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #00d4aa;
+    margin-bottom: 5px;
+}
+.kpi-label {
+    font-size: 0.85rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.kpi-change {
+    font-size: 0.9rem;
+    margin-top: 5px;
+}
+.kpi-change.positive { color: #00d4aa; }
+.kpi-change.negative { color: #ff6b6b; }
+/* Guidance Section */
+.guidance-section {
+    max-width: 1400px;
+    margin: 0 auto 30px;
+}
+.guidance-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+.guidance-header h3 {
+    color: #fff;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.guidance-header h3::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894);
+    border-radius: 2px;
+}
+.guidance-meta {
+    font-size: 0.85rem;
+    color: #888;
+}
+.guidance-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+.guidance-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.2s ease;
+}
+.guidance-card:hover {
+    transform: translateY(-2px);
+}
+.guidance-metric {
+    font-size: 0.8rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+.guidance-target {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: #00d4aa;
+    margin-bottom: 6px;
+}
+.guidance-period {
+    font-size: 0.85rem;
+    color: #e0e0e0;
+    margin-bottom: 8px;
+}
+.guidance-vs-prior {
+    display: inline-block;
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+.guidance-vs-prior.raised {
+    background: rgba(0, 212, 170, 0.15);
+    color: #00d4aa;
+}
+.guidance-vs-prior.lowered {
+    background: rgba(255, 107, 107, 0.15);
+    color: #ff6b6b;
+}
+.guidance-vs-prior.maintained {
+    background: rgba(255, 255, 255, 0.1);
+    color: #888;
+}
+.guidance-vs-prior.new {
+    background: rgba(99, 102, 241, 0.15);
+    color: #818cf8;
+}
+.guidance-notes {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 8px;
+    line-height: 1.4;
+}
+.guidance-commentary {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    padding: 16px 20px;
+    border-left: 3px solid #00d4aa;
+    font-style: italic;
+    color: #b0b0b0;
+    line-height: 1.6;
+}
+.guidance-commentary::before {
+    content: '"';
+    font-size: 1.5rem;
+    color: #00d4aa;
+    margin-right: 4px;
+}
+.section-title {
+    font-size: 1.5rem;
+    color: #fff;
+    margin: 40px auto 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid rgba(0, 212, 170, 0.3);
+    max-width: 1400px;
+}
+.charts-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 25px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+.chart-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    padding: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+.chart-header h3 {
+    color: #fff;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.chart-header h3::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894);
+    border-radius: 2px;
+}
+.help-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(0, 212, 170, 0.2);
+    border: 1px solid #00d4aa;
+    color: #00d4aa;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+.help-btn:hover {
+    background: #00d4aa;
+    color: #1a1a2e;
+}
+.chart-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.view-toggle {
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #888;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.view-toggle:hover {
+    border-color: #0984e3;
+    color: #0984e3;
+}
+.view-toggle.active {
+    background: rgba(9, 132, 227, 0.2);
+    border-color: #0984e3;
+    color: #0984e3;
+}
+.log-toggle {
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #888;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.log-toggle:hover {
+    border-color: #00d4aa;
+    color: #00d4aa;
+}
+.log-toggle.active {
+    background: rgba(0, 212, 170, 0.2);
+    border-color: #00d4aa;
+    color: #00d4aa;
+}
+.chart-wrapper {
+    position: relative;
+    height: 300px;
+}
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+    background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%);
+    border-radius: 16px;
+    max-width: 600px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    border: 1px solid rgba(0, 212, 170, 0.3);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.modal-header {
+    padding: 20px 25px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.modal-header h3 {
+    color: #00d4aa;
+    font-size: 1.4rem;
+    margin: 0;
+}
+.modal-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 107, 107, 0.2);
+    border: 1px solid #ff6b6b;
+    color: #ff6b6b;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.modal-close:hover {
+    background: #ff6b6b;
+    color: #fff;
+}
+.modal-body {
+    padding: 25px;
+    line-height: 1.7;
+}
+.modal-body p { margin-bottom: 15px; }
+.modal-body strong { color: #00d4aa; }
+.modal-body ul { margin: 15px 0; padding-left: 20px; }
+.modal-body li { margin-bottom: 8px; }
+.metric-highlight {
+    background: rgba(0, 212, 170, 0.1);
+    border-left: 3px solid #00d4aa;
+    padding: 12px 15px;
+    margin: 15px 0;
+    border-radius: 0 8px 8px 0;
+}
+/* Investment Overview Section */
+.overview-section {
+    max-width: 1400px;
+    margin: 0 auto 30px;
+}
+.overview-toggle {
+    width: 100%;
+    background: rgba(0, 212, 170, 0.1);
+    border: 1px solid rgba(0, 212, 170, 0.3);
+    border-radius: 12px;
+    padding: 16px 24px;
+    color: #00d4aa;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s ease;
+}
+.overview-toggle:hover {
+    background: rgba(0, 212, 170, 0.2);
+}
+.overview-toggle .arrow {
+    transition: transform 0.3s ease;
+}
+.overview-toggle.active .arrow {
+    transform: rotate(180deg);
+}
+.overview-content {
+    display: none;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    padding: 30px;
+    margin-top: -12px;
+}
+.overview-content.active {
+    display: block;
+}
+.overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 25px;
+}
+.overview-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.overview-card h3 {
+    color: #00d4aa;
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.overview-card p {
+    margin-bottom: 12px;
+    line-height: 1.6;
+}
+.overview-card ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.overview-card li {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    line-height: 1.5;
+}
+.overview-card li:last-child {
+    border-bottom: none;
+}
+.overview-card.bull h3 { color: #00d4aa; }
+.overview-card.bear h3 { color: #ff6b6b; }
+.overview-card.risks h3 { color: #fdcb6e; }
+.risk-high { color: #ff6b6b; }
+.risk-moderate { color: #fdcb6e; }
+.risk-low { color: #00d4aa; }
+.revenue-stream {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.revenue-stream .percent {
+    color: #00d4aa;
+    font-weight: 600;
+}
+.trend-growing { color: #00d4aa; }
+.trend-stable { color: #888; }
+.trend-declining { color: #ff6b6b; }
+
+@media (max-width: 768px) {
+    .charts-container { grid-template-columns: 1fr; }
+    .overview-grid { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.8rem; }
+}
+/* DCF Valuation Section */
+.dcf-section {
+    max-width: 1400px;
+    margin: 0 auto 40px;
+}
+.dcf-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+.dcf-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease;
+}
+.dcf-card:hover {
+    transform: translateY(-3px);
+}
+.dcf-card.highlight {
+    background: rgba(0, 212, 170, 0.1);
+    border-color: rgba(0, 212, 170, 0.3);
+}
+.dcf-label {
+    font-size: 0.85rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+}
+.dcf-value {
+    font-size: 2.2rem;
+    font-weight: bold;
+    color: #00d4aa;
+}
+.dcf-card:not(.highlight) .dcf-value {
+    color: #fff;
+}
+.dcf-change {
+    font-size: 1rem;
+    margin-top: 8px;
+    font-weight: 600;
+}
+.dcf-change.positive { color: #00d4aa; }
+.dcf-change.negative { color: #ff6b6b; }
+.dcf-sublabel {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 8px;
+}
+.dcf-warning {
+    background: rgba(253, 203, 110, 0.15);
+    border: 1px solid rgba(253, 203, 110, 0.4);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 25px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #fdcb6e;
+}
+.warning-icon {
+    font-size: 1.2rem;
+}
+/* DCF Inputs Display */
+.dcf-inputs {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.dcf-inputs h4 {
+    color: #e0e0e0;
+    margin-bottom: 15px;
+    font-size: 1rem;
+}
+.dcf-inputs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+.dcf-input-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.dcf-input-label {
+    font-size: 0.75rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+.dcf-input-value {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #00d4aa;
+}
+.dcf-input-note {
+    font-size: 0.7rem;
+    color: #666;
+    margin-top: 4px;
+}
+.fcf-projections h5 {
+    color: #b0b0b0;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+}
+.fcf-projection-table {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 12px;
+}
+.fcf-projection-item {
+    text-align: center;
+}
+.fcf-projection-item.header {
+    font-size: 0.75rem;
+    color: #888;
+    font-weight: 600;
+}
+.fcf-projection-item .year {
+    font-size: 0.75rem;
+    color: #888;
+    margin-bottom: 2px;
+}
+.fcf-projection-item .fcf-value {
+    font-size: 1rem;
+    color: #e0e0e0;
+    font-weight: 500;
+}
+.fcf-projection-item .growth-rate {
+    font-size: 0.75rem;
+    color: #00d4aa;
+    margin-top: 2px;
+}
+.dcf-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 25px;
+    margin-bottom: 30px;
+    padding: 25px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.slider-group label {
+    font-size: 0.95rem;
+    color: #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+}
+.slider-group label span {
+    color: #00d4aa;
+    font-weight: 600;
+}
+.slider-group input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #00d4aa;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+.slider-hint {
+    font-size: 0.8rem;
+    color: #666;
+}
+.scenario-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+.scenario-tab {
+    padding: 10px 24px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: transparent;
+    color: #888;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+}
+.scenario-tab:hover {
+    border-color: rgba(0, 212, 170, 0.5);
+    color: #e0e0e0;
+}
+.scenario-tab.active {
+    background: rgba(0, 212, 170, 0.15);
+    border-color: #00d4aa;
+    color: #00d4aa;
+}
+.scenario-details {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.scenario-details h4 {
+    color: #00d4aa;
+    margin-bottom: 15px;
+}
+.assumption-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+}
+.assumption-item {
+    text-align: center;
+}
+.assumption-item .label {
+    font-size: 0.8rem;
+    color: #888;
+    margin-bottom: 4px;
+}
+.assumption-item .value {
+    font-size: 1.1rem;
+    color: #e0e0e0;
+    font-weight: 500;
+}
+.sensitivity-section {
+    margin-bottom: 30px;
+}
+.sensitivity-section h4 {
+    color: #e0e0e0;
+    margin-bottom: 15px;
+}
+.sensitivity-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.sensitivity-table th,
+.sensitivity-table td {
+    padding: 12px 16px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.sensitivity-table th {
+    background: rgba(0, 212, 170, 0.1);
+    color: #00d4aa;
+    font-weight: 600;
+}
+.sensitivity-table td {
+    color: #e0e0e0;
+}
+.sensitivity-table td.highlight {
+    background: rgba(0, 212, 170, 0.15);
+    color: #00d4aa;
+    font-weight: 600;
+}
+.sensitivity-table td.below-current {
+    color: #ff6b6b;
+}
+.sensitivity-table td.above-current {
+    color: #00d4aa;
+}
+.historical-growth {
+    margin-bottom: 30px;
+}
+.historical-growth h4 {
+    color: #e0e0e0;
+    margin-bottom: 15px;
+}
+.growth-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 15px;
+}
+.growth-item {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.growth-item .metric {
+    font-size: 0.8rem;
+    color: #888;
+    margin-bottom: 6px;
+}
+.growth-item .rate {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+.growth-item .rate.positive { color: #00d4aa; }
+.growth-item .rate.negative { color: #ff6b6b; }
+.growth-item.selected {
+    border-color: #00d4aa;
+    background: rgba(0, 212, 170, 0.1);
+}
+.dcf-download {
+    text-align: center;
+    margin-top: 30px;
+}
+.download-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 28px;
+    background: rgba(0, 212, 170, 0.15);
+    border: 1px solid #00d4aa;
+    border-radius: 8px;
+    color: #00d4aa;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+.download-btn:hover {
+    background: #00d4aa;
+    color: #1a1a2e;
+}
+.download-icon {
+    font-size: 1.2rem;
+}
+/* Additions beyond the original agent template */
+.section-subtitle { font-size: 0.9rem; color: #888; max-width: 1400px; margin: -12px auto 20px; }
+.kpi-note { font-size: 0.75rem; color: #666; margin-top: 6px; line-height: 1.3; }
+.chart-annotation {
+    font-size: 0.75rem; color: #fdcb6e; background: rgba(253, 203, 110, 0.08);
+    border-left: 2px solid #fdcb6e; padding: 6px 10px; margin-top: 10px; border-radius: 0 6px 6px 0;
+}
+.dcf-philosophy {
+    background: rgba(255, 255, 255, 0.03); border-left: 3px solid #00d4aa; border-radius: 0 10px 10px 0;
+    padding: 16px 20px; margin-bottom: 25px; font-size: 0.92rem; line-height: 1.7; color: #b0b0b0;
+}
+.dcf-philosophy strong { color: #00d4aa; }
+.scenario-narrative { font-size: 0.9rem; color: #b0b0b0; line-height: 1.6; margin-bottom: 18px; }
+.dcf-banner {
+    max-width: 1400px; margin: 0 auto 25px; background: rgba(255, 107, 107, 0.12);
+    border: 1px solid rgba(255, 107, 107, 0.4); border-radius: 8px; padding: 12px 16px; color: #ff6b6b;
+}
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>South32 Limited (S32.AX)</h1>
+    <p>Operating company &middot; reported in USD &middot; quoted in AUD</p>
+    <div class="header-valuation" id="headerValuation" style="display:none"></div>
+</div>
+
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid" id="overviewGrid"></div>
+    </div>
+</div>
+
+<div class="kpi-grid" id="kpiGrid">
+    <div class="kpi-card">
+        <div class="kpi-value">$5,816.0m</div>
+        <div class="kpi-label">Revenue (latest FY)</div>
+        <div class="kpi-change positive">+0.6% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">$1,087.0m</div>
+        <div class="kpi-label">Net Income</div>
+        <div class="kpi-change positive">+410.3% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">$540.0m</div>
+        <div class="kpi-label">Free Cash Flow (reported)</div>
+        <div class="kpi-change positive">+45.2% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">$453.0m</div>
+        <div class="kpi-label">Owner FCF (DCF base)</div>
+        <div class="kpi-change positive">after SBC, interest income &amp; leases</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">$2,134.0m</div>
+        <div class="kpi-label">Cash &amp; Equivalents</div>
+        <div class="kpi-change positive">+27.3% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">$1,851.0m</div>
+        <div class="kpi-label">Total Debt</div>
+        <div class="kpi-change positive">+13.3% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">4,486</div>
+        <div class="kpi-label">Shares Outstanding (m)</div>
+        <div class="kpi-change negative">-0.4% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">0.2</div>
+        <div class="kpi-label">EPS</div>
+        <div class="kpi-change positive">+412.8% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">$2,462.0m</div>
+        <div class="kpi-label">Underlying EBITDA</div>
+        <div class="kpi-change positive">+27.7% YoY</div>
+        <div class="kpi-note">South32&#x27;s headline non-IFRS measure</div>
+    </div>
+</div>
+
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf">-</span> | <span id="guidanceFY">-</span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<h2 class="section-title">Growth &amp;amp; Profitability</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Revenue &amp;amp; YoY Growth</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('revenueChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('revenueChart', 'interim', this)">H1/H2</button>
+                <button class="help-btn" onclick="openModal('revenue')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="revenueChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Margins</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('marginsChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('marginsChart', 'interim', this)">H1/H2</button>
+                <button class="help-btn" onclick="openModal('margins')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="marginsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Gross Profit, Operating Income &amp;amp; Net Income</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('profitChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('profitChart', 'interim', this)">H1/H2</button>
+                <button class="help-btn" onclick="openModal('profit')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="profitChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>EBITDA &amp;amp; EBITDA Margin</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('ebitdaChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('ebitdaChart', 'interim', this)">H1/H2</button>
+                <button class="log-toggle" onclick="toggleLogScale('ebitdaChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('ebitda')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="ebitdaChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>EPS &amp;amp; Dividend per Share</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('epsDps')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="epsDpsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Underlying EBITDA &amp;amp; Underlying EBIT</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('underlyingEbitdaChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('underlyingEbitdaChart', 'interim', this)">H1/H2</button>
+                <button class="log-toggle" onclick="toggleLogScale('underlyingEbitdaChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('underlyingEbitda')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="underlyingEbitdaChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Income: Statutory vs Continuing Operations</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('statutoryVsContinuingChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('statutoryVsContinuingChart', 'interim', this)">H1/H2</button>
+                <button class="help-btn" onclick="openModal('statutoryVsContinuing')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="statutoryVsContinuingChart"></canvas></div>
+        <div class="chart-annotation">Divestments (Illawarra Coal, Cerro Matoso, pending Alcoa aluminium-chain sale) move discontinued operations in and out of the statutory line.</div>
+    </div>
+</div>
+<h2 class="section-title">Cash Flow &amp;amp; Balance Sheet</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Income vs Free Cash Flow vs Owner FCF</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('fcfChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('fcfChart', 'interim', this)">H1/H2</button>
+                <button class="help-btn" onclick="openModal('fcf')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="fcfChart"></canvas></div>
+        <div class="chart-annotation">Owner FCF, where shown, is the DCF's series after SBC, interest income and lease principal.</div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Operating Cash Flow &amp;amp; CapEx</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('ocfCapexChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('ocfCapexChart', 'interim', this)">H1/H2</button>
+                <button class="help-btn" onclick="openModal('ocfCapex')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="ocfCapexChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Cash vs Total Debt</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('cashDebtChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('cashDebtChart', 'interim', this)">H1/H2</button>
+                <button class="help-btn" onclick="openModal('cashDebt')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="cashDebtChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shareholders&#x27; Equity vs Total Liabilities</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('balanceChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('balanceChart', 'interim', this)">H1/H2</button>
+                <button class="log-toggle" onclick="toggleLogScale('balanceChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('balanceSheet')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="balanceChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Stock-Based Comp &amp;amp; Shares Outstanding</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('sbcChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('sbcChart', 'interim', this)">H1/H2</button>
+                <button class="help-btn" onclick="openModal('sbc')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="sbcChart"></canvas></div>
+    </div>
+</div>
+
+<h2 class="section-title">DCF Valuation</h2>
+
+<div class="dcf-section">
+  <div class="dcf-philosophy" id="dcfPhilosophy"></div>
+
+  <div class="dcf-summary">
+    <div class="dcf-card highlight">
+      <div class="dcf-label">Prob-Weighted IV</div>
+      <div class="dcf-value" id="dcfWeighted">-</div>
+      <div class="dcf-change" id="dcfWeightedUpside"></div>
+      <div class="dcf-sublabel" id="dcfWeightedSublabel">-</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Intrinsic Value (Base)</div>
+      <div class="dcf-value" id="dcfIV">-</div>
+      <div class="dcf-change positive" id="dcfUpside"></div>
+      <div class="dcf-sublabel">Owner FCF &mdash; after SBC, interest income &amp; leases</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Entry Price (15% CAGR)</div>
+      <div class="dcf-value" id="dcfEntry">-</div>
+      <div class="dcf-sublabel">Buy below for a 15% annual return (incl. interim FCF)</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Current Price</div>
+      <div class="dcf-value" id="dcfCurrent">-</div>
+      <div class="dcf-sublabel">as of 2026-09-25</div>
+    </div>
+  </div>
+
+  <div class="dcf-warning" id="growthWarning" style="display: none;">
+    <span class="warning-icon">&#9888;</span>
+    <span id="warningText"></span>
+  </div>
+
+  <div class="dcf-inputs">
+    <h4>DCF Model Inputs</h4>
+    <div class="dcf-inputs-grid">
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Base Owner FCF (FY2026)</div>
+        <div class="dcf-input-value" id="baseFCF">-</div>
+        <div class="dcf-input-note" id="sbcBreakdown">Starting point for projections</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Shares Outstanding</div>
+        <div class="dcf-input-value" id="sharesOut">-</div>
+        <div class="dcf-input-note" id="dilutionNote"></div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Net Debt</div>
+        <div class="dcf-input-value" id="netDebt">-</div>
+        <div class="dcf-input-note">Negative = net cash</div>
+      </div>
+    </div>
+    <div class="fcf-projections">
+      <h5>Projected FCF</h5>
+      <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+    </div>
+  </div>
+
+  <!-- step is fine enough to hold every scenario default exactly; a range
+       input snaps to its step and 7.5 became 8 on NPH.NZ with step="1". -->
+  <div class="slider-hint" id="dcfEngineNote" style="max-width:1400px;margin:0 auto 8px"></div>
+  <div class="dcf-controls">
+    <div class="slider-group">
+      <label>Growth Rate (Yr 1): <span id="growthValue">-</span></label>
+      <input type="range" id="growthSlider" min="-11.4" max="30" value="0.2" step="0.1" oninput="updateDCFDisplay()">
+      <div class="slider-hint" id="growthHint">Base-case Year-1 revenue growth</div>
+    </div>
+    <div class="slider-group">
+      <label>WACC: <span id="waccValue">-</span></label>
+      <input type="range" id="waccSlider" min="6" max="18" value="10" step="0.05" oninput="updateDCFDisplay()">
+    </div>
+    <div class="slider-group">
+      <label>Terminal Growth: <span id="terminalValue">-</span></label>
+      <input type="range" id="terminalSlider" min="0" max="5" value="2" step="0.1" oninput="updateDCFDisplay()">
+    </div>
+  </div>
+
+  <div class="scenario-tabs">
+    <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+    <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+    <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+  </div>
+
+  <div class="scenario-details" id="scenarioDetails">
+    <h4>Assumptions</h4>
+    <div class="scenario-narrative" id="scenarioNarrative"></div>
+    <div class="assumption-grid" id="assumptionGrid"></div>
+  </div>
+
+  <div class="sensitivity-section">
+    <h4>Sensitivity Analysis: Intrinsic Value by WACC &amp; Terminal Growth (Base Case)</h4>
+    <table class="sensitivity-table" id="sensitivityMatrix"></table>
+  </div>
+
+  <div class="historical-growth">
+    <h4>Historical Growth Rates (CAGR)</h4>
+    <div class="growth-grid" id="growthGrid"></div>
+  </div>
+
+  <div class="dcf-download">
+    <a href="S32.AX_DCF_Model.xlsx" class="download-btn" download>
+      <span class="download-icon">&#8681;</span> Download Excel Model
+    </a>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// EMBEDDED DATA (generated by scripts/build_dashboard.py -- do not hand-edit;
+// edit the Spec JSON / CSV / Analysis / DCF and rebuild)
+// ============================================================
+const csvData = `Period,Revenue,CostOfRevenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,EBITDA,NetIncome,NetMargin,EPS,OperatingCashFlow,CapEx,FreeCashFlow,ShareholdersEquity,TotalAssets,TotalLiabilities,TotalDebt,CashAndEquivalents,SharesOutstanding,StockBasedComp,DividendPerShare,EBITDABeforeSignificant,RevenueContinuing,EBITDAContinuingBeforeSignificant,EBITContinuingBeforeSignificant,Units,Currency,BasicEPS,EPSDiluted,LeasePrincipalRepaid,NetIncomeContinuing,ShareOfAssociatesProfit,TreasurySharesPurchased,UnderlyingEBIT,UnderlyingEBITDA
+FY2016,5812.0,,,,-1441.0,-24.8,1131.0,-1615.0,-27.8,-0.303,1030.0,400.0,630.0,9422.0,13374.0,3952.0,913.0,1225.0,5330.0,23.0,,1131.0,,,,millions,USD,-0.303,-0.303,,-1615.0,-330.0,3.0,,1131.0
+FY2017,6950.0,,,,1795.0,25.8,2411.0,1231.0,17.7,0.229,2132.0,319.0,1813.0,10235.0,14733.0,4498.0,1035.0,2675.0,5306.0,37.0,,2411.0,,,,millions,USD,0.232,0.229,,1231.0,312.0,27.0,,2411.0
+FY2018,7549.0,,,,1719.0,22.8,2516.0,1332.0,17.6,0.254,1717.0,436.0,1281.0,10709.0,15133.0,4424.0,929.0,2970.0,5120.0,40.0,,2516.0,,,,millions,USD,0.258,0.254,,1332.0,521.0,84.0,,2516.0
+FY2019,7274.0,,,,887.0,12.2,2197.0,389.0,5.3,0.076,1817.0,710.0,1107.0,10168.0,14715.0,4547.0,904.0,1408.0,5006.0,38.0,,2197.0,,,,millions,USD,0.077,0.076,,389.0,467.0,99.0,,2197.0
+FY2020,6075.0,,,,261.0,4.3,1185.0,-65.0,-1.1,-0.013,1365.0,745.0,620.0,9562.0,13737.0,4175.0,1017.0,1315.0,4846.0,29.0,,1185.0,,,,millions,USD,-0.013,-0.013,,-65.0,100.0,23.0,,1185.0
+FY2021,5476.0,,,,203.0,3.7,1564.0,-195.0,-3.6,-0.041,1405.0,566.0,839.0,8954.0,13242.0,4288.0,1207.0,1613.0,4675.0,32.0,,1564.0,,,,millions,USD,-0.041,-0.041,,142.0,141.0,0.0,,1564.0
+FY2022,9269.0,,,,3724.0,40.2,4755.0,2669.0,28.8,0.57,3070.0,559.0,2511.0,10779.0,16336.0,5557.0,1827.0,2365.0,4628.0,23.0,,4755.0,,,,millions,USD,0.574,0.57,,2669.0,272.0,22.0,,4755.0
+FY2023,7429.0,,,,198.0,2.7,2534.0,-173.0,-2.3,-0.038,1191.0,894.0,297.0,9375.0,14564.0,5189.0,1741.0,1258.0,4545.0,24.0,,2534.0,,,,millions,USD,-0.038,-0.038,,-173.0,246.0,33.0,,2534.0
+H1 FY2024,2507.0,,,,-52.0,-2.1,708.0,53.0,2.1,0.012,203.0,584.0,-381.0,,,,,,4529.0,12.0,,708.0,,,,millions,USD,0.012,0.012,,-26.0,-7.0,8.0,236.0,708.0
+FY2024,5479.0,,,,-735.0,-13.4,1802.0,-203.0,-3.7,-0.045,1119.0,1080.0,39.0,8971.0,14245.0,5274.0,1566.0,842.0,4529.0,22.0,,1802.0,,,,millions,USD,-0.045,-0.045,,-640.0,-59.0,11.0,886.0,1802.0
+H1 FY2025,3123.0,,,,520.0,16.7,1018.0,360.0,11.5,0.08,450.0,478.0,-28.0,9178.0,13855.0,4677.0,1647.0,1600.0,4517.0,10.0,,1018.0,,,,millions,USD,0.08,0.08,,373.0,80.0,5.0,663.0,1018.0
+FY2025,5780.0,,,,554.0,9.6,1928.0,213.0,3.7,0.047,1335.0,963.0,372.0,8857.0,13727.0,4870.0,1634.0,1677.0,4504.0,20.0,,1928.0,,,,millions,USD,0.047,0.047,76.0,315.0,99.0,10.0,1211.0,1928.0
+H1 FY2026,2809.0,,,,532.0,18.9,1107.0,464.0,16.5,0.103,541.0,524.0,17.0,9256.0,13797.0,4541.0,1689.0,1664.0,4486.0,9.0,,1107.0,,,,millions,USD,0.103,0.103,,432.0,115.0,4.0,747.0,1107.0
+FY2026,5816.0,,,,1359.0,23.4,2462.0,1087.0,18.7,0.241,1634.0,1094.0,540.0,9714.0,14491.0,4777.0,1851.0,2134.0,4486.0,20.0,,2462.0,,,,millions,USD,0.242,0.241,110.0,1059.0,89.0,5.0,1717.0,2462.0`;
+
+const analysis = {
+ "ticker": "S32.AX",
+ "company_name": "South32 Limited",
+ "analysis_date": "2026-09-25",
+ "overview": "South32 is a diversified mining and metals company, demerged from BHP in 2015, that mines and processes bauxite, alumina, aluminium, copper, manganese, zinc, lead and silver across the Americas, Australia and Southern Africa. It reports in US dollars with a June fiscal year end and is listed on the ASX, LSE and JSE (ADR: SOUHY). On 30 June 2026 South32 agreed to sell its entire aluminium value chain (Worsley Alumina, Hillside Aluminium, MRN bauxite, Brazil Alumina and Brazil Aluminium) to Alcoa Corporation for up to US$5.6 billion, a transaction expected to complete in H2 FY27 that will re-position the company as an upstream base-metals producer (copper, zinc, silver, lead) alongside a large manganese business.",
+ "business_model": {
+  "summary": "South32 makes money by mining and processing bulk and base metal commodities and selling them into global markets at prevailing (largely USD-denominated) commodity prices; there is no recurring/subscription revenue -- it is a price-taker, volume-and-cost-driven commodity producer with earnings highly leveraged to spot prices for aluminium, alumina, copper, zinc, manganese and silver. Following the FY26 Alcoa agreement and the FY25 divestments of Illawarra Metallurgical Coal (Aug 2024) and Cerro Matoso nickel (Dec 2025), the portfolio is being actively reshaped toward higher-margin base and precious metals.",
+  "revenue_streams": [
+   {
+    "name": "Alumina (Worsley, Brazil Alumina JV) - pending sale to Alcoa",
+    "percent": 18,
+    "trend": "declining (to be divested H2 FY27)"
+   },
+   {
+    "name": "Aluminium (Hillside, Mozal, Brazil Aluminium) - pending sale to Alcoa; Mozal on care & maintenance from Mar-2026",
+    "percent": 16,
+    "trend": "declining (to be divested H2 FY27; Mozal excluded/under care & maintenance)"
+   },
+   {
+    "name": "Base metals - Sierra Gorda copper JV (45%)",
+    "percent": 34,
+    "trend": "growing (record H1 FY26 EBITDA; 4th grinding line, ~30% production uplift from FY31)"
+   },
+   {
+    "name": "Base metals - Cannington zinc-lead-silver (100%)",
+    "percent": 10,
+    "trend": "growing (Ore Reserve +28%, mine life extended to FY33)"
+   },
+   {
+    "name": "Manganese (Australia Manganese 60%, South Africa Manganese 54.6%)",
+    "percent": 18,
+    "trend": "stable/growing (Australia Manganese recovering post-cyclone; ~8% of pro-forma EBITDA post Alcoa deal)"
+   },
+   {
+    "name": "Hermosa development project (Taylor zinc-lead-silver, Clark manganese, Peake copper) - not yet producing",
+    "percent": 0,
+    "trend": "growing (first production Taylor now H1 FY29 vs original guidance, full capacity FY31; capex raised to ~US$3.3B)"
+   }
+  ],
+  "customer_type": "B2B - global industrial/commodity customers (smelters, steel mills, battery/cathode makers, trading houses); commodities sold on global exchange-linked or contract pricing",
+  "geographic_mix": "Operations in Australia, Southern Africa (South Africa, Mozambique), South America (Chile, Colombia, Brazil, Argentina), and North America (Arizona/Hermosa, Alaska/Ambler); Illawarra coal (Australia) and Cerro Matoso (Colombia) divested FY25/FY26; post-Alcoa-completion the aluminium value chain assets in Australia, Brazil and Mozal (South Africa/Mozambique JV, excluded from sale) exit the portfolio"
+ },
+ "competitive_position": {
+  "main_competitors": [
+   "BHP Group",
+   "Rio Tinto",
+   "Glencore",
+   "Alcoa (post-transaction, in alumina/aluminium)",
+   "Freeport-McMoRan and other copper miners",
+   "Anglo American",
+   "OM Holdings / Eramet (manganese)"
+  ],
+  "market_position": "Mid-tier diversified miner; globally significant producer of manganese ore (Australia Manganese and South Africa Manganese together make it one of the largest seaborne manganese suppliers) and a meaningful producer of alumina/aluminium (pending divestment) and silver/lead/zinc (Cannington is one of the world's highest-grade silver-lead-zinc mines); minority (45%) stakeholder in the large Sierra Gorda copper mine in Chile, not an operator",
+  "moat_factors": [
+   {
+    "factor": "High-grade, low-cost orebodies",
+    "strength": "moderate",
+    "description": "Cannington is a high-grade, high-margin zinc-lead-silver mine (53% operating margin in H1 FY26); Sierra Gorda delivered a 68% EBITDA margin in H1 FY26, reflecting favorable cost position, though these are asset-specific rather than company-wide advantages"
+   },
+   {
+    "factor": "Scale in manganese",
+    "strength": "moderate",
+    "description": "Combined Australian and South African manganese operations give South32 meaningful influence over a concentrated global seaborne manganese market, a key steel and battery input"
+   },
+   {
+    "factor": "Long-life reserve base and growth optionality",
+    "strength": "moderate",
+    "description": "Hermosa's Taylor deposit (extended to ~33-year mine life), Ambler Metals (Alaska), and Sierra Gorda's fourth grinding line provide multi-decade production and optionality, though most require large, multi-year capital commitments before generating cash"
+   },
+   {
+    "factor": "Balance sheet / capital discipline",
+    "strength": "moderate",
+    "description": "Net debt of only US$25M at Dec-2025, an active US$2.6B capital-return program, and the Alcoa deal (which also removes ~US$1.1-1.2B of rehabilitation liabilities) support financial flexibility"
+   }
+  ],
+  "weaknesses": [
+   "No pricing power - a pure price-taker on globally-traded commodities with cost, not brand, as the main lever",
+   "Minority, non-operated stakes in several key assets (Sierra Gorda 45%, Ambler Metals 50%, Brazil Alumina/Aluminium JVs), limiting operational control",
+   "Post-Alcoa-completion the portfolio becomes materially smaller and more concentrated (~85% of earnings from base/precious metals), increasing single-commodity and single-asset (Sierra Gorda, Cannington, Hermosa) concentration risk",
+   "History of operational disruptions - Tropical Cyclone Megan at Australia Manganese, Mozal Aluminium power curtailment/care & maintenance, and a fatality at Worsley Alumina (Mar-2026) highlight execution and safety risk",
+   "Hermosa Taylor project capex has already grown by ~US$1.1B versus original approval (to ~US$3.3B) with first production pushed out from FY28 to H1 FY29 (full capacity FY31), evidencing execution/cost-overrun risk on its flagship growth project"
+  ]
+ },
+ "growth_drivers": [
+  "Alcoa transaction (announced 30 Jun 2026, ~US$5.6B, completion H2 FY27) reshapes South32 into a higher-margin, base-metals-focused producer, expected to lift base/precious metals' share of earnings to ~85% pro-forma and free up balance sheet capacity for growth and returns",
+  "Hermosa Taylor zinc-lead-silver project construction (federal NEPA permitting completed Jul-2026; Notice to Proceed expected Q1 FY27) - expected to almost double Group silver production once ramped, with adjacent Peake copper and Clark manganese deposits offering further optionality",
+  "Sierra Gorda fourth grinding line - feasibility study advancing, targeting ~20% increase in plant throughput and ~30% increase in copper-equivalent production from FY31, subject to a joint venture partner FID expected mid-CY26",
+  "Cannington underground Ore Reserve increased 28% in H1 FY26, extending mine life ~2 years to FY33, with additional underground and open-pit growth options under study",
+  "Ambler Metals (Alaska) - US Government support for the Ambler Access Road (Oct-2025) and Arctic deposit's acceptance into the FAST-41 covered-projects program (May-2026) are unlocking a high-grade copper/zinc growth option; approved/under-construction projects across the portfolio are expected to grow copper-equivalent production by ~55%",
+  "Secular demand tailwinds - copper, zinc, silver and manganese are all positioned as critical inputs to electrification, EVs, renewable energy, AI/data-centre buildout and battery technology",
+  "Capital management - ordinary dividend policy of minimum 40% of Underlying earnings, plus an active buyback/capital-return program (extended to Sept-2027, US$209M remaining as of FY26 year-end)"
+ ],
+ "risks": {
+  "business": [
+   {
+    "risk": "Commodity price cyclicality",
+    "severity": "high",
+    "description": "Earnings are directly exposed to volatile global prices for alumina, aluminium, copper, zinc, manganese and silver; H1 FY26 alumina price fell 27% YoY, cutting alumina EBITDA by US$365M even as base metals prices rose"
+   },
+   {
+    "risk": "Hermosa/Taylor execution and cost overrun risk",
+    "severity": "high",
+    "description": "Taylor's growth capex has risen by ~US$1.1B to ~US$3.3B and first production has slipped from the original schedule to H1 FY29 (full capacity FY31), driven by contractor productivity issues, inflation and tariff-driven input cost increases"
+   },
+   {
+    "risk": "Non-operated joint venture concentration",
+    "severity": "moderate",
+    "description": "Large stakes in Sierra Gorda (45%) and Ambler Metals (50%) mean South32 does not control operating decisions, capital allocation timing or cost outcomes at some of its most important growth assets"
+   },
+   {
+    "risk": "Alcoa transaction completion risk",
+    "severity": "moderate",
+    "description": "The sale requires South32 shareholder approval and other conditions precedent; expected to complete in H2 FY27, leaving execution, timing, and final consideration (up to US$5.6B, contingent elements) at risk of delay or adjustment"
+   },
+   {
+    "risk": "Operational disruption / safety incidents",
+    "severity": "moderate",
+    "description": "Recent disruptions include Tropical Cyclone Megan's impact on Australia Manganese, Mozal Aluminium's move to care and maintenance (power supply), and a fatality at Worsley Alumina in March 2026"
+   }
+  ],
+  "financial": [
+   {
+    "risk": "Currency exposure",
+    "severity": "moderate",
+    "description": "Revenue and costs are exposed to AUD, ZAR, BRL and CLP movements against the USD reporting currency; a stronger South African rand and Brazilian real reduced H1 FY26 EBIT by US$25M"
+   },
+   {
+    "risk": "Inflation and input cost pressure",
+    "severity": "moderate",
+    "description": "General inflation across Australia, South America and Southern Africa, plus tariff-driven increases in steel, concrete and electrical components, reduced FY26 earnings and inflated Hermosa's growth capex"
+   },
+   {
+    "risk": "Tax and royalty exposure",
+    "severity": "moderate",
+    "description": "Underlying effective tax rate of 34.2% in H1 FY26 reflects multiple high-tax/royalty jurisdictions (Australia Manganese royalty-related tax of 20% of adjusted EBIT; Sierra Gorda royalty-related tax of 5-14%)"
+   }
+  ],
+  "regulatory": [
+   {
+    "risk": "Multi-jurisdiction regulatory/permitting risk",
+    "severity": "moderate",
+    "description": "Growth projects depend on permitting and government support across the US (Hermosa NEPA, Ambler Access Road, FAST-41), Chile, Australia and Southern Africa; the Alcoa transaction also requires various regulatory clearances across the jurisdictions in which the aluminium assets operate"
+   },
+   {
+    "risk": "Climate/decarbonisation obligations",
+    "severity": "moderate",
+    "description": "Target to halve Scope 1 and 2 emissions by FY35 (from FY21 levels) and reach net zero by 2050 requires ongoing capital investment in decarbonisation; a non-binding Climate Change Action Plan resolution passed with 90% shareholder support in Oct-2025, but future capex/compliance costs remain a variable"
+   },
+   {
+    "risk": "Rehabilitation and closure liabilities",
+    "severity": "moderate",
+    "description": "Mine closure and rehabilitation obligations are significant (Alcoa is assuming ~US$1.1-1.2B of rehabilitation provisions as part of the aluminium sale), and other operations carry similar long-dated environmental liabilities"
+   }
+  ],
+  "macro": [
+   {
+    "risk": "China/global demand sensitivity",
+    "severity": "high",
+    "description": "Prices for alumina, aluminium, copper, zinc and manganese are highly sensitive to Chinese industrial demand and global growth expectations, as well as supply-side dynamics in those commodity markets"
+   },
+   {
+    "risk": "Energy costs and security of supply",
+    "severity": "moderate",
+    "description": "Mozal Aluminium was forced into care and maintenance in March 2026 due to an inability to secure sufficient, affordable electricity - illustrating energy security/cost risk for energy-intensive smelting operations generally"
+   },
+   {
+    "risk": "Interest rate and capital markets sensitivity",
+    "severity": "low",
+    "description": "Net debt is low (US$25M at Dec-2025) limiting direct rate sensitivity, though large growth capex programs (Hermosa, Sierra Gorda) are sensitive to the cost and availability of capital and to commodity price assumptions underpinning project returns"
+   }
+  ]
+ },
+ "macro_factors": {
+  "industry_outlook": "Diversified mining sector outlook is mixed: bulk/alumina prices have retreated from elevated levels while base and precious metals (copper, zinc, silver) have strengthened on electrification, AI/data-centre and renewable energy demand narratives; South32 is deliberately rotating its portfolio toward the latter",
+  "cyclicality": "High - commodity price cycles drive earnings volatility across all segments; South32's FY26 results show earnings swinging materially between segments (alumina down sharply, base metals and manganese up) within a single half-year",
+  "interest_rate_sensitivity": "Low direct balance-sheet sensitivity given low net debt, but moderate indirect sensitivity via the cost of capital for large development projects (Hermosa) and via the impact of rates on global growth/commodity demand",
+  "key_input_costs": [
+   "Electricity (critical for aluminium smelting - Hillside, Mozal)",
+   "Coke and other smelter raw materials",
+   "Steel, concrete and electrical components for construction (Hermosa)",
+   "Diesel/freight",
+   "Labour and contractor costs"
+  ]
+ },
+ "recent_developments": [
+  {
+   "date": "2025-10",
+   "event": "US Government announced authorisations for the Ambler Access Road, a key enabler for the Ambler Metals copper/zinc joint venture in Alaska"
+  },
+  {
+   "date": "2025-10",
+   "event": "Non-binding shareholder resolution on South32's second Climate Change Action Plan passed AGM with 90% support"
+  },
+  {
+   "date": "2025-12",
+   "event": "Completed divestment of Cerro Matoso (Colombian ferronickel operation) to a subsidiary of CoreX Holding B.V., further streamlining the portfolio toward base metals"
+  },
+  {
+   "date": "2025-12",
+   "event": "Announced Mozal Aluminium would transition to care and maintenance around 15 March 2026 due to inability to secure sufficient, affordable electricity; divestment now under active consideration"
+  },
+  {
+   "date": "2026-02",
+   "event": "H1 FY26 results: Underlying EBITDA up 9% to US$1,107M, Underlying earnings up 16% to US$435M, interim dividend of 3.9 US cents/share (40% payout), net debt of only US$25M; Cannington underground Ore Reserve increased 28%, extending mine life to FY33; capital management program increased by US$100M to US$2.6B"
+  },
+  {
+   "date": "2026-03",
+   "event": "Mozal Aluminium placed on care and maintenance; a fatality occurred at Worsley Alumina in Western Australia"
+  },
+  {
+   "date": "2026-03",
+   "event": "Board leadership transition: Stephen Pearce became Chair (replacing Karen Wood AM); Matt Daley joined as Deputy CEO ahead of becoming CEO"
+  },
+  {
+   "date": "2026-04",
+   "event": "Hermosa Taylor project update: operating life extended 5 years to ~33 years, Ore Reserve/Mineral estimates up 52% to 99Mt, but growth capex raised by ~US$1.1B to ~US$3.3B and first production pushed to H1 FY29 (full capacity FY31) due to contractor productivity challenges, inflation and tariffs; Peake copper deposit Mineral Resource up 32%"
+  },
+  {
+   "date": "2026-05",
+   "event": "Ambler Metals' Arctic polymetallic deposit accepted as a covered project under the US FAST-41 program, accelerating federal permitting"
+  },
+  {
+   "date": "2026-06-30",
+   "event": "Entered binding conditional agreement to sell the aluminium value chain (Worsley Alumina, Hillside Aluminium, MRN bauxite stake, Brazil Alumina and Brazil Aluminium JVs) to Alcoa Corporation for up to US$5.6 billion, plus Alcoa assuming ~US$1.1-1.2B of rehabilitation provisions; expected to complete H2 FY27 subject to shareholder and regulatory approval; Matt Daley assumed CEO role effective 1 July 2026, succeeding Graham Kerr"
+  },
+  {
+   "date": "2026-07",
+   "event": "US Forest Service issued the Final Record of Decision for Hermosa, completing NEPA federal permitting; Notice to Proceed on track for Q1 FY27"
+  },
+  {
+   "date": "2026-08",
+   "event": "FY26 full-year results: Underlying EBITDA up 28% to US$2,462M, Underlying earnings up 55% to US$1,032M, full-year dividend up 55% to 9.3 US cents/share, free cash flow up to US$610M; capital management program extended to Sept-2027 (US$209M remaining); shares reached a 10-year high (~A$5.09) with ~43% YTD gains amid the base-metals re-rating narrative"
+  }
+ ],
+ "guidance": {
+  "as_of": "FY2026 Annual Results / H1 FY26 Results (August 2026 / February 2026)",
+  "fiscal_year": "FY2027",
+  "items": [
+   {
+    "metric": "Sierra Gorda copper production growth",
+    "target": "+5% in FY27, +2% further in FY28",
+    "period": "FY2027-FY2028",
+    "vs_prior": "maintained/refined",
+    "notes": "Reflects continued ramp-up ahead of the potential fourth grinding line FID (targeted mid-CY26)"
+   },
+   {
+    "metric": "Cannington zinc-equivalent production",
+    "target": "Broadly steady vs FY26 (FY26 guidance was 200.6kt zinc-equivalent)",
+    "period": "FY2026-FY2027",
+    "vs_prior": "maintained",
+    "notes": "Underground Ore Reserve extended to FY33 following a 28% increase in H1 FY26; open-pit and further underground extension studies ongoing"
+   },
+   {
+    "metric": "Hermosa Taylor first production",
+    "target": "H1 FY29 (shafts); ramp to full nameplate capacity by FY31",
+    "period": "FY2029-FY2031",
+    "vs_prior": "lowered/delayed",
+    "notes": "Previously targeted earlier first production and FY30 full capacity; delay driven by contractor productivity challenges. Growth capex guidance raised to ~US$3.3B (~US$1.1B increase vs original Jan-2024 approval)"
+   },
+   {
+    "metric": "Worsley Alumina / bauxite production",
+    "target": "2.65-2.90 million wet metric tonnes",
+    "period": "FY2027",
+    "vs_prior": "new guidance",
+    "notes": "Constrained by mine pit access due to elevated water levels; asset pending sale to Alcoa (completion H2 FY27)"
+   },
+   {
+    "metric": "Aluminium/Hillside/Mozal/Brazil Aluminium production",
+    "target": "FY26 guidance for continuing aluminium assets largely unchanged; Brazil Aluminium production guidance cut to 135kt (from 160kt) FY26 and 140kt (from 165kt) FY27; Mozal Aluminium on care and maintenance from mid-March 2026",
+    "period": "FY2026-FY2027",
+    "vs_prior": "lowered (Brazil Aluminium); Mozal suspended",
+    "notes": "Brazil Aluminium cut due to unplanned pot outages and external energy disruptions; entire aluminium value chain pending divestment to Alcoa (H2 FY27 completion)"
+   },
+   {
+    "metric": "Dividend policy",
+    "target": "Minimum 40% of Underlying earnings attributable to members as ordinary dividends",
+    "period": "Ongoing",
+    "vs_prior": "maintained",
+    "notes": "FY26 final dividend of 5.4 US cents/share (41% payout); full-year FY26 dividend 9.3 US cents/share, up 55% YoY"
+   },
+   {
+    "metric": "Capital management program",
+    "target": "US$2.6B total program, US$209M remaining to be returned to shareholders",
+    "period": "Through September 2027",
+    "vs_prior": "raised and extended",
+    "notes": "Increased by US$100M in Feb-2026 and extended by a further six months to 10 September 2027 at FY26 results"
+   },
+   {
+    "metric": "Pro-forma earnings mix post-Alcoa transaction",
+    "target": "~85% of Earnings from base and precious metals (from ~50-55% pre-transaction)",
+    "period": "Post-completion (H2 FY27)",
+    "vs_prior": "new disclosure",
+    "notes": "Approved/under-construction growth projects expected to lift copper-equivalent production by ~55%"
+   }
+  ],
+  "management_commentary": "Incoming CEO Matt Daley (effective 1 July 2026) emphasized 'creating a simpler, stronger business and delivering our growth projects,' with priorities centred on completing the Alcoa sale, progressing Hermosa, and growing base metals exposure. Chair Stephen Pearce noted the Alcoa transaction 'is a step change... that accelerates the delivery of our strategy and provides additional balance sheet flexibility to invest in our next phase of growth, while delivering shareholder returns.' Management flagged that FY26 production guidance was largely unchanged across operated businesses at the H1 mark, and that Taylor's capex increase and schedule slip reflect industry-wide inflation, contractor productivity and US tariff impacts rather than asset quality issues."
+ },
+ "bull_case": [
+  "Transformational Alcoa transaction (up to US$5.6B, completing H2 FY27) sheds the lower-margin, capital-intensive aluminium value chain and ~US$1.1-1.2B of rehabilitation liabilities, leaving a simpler, higher-margin base-metals-and-manganese portfolio (~85% of pro-forma earnings from base/precious metals) that could re-rate toward peer base-metals multiples",
+  "Strong balance sheet (net debt just US$25M at Dec-2025) and an active, extended capital-return program (US$2.6B total, US$209M remaining through Sept-2027) support shareholder returns even while funding growth capex",
+  "Multiple base-metals growth options - Sierra Gorda's fourth grinding line (~30% copper-equivalent uplift from FY31), Cannington's extended mine life (to FY33) and open-pit optionality, and Hermosa's Taylor/Peake/Clark polymetallic deposits - position South32 to benefit from secular electrification, AI/data-centre and renewable-energy demand for copper, zinc, silver and manganese",
+  "FY26 delivered record profitability (Underlying EBITDA +28% to US$2,462M, Underlying earnings +55% to US$1,032M) and the share price reached a 10-year high (~43% YTD gain to Aug-2026), evidencing strong operating momentum and market recognition of the portfolio shift",
+  "Manganese scale (Australia + South Africa) gives South32 a strategically significant position in a commodity increasingly valued for battery cathode chemistries and steel demand"
+ ],
+ "bear_case": [
+  "Flagship Hermosa/Taylor growth project has already seen capex balloon by ~US$1.1B to ~US$3.3B and first production slip to H1 FY29 (full capacity FY31), raising doubts about management's ability to deliver large projects on time and budget, with further slippage a real risk given contractor productivity and tariff-driven cost pressure",
+  "Post-Alcoa-completion earnings concentration rises sharply (~85% from base/precious metals), meaning a downturn in copper, zinc or silver prices would hit a much larger share of Group earnings with less diversification cushion than before",
+  "Key growth assets (Sierra Gorda 45%, Ambler Metals 50%) are non-operated joint ventures, limiting South32's control over capital allocation, cost management and development timing",
+  "Consensus analyst price targets (~A$4.84-5.09) sit close to or slightly below the recent share price (~A$5.09-5.16), suggesting the market may have already priced in much of the transformation story, leaving limited near-term upside absent further commodity price strength or upside surprises",
+  "Operational and safety disruptions recur across the portfolio - Mozal Aluminium's care-and-maintenance due to power supply issues, Tropical Cyclone Megan's earlier impact on Australia Manganese, and a fatality at Worsley Alumina - underscoring execution and ESG/safety risk inherent to a geographically dispersed, multi-commodity mining operation"
+ ]
+};
+
+const dcfData = {
+ "ticker": "S32.AX",
+ "company_name": "South32 Limited",
+ "valuation_date": "2026-09-25",
+ "current_price": 4.94,
+ "model": "owner_fcf_dcf_component",
+ "equity_bridge": [
+  {
+   "item": "Alcoa upfront cash consideration",
+   "value": 3100.0,
+   "note": "AR FY26 note 2(c): US$3,100m cash, locked box 31-Mar-2026, completion H2 FY27"
+  },
+  {
+   "item": "17m Alcoa shares at market",
+   "value": 726.0,
+   "note": "17m x US$42.68 (Yahoo AA, 2026-09-24 close); no haircut applied here, deal-break line below carries the package risk"
+  },
+  {
+   "item": "Price-linked contingent consideration, expected value",
+   "value": 150.0,
+   "note": "Up to US$750m; taken at 20% - requires alumina/aluminium prices above thresholds not disclosed in the AR"
+  },
+  {
+   "item": "5% p.a. equity return fee on upfront cash",
+   "value": 60.0,
+   "note": "5% x 3,100 x ~0.4yr between shareholder approval and completion"
+  },
+  {
+   "item": "Estimated disposal taxes and transaction costs",
+   "value": -300.0,
+   "note": "Assumption: ~8% of cash + share consideration; Hillside (SA CGT) and Brazil JV interests have low tax bases, Worsley reset at the 2015 demerger. Not disclosed - a key unknown"
+  },
+  {
+   "item": "Locked-box leakage (Apr-Jun 2026 aluminium cash inside 30-Jun balance sheet)",
+   "value": -100.0,
+   "note": "Aluminium-chain FCF generated after the locked-box date belongs to Alcoa; ~one quarter (~EBITDA 200 - capex 70 - tax 40) sits in the FY26 net cash and will be adjusted at completion"
+  },
+  {
+   "item": "Deal-break risk adjustment",
+   "value": -114.0,
+   "note": "10% probability the sale fails (FIRB/Brazil/SA approvals, shareholder vote). If it does, the retained chain is worth ~US$2.5B (FCF ~350/yr at 7x cyclical) vs the ~US$3.6B net package: 0.10 x (3,636 - 2,500)"
+  },
+  {
+   "item": "Illawarra Coal contingent consideration receivable at fair value",
+   "value": 152.0,
+   "note": "AR FY26 note: 12 current + 140 non-current, price-linked on met coal for 5 years from Aug-2024"
+  },
+  {
+   "item": "Mozal Aluminium (retained, care & maintenance)",
+   "value": 0.0,
+   "note": "Excluded from the Alcoa sale; divestment under consideration. Sale value assumed to offset holding costs and closure exposure; nil"
+  }
+ ],
+ "historical_growth": {
+  "revenue_3yr_cagr": -7.8,
+  "revenue_5yr_cagr": 1.2,
+  "eps_3yr_cagr": null,
+  "eps_5yr_cagr": null,
+  "equity_3yr_cagr": 1.2,
+  "equity_5yr_cagr": 1.6,
+  "fcf_3yr_cagr": 32.4,
+  "fcf_5yr_cagr": -10.3,
+  "reported_fcf_3yr_cagr": 22.0,
+  "reported_fcf_5yr_cagr": -8.4,
+  "selected_growth_rate": 3.9,
+  "growth_rate_source": "base-case 10-year pro-forma revenue CAGR (3,045 -> ~4,530 by FY36: Taylor + Sierra Gorda 4th line on a mid-cycle deck); historical CAGRs are not used",
+  "growth_divergence_warning": "All CAGRs describe a portfolio that will not exist after H2 FY27: Illawarra Coal (Aug-2024), Cerro Matoso (Dec-2025) and the aluminium chain (~55% of FY26 underlying revenue) are gone. EPS CAGRs are undefined (FY21 and FY23 EPS negative). Owner-FCF series: FY16 580, FY17 1,735, FY18 1,177, FY19 998, FY20 547, FY21 781, FY22 2,422, FY23 195, FY24 -68, FY25 286, FY26 453 - a commodity cycle, not a growth trend.",
+  "notes": "Owner FCF = reported FCF - SBC - cash interest, applied across the full history. The 3yr owner-FCF CAGR of +32% is trough-to-recovery (FY23 base of 195 after the FY22 peak of 2,422) and means nothing; the 5yr -10% is the honest read of a business whose reported FCF has been sustained by asset sales and EAI distributions while growth capex (Hermosa 711 in FY26) consumes it."
+ },
+ "scenario_narratives": {
+  "base": "The company that exists after H2 FY27 is a 45% Sierra Gorda stake, Cannington, a 60%/54.6% manganese business and a US$3.3B zinc-lead-silver mine under construction, plus ~US$3.7B of risk-adjusted Alcoa proceeds and US$1.0B of net cash. Base assumes prices revert from the FY26/FY27 highs (Cu US$5.92-6.20/lb, Ag US$65-71/oz) to a mid-cycle deck (Cu 4.75, Ag 35, Zn 2,800, Mn 4.50) by FY28, which takes continuing EBITDA from ~1,430 (FY26 actual) to ~970. Owner FCF is negative in FY27 (~-670) and FY28 (~-370) while Hermosa consumes US$1,000m then ~550m, turns positive in FY29 and reaches ~630 in FY31 once Taylor (~US$1,000m revenue, ~55% margin at the mid-cycle deck) and the Sierra Gorda fourth grinding line (+30% CuEq) are at capacity. The axes are the price deck and Taylor delivery; the Alcoa package is worth ~A$1.16/share on its own.",
+  "bull": "Copper and silver hold near current levels on the structural-deficit thesis (Cu 5.50, Ag 50), FY27 lands at the full guidance deck, Taylor is on the April-2026 schedule and de-bottlenecks ~25% above design via the Clark decline, the fourth grinding line delivers FY31 and Cannington's open-pit extension replaces the FY33 underground closure. Mature margin 47%, terminal cap 14x. Even here the FY27-28 Hermosa spend keeps cumulative owner FCF negative until FY29.",
+  "bear": "A demand-led price reversion to 2023-24 levels (Cu 3.90, Ag 26, Zn 2,500) coincides with a second Taylor slip and overrun; South32 spends ~US$2.4B of cumulative negative owner FCF over FY27-31 funded by the Alcoa cash, South Africa Manganese is loss-making at the deck, and Cannington closes in FY33 without replacement. The DCF of the continuing business is negative and the equity is essentially the Alcoa proceeds, net cash and the Illawarra receivable, less the Hermosa burn."
+ },
+ "valuation_philosophy": {
+  "summary": "Value the business that will exist, at the prices that persist. South32 post-Alcoa is a US$3.7B cash-and-shares receivable, US$1.0B of net cash, two high-margin base-metals assets it does not fully own or operate, a marginal manganese business and a US$3.3B construction project. The market price (A$4.94, ~US$15.6B) implies an enterprise value of ~US$11B for the continuing operations, which is ~7x FY26 EBITDA at cycle-high prices but ~11x mid-cycle and ~6x the FY31 EBITDA that requires Taylor and the fourth line to arrive. The house view charges the price cycle in the flows: base reverts to mid-cycle, the bear takes 30% weight. Each +US$0.50/lb sustained copper is worth ~A$0.26/share and each +US$10/oz silver ~A$0.64/share; the current price is consistent with a permanent deck near Cu US$5.50-6.00 / Ag US$55-65, which the house does not underwrite.",
+  "key_risks_to_valuation": [
+   "Price deck: the entire gap to the market price is the deck. Sustained copper above US$5.50/lb and silver above US$50/oz would put the base near the current price.",
+   "Hermosa/Taylor execution: capex already +US$1.1B to US$3.3B, first production moved to H2 FY28; another slip in a price trough is the bear case and it consumes most of the Alcoa proceeds.",
+   "Alcoa completion: shareholder vote and FIRB/Brazil/SA approvals; consideration includes 17m Alcoa shares (equity-market exposure) and US$750m price-linked contingent (taken at 20%). Disposal tax (assumed US$300m) is undisclosed.",
+   "Non-operated assets: Sierra Gorda (45%, KGHM operates) and Ambler (50%) control capital timing and costs; the fourth grinding line is a JV decision.",
+   "Cannington reserve life to FY33; base assumes extension, bear does not.",
+   "Rehabilitation/closure provisions on retained assets are not deducted (folder convention); Alcoa assumes ~US$1.1-1.2B of the aluminium chain's provisions, which is part of why the EV looks higher than the cash.",
+   "USD/AUD: the flows are USD, the quote is AUD; a stronger AUD lowers the AUD value per share one-for-one."
+  ]
+ },
+ "data_sources": {
+  "price": "Yahoo Finance chart API at inputs.price_as_of; 52-week range 2.60-5.33. FX AUDUSD=X, parity checked against SOUHY (1 ADR = 5 shares) and S32.L.",
+  "financials": "S32.AX_Metrics.csv (FY2016-FY2026, H1 FY24-26) from the annual reports; FY26 Annual Report for the operations table (p39), segment note 4, capex/other-expenditure guidance (p36-38), balance sheet table (p33), note 2(c) Alcoa transaction terms, Hermosa project update (p23).",
+  "qualitative": "S32.AX_Analysis.json (2026-09-25); AR FY26 outlook and guidance; FY26 results market releases referenced in the AR (Alcoa agreement 1-Jul-2026, Hermosa project update 30-Apr-2026, Sierra Gorda 4th line FID 1-Jul-2026)."
+ },
+ "inputs": {
+  "base_revenue": 3045.0,
+  "base_revenue_basis": "FY2026 pro-forma CONTINUING portfolio on South32's proportional-consolidation (Underlying) basis: Sierra Gorda 1,154 + Cannington 852 + Australia Manganese 675 + South Africa Manganese 364 (AR FY26 operations table, p39). Excludes the aluminium value chain being sold to Alcoa (4,498 of FY26 underlying revenue), Mozal (890; care & maintenance since Mar-2026, retained but valued at nil), Cerro Matoso (divested Dec-2025) and third-party products. Statutory revenue of 5,816 equity-accounts Sierra Gorda and manganese and is NOT the base for the 2,462 Underlying EBITDA, which is proportional; the two bases must not be mixed.",
+  "shares_outstanding": 4500.0,
+  "annual_share_growth_pct": 0.0,
+  "share_count_basis": "4,486m ordinary shares on issue at 30-Jun-2026 (AR FY26 p22) plus ~14m unvested share rights, ~4,500m fully diluted (FY26 diluted EPS denominator 4,503m weighted). Held FLAT: SBC is expensed in the flows; the on-market buyback (US$35m FY26, US$209m remaining to Sep-2027) funds the flat count.",
+  "net_debt": -1031.0,
+  "total_debt": 1103.0,
+  "cash": 2134.0,
+  "net_debt_note": "Ex-lease: cash 2,134 less other interest-bearing liabilities 1,103 = net cash 1,031 (AR FY26 balance sheet table p33). Company-defined net cash is 283 because it also nets lease liabilities of 748; those are charged in the flows instead (lease treatment B). Group cash only; EAI cash and Sierra Gorda's own balance sheet are inside the proportional flows.",
+  "last_fcf": 453.0,
+  "reported_fcf": 540.0,
+  "sbc": 20.0,
+  "sbc_incl_equity_taxes": 20.0,
+  "interest_income": 67.0,
+  "sbc_source": "AR FY26 cash flow statement share-based payments add-back (US$20m); no equity-award withholding tax disclosed (EquityAwardTaxes 0). Interest income stripped is the US$67m 'interest income on cash and cash equivalents' (AR FY26 note, line 2131), NOT the US$487m 'interest received', which is dominated by the US$401m accrued-interest distribution on the Sierra Gorda shareholder loan; that loan and its interest are eliminated on the proportional basis the flows are built on.",
+  "last_fcf_note": "Whole-group FY26 owner FCF for the record: reported FCF 540 (OCF 1,634 - capex 1,094, statutory, includes 503 of EAI net distributions) - SBC 20 - cash interest 67 = 453. The forward flows are NOT anchored to this number: they are rebuilt from the pro-forma continuing revenue base above, because ~55% of FY26 revenue is being sold.",
+  "buyback_cash": 35.0,
+  "currency": "USD",
+  "quote_currency": "AUD",
+  "fx_rate": 1.4253,
+  "fx_note": "Flows and statements in USD; ASX quote in AUD. fx_rate is USD->AUD = 1/0.7016 = 1.4253 (Yahoo AUDUSD=X 0.7016 at 2026-09-25T04:32Z). Parity check: A$4.94 x 0.7016 = US$3.466 vs SOUHY ADR US$17.36 / 5 shares = US$3.472 (0.2% tie, 2026-09-24 close) and S32.L 259.6p. Unsuffixed per-share values are in AUD (quote currency); USD twins are the model currency.",
+  "units": "millions",
+  "fy0": "FY2026",
+  "fiscal_year_end": "30 June",
+  "price_as_of": "2026-09-25T04:12:58Z ASX regular session",
+  "balance_sheet_date": "2026-06-30",
+  "share_count_date": "2026-06-30",
+  "wacc_rationale": "Built in USD, the flows' currency: 10y UST ~4.2% + 5.0% ERP x beta ~1.15 = ~10% cost of equity; net cash, so WACC = cost of equity = 10.0%. No cyclical or execution premium is stacked on top: commodity-price risk is charged in the flows (mid-cycle deck, 30% bear weight) and Hermosa execution risk in the bear path. One WACC across all three scenarios.",
+  "lease_treatment": "B - leases as operating cost. FY26 lease cash = principal 110 + interest 59 = 169 (2.1% of 8,108 underlying revenue); pro-forma continuing share set at 3.0% of revenue (Hermosa alone carries ~US$60m/yr of self-generated-power leases excluded from its capex guidance). Lease liabilities (748) are therefore EXCLUDED from net debt, and da_pct_path is D&A ex right-of-use depreciation.",
+  "nci_treatment": "Sierra Gorda (45%) and Samancor manganese (60%) are equity-accounted; the flows use South32's proportional share so they are attributable by construction. Consolidated NCI is US$14m (Mozal minority) - immaterial, ignored.",
+  "notes": "MODEL: owner-FCF component DCF (SKILL.md row 'operating company, non-US or cyclical') on a PRO-FORMA basis with mid-cycle commodity normalisation. Why pro-forma: on 30-Jun-2026 South32 agreed to sell Worsley, Hillside, Brazil Alumina/Aluminium and MRN to Alcoa (US$3,100m cash + 17m Alcoa shares + up to US$750m price-linked contingent, locked box at 31-Mar-2026, completion H2 FY27). Under the locked box the aluminium chain's post-March-2026 cash accrues to Alcoa, so it is valued as a bridge item at risk-adjusted consideration, not projected. Why mid-cycle: FY26 realised prices (Cu US$5.92/lb, Ag US$66-71/oz, Zn US$3,000/t) and the FY27 guidance deck (Cu 6.20, Ag 65, Zn 3,500, Mn 4.90) are cycle highs; base reverts to Cu 4.75 / Ag 35 / Zn 2,800 / Pb 2,000 / Mn 4.50 by FY28, with FY27 a 50/50 blend. Volumes follow guidance: Sierra Gorda CuEq 91.8kt FY27 / 94.0kt FY28 and +30% from FY31 (fourth grinding line, FID 30-Jun-2026, South32 share of capex ~US$326m FY27-30); Cannington 290kt ZnEq FY27-28 (+41% vs FY26 205.4kt, low-grade stockpile milling); Australia Manganese 2,650-2,900kwmt (vs 3,598 sold in FY26 restart year); Taylor first production H2 FY28, full capacity FY31, steady-state revenue ~US$1,000m / EBITDA ~US$550m at the mid-cycle deck (company: ~US$650m at its deck), growth capex US$3.3B of which ~US$2.7B spent/guided through FY27. Functional cost saving of US$125m/yr fully realised FY29 is in the group-cost line (~110/yr net incl. greenfield exploration and Mozal holding cost). Rehabilitation provisions on retained assets are not deducted (folder convention) - a known omission, ~US$0.5-0.8B undiscounted for Cannington/manganese/Sierra Gorda share. Historical CAGRs describe a portfolio that will not exist and are reported for the record only.",
+  "projected_shares": [
+   4500.0,
+   4500.0,
+   4500.0,
+   4500.0,
+   4500.0,
+   4500.0,
+   4500.0,
+   4500.0,
+   4500.0,
+   4500.0
+  ]
+ },
+ "assumptions": {
+  "bear": {
+   "growth_rates": [
+    -6.4,
+    -18.3,
+    2.0,
+    12.6,
+    14.8,
+    11.4,
+    11.0,
+    -20.0,
+    2.0,
+    2.0
+   ],
+   "ebitda_margin_path": [
+    33.0,
+    25.0,
+    25.0,
+    27.0,
+    29.5,
+    30.0,
+    33.0,
+    32.5,
+    32.5,
+    32.5
+   ],
+   "sbc_pct_path": [
+    0.6,
+    0.6,
+    0.6,
+    0.6,
+    0.6,
+    0.6,
+    0.6,
+    0.6,
+    0.6,
+    0.6
+   ],
+   "lease_cost_pct_path": [
+    3.2,
+    3.2,
+    3.2,
+    3.2,
+    3.2,
+    3.2,
+    3.2,
+    3.2,
+    3.2,
+    3.2
+   ],
+   "da_pct_path": [
+    15.8,
+    19.0,
+    19.0,
+    18.0,
+    17.0,
+    17.0,
+    17.0,
+    17.0,
+    17.0,
+    17.0
+   ],
+   "capex_pct_path": [
+    55.4,
+    59.3,
+    41.3,
+    28.0,
+    23.8,
+    20.8,
+    16.3,
+    17.8,
+    17.0,
+    17.0
+   ],
+   "cash_tax_rate_path": [
+    32.0,
+    30.0,
+    28.0,
+    26.0,
+    28.0,
+    30.0,
+    33.0,
+    33.0,
+    33.0,
+    33.0
+   ],
+   "wc_capture_pct": -10.0,
+   "wacc": 10.0,
+   "terminal_growth": 1.5,
+   "terminal_cap_multiple": 10,
+   "growth_note": "Trough deck from FY28: Cu US$3.90/lb, Ag US$26/oz, Zn US$2,500/t, Mn US$4.00/dmtu -> continuing 2,328 (SAMn loss-making at that deck). Taylor slips a further year (first production FY30, full FY32) with another ~US$500m overrun; 4th line delayed to FY33; Cannington NOT extended and closes end-FY33 (-20% revenue in FY34).",
+   "narrative": "China-led demand slowdown takes copper and silver back to 2023-24 levels while Taylor - already +US$1.1B and a year late - slips again; South32 funds the overrun from the Alcoa proceeds in a price trough, manganese runs at breakeven, and Cannington's FY33 closure is not replaced.",
+   "horizon_years": 10
+  },
+  "base": {
+   "growth_rates": [
+    0.2,
+    -9.5,
+    10.9,
+    11.4,
+    17.3,
+    2.5,
+    2.5,
+    2.5,
+    2.5,
+    2.5
+   ],
+   "ebitda_margin_path": [
+    40.5,
+    35.0,
+    37.0,
+    39.5,
+    43.5,
+    43.5,
+    43.5,
+    43.5,
+    43.5,
+    43.5
+   ],
+   "sbc_pct_path": [
+    0.6,
+    0.6,
+    0.6,
+    0.6,
+    0.6,
+    0.6,
+    0.6,
+    0.6,
+    0.6,
+    0.6
+   ],
+   "lease_cost_pct_path": [
+    3.0,
+    3.0,
+    3.0,
+    3.0,
+    3.0,
+    3.0,
+    3.0,
+    3.0,
+    3.0,
+    3.0
+   ],
+   "da_pct_path": [
+    14.8,
+    16.5,
+    16.0,
+    15.8,
+    15.8,
+    15.5,
+    15.5,
+    15.5,
+    15.5,
+    15.5
+   ],
+   "capex_pct_path": [
+    51.8,
+    40.9,
+    24.5,
+    20.2,
+    15.5,
+    15.5,
+    15.5,
+    15.5,
+    15.5,
+    15.5
+   ],
+   "cash_tax_rate_path": [
+    32.0,
+    32.0,
+    30.0,
+    28.0,
+    30.0,
+    32.0,
+    33.0,
+    33.0,
+    33.0,
+    33.0
+   ],
+   "wc_capture_pct": -10.0,
+   "wacc": 10.0,
+   "terminal_growth": 2.0,
+   "terminal_cap_multiple": 12,
+   "growth_note": "FY27 3,050 (50/50 blend of the FY27 guidance deck ~3,383 and mid-cycle ~2,710); FY28 2,760 (mid-cycle 2,710 + Taylor first ore 50); FY29 3,060 (Taylor 350); FY30 3,410 (Taylor 700); FY31 4,000 (Taylor 1,000 + Sierra Gorda 4th line +290); then 2.5% nominal. Cannington assumed extended past FY33 (28% reserve uplift, extension studies live).",
+   "margin_note": "Mid-cycle continuing EBITDA ~966 on 2,710 = 35.6% (SG 546, Cannington 409, AusMn 150, SAMn 16, Hermosa pre-production -45, group/exploration/Mozal -110). FY27 blend 40.5%. Taylor at ~55% and the 4th line at ~65% incremental lift the mature margin to 43.5%.",
+   "capex_note": "FY27 = guidance 1,500 incl. EAIs + 80 capitalised exploration = 1,580. FY28 1,130 (Hermosa ~550 tail of the US$3.3B), FY29 750, FY30 690, then sustaining ~620 rising with revenue (SG 230, Cannington 80, manganese 100, Taylor 100, exploration 80, intangibles ~15) = 15.5%.",
+   "tax_note": "Underlying ETR 34% (AU 30% + royalty-related taxes, Chile 27% + mining royalty, US 21%+AZ). Cash rate dips FY29-30 as Taylor's US$3.3B tax depreciation starts; 33% mature.",
+   "narrative": "Prices revert to mid-cycle by FY28; Taylor delivered on the April-2026 revised schedule and budget; the Alcoa sale completes in H2 FY27 at the headline terms.",
+   "horizon_years": 10
+  },
+  "bull": {
+   "growth_rates": [
+    11.1,
+    -5.4,
+    10.6,
+    11.3,
+    17.5,
+    3.0,
+    3.0,
+    3.0,
+    3.0,
+    3.0
+   ],
+   "ebitda_margin_path": [
+    45.0,
+    40.0,
+    41.0,
+    43.0,
+    47.0,
+    47.0,
+    47.0,
+    47.0,
+    47.0,
+    47.0
+   ],
+   "sbc_pct_path": [
+    0.6,
+    0.6,
+    0.6,
+    0.6,
+    0.6,
+    0.6,
+    0.6,
+    0.6,
+    0.6,
+    0.6
+   ],
+   "lease_cost_pct_path": [
+    2.8,
+    2.8,
+    2.8,
+    2.8,
+    2.8,
+    2.8,
+    2.8,
+    2.8,
+    2.8,
+    2.8
+   ],
+   "da_pct_path": [
+    13.3,
+    14.2,
+    13.8,
+    13.7,
+    13.6,
+    13.5,
+    13.5,
+    13.5,
+    13.5,
+    13.5
+   ],
+   "capex_pct_path": [
+    46.7,
+    35.3,
+    21.2,
+    17.5,
+    13.8,
+    14.0,
+    14.0,
+    14.0,
+    14.0,
+    14.0
+   ],
+   "cash_tax_rate_path": [
+    32.0,
+    32.0,
+    30.0,
+    28.0,
+    30.0,
+    32.0,
+    33.0,
+    33.0,
+    33.0,
+    33.0
+   ],
+   "wc_capture_pct": -10.0,
+   "wacc": 10.0,
+   "terminal_growth": 2.5,
+   "terminal_cap_multiple": 14,
+   "growth_note": "FY27 at the full guidance deck (3,383); structural-deficit deck thereafter: Cu US$5.50/lb, Ag US$50/oz, Zn US$3,200/t, Mn US$5.00/dmtu -> continuing 3,143; Taylor ramps 60/400/800/1,150 (de-bottlenecked above nameplate via the Clark decline); 4th line +340 FY31; 3% nominal thereafter.",
+   "narrative": "Electrification/AI demand keeps copper and silver near current levels; Taylor arrives on schedule and de-bottlenecks above design; the 4th grinding line and Cannington open-pit extension are delivered; the market re-rates the simplified base-metals portfolio.",
+   "horizon_years": 10
+  }
+ },
+ "projections": {
+  "bear": {
+   "years": [
+    "FY2027",
+    "FY2028",
+    "FY2029",
+    "FY2030",
+    "FY2031",
+    "FY2032",
+    "FY2033",
+    "FY2034",
+    "FY2035",
+    "FY2036"
+   ],
+   "growth_rates": [
+    -6.4,
+    -18.3,
+    2.0,
+    12.6,
+    14.8,
+    11.4,
+    11.0,
+    -20.0,
+    2.0,
+    2.0
+   ],
+   "revenue": [
+    2850.1,
+    2328.5,
+    2375.1,
+    2674.4,
+    3070.2,
+    3420.2,
+    3796.4,
+    3037.1,
+    3097.9,
+    3159.8
+   ],
+   "adj_ebitda": [
+    940.5,
+    582.1,
+    593.8,
+    722.1,
+    905.7,
+    1026.1,
+    1252.8,
+    987.1,
+    1006.8,
+    1026.9
+   ],
+   "sbc": [
+    17.1,
+    14.0,
+    14.3,
+    16.0,
+    18.4,
+    20.5,
+    22.8,
+    18.2,
+    18.6,
+    19.0
+   ],
+   "lease_cost": [
+    91.2,
+    74.5,
+    76.0,
+    85.6,
+    98.2,
+    109.4,
+    121.5,
+    97.2,
+    99.1,
+    101.1
+   ],
+   "d_and_a": [
+    450.3,
+    442.4,
+    451.3,
+    481.4,
+    521.9,
+    581.4,
+    645.4,
+    516.3,
+    526.6,
+    537.2
+   ],
+   "ebit": [
+    381.9,
+    51.2,
+    52.3,
+    139.1,
+    267.1,
+    314.7,
+    463.2,
+    355.3,
+    362.5,
+    369.7
+   ],
+   "cash_tax_rate": [
+    32.0,
+    30.0,
+    28.0,
+    26.0,
+    28.0,
+    30.0,
+    33.0,
+    33.0,
+    33.0,
+    33.0
+   ],
+   "cash_tax": [
+    122.2,
+    15.4,
+    14.6,
+    36.2,
+    74.8,
+    94.4,
+    152.8,
+    117.3,
+    119.6,
+    122.0
+   ],
+   "nopat": [
+    259.7,
+    35.9,
+    37.6,
+    102.9,
+    192.3,
+    220.3,
+    310.3,
+    238.1,
+    242.8,
+    247.7
+   ],
+   "capex": [
+    1579.0,
+    1380.8,
+    980.9,
+    748.8,
+    730.7,
+    711.4,
+    618.8,
+    540.6,
+    526.6,
+    537.2
+   ],
+   "working_capital": [
+    19.5,
+    52.2,
+    -4.7,
+    -29.9,
+    -39.6,
+    -35.0,
+    -37.6,
+    75.9,
+    -6.1,
+    -6.2
+   ],
+   "fcf": [
+    -849.5,
+    -850.4,
+    -496.7,
+    -194.5,
+    -56.0,
+    55.3,
+    299.3,
+    289.7,
+    236.8,
+    241.5
+   ],
+   "owner_fcf_margin": [
+    -29.8,
+    -36.5,
+    -20.9,
+    -7.3,
+    -1.8,
+    1.6,
+    7.9,
+    9.5,
+    7.6,
+    7.6
+   ],
+   "discount_factors": [
+    0.9091,
+    0.8264,
+    0.7513,
+    0.683,
+    0.6209,
+    0.5645,
+    0.5132,
+    0.4665,
+    0.4241,
+    0.3855
+   ],
+   "pv_fcf": [
+    -772.2,
+    -702.8,
+    -373.2,
+    -132.8,
+    -34.8,
+    31.2,
+    153.6,
+    135.2,
+    100.4,
+    93.1
+   ]
+  },
+  "base": {
+   "years": [
+    "FY2027",
+    "FY2028",
+    "FY2029",
+    "FY2030",
+    "FY2031",
+    "FY2032",
+    "FY2033",
+    "FY2034",
+    "FY2035",
+    "FY2036"
+   ],
+   "growth_rates": [
+    0.2,
+    -9.5,
+    10.9,
+    11.4,
+    17.3,
+    2.5,
+    2.5,
+    2.5,
+    2.5,
+    2.5
+   ],
+   "revenue": [
+    3051.1,
+    2761.2,
+    3062.2,
+    3411.3,
+    4001.5,
+    4101.5,
+    4204.0,
+    4309.1,
+    4416.9,
+    4527.3
+   ],
+   "adj_ebitda": [
+    1235.7,
+    966.4,
+    1133.0,
+    1347.5,
+    1740.6,
+    1784.2,
+    1828.8,
+    1874.5,
+    1921.3,
+    1969.4
+   ],
+   "sbc": [
+    18.3,
+    16.6,
+    18.4,
+    20.5,
+    24.0,
+    24.6,
+    25.2,
+    25.9,
+    26.5,
+    27.2
+   ],
+   "lease_cost": [
+    91.5,
+    82.8,
+    91.9,
+    102.3,
+    120.0,
+    123.0,
+    126.1,
+    129.3,
+    132.5,
+    135.8
+   ],
+   "d_and_a": [
+    451.6,
+    455.6,
+    490.0,
+    539.0,
+    632.2,
+    635.7,
+    651.6,
+    667.9,
+    684.6,
+    701.7
+   ],
+   "ebit": [
+    674.3,
+    411.4,
+    532.8,
+    685.7,
+    964.4,
+    1000.8,
+    1025.8,
+    1051.4,
+    1077.7,
+    1104.7
+   ],
+   "cash_tax_rate": [
+    32.0,
+    32.0,
+    30.0,
+    28.0,
+    30.0,
+    32.0,
+    33.0,
+    33.0,
+    33.0,
+    33.0
+   ],
+   "cash_tax": [
+    215.8,
+    131.7,
+    159.8,
+    192.0,
+    289.3,
+    320.2,
+    338.5,
+    347.0,
+    355.6,
+    364.5
+   ],
+   "nopat": [
+    458.5,
+    279.8,
+    373.0,
+    493.7,
+    675.0,
+    680.5,
+    687.3,
+    704.5,
+    722.1,
+    740.1
+   ],
+   "capex": [
+    1580.5,
+    1129.3,
+    750.2,
+    689.1,
+    620.2,
+    635.7,
+    651.6,
+    667.9,
+    684.6,
+    701.7
+   ],
+   "working_capital": [
+    -0.6,
+    29.0,
+    -30.1,
+    -34.9,
+    -59.0,
+    -10.0,
+    -10.3,
+    -10.5,
+    -10.8,
+    -11.0
+   ],
+   "fcf": [
+    -671.0,
+    -365.0,
+    82.6,
+    308.7,
+    628.0,
+    670.5,
+    677.0,
+    693.9,
+    711.3,
+    729.1
+   ],
+   "owner_fcf_margin": [
+    -22.0,
+    -13.2,
+    2.7,
+    9.0,
+    15.7,
+    16.3,
+    16.1,
+    16.1,
+    16.1,
+    16.1
+   ],
+   "discount_factors": [
+    0.9091,
+    0.8264,
+    0.7513,
+    0.683,
+    0.6209,
+    0.5645,
+    0.5132,
+    0.4665,
+    0.4241,
+    0.3855
+   ],
+   "pv_fcf": [
+    -610.0,
+    -301.6,
+    62.1,
+    210.8,
+    390.0,
+    378.5,
+    347.4,
+    323.7,
+    301.7,
+    281.1
+   ]
+  },
+  "bull": {
+   "years": [
+    "FY2027",
+    "FY2028",
+    "FY2029",
+    "FY2030",
+    "FY2031",
+    "FY2032",
+    "FY2033",
+    "FY2034",
+    "FY2035",
+    "FY2036"
+   ],
+   "growth_rates": [
+    11.1,
+    -5.4,
+    10.6,
+    11.3,
+    17.5,
+    3.0,
+    3.0,
+    3.0,
+    3.0,
+    3.0
+   ],
+   "revenue": [
+    3383.0,
+    3200.3,
+    3539.5,
+    3939.5,
+    4628.9,
+    4767.8,
+    4910.8,
+    5058.2,
+    5209.9,
+    5366.2
+   ],
+   "adj_ebitda": [
+    1522.3,
+    1280.1,
+    1451.2,
+    1694.0,
+    2175.6,
+    2240.9,
+    2308.1,
+    2377.3,
+    2448.7,
+    2522.1
+   ],
+   "sbc": [
+    20.3,
+    19.2,
+    21.2,
+    23.6,
+    27.8,
+    28.6,
+    29.5,
+    30.3,
+    31.3,
+    32.2
+   ],
+   "lease_cost": [
+    94.7,
+    89.6,
+    99.1,
+    110.3,
+    129.6,
+    133.5,
+    137.5,
+    141.6,
+    145.9,
+    150.3
+   ],
+   "d_and_a": [
+    449.9,
+    454.4,
+    488.5,
+    539.7,
+    629.5,
+    643.7,
+    663.0,
+    682.9,
+    703.3,
+    724.4
+   ],
+   "ebit": [
+    957.4,
+    716.9,
+    842.4,
+    1020.3,
+    1388.7,
+    1435.1,
+    1478.2,
+    1522.5,
+    1568.2,
+    1615.2
+   ],
+   "cash_tax_rate": [
+    32.0,
+    32.0,
+    30.0,
+    28.0,
+    30.0,
+    32.0,
+    33.0,
+    33.0,
+    33.0,
+    33.0
+   ],
+   "cash_tax": [
+    306.4,
+    229.4,
+    252.7,
+    285.7,
+    416.6,
+    459.2,
+    487.8,
+    502.4,
+    517.5,
+    533.0
+   ],
+   "nopat": [
+    651.0,
+    487.5,
+    589.7,
+    734.6,
+    972.1,
+    975.9,
+    990.4,
+    1020.1,
+    1050.7,
+    1082.2
+   ],
+   "capex": [
+    1579.9,
+    1129.7,
+    750.4,
+    689.4,
+    638.8,
+    667.5,
+    687.5,
+    708.1,
+    729.4,
+    751.3
+   ],
+   "working_capital": [
+    -33.8,
+    18.3,
+    -33.9,
+    -40.0,
+    -68.9,
+    -13.9,
+    -14.3,
+    -14.7,
+    -15.2,
+    -15.6
+   ],
+   "fcf": [
+    -512.7,
+    -169.5,
+    293.8,
+    544.9,
+    893.9,
+    938.1,
+    951.5,
+    980.1,
+    1009.5,
+    1039.7
+   ],
+   "owner_fcf_margin": [
+    -15.2,
+    -5.3,
+    8.3,
+    13.8,
+    19.3,
+    19.7,
+    19.4,
+    19.4,
+    19.4,
+    19.4
+   ],
+   "discount_factors": [
+    0.9091,
+    0.8264,
+    0.7513,
+    0.683,
+    0.6209,
+    0.5645,
+    0.5132,
+    0.4665,
+    0.4241,
+    0.3855
+   ],
+   "pv_fcf": [
+    -466.1,
+    -140.1,
+    220.8,
+    372.2,
+    555.0,
+    529.6,
+    488.3,
+    457.2,
+    428.1,
+    400.9
+   ]
+  }
+ },
+ "valuation": {
+  "bear": {
+   "sum_pv_fcf": -1502.4,
+   "tv_gordon": 2883.8,
+   "tv_cap": 2415.0,
+   "terminal_value": 2415.0,
+   "terminal_value_bound": "cap",
+   "pv_terminal": 931.1,
+   "enterprise_value": -571.2,
+   "equity_bridge_total": 3674.0,
+   "side_stream_value": 3674.0,
+   "net_debt": -1031.0,
+   "equity_value": 4133.8,
+   "intrinsic_value": 1.31,
+   "street_intrinsic_value": 1.37,
+   "upside": -73.5,
+   "terminal_pct_of_value": -163.0,
+   "implied_exit_multiple": 10.0,
+   "implied_terminal_ev_to_ebitda": 2.4,
+   "intrinsic_value_usd": 0.92,
+   "street_intrinsic_value_usd": 0.96
+  },
+  "base": {
+   "sum_pv_fcf": 1383.6,
+   "tv_gordon": 9295.7,
+   "tv_cap": 8748.9,
+   "terminal_value": 8748.9,
+   "terminal_value_bound": "cap",
+   "pv_terminal": 3373.1,
+   "enterprise_value": 4756.7,
+   "equity_bridge_total": 3674.0,
+   "side_stream_value": 3674.0,
+   "net_debt": -1031.0,
+   "equity_value": 9461.7,
+   "intrinsic_value": 3.0,
+   "street_intrinsic_value": 3.08,
+   "upside": -39.3,
+   "terminal_pct_of_value": 70.9,
+   "implied_exit_multiple": 12.0,
+   "implied_terminal_ev_to_ebitda": 4.4,
+   "intrinsic_value_usd": 2.1,
+   "street_intrinsic_value_usd": 2.16
+  },
+  "bull": {
+   "sum_pv_fcf": 2845.8,
+   "tv_gordon": 14209.8,
+   "tv_cap": 14556.4,
+   "terminal_value": 14209.8,
+   "terminal_value_bound": "gordon",
+   "pv_terminal": 5478.5,
+   "enterprise_value": 8324.3,
+   "equity_bridge_total": 3674.0,
+   "side_stream_value": 3674.0,
+   "net_debt": -1031.0,
+   "equity_value": 13029.3,
+   "intrinsic_value": 4.13,
+   "street_intrinsic_value": 4.23,
+   "upside": -16.4,
+   "terminal_pct_of_value": 65.8,
+   "implied_exit_multiple": 13.7,
+   "implied_terminal_ev_to_ebitda": 5.6,
+   "intrinsic_value_usd": 2.9,
+   "street_intrinsic_value_usd": 2.97
+  }
+ },
+ "entry_price": {
+  "hurdle_rate": 0.15,
+  "bear": {
+   "years_to_terminal": 10,
+   "pv_interim_fcf_at_hurdle": -1489.2,
+   "terminal_value_at_hurdle": 1815.7,
+   "terminal_value_bound": "gordon",
+   "pv_terminal_at_hurdle": 448.8,
+   "net_debt": -1031.0,
+   "entry_price": 1.16,
+   "entry_discount_from_current": -76.5,
+   "entry_price_usd": 0.81
+  },
+  "base": {
+   "years_to_terminal": 10,
+   "pv_interim_fcf_at_hurdle": 837.2,
+   "terminal_value_at_hurdle": 5720.5,
+   "terminal_value_bound": "gordon",
+   "pv_terminal_at_hurdle": 1414.0,
+   "net_debt": -1031.0,
+   "entry_price": 2.2,
+   "entry_discount_from_current": -55.5,
+   "entry_price_usd": 1.55
+  },
+  "bull": {
+   "years_to_terminal": 10,
+   "pv_interim_fcf_at_hurdle": 2002.8,
+   "terminal_value_at_hurdle": 8525.9,
+   "terminal_value_bound": "gordon",
+   "pv_terminal_at_hurdle": 2107.5,
+   "net_debt": -1031.0,
+   "entry_price": 2.79,
+   "entry_discount_from_current": -43.5,
+   "entry_price_usd": 1.96
+  },
+  "weighted_entry_price": 2.01,
+  "weighted_entry_price_usd": 1.41
+ },
+ "required_return_table": {
+  "scenario": "base",
+  "returns": [
+   9,
+   10.0,
+   11,
+   12,
+   15
+  ],
+  "value_per_share": [
+   3.14,
+   3.0,
+   2.81,
+   2.61,
+   2.2
+  ],
+  "note": "Each row rebuilds the terminal value at that row's rate (max(0, min(Gordon@r, 12x FCF_N))); the WACC row is valuation.base.intrinsic_value and the hurdle row is entry_price.base.entry_price."
+ },
+ "sensitivity": {
+  "scenario": "base",
+  "wacc_range": [
+   8.0,
+   9.0,
+   10.0,
+   11.0,
+   12.0
+  ],
+  "terminal_growth_range": [
+   1.0,
+   1.5,
+   2.0,
+   2.5,
+   3.0
+  ],
+  "matrix": [
+   [
+    3.3,
+    3.3,
+    3.3,
+    3.3,
+    3.3
+   ],
+   [
+    3.14,
+    3.14,
+    3.14,
+    3.14,
+    3.14
+   ],
+   [
+    2.93,
+    2.99,
+    3.0,
+    3.0,
+    3.0
+   ],
+   [
+    2.71,
+    2.76,
+    2.81,
+    2.86,
+    2.86
+   ],
+   [
+    2.53,
+    2.57,
+    2.61,
+    2.65,
+    2.7
+   ]
+  ],
+  "terminal_cap_multiple": 12.0,
+  "note": "Rows are WACC, columns terminal growth; each cell rebuilds its own terminal value."
+ },
+ "probability_weighted": {
+  "weights": {
+   "bear": 0.3,
+   "base": 0.5,
+   "bull": 0.2
+  },
+  "weighted_iv": 2.72,
+  "street_weighted_iv": 2.8,
+  "weighted_upside_pct": -45.0,
+  "band_position": 2775.0,
+  "weighted_iv_usd": 1.91,
+  "street_weighted_iv_usd": 1.96,
+  "weights_rationale": "Bear raised from the 15% default to 30%: realised prices are at multi-decade highs (silver US$66-71/oz vs a ten-year average near US$24; copper US$5.92 vs ~US$3.80) so the reversion risk is asymmetric, and the flagship project has already had one +50% capex overrun and a schedule slip. Bull cut to 20% because it needs three independent things - the deck holding, Taylor on the revised schedule and the fourth line/Cannington extension - all to land. Base 50%."
+ },
+ "engine": {
+  "name": "dcf_engine",
+  "version": 1,
+  "built_at": "2026-09-25T04:41:37Z",
+  "drivers": "S32.AX_Drivers.json"
+ },
+ "price_refresh": {
+  "refreshed_at": "2026-09-25T04:41:42Z",
+  "price_source": "yahoo:regularMarketPrice",
+  "previous_price": 4.94,
+  "current_price": 4.94,
+  "drift_pct": 0.0,
+  "valuation_date": "2026-09-25",
+  "fields_updated": [
+   "valuation.bull.upside",
+   "entry_price.base.entry_discount_from_current"
+  ],
+  "prose_is_stale": true,
+  "prose_paths_quoting_previous_price": [
+   "valuation_philosophy.summary",
+   "inputs.fx_note"
+  ],
+  "dashboard_stale": false
+ },
+ "sanity_check": {
+  "ran": true,
+  "passed": true,
+  "model": "owner_fcf",
+  "basis": "SBC-adjusted on both sides (EPS less SBC/share; EBITDA less SBC), so these deliberately do not match GAAP screener multiples.",
+  "rules_evaluated": [
+   "pe",
+   "pb",
+   "ev_ebitda",
+   "p_sales"
+  ],
+  "rules_not_evaluated": [],
+  "fy_end_month": 6,
+  "fy_end_month_source": "learned from the annual filings",
+  "implied_multiples": {
+   "pe": 12.6129,
+   "pb": 1.3854,
+   "ev_ebitda": 5.3952,
+   "p_sales": 2.314
+  },
+  "historical_averages_ex_outliers": {
+   "pe_avg": 39.5164,
+   "pe_max": 97.7901,
+   "pe_min": 9.4981,
+   "pb_avg": 2.2845,
+   "pb_max": 3.008,
+   "pb_min": 1.488,
+   "ev_ebitda_avg": 10.1786,
+   "ev_ebitda_max": 12.6527,
+   "ev_ebitda_min": 5.1973,
+   "p_sales_avg": 3.3655,
+   "p_sales_max": 5.0241,
+   "p_sales_min": 2.3421
+  },
+  "price_position_in_10yr_range": 1.554,
+  "trip_reasons": [],
+  "diagnosis": [],
+  "historical_table": [
+   {
+    "period": "FY2016",
+    "price": null,
+    "pe": null,
+    "pb": null,
+    "ev_ebitda": null,
+    "p_sales": null
+   },
+   {
+    "period": "FY2017",
+    "price": 4.147623,
+    "pe": 18.4316,
+    "pb": 2.1502,
+    "ev_ebitda": 8.5793,
+    "p_sales": 3.1665
+   },
+   {
+    "period": "FY2018",
+    "price": 5.088321,
+    "pe": 20.1642,
+    "pb": 2.4327,
+    "ev_ebitda": 9.6976,
+    "p_sales": 3.4511
+   },
+   {
+    "period": "FY2019",
+    "price": 4.475442,
+    "pe": 63.8292,
+    "pb": 2.2034,
+    "ev_ebitda": 10.1436,
+    "p_sales": 3.08
+   },
+   {
+    "period": "FY2020",
+    "price": 2.936118,
+    "pe": null,
+    "pb": 1.488,
+    "ev_ebitda": 12.0505,
+    "p_sales": 2.3421
+   },
+   {
+    "period": "FY2021",
+    "price": 4.233141,
+    "pe": null,
+    "pb": 2.2102,
+    "ev_ebitda": 12.6527,
+    "p_sales": 3.6139
+   },
+   {
+    "period": "FY2022",
+    "price": 5.430393,
+    "pe": 9.4981,
+    "pb": 2.3316,
+    "ev_ebitda": 5.1973,
+    "p_sales": 2.7114
+   },
+   {
+    "period": "FY2023",
+    "price": 5.530164,
+    "pe": null,
+    "pb": 2.681,
+    "ev_ebitda": 10.2062,
+    "p_sales": 3.3833
+   },
+   {
+    "period": "FY2024",
+    "price": 4.375671,
+    "pe": null,
+    "pb": 2.2091,
+    "ev_ebitda": 11.5401,
+    "p_sales": 3.617
+   },
+   {
+    "period": "FY2025",
+    "price": 4.190382,
+    "pe": 97.7901,
+    "pb": 2.1309,
+    "ev_ebitda": 9.8692,
+    "p_sales": 3.2653
+   },
+   {
+    "period": "FY2026",
+    "price": 6.513621,
+    "pe": 27.3853,
+    "pb": 3.008,
+    "ev_ebitda": 11.8498,
+    "p_sales": 5.0241
+   }
+  ],
+  "computed_by": "scripts/sanity_check.py",
+  "computed_at": "2026-09-25T04:41:52.294772Z"
+ }
+};
+
+// Numbers the DCF cards must show at each scenario's own defaults. The
+// interactive model below is a generic 5-year Gordon toy; it scales these
+// anchors by the ratio it implies, it never replaces them.
+const dcfAnchors = {
+ "bear": {
+  "iv": 1.31,
+  "entry": 1.16
+ },
+ "base": {
+  "iv": 3.0,
+  "entry": 2.2
+ },
+ "bull": {
+  "iv": 4.13,
+  "entry": 2.79
+ }
+};
+
+// Chart configuration from the Spec, and the series pre-computed from the CSV.
+const chartSpecs = [
+ {
+  "id": "revenueChart",
+  "series": [
+   {
+    "label": "Revenue",
+    "column": "Revenue",
+    "kind": "bar"
+   },
+   {
+    "label": "YoY %",
+    "derive": "yoy:Revenue",
+    "kind": "line",
+    "axis": "y1",
+    "color": "warning"
+   }
+  ],
+  "y1_title": "YoY %"
+ },
+ {
+  "id": "marginsChart",
+  "series": [
+   {
+    "label": "Operating margin",
+    "column": "OperatingMargin",
+    "kind": "line"
+   },
+   {
+    "label": "Net margin",
+    "column": "NetMargin",
+    "kind": "line"
+   }
+  ],
+  "percent": true
+ },
+ {
+  "id": "profitChart",
+  "series": [
+   {
+    "label": "Operating income",
+    "column": "OperatingIncome",
+    "kind": "bar"
+   },
+   {
+    "label": "Net income",
+    "column": "NetIncome",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "ebitdaChart",
+  "series": [
+   {
+    "label": "EBITDA",
+    "column": "EBITDA",
+    "kind": "bar"
+   },
+   {
+    "label": "EBITDA %",
+    "derive": "ratio:EBITDA/Revenue",
+    "kind": "line",
+    "axis": "y1",
+    "color": "warning"
+   }
+  ],
+  "y1_title": "EBITDA %"
+ },
+ {
+  "id": "epsDpsChart",
+  "series": [
+   {
+    "label": "EPS",
+    "column": "EPS",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "underlyingEbitdaChart",
+  "series": [
+   {
+    "label": "Underlying EBITDA",
+    "column": "UnderlyingEBITDA",
+    "kind": "bar"
+   },
+   {
+    "label": "Underlying EBIT",
+    "column": "UnderlyingEBIT",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "statutoryVsContinuingChart",
+  "series": [
+   {
+    "label": "Net income (statutory)",
+    "column": "NetIncome",
+    "kind": "bar"
+   },
+   {
+    "label": "Net income (continuing ops)",
+    "column": "NetIncomeContinuing",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "fcfChart",
+  "series": [
+   {
+    "label": "Net income",
+    "column": "NetIncome",
+    "kind": "bar"
+   },
+   {
+    "label": "Reported FCF",
+    "column": "FreeCashFlow",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "ocfCapexChart",
+  "series": [
+   {
+    "label": "Operating cash flow",
+    "column": "OperatingCashFlow",
+    "kind": "bar"
+   },
+   {
+    "label": "CapEx",
+    "column": "CapEx",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "cashDebtChart",
+  "series": [
+   {
+    "label": "Cash &amp; equivalents",
+    "column": "CashAndEquivalents",
+    "kind": "bar"
+   },
+   {
+    "label": "Total debt",
+    "column": "TotalDebt",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "balanceChart",
+  "series": [
+   {
+    "label": "Total assets",
+    "column": "TotalAssets",
+    "kind": "line"
+   },
+   {
+    "label": "Shareholders' equity",
+    "column": "ShareholdersEquity",
+    "kind": "line"
+   },
+   {
+    "label": "Total liabilities",
+    "column": "TotalLiabilities",
+    "kind": "line"
+   }
+  ]
+ },
+ {
+  "id": "sbcChart",
+  "series": [
+   {
+    "label": "Stock-based comp",
+    "column": "StockBasedComp",
+    "kind": "bar"
+   },
+   {
+    "label": "Shares outstanding (m)",
+    "column": "SharesOutstanding",
+    "kind": "line",
+    "axis": "y1"
+   }
+  ],
+  "y1_title": "shares (m)"
+ }
+];
+const chartData = {
+ "revenueChart": {
+  "annual": {
+   "labels": [
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     5812.0,
+     6950.0,
+     7549.0,
+     7274.0,
+     6075.0,
+     5476.0,
+     9269.0,
+     7429.0,
+     5479.0,
+     5780.0,
+     5816.0
+    ],
+    [
+     null,
+     19.580178940123883,
+     8.618705035971223,
+     -3.6428666048483245,
+     -16.483365411053068,
+     -9.860082304526749,
+     69.26588750913075,
+     -19.851116625310176,
+     -26.2484856642886,
+     5.493703230516518,
+     0.6228373702422145
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'24",
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     2507.0,
+     3123.0,
+     2809.0
+    ],
+    [
+     null,
+     24.571200638213003,
+     -10.05443483829651
+    ]
+   ]
+  }
+ },
+ "marginsChart": {
+  "annual": {
+   "labels": [
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     -24.8,
+     25.8,
+     22.8,
+     12.2,
+     4.3,
+     3.7,
+     40.2,
+     2.7,
+     -13.4,
+     9.6,
+     23.4
+    ],
+    [
+     -27.8,
+     17.7,
+     17.6,
+     5.3,
+     -1.1,
+     -3.6,
+     28.8,
+     -2.3,
+     -3.7,
+     3.7,
+     18.7
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'24",
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     -2.1,
+     16.7,
+     18.9
+    ],
+    [
+     2.1,
+     11.5,
+     16.5
+    ]
+   ]
+  }
+ },
+ "profitChart": {
+  "annual": {
+   "labels": [
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     -1441.0,
+     1795.0,
+     1719.0,
+     887.0,
+     261.0,
+     203.0,
+     3724.0,
+     198.0,
+     -735.0,
+     554.0,
+     1359.0
+    ],
+    [
+     -1615.0,
+     1231.0,
+     1332.0,
+     389.0,
+     -65.0,
+     -195.0,
+     2669.0,
+     -173.0,
+     -203.0,
+     213.0,
+     1087.0
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'24",
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     -52.0,
+     520.0,
+     532.0
+    ],
+    [
+     53.0,
+     360.0,
+     464.0
+    ]
+   ]
+  }
+ },
+ "ebitdaChart": {
+  "annual": {
+   "labels": [
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     1131.0,
+     2411.0,
+     2516.0,
+     2197.0,
+     1185.0,
+     1564.0,
+     4755.0,
+     2534.0,
+     1802.0,
+     1928.0,
+     2462.0
+    ],
+    [
+     19.459738472126634,
+     34.690647482014384,
+     33.32891773744867,
+     30.2034643937311,
+     19.50617283950617,
+     28.56099342585829,
+     51.30003236595102,
+     34.109570601696056,
+     32.88921336010221,
+     33.35640138408304,
+     42.331499312242094
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'24",
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     708.0,
+     1018.0,
+     1107.0
+    ],
+    [
+     28.240925408855205,
+     32.59686199167467,
+     39.409042363830544
+    ]
+   ]
+  }
+ },
+ "epsDpsChart": {
+  "annual": {
+   "labels": [
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     -0.303,
+     0.229,
+     0.254,
+     0.076,
+     -0.013,
+     -0.041,
+     0.57,
+     -0.038,
+     -0.045,
+     0.047,
+     0.241
+    ]
+   ]
+  }
+ },
+ "underlyingEbitdaChart": {
+  "annual": {
+   "labels": [
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     1131.0,
+     2411.0,
+     2516.0,
+     2197.0,
+     1185.0,
+     1564.0,
+     4755.0,
+     2534.0,
+     1802.0,
+     1928.0,
+     2462.0
+    ],
+    [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     886.0,
+     1211.0,
+     1717.0
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'24",
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     708.0,
+     1018.0,
+     1107.0
+    ],
+    [
+     236.0,
+     663.0,
+     747.0
+    ]
+   ]
+  }
+ },
+ "statutoryVsContinuingChart": {
+  "annual": {
+   "labels": [
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     -1615.0,
+     1231.0,
+     1332.0,
+     389.0,
+     -65.0,
+     -195.0,
+     2669.0,
+     -173.0,
+     -203.0,
+     213.0,
+     1087.0
+    ],
+    [
+     -1615.0,
+     1231.0,
+     1332.0,
+     389.0,
+     -65.0,
+     142.0,
+     2669.0,
+     -173.0,
+     -640.0,
+     315.0,
+     1059.0
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'24",
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     53.0,
+     360.0,
+     464.0
+    ],
+    [
+     -26.0,
+     373.0,
+     432.0
+    ]
+   ]
+  }
+ },
+ "fcfChart": {
+  "annual": {
+   "labels": [
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     -1615.0,
+     1231.0,
+     1332.0,
+     389.0,
+     -65.0,
+     -195.0,
+     2669.0,
+     -173.0,
+     -203.0,
+     213.0,
+     1087.0
+    ],
+    [
+     630.0,
+     1813.0,
+     1281.0,
+     1107.0,
+     620.0,
+     839.0,
+     2511.0,
+     297.0,
+     39.0,
+     372.0,
+     540.0
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'24",
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     53.0,
+     360.0,
+     464.0
+    ],
+    [
+     -381.0,
+     -28.0,
+     17.0
+    ]
+   ]
+  }
+ },
+ "ocfCapexChart": {
+  "annual": {
+   "labels": [
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     1030.0,
+     2132.0,
+     1717.0,
+     1817.0,
+     1365.0,
+     1405.0,
+     3070.0,
+     1191.0,
+     1119.0,
+     1335.0,
+     1634.0
+    ],
+    [
+     400.0,
+     319.0,
+     436.0,
+     710.0,
+     745.0,
+     566.0,
+     559.0,
+     894.0,
+     1080.0,
+     963.0,
+     1094.0
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'24",
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     203.0,
+     450.0,
+     541.0
+    ],
+    [
+     584.0,
+     478.0,
+     524.0
+    ]
+   ]
+  }
+ },
+ "cashDebtChart": {
+  "annual": {
+   "labels": [
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     1225.0,
+     2675.0,
+     2970.0,
+     1408.0,
+     1315.0,
+     1613.0,
+     2365.0,
+     1258.0,
+     842.0,
+     1677.0,
+     2134.0
+    ],
+    [
+     913.0,
+     1035.0,
+     929.0,
+     904.0,
+     1017.0,
+     1207.0,
+     1827.0,
+     1741.0,
+     1566.0,
+     1634.0,
+     1851.0
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'24",
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     null,
+     1600.0,
+     1664.0
+    ],
+    [
+     null,
+     1647.0,
+     1689.0
+    ]
+   ]
+  }
+ },
+ "balanceChart": {
+  "annual": {
+   "labels": [
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     13374.0,
+     14733.0,
+     15133.0,
+     14715.0,
+     13737.0,
+     13242.0,
+     16336.0,
+     14564.0,
+     14245.0,
+     13727.0,
+     14491.0
+    ],
+    [
+     9422.0,
+     10235.0,
+     10709.0,
+     10168.0,
+     9562.0,
+     8954.0,
+     10779.0,
+     9375.0,
+     8971.0,
+     8857.0,
+     9714.0
+    ],
+    [
+     3952.0,
+     4498.0,
+     4424.0,
+     4547.0,
+     4175.0,
+     4288.0,
+     5557.0,
+     5189.0,
+     5274.0,
+     4870.0,
+     4777.0
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'24",
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     null,
+     13855.0,
+     13797.0
+    ],
+    [
+     null,
+     9178.0,
+     9256.0
+    ],
+    [
+     null,
+     4677.0,
+     4541.0
+    ]
+   ]
+  }
+ },
+ "sbcChart": {
+  "annual": {
+   "labels": [
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     23.0,
+     37.0,
+     40.0,
+     38.0,
+     29.0,
+     32.0,
+     23.0,
+     24.0,
+     22.0,
+     20.0,
+     20.0
+    ],
+    [
+     5330.0,
+     5306.0,
+     5120.0,
+     5006.0,
+     4846.0,
+     4675.0,
+     4628.0,
+     4545.0,
+     4529.0,
+     4504.0,
+     4486.0
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "half",
+   "labels": [
+    "H1'24",
+    "H1'25",
+    "H1'26"
+   ],
+   "data": [
+    [
+     12.0,
+     10.0,
+     9.0
+    ],
+    [
+     4529.0,
+     4517.0,
+     4486.0
+    ]
+   ]
+  }
+ }
+};
+
+const metricDescriptions = {
+ "balanceSheet": {
+  "title": "Balance sheet",
+  "content": "<p><strong>Shareholders' equity<\/strong> is assets less liabilities; plotted against <strong>total liabilities<\/strong> to show leverage.<\/p><div class=\"metric-highlight\"><strong>For South32 Limited:<\/strong> equity that grows only through revaluations or share issues is not the same as retained earnings.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Liabilities growing faster than equity<\/li><li>Goodwill share of equity after acquisitions<\/li><\/ul>"
+ },
+ "cashDebt": {
+  "title": "Cash and debt",
+  "content": "<p><strong>Cash &amp; equivalents<\/strong> against <strong>total borrowings<\/strong> (leases excluded unless noted).<\/p><div class=\"metric-highlight\"><strong>For South32 Limited:<\/strong> the DCF's net-debt bridge uses these balances at the latest balance-sheet date.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Net debt trend versus EBITDA<\/li><li>Refinancing dates and covenants in the filings<\/li><\/ul>"
+ },
+ "ebitda": {
+  "title": "EBITDA",
+  "content": "<p><strong>EBITDA<\/strong> is earnings before interest, tax, depreciation and amortisation -- an operating-cash proxy that ignores capital intensity.<\/p><div class=\"metric-highlight\"><strong>For South32 Limited:<\/strong> read it beside CapEx: a business that must reinvest most of its EBITDA is not as cash-generative as the margin suggests.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>EBITDA margin trend<\/li><li>Gap between EBITDA and operating cash flow (working capital)<\/li><\/ul>"
+ },
+ "epsDps": {
+  "title": "EPS and dividends",
+  "content": "<p><strong>EPS<\/strong> is net income per share; <strong>DPS<\/strong> is the cash dividend paid per share. Both are in major currency units.<\/p><div class=\"metric-highlight\"><strong>For South32 Limited:<\/strong> the payout ratio (DPS / EPS) shows how much of earnings is returned versus reinvested.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>EPS growth versus net income growth (dilution)<\/li><li>Dividends funded from earnings, not debt<\/li><\/ul>"
+ },
+ "fcf": {
+  "title": "Free cash flow",
+  "content": "<p><strong>Reported FCF<\/strong> is operating cash flow less capital expenditure. <strong>Owner FCF<\/strong> (from the DCF) further deducts stock-based compensation, interest income and lease principal -- the cash an owner could actually take out.<\/p><div class=\"metric-highlight\"><strong>For South32 Limited:<\/strong> the gap between net income and owner FCF is the earnings-quality question the valuation is built on.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>FCF persistently below net income<\/li><li>Working-capital swings inflating one year's FCF<\/li><\/ul>"
+ },
+ "margins": {
+  "title": "Margins",
+  "content": "<p><strong>Gross margin<\/strong> is revenue less cost of revenue; <strong>operating margin<\/strong> deducts operating expenses; <strong>net margin<\/strong> is after interest and tax.<\/p><div class=\"metric-highlight\"><strong>For South32 Limited:<\/strong> the spread between gross and operating margin is the cost of running the business; a widening spread with flat gross margin means opex is growing faster than sales.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Direction of operating margin over several years, not one<\/li><li>One-offs (impairments, disposals) that distort net margin<\/li><\/ul>"
+ },
+ "ocfCapex": {
+  "title": "Operating cash flow and CapEx",
+  "content": "<p><strong>Operating cash flow<\/strong> is cash generated by operations; <strong>CapEx<\/strong> is cash invested in fixed and intangible assets.<\/p><div class=\"metric-highlight\"><strong>For South32 Limited:<\/strong> CapEx here is shown as stored (sign convention varies by ticker); the DCF splits it into stay-in-business and growth where disclosed.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>CapEx rising faster than revenue<\/li><li>OCF that diverges from EBITDA<\/li><\/ul>"
+ },
+ "profit": {
+  "title": "Profit lines",
+  "content": "<p><strong>Gross profit<\/strong> is revenue less cost of revenue; <strong>operating income<\/strong> deducts operating expenses; <strong>net income<\/strong> is after interest, tax and one-offs.<\/p><div class=\"metric-highlight\"><strong>For South32 Limited:<\/strong> the three lines together show where margin is made and lost between the top line and the bottom.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Operating income growing slower than gross profit (opex creep)<\/li><li>Net income far from operating income (interest, tax, one-offs)<\/li><\/ul>"
+ },
+ "revenue": {
+  "title": "Revenue",
+  "content": "<p><strong>Revenue<\/strong> is the top line: what customers paid for goods and services in the period, before any costs.<\/p><div class=\"metric-highlight\"><strong>For South32 Limited:<\/strong> the growth rate matters more than the level; compare it with the DCF's base-case growth path below.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Acceleration or deceleration in YoY growth<\/li><li>Whether growth is organic or acquired<\/li><li>Interim rows show seasonality<\/li><\/ul>"
+ },
+ "sbc": {
+  "title": "Stock-based compensation and share count",
+  "content": "<p><strong>Stock-based comp<\/strong> is the expense of equity awards; <strong>shares outstanding<\/strong> shows the dilution it causes net of buybacks.<\/p><div class=\"metric-highlight\"><strong>For South32 Limited:<\/strong> the DCF charges SBC as a cash cost and holds the share count flat, so this chart is the check on that assumption.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Share count rising while buybacks are advertised<\/li><li>SBC as a percentage of revenue<\/li><\/ul>"
+ },
+ "underlyingEbitda": {
+  "title": "Underlying EBITDA and Underlying EBIT",
+  "content": "<p><strong>Underlying EBITDA<\/strong> and <strong>Underlying EBIT<\/strong> are South32's own headline non-IFRS performance measures, excluding significant items (impairments, gains/losses on disposal, and other one-offs) that distort the statutory operating result.<\/p><div class=\"metric-highlight\"><strong>For South32 Limited:<\/strong> management, analysts and the company's own guidance are all framed around Underlying EBITDA, not statutory operating income -- commodity-price swings and the run of divestments (Illawarra Coal, Cerro Matoso, the pending Alcoa aluminium-chain sale) make the statutory line noisy period to period.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Underlying EBITDA margin trend across the commodity cycle<\/li><li>Gap between Underlying EBIT and Underlying EBITDA (D&amp;A intensity of the asset base)<\/li><li>How far statutory operating income (profitChart) diverges from Underlying EBIT in a given period, and why<\/li><\/ul>"
+ },
+ "statutoryVsContinuing": {
+  "title": "Statutory vs continuing-operations net income",
+  "content": "<p><strong>Net income (statutory)<\/strong> includes discontinued operations; <strong>net income (continuing operations)<\/strong> strips them out to show the ongoing portfolio.<\/p><div class=\"metric-highlight\"><strong>For South32 Limited:<\/strong> Illawarra Coal and Cerro Matoso were divested and the Alcoa aluminium-chain sale (Worsley, Boddington, Mt Holly, Alumar) is pending -- each creates a discontinued-operations line that can swing statutory net income well away from what the remaining business actually earned.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Periods where the two lines diverge sharply (a completed or pending divestment)<\/li><li>Whether continuing-operations earnings are trending independently of statutory net income<\/li><li>The Alcoa sale's future impact once completed -- current continuing-ops figures do not yet exclude it<\/li><\/ul>"
+ }
+};
+
+// ============================================================
+// OVERVIEW & GUIDANCE
+// ============================================================
+function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function renderGuidance() {
+    const g = analysis.guidance;
+    const section = document.getElementById('guidanceSection');
+    if (!g || !g.items || g.items.length === 0) { section.style.display = 'none'; return; }
+    document.getElementById('guidanceAsOf').textContent = g.as_of || '';
+    document.getElementById('guidanceFY').textContent = g.fiscal_year || '';
+    document.getElementById('guidanceGrid').innerHTML = g.items.map(item => {
+        const vp = item.vs_prior ? String(item.vs_prior) : '';
+        const vsClass = vp ? (vp.toLowerCase().replace(/[^a-z]/g, '') || 'na') : 'new';
+        const vsLabel = vp ? (vp === 'n/a' ? 'N/A' : vp.charAt(0).toUpperCase() + vp.slice(1)) : 'New';
+        return `<div class="guidance-card">
+            <div class="guidance-metric">${esc(item.metric)}</div>
+            <div class="guidance-target">${esc(item.target)}</div>
+            <div class="guidance-period">${esc(item.period)}</div>
+            <span class="guidance-vs-prior ${vsClass}">${esc(vsLabel)}</span>
+            ${item.notes ? `<div class="guidance-notes">${esc(item.notes)}</div>` : ''}
+        </div>`;
+    }).join('');
+    const c = document.getElementById('guidanceCommentary');
+    if (g.management_commentary) { c.textContent = g.management_commentary; c.style.display = 'block'; }
+    else { c.style.display = 'none'; }
+}
+
+function renderOverview() {
+    const bm = analysis.business_model || {};
+    const cp = analysis.competitive_position || {};
+    const risks = analysis.risks || {};
+    const cats = { business: 'Business', financial: 'Financial', regulatory: 'Regulatory', macro: 'Macro', execution: 'Execution' };
+    const allRisks = [];
+    for (const k of Object.keys(risks)) {
+        (risks[k] || []).forEach(r => allRisks.push({ ...r, cat: cats[k] || k }));
+    }
+    const sevClass = s => s === 'high' ? 'risk-high' : s === 'moderate' || s === 'medium' ? 'risk-moderate' : 'risk-low';
+    const trendClass = t => /grow/i.test(t || '') ? 'trend-growing' : /declin/i.test(t || '') ? 'trend-declining' : 'trend-stable';
+    const list = xs => (xs || []).map(x => `<li>${esc(x)}</li>`).join('');
+    document.getElementById('overviewGrid').innerHTML = `
+        <div class="overview-card"><h3>Company Overview</h3><p>${esc(analysis.overview)}</p></div>
+        <div class="overview-card"><h3>Business Model</h3><p>${esc(bm.summary)}</p>
+            <ul>${(bm.revenue_streams || []).map(r => `<li class="revenue-stream"><span>${esc(r.name)} <span class="${trendClass(r.trend)}">(${esc(r.trend)})</span></span><span class="percent">${r.percent != null ? esc(r.percent) + '%' : ''}</span></li>`).join('')}</ul></div>
+        <div class="overview-card"><h3>Competitive Position</h3>
+            <p><strong>Competitors:</strong> ${esc((cp.main_competitors || []).join(', '))}</p>
+            ${cp.market_position ? `<p>${esc(cp.market_position)}</p>` : ''}
+            <p><strong>Moat factors:</strong></p>
+            <ul>${(cp.moat_factors || []).map(m => `<li><strong>${esc(m.factor)}</strong> (${esc(m.strength)}) &mdash; ${esc(m.description)}</li>`).join('')}</ul></div>
+        <div class="overview-card"><h3>Growth Drivers</h3><ul>${list(analysis.growth_drivers)}</ul></div>
+        <div class="overview-card risks"><h3>Key Risks</h3>
+            <ul>${allRisks.map(r => `<li><span class="${sevClass(r.severity)}">&#9679; ${esc(String(r.severity || '').toUpperCase())}</span> [${esc(r.cat)}] <strong>${esc(r.risk)}</strong> &mdash; ${esc(r.description)}</li>`).join('')}</ul></div>
+        <div class="overview-card bull"><h3>Bull Case</h3><ul>${list(analysis.bull_case)}</ul></div>
+        <div class="overview-card bear"><h3>Bear Case</h3><ul>${list(analysis.bear_case)}</ul></div>
+        <div class="overview-card"><h3>Recent Developments</h3>
+            <ul>${(analysis.recent_developments || []).map(d => `<li><strong>${esc(d.date)}:</strong> ${esc(d.event)}</li>`).join('')}</ul></div>`;
+}
+
+function toggleOverview() {
+    document.querySelector('.overview-toggle').classList.toggle('active');
+    document.getElementById('overviewContent').classList.toggle('active');
+}
+
+// ============================================================
+// CHARTS
+// ============================================================
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } } },
+    scales: {
+        x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+// Every chart gets its OWN scales object so a log toggle changes only that chart.
+function freshScales() {
+    return { x: { ...chartDefaults.scales.x }, y: { ...chartDefaults.scales.y } };
+}
+const colors = {
+    primary: '#00d4aa', secondary: '#00b894', tertiary: '#0984e3',
+    quaternary: '#6c5ce7', warning: '#fdcb6e', danger: '#ff6b6b'
+};
+const palette = [colors.primary, colors.warning, colors.tertiary, colors.quaternary, colors.danger, colors.secondary];
+
+const chartRegistry = {};
+const chartSeries = {};
+
+// A brighter 2px grid line before each Q1 so a fiscal year reads as one group.
+function scaleXFor(labels, kind) {
+    const x = { ...chartDefaults.scales.x };
+    if (kind === 'quarterly') {
+        x.grid = {
+            color: ctx => (labels[ctx.index] || '').startsWith('Q1') ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.05)',
+            lineWidth: ctx => (labels[ctx.index] || '').startsWith('Q1') ? 2 : 1
+        };
+    }
+    return x;
+}
+
+function toggleLogScale(canvasId, btn) {
+    const chart = chartRegistry[canvasId];
+    if (!chart) return;
+    const toLog = chart.options.scales.y.type !== 'logarithmic';
+    chart.options.scales.y.type = toLog ? 'logarithmic' : 'linear';
+    btn.classList.toggle('active', toLog);
+    chart.update();
+}
+
+function setPeriodView(canvasId, view, btn) {
+    const chart = chartRegistry[canvasId], s = chartSeries[canvasId];
+    if (!chart || !s || !s[view]) return;
+    chart.data.labels = s[view].labels;
+    s[view].data.forEach((d, i) => { if (chart.data.datasets[i]) chart.data.datasets[i].data = d; });
+    if (chart.options.scales.x) chart.options.scales.x = s[view].scaleX;
+    btn.parentNode.querySelectorAll('.view-toggle').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    chart.update();
+}
+
+function buildChart(spec) {
+    const cd = chartData[spec.id];
+    const el = document.getElementById(spec.id);
+    if (!cd || !el) return;
+    const annual = cd.annual;
+    const hasY1 = spec.series.some(s => s.axis === 'y1');
+    const kindOf = s => s.kind || spec.type || 'bar';
+    const hasBars = spec.series.some(s => kindOf(s) === 'bar');
+    const datasets = spec.series.map((s, i) => {
+        const color = colors[s.color] || palette[i % palette.length];
+        const kind = kindOf(s);
+        // Chart.js paints ascending `order`, so lines need a LOWER order than
+        // bars to land on top of them -- otherwise a YoY line hides behind its bars.
+        const ds = { type: kind, label: s.label, data: annual.data[i], yAxisID: s.axis || 'y',
+                     spanGaps: true, order: (kind === 'bar' ? 100 : 0) + i };
+        if (kind === 'bar') { ds.backgroundColor = color; ds.borderRadius = 4; }
+        else {
+            ds.borderColor = color; ds.backgroundColor = spec.fill ? color.replace(')', ',0.15)').replace('rgb', 'rgba') : color;
+            ds.tension = 0.3; ds.fill = !!spec.fill;
+            if (hasBars) {
+                // Over bars a hairline disappears: give it weight and dotted
+                // points haloed in the card background so it stays legible.
+                ds.borderWidth = 3;
+                ds.pointRadius = 3.5;
+                ds.pointBackgroundColor = color;
+                ds.pointBorderColor = 'rgba(22, 26, 46, 0.9)';
+                ds.pointBorderWidth = 1.5;
+                ds.pointHoverRadius = 5.5;
+            }
+        }
+        return ds;
+    });
+    const scales = freshScales();
+    scales.x = scaleXFor(annual.labels, 'annual');
+    if (spec.y_title) scales.y.title = { display: true, text: spec.y_title, color: '#888' };
+    if (hasY1) {
+        scales.y.position = 'left';
+        scales.y1 = { position: 'right', ticks: { color: '#888' }, grid: { display: false } };
+        if (spec.y1_title) scales.y1.title = { display: true, text: spec.y1_title, color: '#888' };
+    }
+    const chart = new Chart(el.getContext('2d'), {
+        data: { labels: annual.labels, datasets: datasets },
+        options: { ...chartDefaults, scales: scales }
+    });
+    chartRegistry[spec.id] = chart;
+    chartSeries[spec.id] = { annual: { labels: annual.labels, data: annual.data, scaleX: scales.x } };
+    if (cd.interim) {
+        chartSeries[spec.id].interim = {
+            labels: cd.interim.labels, data: cd.interim.data, scaleX: scaleXFor(cd.interim.labels, cd.interim.kind)
+        };
+    }
+}
+
+function initCharts() { chartSpecs.forEach(buildChart); }
+
+// ============================================================
+// MODALS
+// ============================================================
+function openModal(key) {
+    const m = metricDescriptions[key];
+    if (!m) return;
+    document.getElementById('modalTitle').textContent = m.title;
+    document.getElementById('modalBody').innerHTML = m.content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ============================================================
+// DCF VALUATION
+// ============================================================
+let currentScenario = 'base';
+
+// Display symbols for currencies whose ISO code is not what a reader
+// expects to see against a share price. Anything not listed renders as its
+// own code, which is the right answer for USD/EUR/AUD/NZD-style tickers.
+const CURRENCY_SYMBOLS = { hkd: 'HK$', rmb: 'RMB', cny: 'RMB', usd: 'US$', gbp: '\u00a3', jpy: '\u00a5' };
+// Minor-unit quote codes are case-sensitive: GBp (pence) is not GBP (pounds).
+// A per-share figure in pence takes a 'p' suffix; lowercasing GBp to gbp
+// rendered WISE.L's 920p as "\u00a3920", 100x the real price.
+const PENCE_CODES = { GBp: 'p', GBX: 'p', ZAc: 'c' };
+function penceSuffix(code) {
+    return code ? (PENCE_CODES[String(code)] || null) : null;
+}
+function currencySymbol(code) {
+    if (!code) return null;
+    if (penceSuffix(code)) return '';
+    return CURRENCY_SYMBOLS[String(code).toLowerCase()] || String(code);
+}
+// PER-SHARE quantities (intrinsic value, weighted IV, entry price, current
+// price, every sensitivity cell) are denominated in the QUOTE currency,
+// because runEngine multiplies its model-currency result by quoteFxRate and
+// the analyst stores intrinsic_value in the quote currency too. The FLOWS
+// (owner FCF, net cash, the equity bridge) stay in inputs.currency and are
+// formatted by formatMoney, which is deliberately left alone. Labelling a
+// HKD share price "RMB192" is wrong by the 1.08 rate and invites a reader to
+// compare it against the RMB financials elsewhere on the page.
+function perShareCurrency() {
+    const inputs = (dcfData && dcfData.inputs) || {};
+    const quote = currencySymbol(inputs.quote_currency);   // '' for a pence quote, null if unset
+    if (quote !== null) return quote;
+    return currencySymbol(inputs.currency) || '$';
+}
+
+function fmtIV(v) {
+    const c = perShareCurrency();
+    if (v == null || !isFinite(v)) return '-';
+    const a = Math.abs(v);
+    const dp = a >= 100 ? 0 : a >= 10 ? 1 : a >= 1 ? 2 : 4;
+    const inputs = (dcfData && dcfData.inputs) || {};
+    const suffix = penceSuffix(inputs.quote_currency) || '';
+    return c + v.toFixed(dp) + suffix;
+}
+
+function scenarioDefaults(sc) {
+    const a = dcfData.assumptions;
+    const cur = a[sc] || a.base;
+    const growth = (Array.isArray(cur.growth_rates) && cur.growth_rates.length)
+        ? cur.growth_rates[0] : dcfData.historical_growth.selected_growth_rate;
+    return {
+        growth: growth,
+        wacc: cur.wacc != null ? cur.wacc : a.base.wacc,
+        terminal: cur.terminal_growth != null ? cur.terminal_growth : a.base.terminal_growth
+    };
+}
+
+// ---- Valuation engine --------------------------------------------------
+// Reproduces the analyst's model from `assumptions[scenario]` so the sliders
+// recompute real numbers. Three families, detected from the fields present:
+//   component    : revenue path x (ebitda margin - sbc - lease - D&A) -> tax ->
+//                  + D&A - capex + wc capture on revenue change (owner-fcf.md s2)
+//   sum-of-parts : component OpCo leg (WACC) + a second embedded-lender leg
+//                  (assumptions[sc].monee: book_growth/roa_path/cost_of_equity,
+//                  discounted separately at its own cost of equity) + surplus
+//                  net cash, for models where one FCF stream cannot price a
+//                  credit book (dcf-methods sum-of-the-parts routing)
+//   fcf-margin   : revenue path x fcf margin path
+//   fcf-growth   : last_fcf compounded along the growth path
+// Each is validated at the scenario's own defaults against
+// valuation[scenario].intrinsic_value; a family that cannot reproduce the
+// JSON within ENGINE_TOL is not trusted and the page falls back to the
+// generic scaler below. Displayed numbers are always the JSON's own at
+// defaults; the engine supplies the ratio when the sliders move.
+const ENGINE_TOL = 0.015;
+const dcfEngineStatus = {};
+
+function asPath(v, n, fallback) {
+    if (Array.isArray(v) && v.length) {
+        const out = v.slice(0, n).map(Number);
+        while (out.length < n) out.push(out[out.length - 1]);
+        return out;
+    }
+    if (typeof v === 'number') return Array(n).fill(v);
+    return fallback == null ? null : Array(n).fill(fallback);
+}
+function firstOf(a, names) {
+    for (const k of names) if (a[k] != null) return a[k];
+    return null;
+}
+function growthPathOf(a) {
+    const g = firstOf(a, ['growth_rates', 'revenue_growth_pct_path', 'revenue_growth_rates', 'revenue_growth_pct', 'growth_rate']);
+    if (Array.isArray(g) && g.length) return g.map(Number);
+    if (typeof g === 'number') return Array(a.horizon_years || 5).fill(g);
+    return null;
+}
+function baseRevenueOf(sc, g0) {
+    const inputs = dcfData.inputs || {};
+    const proj = (dcfData.projections || {})[sc];
+    if (proj && Array.isArray(proj.revenue) && proj.revenue.length && isFinite(g0)) return proj.revenue[0] / (1 + g0 / 100);
+    for (const k of ['last_revenue', 'revenue', 'base_revenue']) if (inputs[k] != null) return Number(inputs[k]);
+    for (const k of Object.keys(inputs)) if (/^revenue_fy\d{4}$/.test(k)) return Number(inputs[k]);
+    return null;
+}
+// A separately-valued stream that the operating sliders deliberately do not
+// drive: a payment processor's merchant settlement float (ADYEN.AS) is valued
+// on its own interest spread, not on the operating growth path. It is a real
+// term in the equity bridge, so an engine that omits it undershoots and
+// silently falls back to the toy model. Read from valuation[sc] because that
+// is where the analyst records the already-discounted value.
+function sideStreamValue(sc) {
+    const v = (dcfData.valuation || {})[sc] || {};
+    const n = Number(firstOf(v, ['merchant_float_value', 'float_value', 'side_stream_value',
+                                'non_operating_assets']));
+    return isFinite(n) ? n : 0;
+}
+function engineFamily(sc) {
+    const a = (dcfData.assumptions || {})[sc];
+    if (!a) return null;
+    const g = growthPathOf(a);
+    if (!g) return null;
+    const hasMargin = firstOf(a, ['ebitda_margin_path', 'ebitda_margin_path_pct', 'ebitda_margin']) != null;
+    if (hasMargin && a.monee && baseRevenueOf(sc, g[0]) != null) return 'sum-of-parts';
+    if (hasMargin && baseRevenueOf(sc, g[0]) != null) return 'component';
+    if (firstOf(a, ['fcf_margin', 'fcf_margins', 'fcf_margin_path']) != null && baseRevenueOf(sc, g[0]) != null) return 'fcf-margin';
+    if ((dcfData.inputs || {}).last_fcf != null) return 'fcf-growth';
+    return null;
+}
+// Second, independently-discounted leg for sum-of-the-parts DCFs: an
+// embedded lender/insurer valued on distributable earnings (post-tax
+// earnings less a fixed share of loan/book growth retained as capital) at
+// its own cost of equity, not the OpCo WACC. Detected from assumptions[sc]
+// .monee = {book_growth[], roa_path[], capital_ratio_pct, cost_of_equity,
+// terminal_growth, exit_pe_cap}; book0 is backed out from
+// projections[sc].monee.loan_book_year_end[0] and the first book_growth
+// rate so the leg still works if the growth slider is not wired to it.
+function moneeLeg(sc) {
+    const a = (dcfData.assumptions || {})[sc] || {};
+    const m = a.monee;
+    const proj = ((dcfData.projections || {})[sc] || {}).monee;
+    if (!m || !proj || !Array.isArray(proj.loan_book_year_end) || !proj.loan_book_year_end.length) return null;
+    const bookGrowth = m.book_growth, roa = m.roa_path;
+    if (!Array.isArray(bookGrowth) || !Array.isArray(roa)) return null;
+    const n = bookGrowth.length;
+    const coe = Number(m.cost_of_equity);
+    const capRatio = Number(m.capital_ratio_pct || 0);
+    if (!isFinite(coe)) return null;
+    let book = proj.loan_book_year_end[0] / (1 + bookGrowth[0] / 100);
+    const distrib = [];
+    for (let i = 0; i < n; i++) {
+        const prev = book;
+        book *= (1 + bookGrowth[i] / 100);
+        const avgBook = (book + prev) / 2;
+        const earnings = avgBook * roa[i] / 100;
+        const retained = (book - prev) * capRatio / 100;
+        distrib.push(earnings - retained);
+    }
+    const tg = Number(m.terminal_growth), cap = Number(m.exit_pe_cap || 12);
+    const last = distrib[n - 1];
+    const gordon = (coe - tg) > 0 ? last * (1 + tg / 100) / ((coe - tg) / 100) : last * cap;
+    const tv = Math.max(0, Math.min(gordon, last * cap));
+    return { distrib: distrib, tv: tv, coe: coe, n: n };
+}
+// Shift the growth path by the slider delta at year 1, tapering to zero by
+// the final year so the long-run rate is untouched.
+function shiftedGrowth(path, startGrowth) {
+    if (startGrowth == null || !isFinite(startGrowth)) return path.slice();
+    const n = path.length, delta = startGrowth - path[0];
+    return path.map((g, i) => i === 0 ? startGrowth : g + delta * Math.max(0, 1 - i / Math.max(1, n - 1)));
+}
+// The engine builds value out of the PROJECTIONS, so its result is
+// denominated in the model currency (inputs.currency). The headline
+// `intrinsic_value` may be reported in the QUOTE currency instead -- for a
+// dual-listed filer the canonical-weighted-iv rule picks the currency the
+// primary listing trades in (9999.HK: RMB financials, HKD per-share values).
+// Comparing the two directly fails by exactly the FX rate and silently drops
+// every scenario to the toy model. The rate is derived from the JSON's OWN
+// paired intrinsic_value_<cur> keys rather than any hardcoded assumption, so
+// it stays correct when the analyst refreshes FX, and returns 1 whenever the
+// two currencies agree or the pair is absent.
+function quoteFxRate(sc) {
+    const v = ((dcfData.valuation || {})[sc] || {});
+    const inputs = dcfData.inputs || {};
+    const model = String(inputs.currency || '').toLowerCase();
+    const quote = String(inputs.quote_currency || '').toLowerCase();
+    if (!model || !quote || model === quote) return 1;
+    const iv = Number(v.intrinsic_value);
+    const modelIv = Number(v['intrinsic_value_' + model]);
+    if (isFinite(iv) && isFinite(modelIv) && modelIv !== 0) return iv / modelIv;
+    return 1;
+}
+function runEngine(sc, ov) {
+    const family = engineFamily(sc);
+    if (!family) return null;
+    const a = dcfData.assumptions[sc], inputs = dcfData.inputs || {};
+    const wacc = (ov && ov.wacc != null) ? ov.wacc : a.wacc;
+    const tg = (ov && ov.terminal != null) ? ov.terminal : a.terminal_growth;
+    if (wacc == null || tg == null) return null;
+    const growth = shiftedGrowth(growthPathOf(a), ov && ov.growth);
+    const n = growth.length;
+    const fcfs = [];
+    if (family === 'fcf-growth') {
+        let f = Number(inputs.last_fcf);
+        for (let i = 0; i < n; i++) { f *= (1 + growth[i] / 100); fcfs.push(f); }
+    } else {
+        let rev = baseRevenueOf(sc, growth[0]);
+        if (family === 'fcf-margin') {
+            const m = asPath(firstOf(a, ['fcf_margins', 'fcf_margin_path', 'fcf_margin']), n);
+            for (let i = 0; i < n; i++) { rev *= (1 + growth[i] / 100); fcfs.push(rev * m[i] / 100); }
+        } else {
+            const m = asPath(firstOf(a, ['ebitda_margin_path', 'ebitda_margin_path_pct', 'ebitda_margin']), n);
+            const sbc = asPath(firstOf(a, ['sbc_pct_path', 'sbc_pct']), n, 0);
+            const lease = asPath(firstOf(a, ['lease_cost_pct', 'lease_cost_pct_path', 'lease_principal_pct_path', 'lease_principal_pct']), n, 0);
+            const da = asPath(firstOf(a, ['da_pct_path', 'da_pct']), n, 0);
+            const capex = asPath(firstOf(a, ['capex_pct_path', 'capex_pct']), n, 0);
+            const tax = asPath(firstOf(a, ['cash_tax_rate_path', 'cash_tax_rate_path_pct', 'cash_tax_rate', 'tax_rate']), n, 0);
+            const wc = Number(firstOf(a, ['wc_capture_pct']) || 0);
+            for (let i = 0; i < n; i++) {
+                const prev = rev;
+                rev *= (1 + growth[i] / 100);
+                const ebit = rev * (m[i] - sbc[i] - lease[i] - da[i]) / 100;
+                const nopat = ebit - Math.max(0, ebit) * tax[i] / 100;
+                fcfs.push(nopat + rev * da[i] / 100 - rev * capex[i] / 100 + (rev - prev) * wc / 100);
+            }
+        }
+    }
+    const cap = Number(firstOf(a, ['terminal_cap_multiple', 'terminal_fcf_multiple_cap', 'terminal_multiple_cap']) || 20);
+    const last = fcfs[n - 1];
+    // Terminal value depends on the discount rate through the Gordon spread
+    // (r - g), so it must be rebuilt at whichever rate is doing the
+    // discounting -- WACC for the intrinsic value, the entry-price hurdle
+    // rate for the entry price. Reusing the WACC-built `tv` for the hurdle
+    // leg overstated every slider-moved entry price (SPN.NZ: $4.38 vs the
+    // correct $3.51 at defaults for the same reason).
+    const tvAt = (rate) => {
+        const g = (rate - tg) > 0 ? last * (1 + tg / 100) / ((rate - tg) / 100) : last * cap;
+        return Math.max(0, Math.min(g, last * cap));
+    };
+    const tv = tvAt(wacc);
+    const netDebt = Number(inputs.net_debt || 0);
+    const shares = (inputs.projected_shares && inputs.projected_shares.length >= n)
+        ? Number(inputs.projected_shares[n - 1]) : Number(inputs.shares_outstanding);
+    if (!shares) return null;
+    const pv = (rate) => fcfs.reduce((s, f, i) => s + f / Math.pow(1 + rate / 100, i + 1), 0);
+    if (family === 'sum-of-parts') {
+        // The Monee (or equivalent embedded-lender) leg is not driven by the
+        // OpCo sliders: its own book-growth/ROA/cost-of-equity path is a
+        // separate, unlisted-elsewhere model the growth/WACC/terminal
+        // sliders intentionally do not touch (see the DCF section note).
+        const leg = moneeLeg(sc);
+        if (!leg) return null;
+        const pvLeg = (rate) => leg.distrib.reduce((s, f, i) => s + f / Math.pow(1 + rate / 100, i + 1), 0);
+        const moneeEquity = pvLeg(leg.coe) + leg.tv / Math.pow(1 + leg.coe / 100, leg.n);
+        const surplusCash = -netDebt;
+        const ev = pv(wacc) + tv / Math.pow(1 + wacc / 100, n);
+        const equityValue = ev + moneeEquity + surplusCash;
+        const hurdle = ((dcfData.entry_price || {}).hurdle_rate || 0.15) * 100;
+        const tvHurdle = tvAt(hurdle);
+        const entryEquity = pv(hurdle) + tvHurdle / Math.pow(1 + hurdle / 100, n)
+            + pvLeg(hurdle) + leg.tv / Math.pow(1 + hurdle / 100, leg.n) + surplusCash;
+        const fxSop = quoteFxRate(sc);
+        return { family: family, iv: equityValue / shares * fxSop,
+                 entryPrice: entryEquity / shares * fxSop,
+                 fcfList: fcfs, growthRates: growth };
+    }
+    const ev = pv(wacc) + tv / Math.pow(1 + wacc / 100, n);
+    const hurdle = ((dcfData.entry_price || {}).hurdle_rate || 0.15) * 100;
+    const side = sideStreamValue(sc);
+    const tvHurdle = tvAt(hurdle);
+    const entry = (pv(hurdle) + tvHurdle / Math.pow(1 + hurdle / 100, n) + side - netDebt) / shares;
+    const fx = quoteFxRate(sc);
+    return { family: family, iv: (ev + side - netDebt) / shares * fx, entryPrice: entry * fx, fcfList: fcfs, growthRates: growth };
+}
+function validateEngines() {
+    for (const sc of ['base', 'bull', 'bear']) {
+        const r = runEngine(sc);
+        const target = ((dcfData.valuation || {})[sc] || {}).intrinsic_value;
+        const ok = !!(r && target && isFinite(r.iv) && Math.abs(r.iv - target) <= ENGINE_TOL * Math.abs(target));
+        dcfEngineStatus[sc] = { family: r ? r.family : null, ok: ok, iv: r ? r.iv : null, target: target };
+    }
+}
+
+// Generic 5-year Gordon model: the fallback when no engine family validates
+// (older JSONs without component fields). Only ever used as a ratio.
+function toyDCF(startGrowth, wacc, terminalGrowth) {
+    const years = 5;
+    const hurdle = 0.15;
+    const inputs = dcfData.inputs;
+    let pvFCF = 0, pvFCFHurdle = 0, projectedFCF = inputs.last_fcf;
+    const endGrowth = 10;
+    for (let i = 0; i < years; i++) {
+        const yearGrowth = startGrowth > endGrowth ? startGrowth - (startGrowth - endGrowth) * (i / 4) : startGrowth;
+        projectedFCF *= (1 + yearGrowth / 100);
+        pvFCF += projectedFCF / Math.pow(1 + wacc / 100, i + 1);
+        pvFCFHurdle += projectedFCF / Math.pow(1 + hurdle, i + 1);
+    }
+    const spread = Math.max(wacc / 100 - terminalGrowth / 100, 0.005);
+    const terminalValue = projectedFCF * (1 + terminalGrowth / 100) / spread;
+    const pvTerminal = terminalValue / Math.pow(1 + wacc / 100, years);
+    const enterpriseValue = pvFCF + pvTerminal;
+    const equityValue = enterpriseValue - (inputs.net_debt || 0);
+    const exitShares = (inputs.projected_shares && inputs.projected_shares.length >= years)
+        ? inputs.projected_shares[years - 1]
+        : inputs.shares_outstanding * Math.pow(1 + (inputs.annual_share_growth_pct || 0) / 100, years);
+    return { iv: equityValue / exitShares,
+             entryPrice: (pvFCFHurdle + terminalValue / Math.pow(1 + hurdle, years) - (inputs.net_debt || 0)) / exitShares };
+}
+
+// The model behind the sliders for one scenario: the validated engine, else the toy.
+function calculateDCF(sc, growth, wacc, terminal) {
+    const st = dcfEngineStatus[sc];
+    if (st && st.ok) {
+        const r = runEngine(sc, { growth: growth, wacc: wacc, terminal: terminal });
+        if (r && isFinite(r.iv)) return r;
+    }
+    return toyDCF(growth, wacc, terminal);
+}
+
+function canScale() {
+    const i = dcfData.inputs || {};
+    return i.last_fcf != null && (i.shares_outstanding != null || (i.projected_shares && i.projected_shares.length));
+}
+
+// Anchor the selected scenario's stored number (iv | entry) and scale it by
+// the model's ratio when the sliders leave that scenario's defaults.
+function anchored(field, growth, wacc, terminal) {
+    const stored = (dcfAnchors[currentScenario] || {})[field];
+    const d = scenarioDefaults(currentScenario);
+    const atDefaults = growth === d.growth && wacc === d.wacc && terminal === d.terminal;
+    if (stored != null && atDefaults) return stored;
+    const st = dcfEngineStatus[currentScenario];
+    if (!(st && st.ok) && !canScale()) return stored;
+    const key = field === 'iv' ? 'iv' : 'entryPrice';
+    const now = calculateDCF(currentScenario, growth, wacc, terminal)[key];
+    if (stored == null) return now;
+    // The entry price is returned STRAIGHT from the engine once a slider has
+    // moved, never scaled onto the stored number. Every DCF JSON written
+    // before the terminal-value-at-hurdle fix has a stored entry_price built
+    // with the WACC terminal value, so `stored * (now / ref)` re-injects the
+    // very bug the engine corrects -- on the TPW fixture a correct 2.943
+    // comes back out as 3.254.
+    //
+    // IV keeps its anchor: it is not what that fix changed, and anchoring
+    // stops a tab click nudging the headline number off the JSON.
+    if (key === 'entryPrice') return now;
+    const ref = calculateDCF(currentScenario, d.growth, d.wacc, d.terminal)[key];
+    if (!ref || !isFinite(ref) || !isFinite(now)) return stored;
+    return stored * (now / ref);
+}
+
+function isWeightedLive() {
+    const pw = dcfData.probability_weighted || {};
+    const w = pw.weights, a = dcfData.assumptions;
+    if (!w || !a || !a.base || !a.bull || !a.bear) return false;
+    // Two different things are needed before the weighted IV may be rescaled.
+    //
+    // `ok` is strict: the engine reproduced the stored IV within ENGINE_TOL. An
+    // engine can miss that and still be perfectly usable for a RATIO -- it only
+    // has to move the same way the model does -- so `ok` alone is too harsh and
+    // would freeze the sliders on dashboards that model fine.
+    //
+    // What must not happen is trusting an engine that modelled NOTHING. A
+    // finite-mine DCF (SMI.NZ) has no FCF projection to discount: family
+    // resolves null and the engine returns ~0.027 against a 1.011 target. The
+    // ratio stored * (now / ref) then divides two meaningless near-zero numbers,
+    // and once ref crosses zero the sign flips -- which published a +0.919
+    // weighted IV as NZD-5.59 (-1017%) while the header still read +51%.
+    //
+    // canScale() cannot stand in for this: it only says the inputs for a
+    // proportional rescale exist (last_fcf + shares), which a pre-revenue miner
+    // burning cash still satisfies.
+    const engineModels = ['base', 'bull', 'bear'].every(sc => {
+        const st = dcfEngineStatus[sc];
+        return st && st.family && isFinite(st.iv) && st.iv > 0;
+    });
+    if (!engineModels) return false;
+    const total = (w.bull || 0) + (w.base || 0) + (w.bear || 0);
+    return Math.abs(total - 1) <= 0.001;
+}
+
+// Probability-weighted IV: the stored weighted_iv at the selected scenario's
+// defaults (so a tab click never moves it), scaled by re-weighting all three
+// scenarios with the user's slider deltas applied to each.
+function weightedIV(growth, wacc, terminal) {
+    const pw = dcfData.probability_weighted || {};
+    const stored = pw.weighted_iv;
+    if (stored == null || !isWeightedLive()) return stored;
+    const d = scenarioDefaults(currentScenario);
+    if (growth === d.growth && wacc === d.wacc && terminal === d.terminal) return stored;
+    const w = pw.weights;
+    const at = (g, k, t) => {
+        let sum = 0;
+        for (const sc of ['bull', 'base', 'bear']) {
+            const sd = scenarioDefaults(sc);
+            const sg = sd.growth + (g - d.growth), sk = sd.wacc + (k - d.wacc), st = sd.terminal + (t - d.terminal);
+            sum += w[sc] * calculateDCF(sc, sg, Math.max(sk, st + 0.5), st).iv;
+        }
+        return sum;
+    };
+    const ref = at(d.growth, d.wacc, d.terminal);
+    if (!ref || !isFinite(ref)) return stored;
+    const now = at(growth, wacc, terminal);
+    if (!now || !isFinite(now)) return stored;
+    return stored * (now / ref);
+}
+
+function renderHeaderValuation() {
+    const el = document.getElementById('headerValuation');
+    if (!el) return;
+    const pw = dcfData.probability_weighted || {};
+    const wiv = pw.weighted_iv, price = dcfData.current_price;
+    if (wiv == null || price == null) return;
+    // A price must be denominated like the IV that divides it (WISE.L: GBp
+    // quote vs USD model). Suppress the chip rather than print -98%.
+    const ratio = wiv / price;
+    if (ratio > 20 || ratio < 0.05) return;
+    const up = (wiv - price) / price * 100;
+    const cls = up >= 0 ? 'positive' : 'negative', sign = up >= 0 ? '+' : '';
+    el.innerHTML = `<div class="hv-item"><span class="hv-label">Prob-Weighted IV</span><span class="hv-value">${fmtIV(wiv)}</span></div>
+        <div class="hv-item"><span class="hv-label">Current Price</span><span class="hv-value">${fmtIV(price)}</span></div>
+        <div class="hv-item"><span class="hv-label">Upside</span><span class="hv-value ${cls}">${sign}${up.toFixed(0)}%</span></div>`;
+    el.style.display = 'flex';
+}
+
+function formatMoney(n) {
+    const inputs = dcfData.inputs || {};
+    const currency = inputs.currency || '$';
+    const units = inputs.units === 'millions' ? 'M' : inputs.units === 'billions' ? 'B' : '';
+    if (n == null || !isFinite(n)) return '-';
+    if (Math.abs(n) >= 1000 && inputs.units === 'millions') return currency + (n / 1000).toFixed(1) + 'B';
+    return currency + n.toFixed(1) + units;
+}
+
+function renderDCFInputs() {
+    const inputs = dcfData.inputs || {};
+    document.getElementById('baseFCF').textContent = formatMoney(inputs.last_fcf);
+    const sbcEl = document.getElementById('sbcBreakdown');
+    if (inputs.sbc_source === 'unavailable') {
+        sbcEl.innerHTML = '<span style="color:#fdcb6e">&#9888; SBC not disclosed &mdash; FCF unadjusted, IV overstated</span>';
+    } else if (inputs.sbc != null && inputs.reported_fcf != null) {
+        const sbcAmt = inputs.sbc_incl_equity_taxes != null ? inputs.sbc_incl_equity_taxes : inputs.sbc;
+        let parts = `${formatMoney(inputs.reported_fcf)} reported − ${formatMoney(sbcAmt)} SBC`;
+        if (inputs.interest_income) parts += ` − ${formatMoney(inputs.interest_income)} interest`;
+        if (inputs.lease_principal_paid) parts += ` − ${formatMoney(inputs.lease_principal_paid)} leases`;
+        sbcEl.textContent = parts;
+    } else {
+        sbcEl.textContent = 'Starting point for projections';
+    }
+    const shares = inputs.shares_outstanding;
+    document.getElementById('sharesOut').textContent = shares == null ? '-'
+        : shares >= 1000 ? (shares / 1000).toFixed(2) + 'B' : shares.toFixed(1) + 'M';
+    const g = inputs.annual_share_growth_pct;
+    document.getElementById('dilutionNote').textContent = (g > 0)
+        ? `+${g.toFixed(1)}%/yr from non-SBC issuance` : 'Flat — SBC expensed in cash flows';
+    const netDebt = inputs.net_debt;
+    const ndEl = document.getElementById('netDebt');
+    ndEl.textContent = netDebt == null ? '-' : (netDebt < 0 ? '-' : '') + formatMoney(Math.abs(netDebt));
+    if (netDebt < 0) ndEl.style.color = '#00d4aa';
+    renderFCFProjections();
+}
+
+// The analyst's own projection when present; otherwise the toy model's path.
+function renderFCFProjections() {
+    const table = document.getElementById('fcfProjectionTable');
+    const proj = dcfData.projections && dcfData.projections[currentScenario];
+    let values = null, years = [];
+    const st = dcfEngineStatus[currentScenario];
+    if (st && st.ok) {
+        const s = sliderValues();
+        const r = runEngine(currentScenario, { growth: s.growth, wacc: s.wacc, terminal: s.terminal });
+        if (r) {
+            values = r.fcfList;
+            years = (proj && Array.isArray(proj.years) && proj.years.length === values.length)
+                ? proj.years : values.map((_, i) => 'Yr ' + (i + 1));
+        }
+    }
+    if (!values && proj && Array.isArray(proj.owner_fcf || proj.fcf)) {
+        values = proj.owner_fcf || proj.fcf;
+        years = Array.isArray(proj.years) ? proj.years : values.map((_, i) => 'Yr ' + (i + 1));
+    } else if (proj && Array.isArray(proj)) {
+        values = proj.map(p => p.owner_fcf != null ? p.owner_fcf : p.fcf);
+        years = proj.map((p, i) => p.year || p.fiscal_year || ('Yr ' + (i + 1)));
+    }
+    if (!values || !values.length) {
+        const startGrowth = parseFloat(document.getElementById('growthSlider').value);
+        let fcf = dcfData.inputs.last_fcf;
+        values = [];
+        for (let i = 0; i < 5; i++) {
+            const rate = startGrowth > 10 ? startGrowth - (startGrowth - 10) * (i / 4) : startGrowth;
+            fcf = fcf * (1 + rate / 100);
+            values.push(fcf);
+            years.push('Year ' + (i + 1));
+        }
+    }
+    const base = dcfData.inputs.last_fcf;
+    const cols = [['Base', base, null]].concat(values.map((v, i) => [years[i], v, i === 0 ? base : values[i - 1]]));
+    table.style.gridTemplateColumns = `repeat(${cols.length}, 1fr)`;
+    let html = cols.map(c => `<div class="fcf-projection-item header">${esc(c[0])}</div>`).join('');
+    html += cols.map(c => {
+        const g = (c[2] != null && c[2] !== 0 && c[1] != null) ? ((c[1] - c[2]) / Math.abs(c[2]) * 100) : null;
+        return `<div class="fcf-projection-item"><div class="fcf-value">${formatMoney(c[1])}</div>
+            <div class="growth-rate">${g == null ? '-' : (g >= 0 ? '+' : '') + g.toFixed(0) + '%'}</div></div>`;
+    }).join('');
+    table.innerHTML = html;
+}
+
+function sliderValues() {
+    return {
+        growth: parseFloat(document.getElementById('growthSlider').value),
+        wacc: parseFloat(document.getElementById('waccSlider').value),
+        terminal: parseFloat(document.getElementById('terminalSlider').value)
+    };
+}
+
+window.updateDCFDisplay = function() {
+    const s = sliderValues();
+    document.getElementById('growthValue').textContent = s.growth + '%';
+    document.getElementById('waccValue').textContent = s.wacc + '%';
+    document.getElementById('terminalValue').textContent = s.terminal + '%';
+    renderFCFProjections();
+
+    const iv = anchored('iv', s.growth, s.wacc, s.terminal);
+    const entry = anchored('entry', s.growth, s.wacc, s.terminal);
+    const price = dcfData.current_price;
+    document.getElementById('dcfIV').textContent = fmtIV(iv);
+    document.getElementById('dcfEntry').textContent = fmtIV(entry);
+    const upEl = document.getElementById('dcfUpside');
+    if (iv != null && price) {
+        const up = (iv - price) / price * 100;
+        upEl.textContent = (up >= 0 ? '+' : '') + up.toFixed(0) + '% ' + (up >= 0 ? 'upside' : 'downside');
+        upEl.className = 'dcf-change ' + (up >= 0 ? 'positive' : 'negative');
+    }
+    const wiv = weightedIV(s.growth, s.wacc, s.terminal);
+    document.getElementById('dcfWeighted').textContent = fmtIV(wiv);
+    const wUpEl = document.getElementById('dcfWeightedUpside');
+    if (wiv != null && price) {
+        const wUp = (wiv - price) / price * 100;
+        wUpEl.textContent = (wUp >= 0 ? '+' : '') + wUp.toFixed(0) + '% ' + (wUp >= 0 ? 'upside' : 'downside');
+        wUpEl.className = 'dcf-change ' + (wUp >= 0 ? 'positive' : 'negative');
+    }
+    renderAssumptions(s, iv, entry);
+};
+
+function renderAssumptions(s, iv, entry) {
+    const a = dcfData.assumptions[currentScenario] || {};
+    const items = [['Year 1 Growth', s.growth + '%']];
+    if (Array.isArray(a.growth_rates) && a.growth_rates.length > 1) {
+        items.push([`Year ${a.growth_rates.length} Growth`, a.growth_rates[a.growth_rates.length - 1] + '%']);
+    }
+    for (const k of Object.keys(a)) {
+        if (/margin/.test(k) && Array.isArray(a[k]) && a[k].length) {
+            items.push([k.replace(/_/g, ' ').replace(/ path$/, '') + ' (Y1 → end)', a[k][0] + '% → ' + a[k][a[k].length - 1] + '%']);
+            break;
+        }
+        if (/margin/.test(k) && typeof a[k] === 'number') { items.push([k.replace(/_/g, ' '), a[k] + '%']); break; }
+    }
+    items.push(['WACC', s.wacc + '%'], ['Terminal Growth', s.terminal + '%']);
+    if (a.terminal_cap_multiple) items.push(['Terminal cap', a.terminal_cap_multiple + 'x']);
+    items.push(['Intrinsic Value', fmtIV(iv)], ['Entry Price', fmtIV(entry)]);
+    document.getElementById('assumptionGrid').innerHTML = items.map(([l, v], i) =>
+        `<div class="assumption-item"><div class="label">${esc(l)}</div><div class="value"${i >= items.length - 2 ? ' style="color:#00d4aa"' : ''}>${esc(v)}</div></div>`).join('');
+}
+
+window.switchScenario = function(scenario) {
+    currentScenario = scenario;
+    document.querySelectorAll('.scenario-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.scenario === scenario);
+    });
+    const d = scenarioDefaults(scenario);
+    document.getElementById('growthSlider').value = d.growth;
+    document.getElementById('waccSlider').value = d.wacc;
+    document.getElementById('terminalSlider').value = d.terminal;
+    const nar = document.getElementById('scenarioNarrative');
+    const narratives = dcfData.scenario_narratives || {};
+    const text = narratives[scenario];
+    nar.textContent = typeof text === 'string' ? text : (text && text.summary) || '';
+    updateDCFDisplay();
+};
+
+function renderHistoricalGrowth() {
+    const growth = dcfData.historical_growth || {};
+    const selected = growth.growth_rate_source;
+    const keys = Object.keys(growth).filter(k => /cagr/.test(k) && typeof growth[k] === 'number');
+    document.getElementById('growthGrid').innerHTML = keys.map(k => {
+        const rate = growth[k];
+        const label = k.replace(/_cagr$/, '').replace(/_(\d+)yr/, ' $1Y').replace(/_/g, ' ');
+        return `<div class="growth-item ${k === selected ? 'selected' : ''}">
+            <div class="metric">${esc(label)}</div>
+            <div class="rate ${rate >= 0 ? 'positive' : 'negative'}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div></div>`;
+    }).join('');
+}
+
+// The grid is not always WACC x terminal growth: a multiple-exit model
+// (no Gordon terminal) ships e.g. coe_range x exit_multiple_range. Find the
+// two axes by shape -- rows match matrix.length, cols match the row width --
+// so any well-formed grid renders instead of being discarded.
+const SENS_AXES = {
+    wacc_range: { label: 'WACC', unit: '%', base: b => b.wacc },
+    coe_range: { label: 'Cost of equity', unit: '%', base: b => b.cost_of_equity ?? b.coe ?? b.wacc },
+    terminal_growth_range: { label: 'Term G', unit: '%', base: b => b.terminal_growth },
+    exit_multiple_range: { label: 'Exit multiple', unit: 'x', base: b => b.exit_multiple },
+    growth_range: { label: 'Growth', unit: '%', base: b => b.growth },
+};
+
+function pickSensAxis(sens, len, exclude) {
+    const keys = Object.keys(sens).filter(k =>
+        k !== exclude && Array.isArray(sens[k]) && sens[k].length === len && sens[k] !== sens.matrix);
+    // prefer a known axis name, else fall back to any range-shaped array
+    return keys.find(k => SENS_AXES[k]) || keys.find(k => /_range$/.test(k)) || null;
+}
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const table = document.getElementById('sensitivityMatrix');
+    const rows = sens && Array.isArray(sens.matrix) ? sens.matrix : null;
+    const rowKey = rows && rows.length ? pickSensAxis(sens, rows.length, null) : null;
+    const colKey = rowKey && Array.isArray(rows[0]) ? pickSensAxis(sens, rows[0].length, rowKey) : null;
+    if (!rowKey || !colKey) {
+        table.innerHTML = '<tr><td>No sensitivity grid in the DCF JSON</td></tr>';
+        return;
+    }
+    const price = dcfData.current_price;
+    const base = dcfData.assumptions.base || {};
+    const rowAx = SENS_AXES[rowKey] || { label: rowKey.replace(/_range$/, ''), unit: '', base: () => undefined };
+    const colAx = SENS_AXES[colKey] || { label: colKey.replace(/_range$/, ''), unit: '', base: () => undefined };
+    const rowBase = rowAx.base(base), colBase = colAx.base(base);
+    let html = `<tr><th>${rowAx.label} \\ ${colAx.label}</th>`
+        + sens[colKey].map(c => `<th>${c}${colAx.unit}</th>`).join('') + '</tr>';
+    sens[rowKey].forEach((rv, i) => {
+        html += `<tr><th>${rv}${rowAx.unit}</th>`;
+        (rows[i] || []).forEach((val, j) => {
+            const hl = rv === rowBase && sens[colKey][j] === colBase;
+            const cls = hl ? 'highlight' : (val >= price ? 'above-current' : 'below-current');
+            html += `<td class="${cls}">${fmtIV(val)}</td>`;
+        });
+        html += '</tr>';
+    });
+    table.innerHTML = html;
+}
+
+function philosophyLabel(key) {
+    const t = key.replace(/_/g, ' ').trim();
+    return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/* `valuation_philosophy` is a string on some DCF JSONs and a nested object on
+   others (52 of them). Interpolating the object rendered "[object Object]". */
+function philosophyParts(value, label) {
+    if (value === null || value === undefined || value === '') return [];
+    if (Array.isArray(value)) return value.flatMap(v => philosophyParts(v, label));
+    if (typeof value === 'object') {
+        return Object.keys(value).flatMap(k => philosophyParts(value[k], philosophyLabel(k)));
+    }
+    return [{ label: label, text: String(value) }];
+}
+
+function renderPhilosophy(value, el) {
+    if (!el) return;
+    const parts = philosophyParts(value, '');
+    if (!parts.length) { el.style.display = 'none'; return; }
+    const body = parts
+        .map(p => (p.label ? `<strong>${esc(p.label)}:</strong> ` : '') + esc(p.text))
+        .join('<br>');
+    el.innerHTML = `<strong>Valuation philosophy:</strong> ${body}`;
+}
+
+function initDCF() {
+    if (!dcfData || !dcfData.valuation || !dcfData.assumptions) return;
+    validateEngines();
+    const eng = document.getElementById('dcfEngineNote');
+    if (eng) {
+        const okAll = ['base', 'bull', 'bear'].every(sc => dcfEngineStatus[sc].ok);
+        eng.textContent = okAll
+            ? `Sliders re-run the ${dcfEngineStatus.base.family} model from the DCF's own assumptions.`
+            : 'Sliders scale the stored valuation with a generic model — the DCF JSON lacks the fields to rebuild it exactly.';
+    }
+    document.getElementById('dcfCurrent').textContent = fmtIV(dcfData.current_price);
+    renderPhilosophy(dcfData.valuation_philosophy, document.getElementById('dcfPhilosophy'));
+    const hg = dcfData.historical_growth || {};
+    if (hg.growth_divergence_warning) {
+        document.getElementById('growthWarning').style.display = 'flex';
+        document.getElementById('warningText').textContent = hg.growth_divergence_warning;
+    }
+    const wsub = document.getElementById('dcfWeightedSublabel');
+    const wts = (dcfData.probability_weighted || {}).weights;
+    if (wts) {
+        const pct = x => Math.round((x || 0) * 100);
+        let txt = `${pct(wts.bull)}% Bull / ${pct(wts.base)}% Base / ${pct(wts.bear)}% Bear`;
+        if (!isWeightedLive()) txt += ' — fixed from model';
+        wsub.textContent = txt;
+    }
+    renderHeaderValuation();
+    renderDCFInputs();
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    switchScenario('base');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+renderGuidance();
+renderOverview();
+initCharts();
+initDCF();
+</script>
+</body>
+</html>
