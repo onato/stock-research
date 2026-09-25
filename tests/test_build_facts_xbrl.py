@@ -366,6 +366,64 @@ class TestCollect:
         _, values, _ = bfx.collect(facts, ["Revenues"])
         assert values == {"FY2024": 7}
 
+    def test_tax_inclusive_revenue_fills_in_when_no_other_concept_exists(self):
+        # Ball Corporation (CIK 0000009389): RevenueFromContractWithCustomer
+        # ExcludingAssessedTax has only 6 sparse quarterly rows spanning
+        # 2017-2018 (no annual coverage), Revenues does not exist for this
+        # filer at all, and SalesRevenueNet stops at FY2017. Every period
+        # FY2018 onward is tagged ONLY under
+        # RevenueFromContractWithCustomerIncludingAssessedTax -- confirmed
+        # against SEC's companyconcept API by start/end date, e.g. FY2019
+        # (2019-01-01 to 2019-12-31) = $11,474,000,000. Without that concept
+        # in the fallback list, collect() returns nothing for FY2019 and
+        # core_metrics carries Revenue as NULL for every period FY2018-2025.
+        facts = {"facts": {"us-gaap": {
+            "RevenueFromContractWithCustomerIncludingAssessedTax": {
+                "units": {"USD": [
+                    {"start": "2019-01-01", "end": "2019-12-31",
+                     "val": 11474000000, "form": "10-K",
+                     "filed": "2020-02-25"},
+                ]}},
+        }}}
+        _, values, _ = bfx.collect(facts, bfx.CONCEPTS["revenue"])
+        assert values["FY2019"] == 11474000000
+
+    def test_tax_inclusive_revenue_loses_to_excluding_variant_when_both_exist(self):
+        # The Including-tax concept must sit at LOWEST preference: it names
+        # the less precise (sales-tax-inclusive) figure, and other filers
+        # that DO tag the Excluding variant should keep using it -- even
+        # when both are tagged in the SAME accession, which is the normal
+        # shape here (Excluding is BY CONSTRUCTION Including minus a tax/fee
+        # add-on, so Including is almost always the larger of the two when
+        # both are real totals for the same line). The general "same
+        # accession, larger value wins" rule exists for a DIFFERENT shape --
+        # a preferred concept naming a narrow subset (AVB: Excluding $5.6m
+        # ancillary fee vs Revenues $2,045m total) -- and would wrongly flip
+        # this pair the other way if applied here. Brown-Forman (CIK
+        # 0000014693) is the real case: the FY2019 10-K (accn
+        # 0000014693-19-000099) tags Excluding $2,994m (net revenue, the
+        # correct headline figure) and Including $3,857m (gross revenue
+        # incl. excise taxes) for the SAME FY2017 period; naive larger-wins
+        # would have overridden the correct 2,994 with the tax-inclusive
+        # 3,857 across 56 periods once IncludingAssessedTax joined the
+        # concept list.
+        facts = {"facts": {"us-gaap": {
+            "RevenueFromContractWithCustomerExcludingAssessedTax": {
+                "units": {"USD": [
+                    {"start": "2016-05-01", "end": "2017-04-30",
+                     "val": 2994000000, "accn": "0000014693-19-000099",
+                     "form": "10-K", "filed": "2019-06-13"},
+                ]}},
+            "RevenueFromContractWithCustomerIncludingAssessedTax": {
+                "units": {"USD": [
+                    {"start": "2016-05-01", "end": "2017-04-30",
+                     "val": 3857000000, "accn": "0000014693-19-000099",
+                     "form": "10-K", "filed": "2019-06-13"},
+                ]}},
+        }}}
+        _, values, _ = bfx.collect(facts, bfx.CONCEPTS["revenue"])
+        assert values["FY2017"] == 2994000000
+
     def test_shares_outstanding_rejects_pre_scaled_filer_error(self):
         # Agilent's FY2009 10-K (accn 0001047469-09-010861, filed
         # 2009-12-21) tagged WeightedAverageNumberOfDilutedSharesOutstanding

@@ -43,8 +43,17 @@ FACTS_URL = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik:010d}.json"
 # RevenueFromContractWithCustomer...), so each maps to a list and the
 # first with data wins.
 CONCEPTS = {
+    # RevenueFromContractWithCustomerIncludingAssessedTax sits last (lowest
+    # preference): it names the less precise, sales-tax-inclusive figure,
+    # so a filer that also tags the Excluding variant should keep using
+    # that one. Ball Corporation (CIK 0000009389) tags ONLY the Including
+    # variant for FY2018 onward -- Excluding has just 6 sparse quarterly
+    # rows in 2017-2018 with no annual coverage, Revenues doesn't exist for
+    # this filer, and SalesRevenueNet stops at FY2017 -- so without this
+    # entry BALL's revenue is NULL for every period FY2018-2025.
     "revenue": ["RevenueFromContractWithCustomerExcludingAssessedTax",
-                "Revenues", "SalesRevenueNet"],
+                "Revenues", "SalesRevenueNet",
+                "RevenueFromContractWithCustomerIncludingAssessedTax"],
     "cost_of_revenue": ["CostOfRevenue", "CostOfGoodsAndServicesSold"],
     "gross_profit": ["GrossProfit"],
     "operating_income": ["OperatingIncomeLoss"],
@@ -260,6 +269,22 @@ def _d(s: str) -> datetime.date:
 # shares-scale bug did, in that same gray zone).
 MIN_PLAUSIBLE_SHARE_COUNT = 862_000
 
+# Concepts that are a superset BY CONSTRUCTION -- tax/fee-inclusive tags
+# name (a strictly narrower concept) + (tax or fee) -- so they are almost
+# always the larger of the two whenever a filer tags both for real. The
+# same-accession "larger value wins" rule in collect() below exists for the
+# opposite shape (a *preferred* concept naming an accidental narrow subset,
+# e.g. AVB's ancillary-fee mistagging) and would otherwise let one of these
+# override a correct, higher-preference total just because tax-inclusive
+# is bigger. Brown-Forman (CIK 0000014693) tags
+# RevenueFromContractWithCustomerExcludingAssessedTax $2,994m (net revenue,
+# the correct headline figure) alongside
+# RevenueFromContractWithCustomerIncludingAssessedTax $3,857m (gross,
+# including excise tax) for the same FY2017 period in the same accession;
+# letting the larger value win would silently replace 56 periods of correct
+# net revenue with the tax-inclusive gross figure.
+NEVER_OVERRIDES_SAME_ACCESSION = {"RevenueFromContractWithCustomerIncludingAssessedTax"}
+
 
 def collect(facts: dict[str, Any],
             concepts: list[str]) -> tuple[str | None, dict[str, Any], str]:
@@ -281,7 +306,10 @@ def collect(facts: dict[str, Any],
     concepts landing on the same period from the same accession is the
     signal a switch-over never produces (each concept there comes from a
     DIFFERENT accession), so when that happens the larger value wins
-    regardless of concept order.
+    regardless of concept order -- unless the challenger is listed in
+    NEVER_OVERRIDES_SAME_ACCESSION, whose members are a superset by
+    construction and so would otherwise win this comparison for the wrong
+    reason.
     """
     gaap = facts.get("facts", {}).get("us-gaap", {})
     out: dict[str, tuple[Any, Any]] = {}
@@ -310,7 +338,8 @@ def collect(facts: dict[str, Any],
                 accn = f.get("accn")
                 prior = accn_seen.get((accn, p)) if accn else None
                 if prior is not None and prior["concept"] != concept:
-                    if abs(f["val"]) <= abs(prior["val"]):
+                    if (concept in NEVER_OVERRIDES_SAME_ACCESSION
+                            or abs(f["val"]) <= abs(prior["val"])):
                         continue
                     # The new value supersedes the smaller same-accession
                     # figure already recorded for this period.
