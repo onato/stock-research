@@ -340,3 +340,56 @@ class TestResetAtEdges:
         got = rate_limit.reset_at(log)
         assert got is not None
         assert got > time.time() + 800
+
+
+FABLE_ERROR = {
+    "type": "system", "subtype": "task_updated",
+    "patch": {"status": "failed", "error":
+              "Agent terminated early due to an API error: You've reached your "
+              "Fable limit. Switch to another model, or manage usage credits at "
+              "claude.ai/settings/usage, to continue. (error type rate_limit, "
+              "HTTP 429, model sent to the API: claude-fable-5-1)"}}
+
+
+class TestFableLimited:
+    """A Fable-only limit is not an account limit (AIZ/AJG/AIG, 2026-09-25).
+
+    The seven_day_overage_included window rejected Fable at 101% while the
+    account's seven_day window sat at 82%: every other model still worked,
+    so halting the whole queue until Sunday threw away two days. The run
+    falls back to Opus for the Fable-pinned agents instead."""
+
+    def test_fable_error_with_rejection_returns_the_reset(self, tmp_path):
+        rej = event("rejected", resets_in=2 * 86400,
+                    kind="seven_day_overage_included")
+        log = write_log(tmp_path, rej, FABLE_ERROR)
+        assert rate_limit.fable_limited(log) == rej["rate_limit_info"]["resetsAt"]
+
+    def test_an_account_rejection_is_not_a_fable_limit(self, tmp_path):
+        log = write_log(tmp_path, event("rejected", resets_in=600))
+        assert rate_limit.fable_limited(log) is None
+
+    def test_a_fable_error_without_a_rejection_has_no_reset(self, tmp_path):
+        # Nothing says when it ends; guessing a reset would pin Opus forever.
+        log = write_log(tmp_path, FABLE_ERROR)
+        assert rate_limit.fable_limited(log) is None
+
+    def test_a_quoted_fable_message_in_a_tool_result_does_not_count(self, tmp_path):
+        # A model reading an old log would echo the text inside a tool_result.
+        quoted = {"type": "user", "message": {"content": [
+            {"type": "tool_result", "content": FABLE_ERROR["patch"]["error"]}]}}
+        log = write_log(tmp_path, event("rejected", resets_in=600), quoted)
+        assert rate_limit.fable_limited(log) is None
+
+    def test_cli_prints_the_reset_and_exits_zero(self, tmp_path, monkeypatch, capsys):
+        log = write_log(tmp_path, event("rejected", resets_in=86400,
+                                        kind="seven_day_overage_included"),
+                        FABLE_ERROR)
+        monkeypatch.setattr(sys, "argv", ["rate_limit.py", "--fable-limited", str(log)])
+        assert rate_limit.main() == 0
+        assert int(capsys.readouterr().out.strip()) > time.time()
+
+    def test_cli_exits_one_on_an_account_limit(self, tmp_path, monkeypatch):
+        log = write_log(tmp_path, event("rejected", resets_in=600))
+        monkeypatch.setattr(sys, "argv", ["rate_limit.py", "--fable-limited", str(log)])
+        assert rate_limit.main() == 1

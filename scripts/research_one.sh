@@ -38,6 +38,8 @@ export PUSH LOG_DIR
 # limit that had nothing to do with them. GNU parallel's --halt cannot key on
 # a specific exit code, so the signal is a file.
 HALT_FILE="${HALT_FILE:-$LOG_DIR/.halt-rate-limit}"
+# Reset epoch of a spent Fable window; read by lib.sh's research_ticker.
+FABLE_FILE="${FABLE_FALLBACK_FILE:-$LOG_DIR/.fable-unavailable}"
 
 if [ -f "$HALT_FILE" ]; then
   echo "[$TICKER] skipped -- run halted on a rate limit (see $HALT_FILE)." >&2
@@ -65,6 +67,19 @@ while : ; do
     # already paid for.
     rc=0
     break
+  fi
+
+  # Refused on the Fable-only window: every other model still works, so
+  # record the reset for lib.sh (which then runs the Fable agents on opus,
+  # for this and every other worker) and retry now instead of halting the
+  # queue. Once only -- a second refusal falls through to the checks below.
+  if [ -z "${fable_retried:-}" ] && fable_reset=$(uv run --project "$REPO_ROOT" \
+       python3 "$REPO_ROOT/scripts/rate_limit.py" --fable-limited \
+       "$LOG_DIR/$TICKER.log" 2>/dev/null); then
+    printf '%s\n' "$fable_reset" > "$FABLE_FILE" 2>/dev/null || true
+    echo "[$TICKER] Fable limit hit -- retrying with Fable agents on opus." >&2
+    fable_retried=1
+    continue
   fi
 
   # A weekly window resets days out; no sleep inside this run reaches it, so

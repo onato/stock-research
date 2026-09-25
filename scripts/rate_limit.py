@@ -133,10 +133,55 @@ def is_unreachable(log: pathlib.Path | str, cap: int = MAX_WAIT,
     return (when - (time.time() if now is None else now)) > cap
 
 
+# The CLI's wording when a Fable-pinned subagent is refused. It arrives on a
+# `system` event (task_updated / task_notification), never on the
+# rate_limit_event, which names only the window.
+FABLE_MARKER = "reached your Fable limit"
+
+
+def fable_limited(log: pathlib.Path | str) -> float | None:
+    """When the Fable window resets, if a Fable-only limit stopped this run.
+
+    A Fable-only limit (seven_day_overage_included, 2026-09-25) leaves every
+    other model working, so the run should fall back rather than halt. The
+    marker must come from a `system` event -- a model quoting an old log in
+    a tool_result is not a refusal -- and a rejected rate_limit_event must
+    give the reset, since without one nothing says when to go back to Fable.
+    """
+    path = pathlib.Path(log)
+    if not path.is_file():
+        return None
+    try:
+        raw_lines = path.read_text(errors="replace").splitlines()
+    except OSError:
+        return None
+    seen = False
+    for raw in raw_lines:
+        line = raw.strip()
+        if not line.startswith("{") or FABLE_MARKER not in line:
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if event.get("type") == "system":
+            seen = True
+            break
+    return reset_at(path) if seen else None
+
+
 def main() -> int:
     if len(sys.argv) < 2:
         print("usage: rate_limit.py LOG [CAP_SECONDS]", file=sys.stderr)
         return 2
+    if "--fable-limited" in sys.argv:
+        # Exit 0 (printing the reset) when only Fable was refused.
+        args = [a for a in sys.argv[1:] if not a.startswith("--")]
+        when = fable_limited(args[0]) if args else None
+        if when is None:
+            return 1
+        print(int(when))
+        return 0
     if "--unreachable" in sys.argv:
         # Exit 0 when the run should stop; the shell branches on this.
         args = [a for a in sys.argv[1:] if not a.startswith("--")]

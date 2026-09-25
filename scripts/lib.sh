@@ -29,7 +29,8 @@
 # interactive default (Fable, at 2x Opus pricing); the per-stage agents set
 # their own tier in .claude/agents/*.md frontmatter -- fable for the
 # valuation (dcf-analyst), opus for adjudication (financial-parser),
-# sonnet/haiku below that.
+# sonnet/haiku below that. While $LOG_DIR/.fable-unavailable holds a future
+# reset epoch, the Fable agents run on opus instead (see below).
 # ---------------------------------------------------------------------------
 research_ticker() {
   local ticker="$1" quiet="${2:-}"
@@ -78,6 +79,29 @@ When finished, reply with at most two sentences stating the ticker and \
 the files written -- the dashboard and reports are the deliverable, so \
 do not summarize their contents."
 
+  # Fable fallback. research_one.sh writes the reset epoch here when a run
+  # was refused on the Fable-only window (every other model still working);
+  # until then the Fable-pinned agents (dcf-analyst) run on Opus through a
+  # CLI --agents override, which outranks .claude/agents/. An expired marker
+  # is removed so the next run goes back to the tiered model.
+  local fable_file="${FABLE_FALLBACK_FILE:-$LOG_DIR/.fable-unavailable}"
+  local agent_args=()
+  if [ -f "$fable_file" ]; then
+    local fable_reset
+    fable_reset=$(cat "$fable_file" 2>/dev/null)
+    if [ "${fable_reset:-0}" -gt "$(date +%s)" ] 2>/dev/null; then
+      local override
+      if override=$(uv run --project "$REPO_ROOT" python3 \
+           "$REPO_ROOT/scripts/agent_models.py" --from fable --to opus) \
+         && [ "$override" != "{}" ]; then
+        agent_args=(--agents "$override")
+        echo "[$ticker] Fable unavailable until $(date -r "$fable_reset" '+%d %b %H:%M' 2>/dev/null || echo "$fable_reset") -- Fable agents on opus."
+      fi
+    else
+      rm -f "$fable_file"
+    fi
+  fi
+
   # Backstop for the skill's "never end your turn with work still running"
   # rule: if the model backgrounds a subagent anyway, wait for it instead of
   # letting the harness terminate it at the default 600s ceiling — that
@@ -103,6 +127,7 @@ do not summarize their contents."
     claude --permission-mode bypassPermissions \
            --model "${BATCH_MODEL:-claude-sonnet-5}" \
            --disallowed-tools "Bash(open *)" \
+           ${agent_args[@]+"${agent_args[@]}"} \
            --output-format stream-json --verbose \
            -p "$skill_prompt
 
@@ -119,6 +144,7 @@ $batch_note" 2>&1 \
     claude --permission-mode bypassPermissions \
            --model "${BATCH_MODEL:-claude-sonnet-5}" \
            --disallowed-tools "Bash(open *)" \
+           ${agent_args[@]+"${agent_args[@]}"} \
            --output-format stream-json --verbose \
            -p "$skill_prompt
 
