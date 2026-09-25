@@ -400,6 +400,44 @@ class TestCollect:
         # must be rejected rather than trusted as a real share count.
         assert "FY2007" not in values
 
+    def test_shares_outstanding_rejects_thousands_scaled_filer_error(self):
+        # Ball Corporation's FY2010 10-K (accn 0000009389-11-000014, filed
+        # 2011-02-28) tagged WeightedAverageNumberOfDilutedSharesOutstanding
+        # with unit "shares" but reported the value already in THOUSANDS --
+        # 194038 and 189978 instead of 194038000 and 189978000. Unlike
+        # Agilent's millions-scaled error, both values clear the old
+        # MIN_PLAUSIBLE_SHARE_COUNT = 100_000 floor, so neither was rejected.
+        # FY2009 self-heals because a later 10-K (accn 0001104659-12-011588,
+        # filed 2012-02-22) restates it correctly and "later filing wins"
+        # picks that one, but FY2008 rolls off the comparative window before
+        # Ball re-tags it, so the bare 194038 survived into core_metrics as
+        # 0.194038 (millions) after the caller's /1e6 scaling -- 1e-03x the
+        # real ~194.038 million shares. (319.9m FY2008 net income / 194.038m
+        # shares = $1.65, matching Ball's reported $1.67 diluted EPS and
+        # confirming the true share count is in the hundreds of millions.)
+        facts = {"facts": {"us-gaap": {
+            "WeightedAverageNumberOfDilutedSharesOutstanding": {"units": {
+                "shares": [
+                    {"start": "2008-01-01", "end": "2008-12-31", "val": 194038,
+                     "accn": "0000009389-11-000014", "form": "10-K",
+                     "filed": "2011-02-28"},
+                    {"start": "2009-01-01", "end": "2009-12-31", "val": 189978,
+                     "accn": "0000009389-11-000014", "form": "10-K",
+                     "filed": "2011-02-28"},
+                    {"start": "2009-01-01", "end": "2009-12-31",
+                     "val": 189978000, "accn": "0001104659-12-011588",
+                     "form": "10-K", "filed": "2012-02-22"},
+                ],
+            }},
+        }}}
+        _, values, _ = bfx.collect(
+            facts, bfx.CONCEPTS["shares_outstanding"])
+        # FY2009 self-heals from the later, correctly-tagged 10-K.
+        assert values["FY2009"] == 189978000
+        # FY2008 has no correcting duplicate -- the bare, thousands-scaled
+        # value must be rejected even though it clears 100,000.
+        assert "FY2008" not in values
+
 
 def db_row(repo, period):
     con = duckdb.connect(

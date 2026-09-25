@@ -243,7 +243,22 @@ def _d(s: str) -> datetime.date:
 # duplicate (FY2007 rolls off the 10-K's 3-year comparative window before
 # Agilent re-tags it) kept the bare value, which the caller's /1e6 scaling
 # then turned into 0.000406 -- 1e-06x the real ~406 million shares.
-MIN_PLAUSIBLE_SHARE_COUNT = 100_000
+#
+# The same bug class recurs at a different scale: Ball Corporation's
+# FY2010 10-K (accn 0000009389-11-000014, filed 2011-02-28) tagged the
+# same concept in THOUSANDS instead of raw shares (194038, 189978 instead
+# of 194038000, 189978000). Both values clear a 100,000 floor, so that
+# threshold let a thousands-scaled tag straight through. FY2009 self-heals
+# from a later, correctly-tagged 10-K, but FY2008 rolls off the
+# comparative window first and kept the bare 194038, which /1e6 scaling
+# turned into 0.194038 million shares -- 1e-03x the real ~194 million
+# (319.9m FY2008 net income / 194.038m shares = $1.65, matching Ball's
+# reported $1.67 diluted EPS). Raised to the ~862,000 floor already cited
+# above as the smallest genuine value seen across every cached ticker,
+# which rejects this case too; nothing legitimate in the warehouse falls
+# between 100,000 and 862,000 raw shares (only FIG's own known
+# shares-scale bug did, in that same gray zone).
+MIN_PLAUSIBLE_SHARE_COUNT = 862_000
 
 
 def collect(facts: dict[str, Any],
