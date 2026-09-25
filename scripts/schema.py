@@ -340,6 +340,16 @@ PROMOTE_KPIS: dict[str, str] = {
     "DiscontinuedOpsProfit": "DiscontinuedOpsProfit",
     "NAVPerShare": "NAVPerShare",
     "NTAPerShare": "NTAPerShare",
+    # Funds From Operations (REIT/stapled-security non-IFRS cash measure,
+    # Stockland Group SGP.AX): FFO strips non-cash property revaluations and
+    # straight-lining out of statutory NPAT and is the number a REIT's own
+    # distribution policy is set against, distinct from AFFO (FFO less
+    # maintenance capex) already promoted above.
+    "FFO": "FFO",
+    "FFOPerShare": "FFOPerShare",
+    "PreTaxFFO": "PreTaxFFO",
+    "PreTaxFFOPerShare": "PreTaxFFOPerShare",
+    "Gearing": "Gearing",
     "Occupancy": "Occupancy",
     "WALT": "WALT",
     "AUM": "AUM",
@@ -416,6 +426,7 @@ PROMOTE_KPIS: dict[str, str] = {
     "BAUClaimsRatio": "BAUClaimsRatio",
     "ManagementExpenseRatio": "ManagementExpenseRatio",
     "InsuranceServiceResult": "InsuranceServiceResult",
+    "NetInsuranceFinancialResult": "NetInsuranceFinancialResult",
     # Pre-revenue JV lithium developer (Argosy Minerals, AGY.AX): Argosy
     # cannot fund the Rincon project alone and holds it through an
     # equal-board equity-accounted JV (Puna Mining S.A.), so the funding
