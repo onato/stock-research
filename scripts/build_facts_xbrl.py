@@ -230,6 +230,21 @@ def _d(s: str) -> datetime.date:
     return dt.date(int(s[:4]), int(s[5:7]), int(s[8:10]))
 
 
+# A real filer's raw share count in the "shares" unit is never this
+# small -- the smallest genuine value seen across every cached ticker is
+# ~862,000 (a micro-cap). Agilent's FY2009 10-K (accn 0001047469-09-010861,
+# filed 2009-12-21) tagged WeightedAverageNumberOfDilutedSharesOutstanding
+# with unit "shares" but reported the number already in millions (406,
+# 371, 346 instead of 406000000, 371000000, 346000000) -- an early-XBRL
+# filer tagging error, not a unit this module chooses. Most periods
+# self-heal because a later filing restates the same period correctly and
+# "later filing wins" picks that one, but a period with no correcting
+# duplicate (FY2007 rolls off the 10-K's 3-year comparative window before
+# Agilent re-tags it) kept the bare value, which the caller's /1e6 scaling
+# then turned into 0.000406 -- 1e-06x the real ~406 million shares.
+MIN_PLAUSIBLE_SHARE_COUNT = 100_000
+
+
 def collect(facts: dict[str, Any],
             concepts: list[str]) -> tuple[str | None, dict[str, Any], str]:
     """Best value per period, merged across every listed concept.
@@ -253,6 +268,9 @@ def collect(facts: dict[str, Any],
         for unit, rows in entry.get("units", {}).items():
             unit_seen = unit_seen or unit
             for f in rows:
+                if (unit == "shares" and f.get("val") is not None
+                        and 0 < abs(f["val"]) < MIN_PLAUSIBLE_SHARE_COUNT):
+                    continue
                 p = period_label(f, fy_end)
                 if not p:
                     continue

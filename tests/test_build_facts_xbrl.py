@@ -319,6 +319,40 @@ class TestCollect:
         _, values, _ = bfx.collect(facts, ["Revenues"])
         assert values == {"FY2024": 7}
 
+    def test_shares_outstanding_rejects_pre_scaled_filer_error(self):
+        # Agilent's FY2009 10-K (accn 0001047469-09-010861, filed
+        # 2009-12-21) tagged WeightedAverageNumberOfDilutedSharesOutstanding
+        # with unit "shares" but reported the value already in millions --
+        # 406, 371, 346 instead of 406000000, 371000000, 346000000. FY2008
+        # self-heals because a later 10-K (filed 2010-12-20) restates it
+        # correctly and the later-filing rank picks that one, but FY2007
+        # never gets a correcting duplicate (it rolls off the 10-K's
+        # 3-year comparative window), so the bare 406 survived into
+        # core_metrics as 0.000406 after the caller's /1e6 scaling --
+        # 1e-06x the real ~406 million shares.
+        facts = {"facts": {"us-gaap": {
+            "WeightedAverageNumberOfDilutedSharesOutstanding": {"units": {
+                "shares": [
+                    {"start": "2006-11-01", "end": "2007-10-31", "val": 406,
+                     "accn": "0001047469-09-010861", "form": "10-K",
+                     "filed": "2009-12-21"},
+                    {"start": "2007-11-01", "end": "2008-10-31", "val": 371,
+                     "accn": "0001047469-09-010861", "form": "10-K",
+                     "filed": "2009-12-21"},
+                    {"start": "2007-11-01", "end": "2008-10-31",
+                     "val": 371000000, "accn": "0001047469-10-010499",
+                     "form": "10-K", "filed": "2010-12-20"},
+                ],
+            }},
+        }}}
+        _, values, _ = bfx.collect(
+            facts, bfx.CONCEPTS["shares_outstanding"])
+        # FY2008 self-heals from the later, correctly-tagged 10-K.
+        assert values["FY2008"] == 371000000
+        # FY2007 has no correcting duplicate -- the bare, mis-scaled value
+        # must be rejected rather than trusted as a real share count.
+        assert "FY2007" not in values
+
 
 def db_row(repo, period):
     con = duckdb.connect(
