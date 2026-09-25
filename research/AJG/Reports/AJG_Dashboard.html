@@ -1,0 +1,6075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arthur J. Gallagher &amp; Co. (AJG) Financial Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 20px;
+}
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+}
+.header h1 {
+    font-size: 2.5rem;
+    background: linear-gradient(90deg, #00d4aa, #00b894);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+}
+.header p {
+    color: #888;
+    font-size: 1.1rem;
+}
+/* Headline valuation chip — fills the wide, otherwise-empty header strip so the
+   number the reader should act on is visible without scrolling to the DCF. */
+.header-valuation {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 14px 32px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.hv-item {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+.hv-label {
+    font-size: 0.75rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.hv-value {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #e0e0e0;
+}
+.hv-value.positive { color: #00d4aa; }
+.hv-value.negative { color: #ff6b6b; }
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.kpi-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.kpi-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 212, 170, 0.2);
+}
+.kpi-value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #00d4aa;
+    margin-bottom: 5px;
+}
+.kpi-label {
+    font-size: 0.85rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.kpi-change {
+    font-size: 0.9rem;
+    margin-top: 5px;
+}
+.kpi-change.positive { color: #00d4aa; }
+.kpi-change.negative { color: #ff6b6b; }
+/* Guidance Section */
+.guidance-section {
+    max-width: 1400px;
+    margin: 0 auto 30px;
+}
+.guidance-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+.guidance-header h3 {
+    color: #fff;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.guidance-header h3::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894);
+    border-radius: 2px;
+}
+.guidance-meta {
+    font-size: 0.85rem;
+    color: #888;
+}
+.guidance-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+.guidance-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.2s ease;
+}
+.guidance-card:hover {
+    transform: translateY(-2px);
+}
+.guidance-metric {
+    font-size: 0.8rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+.guidance-target {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: #00d4aa;
+    margin-bottom: 6px;
+}
+.guidance-period {
+    font-size: 0.85rem;
+    color: #e0e0e0;
+    margin-bottom: 8px;
+}
+.guidance-vs-prior {
+    display: inline-block;
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+.guidance-vs-prior.raised {
+    background: rgba(0, 212, 170, 0.15);
+    color: #00d4aa;
+}
+.guidance-vs-prior.lowered {
+    background: rgba(255, 107, 107, 0.15);
+    color: #ff6b6b;
+}
+.guidance-vs-prior.maintained {
+    background: rgba(255, 255, 255, 0.1);
+    color: #888;
+}
+.guidance-vs-prior.new {
+    background: rgba(99, 102, 241, 0.15);
+    color: #818cf8;
+}
+.guidance-notes {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 8px;
+    line-height: 1.4;
+}
+.guidance-commentary {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    padding: 16px 20px;
+    border-left: 3px solid #00d4aa;
+    font-style: italic;
+    color: #b0b0b0;
+    line-height: 1.6;
+}
+.guidance-commentary::before {
+    content: '"';
+    font-size: 1.5rem;
+    color: #00d4aa;
+    margin-right: 4px;
+}
+.section-title {
+    font-size: 1.5rem;
+    color: #fff;
+    margin: 40px auto 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid rgba(0, 212, 170, 0.3);
+    max-width: 1400px;
+}
+.charts-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 25px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+.chart-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    padding: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+.chart-header h3 {
+    color: #fff;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.chart-header h3::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894);
+    border-radius: 2px;
+}
+.help-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(0, 212, 170, 0.2);
+    border: 1px solid #00d4aa;
+    color: #00d4aa;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+.help-btn:hover {
+    background: #00d4aa;
+    color: #1a1a2e;
+}
+.chart-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.view-toggle {
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #888;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.view-toggle:hover {
+    border-color: #0984e3;
+    color: #0984e3;
+}
+.view-toggle.active {
+    background: rgba(9, 132, 227, 0.2);
+    border-color: #0984e3;
+    color: #0984e3;
+}
+.log-toggle {
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #888;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.log-toggle:hover {
+    border-color: #00d4aa;
+    color: #00d4aa;
+}
+.log-toggle.active {
+    background: rgba(0, 212, 170, 0.2);
+    border-color: #00d4aa;
+    color: #00d4aa;
+}
+.chart-wrapper {
+    position: relative;
+    height: 300px;
+}
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+    background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%);
+    border-radius: 16px;
+    max-width: 600px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    border: 1px solid rgba(0, 212, 170, 0.3);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.modal-header {
+    padding: 20px 25px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.modal-header h3 {
+    color: #00d4aa;
+    font-size: 1.4rem;
+    margin: 0;
+}
+.modal-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 107, 107, 0.2);
+    border: 1px solid #ff6b6b;
+    color: #ff6b6b;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.modal-close:hover {
+    background: #ff6b6b;
+    color: #fff;
+}
+.modal-body {
+    padding: 25px;
+    line-height: 1.7;
+}
+.modal-body p { margin-bottom: 15px; }
+.modal-body strong { color: #00d4aa; }
+.modal-body ul { margin: 15px 0; padding-left: 20px; }
+.modal-body li { margin-bottom: 8px; }
+.metric-highlight {
+    background: rgba(0, 212, 170, 0.1);
+    border-left: 3px solid #00d4aa;
+    padding: 12px 15px;
+    margin: 15px 0;
+    border-radius: 0 8px 8px 0;
+}
+/* Investment Overview Section */
+.overview-section {
+    max-width: 1400px;
+    margin: 0 auto 30px;
+}
+.overview-toggle {
+    width: 100%;
+    background: rgba(0, 212, 170, 0.1);
+    border: 1px solid rgba(0, 212, 170, 0.3);
+    border-radius: 12px;
+    padding: 16px 24px;
+    color: #00d4aa;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s ease;
+}
+.overview-toggle:hover {
+    background: rgba(0, 212, 170, 0.2);
+}
+.overview-toggle .arrow {
+    transition: transform 0.3s ease;
+}
+.overview-toggle.active .arrow {
+    transform: rotate(180deg);
+}
+.overview-content {
+    display: none;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    padding: 30px;
+    margin-top: -12px;
+}
+.overview-content.active {
+    display: block;
+}
+.overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 25px;
+}
+.overview-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.overview-card h3 {
+    color: #00d4aa;
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.overview-card p {
+    margin-bottom: 12px;
+    line-height: 1.6;
+}
+.overview-card ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.overview-card li {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    line-height: 1.5;
+}
+.overview-card li:last-child {
+    border-bottom: none;
+}
+.overview-card.bull h3 { color: #00d4aa; }
+.overview-card.bear h3 { color: #ff6b6b; }
+.overview-card.risks h3 { color: #fdcb6e; }
+.risk-high { color: #ff6b6b; }
+.risk-moderate { color: #fdcb6e; }
+.risk-low { color: #00d4aa; }
+.revenue-stream {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.revenue-stream .percent {
+    color: #00d4aa;
+    font-weight: 600;
+}
+.trend-growing { color: #00d4aa; }
+.trend-stable { color: #888; }
+.trend-declining { color: #ff6b6b; }
+
+@media (max-width: 768px) {
+    .charts-container { grid-template-columns: 1fr; }
+    .overview-grid { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.8rem; }
+}
+/* DCF Valuation Section */
+.dcf-section {
+    max-width: 1400px;
+    margin: 0 auto 40px;
+}
+.dcf-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+.dcf-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease;
+}
+.dcf-card:hover {
+    transform: translateY(-3px);
+}
+.dcf-card.highlight {
+    background: rgba(0, 212, 170, 0.1);
+    border-color: rgba(0, 212, 170, 0.3);
+}
+.dcf-label {
+    font-size: 0.85rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+}
+.dcf-value {
+    font-size: 2.2rem;
+    font-weight: bold;
+    color: #00d4aa;
+}
+.dcf-card:not(.highlight) .dcf-value {
+    color: #fff;
+}
+.dcf-change {
+    font-size: 1rem;
+    margin-top: 8px;
+    font-weight: 600;
+}
+.dcf-change.positive { color: #00d4aa; }
+.dcf-change.negative { color: #ff6b6b; }
+.dcf-sublabel {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 8px;
+}
+.dcf-warning {
+    background: rgba(253, 203, 110, 0.15);
+    border: 1px solid rgba(253, 203, 110, 0.4);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 25px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #fdcb6e;
+}
+.warning-icon {
+    font-size: 1.2rem;
+}
+/* DCF Inputs Display */
+.dcf-inputs {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.dcf-inputs h4 {
+    color: #e0e0e0;
+    margin-bottom: 15px;
+    font-size: 1rem;
+}
+.dcf-inputs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+.dcf-input-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.dcf-input-label {
+    font-size: 0.75rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+.dcf-input-value {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #00d4aa;
+}
+.dcf-input-note {
+    font-size: 0.7rem;
+    color: #666;
+    margin-top: 4px;
+}
+.fcf-projections h5 {
+    color: #b0b0b0;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+}
+.fcf-projection-table {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 12px;
+}
+.fcf-projection-item {
+    text-align: center;
+}
+.fcf-projection-item.header {
+    font-size: 0.75rem;
+    color: #888;
+    font-weight: 600;
+}
+.fcf-projection-item .year {
+    font-size: 0.75rem;
+    color: #888;
+    margin-bottom: 2px;
+}
+.fcf-projection-item .fcf-value {
+    font-size: 1rem;
+    color: #e0e0e0;
+    font-weight: 500;
+}
+.fcf-projection-item .growth-rate {
+    font-size: 0.75rem;
+    color: #00d4aa;
+    margin-top: 2px;
+}
+.dcf-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 25px;
+    margin-bottom: 30px;
+    padding: 25px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.slider-group label {
+    font-size: 0.95rem;
+    color: #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+}
+.slider-group label span {
+    color: #00d4aa;
+    font-weight: 600;
+}
+.slider-group input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #00d4aa;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+.slider-hint {
+    font-size: 0.8rem;
+    color: #666;
+}
+.scenario-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+.scenario-tab {
+    padding: 10px 24px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: transparent;
+    color: #888;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+}
+.scenario-tab:hover {
+    border-color: rgba(0, 212, 170, 0.5);
+    color: #e0e0e0;
+}
+.scenario-tab.active {
+    background: rgba(0, 212, 170, 0.15);
+    border-color: #00d4aa;
+    color: #00d4aa;
+}
+.scenario-details {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.scenario-details h4 {
+    color: #00d4aa;
+    margin-bottom: 15px;
+}
+.assumption-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+}
+.assumption-item {
+    text-align: center;
+}
+.assumption-item .label {
+    font-size: 0.8rem;
+    color: #888;
+    margin-bottom: 4px;
+}
+.assumption-item .value {
+    font-size: 1.1rem;
+    color: #e0e0e0;
+    font-weight: 500;
+}
+.sensitivity-section {
+    margin-bottom: 30px;
+}
+.sensitivity-section h4 {
+    color: #e0e0e0;
+    margin-bottom: 15px;
+}
+.sensitivity-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.sensitivity-table th,
+.sensitivity-table td {
+    padding: 12px 16px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.sensitivity-table th {
+    background: rgba(0, 212, 170, 0.1);
+    color: #00d4aa;
+    font-weight: 600;
+}
+.sensitivity-table td {
+    color: #e0e0e0;
+}
+.sensitivity-table td.highlight {
+    background: rgba(0, 212, 170, 0.15);
+    color: #00d4aa;
+    font-weight: 600;
+}
+.sensitivity-table td.below-current {
+    color: #ff6b6b;
+}
+.sensitivity-table td.above-current {
+    color: #00d4aa;
+}
+.historical-growth {
+    margin-bottom: 30px;
+}
+.historical-growth h4 {
+    color: #e0e0e0;
+    margin-bottom: 15px;
+}
+.growth-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 15px;
+}
+.growth-item {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.growth-item .metric {
+    font-size: 0.8rem;
+    color: #888;
+    margin-bottom: 6px;
+}
+.growth-item .rate {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+.growth-item .rate.positive { color: #00d4aa; }
+.growth-item .rate.negative { color: #ff6b6b; }
+.growth-item.selected {
+    border-color: #00d4aa;
+    background: rgba(0, 212, 170, 0.1);
+}
+.dcf-download {
+    text-align: center;
+    margin-top: 30px;
+}
+.download-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 28px;
+    background: rgba(0, 212, 170, 0.15);
+    border: 1px solid #00d4aa;
+    border-radius: 8px;
+    color: #00d4aa;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+.download-btn:hover {
+    background: #00d4aa;
+    color: #1a1a2e;
+}
+.download-icon {
+    font-size: 1.2rem;
+}
+/* Additions beyond the original agent template */
+.section-subtitle { font-size: 0.9rem; color: #888; max-width: 1400px; margin: -12px auto 20px; }
+.kpi-note { font-size: 0.75rem; color: #666; margin-top: 6px; line-height: 1.3; }
+.chart-annotation {
+    font-size: 0.75rem; color: #fdcb6e; background: rgba(253, 203, 110, 0.08);
+    border-left: 2px solid #fdcb6e; padding: 6px 10px; margin-top: 10px; border-radius: 0 6px 6px 0;
+}
+.dcf-philosophy {
+    background: rgba(255, 255, 255, 0.03); border-left: 3px solid #00d4aa; border-radius: 0 10px 10px 0;
+    padding: 16px 20px; margin-bottom: 25px; font-size: 0.92rem; line-height: 1.7; color: #b0b0b0;
+}
+.dcf-philosophy strong { color: #00d4aa; }
+.scenario-narrative { font-size: 0.9rem; color: #b0b0b0; line-height: 1.6; margin-bottom: 18px; }
+.dcf-banner {
+    max-width: 1400px; margin: 0 auto 25px; background: rgba(255, 107, 107, 0.12);
+    border: 1px solid rgba(255, 107, 107, 0.4); border-radius: 8px; padding: 12px 16px; color: #ff6b6b;
+}
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Arthur J. Gallagher &amp; Co. (AJG)</h1>
+    <p>Operating company &middot; reported in USD</p>
+    <div class="header-valuation" id="headerValuation" style="display:none"></div>
+</div>
+
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid" id="overviewGrid"></div>
+    </div>
+</div>
+
+<div class="kpi-grid" id="kpiGrid">
+    <div class="kpi-card">
+        <div class="kpi-value">$13,942.0m</div>
+        <div class="kpi-label">Revenue (latest FY)</div>
+        <div class="kpi-change positive">+20.7% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">$1,494.0m</div>
+        <div class="kpi-label">Net Income</div>
+        <div class="kpi-change positive">+2.1% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">$1,736.0m</div>
+        <div class="kpi-label">Owner FCF (DCF base)</div>
+        <div class="kpi-change positive">after SBC, interest income &amp; leases</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">$12,873.0m</div>
+        <div class="kpi-label">Total Debt</div>
+        <div class="kpi-change positive">+1.1% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">257</div>
+        <div class="kpi-label">Shares Outstanding (m)</div>
+        <div class="kpi-change positive">+2.8% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">5.7</div>
+        <div class="kpi-label">EPS</div>
+        <div class="kpi-change negative">-11.7% YoY</div>
+    </div>
+</div>
+
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf">-</span> | <span id="guidanceFY">-</span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<h2 class="section-title">Growth &amp; Profitability</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Revenue &amp; YoY Growth</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('revenueChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('revenueChart', 'interim', this)">Q</button>
+                <button class="help-btn" onclick="openModal('revenue')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="revenueChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Margins</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('marginsChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('marginsChart', 'interim', this)">Q</button>
+                <button class="help-btn" onclick="openModal('margins')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="marginsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Gross Profit, Operating Income &amp; Net Income</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('profitChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('profitChart', 'interim', this)">Q</button>
+                <button class="log-toggle" onclick="toggleLogScale('profitChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('profit')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="profitChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>EPS &amp; Dividend per Share</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('epsDps')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="epsDpsChart"></canvas></div>
+    </div>
+</div>
+<h2 class="section-title">Cash Flow &amp; Balance Sheet</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Income vs Free Cash Flow vs Owner FCF</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('fcfChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('fcfChart', 'interim', this)">Q</button>
+                <button class="help-btn" onclick="openModal('fcf')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="fcfChart"></canvas></div>
+        <div class="chart-annotation">Owner FCF, where shown, is the DCF's series after SBC, interest income and lease principal.</div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Operating Cash Flow &amp; CapEx</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('ocfCapexChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('ocfCapexChart', 'interim', this)">Q</button>
+                <button class="help-btn" onclick="openModal('ocfCapex')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="ocfCapexChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Cash vs Total Debt</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('cashDebtChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('cashDebtChart', 'interim', this)">Q</button>
+                <button class="help-btn" onclick="openModal('cashDebt')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="cashDebtChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shareholders&#x27; Equity vs Total Liabilities</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('balanceChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('balanceChart', 'interim', this)">Q</button>
+                <button class="log-toggle" onclick="toggleLogScale('balanceChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('balanceSheet')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="balanceChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Stock-Based Comp &amp; Shares Outstanding</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('sbcChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('sbcChart', 'interim', this)">Q</button>
+                <button class="help-btn" onclick="openModal('sbc')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="sbcChart"></canvas></div>
+    </div>
+</div>
+
+<h2 class="section-title">DCF Valuation</h2>
+
+<div class="dcf-section">
+  <div class="dcf-philosophy" id="dcfPhilosophy"></div>
+
+  <div class="dcf-summary">
+    <div class="dcf-card highlight">
+      <div class="dcf-label">Prob-Weighted IV</div>
+      <div class="dcf-value" id="dcfWeighted">-</div>
+      <div class="dcf-change" id="dcfWeightedUpside"></div>
+      <div class="dcf-sublabel" id="dcfWeightedSublabel">-</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Intrinsic Value (Base)</div>
+      <div class="dcf-value" id="dcfIV">-</div>
+      <div class="dcf-change positive" id="dcfUpside"></div>
+      <div class="dcf-sublabel">Owner FCF &mdash; after SBC, interest income &amp; leases</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Entry Price (15% CAGR)</div>
+      <div class="dcf-value" id="dcfEntry">-</div>
+      <div class="dcf-sublabel">Buy below for a 15% annual return (incl. interim FCF)</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Current Price</div>
+      <div class="dcf-value" id="dcfCurrent">-</div>
+      <div class="dcf-sublabel">as of 2026-09-25</div>
+    </div>
+  </div>
+
+  <div class="dcf-warning" id="growthWarning" style="display: none;">
+    <span class="warning-icon">&#9888;</span>
+    <span id="warningText"></span>
+  </div>
+
+  <div class="dcf-inputs">
+    <h4>DCF Model Inputs</h4>
+    <div class="dcf-inputs-grid">
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Base Owner FCF (FY2025)</div>
+        <div class="dcf-input-value" id="baseFCF">-</div>
+        <div class="dcf-input-note" id="sbcBreakdown">Starting point for projections</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Shares Outstanding</div>
+        <div class="dcf-input-value" id="sharesOut">-</div>
+        <div class="dcf-input-note" id="dilutionNote"></div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Net Debt</div>
+        <div class="dcf-input-value" id="netDebt">-</div>
+        <div class="dcf-input-note">Negative = net cash</div>
+      </div>
+    </div>
+    <div class="fcf-projections">
+      <h5>Projected FCF</h5>
+      <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+    </div>
+  </div>
+
+  <!-- step is fine enough to hold every scenario default exactly; a range
+       input snaps to its step and 7.5 became 8 on NPH.NZ with step="1". -->
+  <div class="slider-hint" id="dcfEngineNote" style="max-width:1400px;margin:0 auto 8px"></div>
+  <div class="dcf-controls">
+    <div class="slider-group">
+      <label>Growth Rate (Yr 1): <span id="growthValue">-</span></label>
+      <input type="range" id="growthSlider" min="-5" max="30" value="7.5" step="0.1" oninput="updateDCFDisplay()">
+      <div class="slider-hint" id="growthHint">Base-case Year-1 revenue growth</div>
+    </div>
+    <div class="slider-group">
+      <label>WACC: <span id="waccValue">-</span></label>
+      <input type="range" id="waccSlider" min="6" max="18" value="8.5" step="0.05" oninput="updateDCFDisplay()">
+    </div>
+    <div class="slider-group">
+      <label>Terminal Growth: <span id="terminalValue">-</span></label>
+      <input type="range" id="terminalSlider" min="0" max="5" value="2.5" step="0.1" oninput="updateDCFDisplay()">
+    </div>
+  </div>
+
+  <div class="scenario-tabs">
+    <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+    <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+    <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+  </div>
+
+  <div class="scenario-details" id="scenarioDetails">
+    <h4>Assumptions</h4>
+    <div class="scenario-narrative" id="scenarioNarrative"></div>
+    <div class="assumption-grid" id="assumptionGrid"></div>
+  </div>
+
+  <div class="sensitivity-section">
+    <h4>Sensitivity Analysis: Intrinsic Value by WACC &amp; Terminal Growth (Base Case)</h4>
+    <table class="sensitivity-table" id="sensitivityMatrix"></table>
+  </div>
+
+  <div class="historical-growth">
+    <h4>Historical Growth Rates (CAGR)</h4>
+    <div class="growth-grid" id="growthGrid"></div>
+  </div>
+
+  <div class="dcf-download">
+    <a href="AJG_DCF_Model.xlsx" class="download-btn" download>
+      <span class="download-icon">&#8681;</span> Download Excel Model
+    </a>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// EMBEDDED DATA (generated by scripts/build_dashboard.py -- do not hand-edit;
+// edit the Spec JSON / CSV / Analysis / DCF and rebuild)
+// ============================================================
+const csvData = `Period,Revenue,CostOfRevenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,EBITDA,NetIncome,NetMargin,EPS,OperatingCashFlow,CapEx,FreeCashFlow,ShareholdersEquity,TotalAssets,TotalLiabilities,TotalDebt,CashAndEquivalents,SharesOutstanding,StockBasedComp,DividendPerShare,EBITDABeforeSignificant,RevenueContinuing,EBITDAContinuingBeforeSignificant,EBITContinuingBeforeSignificant,Units,Currency
+FY2007,,,,,,,,,,,,,,715.5,,,,255.9,,,,,,,,millions,USD
+FY2008,1645.0,,,,,,,77.3,4.699088145896656,0.82,160.6,32.0,128.6,738.5,,,,194.4,,11.4,1.28,,,,,millions,USD
+H1-2009,854.7,,,,,,,70.2,8.213408213408213,0.71,77.6,13.5,64.1,,,,,,,3.9,0.64,,,,,millions,USD
+Q2 2009,453.6,,,,,,,43.8,9.656084656084655,0.44,,,,,,,,226.1,,,0.32,,,,,millions,USD
+Q3 2009,439.5,,,,,,,41.6,9.465301478953355,0.41,118.0,4.100000000000001,113.9,,,,,237.9,,,0.32,,,,,millions,USD
+FY2009,1729.3,,,,,,,128.6,7.436535014167582,1.28,211.5,23.5,188.0,892.9,3250.3,2357.4,550.0,205.9,102.5,9.9,1.28,,,,,millions,USD
+Q1 2010,482.4,64.0,,,,,,29.2,6.053067993366501,0.28,3.5,6.0,-2.5,,,,,227.1,,1.0,0.32,,,,,millions,USD
+H1-2010,941.9,64.0,,,,,,73.2,7.7715256396645085,0.71,89.6,13.0,76.6,,,,,,,3.9,0.64,,,,,millions,USD
+Q2 2010,459.5,,,,,,,44.0,9.57562568008705,0.42,86.1,7.0,79.1,965.4,3555.8,2590.4,550.0,230.0,105.2,,0.32,,,,,millions,USD
+Q3 2010,463.2,,,,,,,46.2,9.974093264248705,0.44,122.80000000000001,5.100000000000001,117.70000000000002,1011.4,3460.7,2449.3,550.0,296.3,106.0,,0.32,,,,,millions,USD
+Q4 2010,459.1,,,,,,,54.7,11.914615552167284,0.51,,,,,,,,,,,,,,,,millions,USD
+FY2010,1864.2,64.0,,,,,,174.1,9.339126703143439,1.66,229.5,25.1,204.4,1106.7,3596.0,2489.3,550.0,249.8,108.4,9.0,1.28,,,,,millions,USD
+Q1 2011,447.4,,,,,,,15.2,3.3974072418417522,0.14,-8.4,8.3,-16.700000000000003,1147.1,3691.1,2544.0,675.0,333.2,110.3,0.8,0.33,,,,,millions,USD
+H1-2011,993.5,11.7,,,,,,56.9,5.7272269753397085,0.51,96.3,22.3,74.0,,,,,,,8.8,0.66,,,,,millions,USD
+Q2 2011,546.1,11.7,,,,,,41.7,7.635964109137521,0.37,104.7,14.0,90.7,1202.8,4581.9,3379.1,675.0,263.2,112.2,0.9,0.33,,,,,millions,USD
+Q3 2011,562.8,0.7,,,,,,46.7,8.297796730632552,0.41,89.3,12.999999999999996,76.3,1219.3,4247.2,3027.9,675.0,241.4,112.9,0.8,0.33,,,,,millions,USD
+Q4 2011,578.4,,,,,,,40.5,7.0020746887966805,0.35,,,,,,,,,,,,,,,,millions,USD
+FY2011,2134.7,32.0,,,,,,144.1,6.750363048671945,1.28,284.0,45.9,238.1,1243.6,4483.5,3239.9,675.0,291.2,114.7,14.3,1.32,,,,,millions,USD
+Q1 2012,546.8,17.7,,,,,,28.1,5.13899049012436,0.24,-49.6,13.0,-62.6,1356.6,4602.7,3246.1,675.0,301.8,118.3,1.0,0.34,,,,,millions,USD
+H1-2012,1196.7,46.7,,,,,,99.8,8.339600568229297,0.83,63.0,26.6,36.4,,,,,,,3.3,0.68,,,,,millions,USD
+Q2 2012,649.9,29.0,,,,,,71.7,11.032466533312817,0.59,112.6,13.600000000000001,99.0,1472.9,5133.6,3660.7,675.0,282.1,121.0,1.1,0.34,,,,,millions,USD
+Q3 2012,650.4,27.7,,,,,,61.7,9.486469864698648,0.5,116.4,9.5,106.9,1636.2,5009.3,3373.1,725.0,305.2,124.4,1.5,0.34,,,,,millions,USD
+Q4 2012,673.2,,,,,,,33.5,4.976232917409388,0.27,,,,,,,,,,,,,,,,millions,USD
+FY2012,2520.3,111.6,,,,,,195.0,7.737174145935007,1.59,343.0,51.0,292.0,1672.8,5352.3,3693.7,725.0,302.1,125.6,7.5,1.36,,,,,millions,USD
+Q1 2013,674.1,58.1,,,,,,40.5,6.008010680907877,0.32,51.2,9.3,41.900000000000006,1664.7,5225.1,3560.4,725.0,224.0,126.8,0.9,0.35,,,,,millions,USD
+H1-2013,1453.6,134.7,,,,,,134.0,9.21849201981288,1.04,73.8,35.9,37.9,,,,,,,3.2,0.7,,,,,millions,USD
+Q2 2013,779.5,76.6,,,,,,93.5,11.994868505452214,0.73,22.599999999999994,26.599999999999998,-4.0000000000000036,1702.0,5562.1,3860.1,925.0,240.0,127.7,1.5,0.35,,,,,millions,USD
+Q3 2013,835.8,146.9,,,,,,74.6,8.925580282364201,0.57,204.8,33.9,170.9,1932.2,5970.2,4038.0,825.0,286.9,131.5,2.0,0.35,,,,,millions,USD
+Q4 2013,890.2,,,,,,,60.0,6.740058413839586,,,,,,,,,,,,,,,,,millions,USD
+FY2013,3179.6,437.3,,,,,,268.6,8.447603472134862,2.06,349.9,93.6,256.29999999999995,2114.8,6860.5,4775.0,825.0,298.1,133.6,7.7,1.4,,,,,millions,USD
+Q1 2014,915.0,171.0,,,,,,49.3,5.387978142076502,0.36,76.1,19.8,56.3,2144.2,7275.6,5131.4,1425.0,739.2,135.1,2.4,0.36,,,,,millions,USD
+H1-2014,2094.3,441.5,,,,,,158.3,7.558611469225994,1.09,206.8,42.1,164.70000000000002,,,,,,,5.1,0.72,,,,,millions,USD
+Q2 2014,1179.3,270.5,,,,,,109.0,9.242771135419318,0.7,130.70000000000002,22.3,108.40000000000002,3249.6,10019.3,6769.7,2125.0,973.5,159.0,,0.36,,,,,millions,USD
+Q3 2014,1286.8,326.2,,,,,,93.6,7.27385763133354,0.58,26.399999999999977,17.6,8.799999999999976,3256.0,9988.0,6732.0,2125.0,290.5,161.4,,0.36,,,,,millions,USD
+Q4 2014,1245.4,,,,,,,51.5,4.1352176007708366,,,,,,,,,,,,,,,,,millions,USD
+FY2014,4626.5,1058.9,,,,,,303.4,6.557873122230627,1.97,,81.5,,3305.1,10010.0,6704.9,2125.0,314.4,164.6,10.6,1.44,,,,,millions,USD
+Q1 2015,1231.3,309.3,,,,,,21.9,1.7786079753106472,0.13,,17.8,,3145.2,9730.9,6511.3,2125.0,276.8,166.7,2.2,0.37,,,,,millions,USD
+H1-2015,2602.7,,,,,,,161.2,6.193568217620164,0.95,,45.5,,,,,,,,5.1,0.74,,,,,millions,USD
+Q2 2015,1371.4,,,,,,,139.3,10.15750328131836,0.81,,27.7,,3638.5,10716.1,7004.6,2125.0,321.7,174.5,,0.37,,,,,millions,USD
+Q3 2015,1454.8,,,,,,,133.3,9.162771514984879,0.75,,26.299999999999997,,3652.4,10510.4,6802.5,2125.0,369.7,176.7,,0.37,,,,,millions,USD
+Q4 2015,1334.9,,,,,,,62.3,4.667016255899318,,,,,,,,,,,,,,,,,millions,USD
+FY2015,5392.4,,,,,,,356.8,6.616719827905943,2.06,,99.0,,3688.2,10913.8,7222.3,2071.7,480.4,176.9,11.2,1.48,,,,,millions,USD
+Q1 2016,1300.4,,,,,,,46.5,3.575822823746539,0.26,,61.9,,3597.1,10712.6,7060.3,2071.8,425.4,177.1,3.3,0.38,,,,,millions,USD
+H1-2016,2727.5,,,,,,,196.5,7.204399633363886,1.1,,103.1,,,,,,,,7.1,0.76,,,,,millions,USD
+Q2 2016,1427.1,,,,,,,150.0,10.510826150935463,0.84,,41.199999999999996,,3599.9,11384.3,7728.5,2344.4,411.1,177.0,,0.38,,,,,millions,USD
+Q3 2016,1482.3,,,,,,,122.8,8.284422856371854,0.69,,35.70000000000002,,3686.5,11200.3,7459.1,2044.6,531.8,177.9,,0.38,,,,,millions,USD
+Q4 2016,1385.0,,,,,,,95.1,6.866425992779783,,,,,,,,,,,,,,,,,millions,USD
+FY2016,5680.5,1408.6,,,,,,396.8,6.985300589736819,2.22,649.6,217.8,431.8,3775.5,13528.2,7833.8,2144.6,545.5,178.3,14.7,1.52,,,,,millions,USD
+Q1 2017,1646.4,,,,,,,228.8,13.896987366375122,1.27,,29.3,,3662.5,11780.6,8053.3,2144.7,564.0,179.5,4.1,0.39,,,,,millions,USD
+H1-2017,3135.9,,,,,,,298.8,9.528365062661436,1.65,260.9,65.6,195.29999999999998,,,,,,,8.5,0.78,,,,,millions,USD
+Q2 2017,1489.5,,,,,,,70.0,4.699563611950319,0.39,,36.3,,3844.7,12569.6,8659.6,2644.8,587.8,180.2,,0.39,,,,,millions,USD
+Q3 2017,1593.7,,,,,,,111.0,6.964924389784777,0.61,332.30000000000007,,,4110.0,12810.4,8638.2,2741.7,564.9,180.8,,0.39,,,,,millions,USD
+Q4 2017,1519.4,,,,,,,71.5,4.7058049229959185,,,,,,,,,,,,,,,,,millions,USD
+FY2017,6249.0,1635.9,,,,,,481.3,7.702032325172027,2.64,854.2,,,4299.7,14909.7,10610.0,2691.9,681.2,181.0,17.3,1.56,,,,,millions,USD
+Q1 2018,1837.7,431.2,,,,,,273.7,14.893617021276595,1.48,-217.6,,,4584.5,16127.5,11543.0,2792.1,697.9,182.1,4.8,0.41,,,,,millions,USD
+H1-2018,3498.1,873.0,,,,,,388.6,11.108887681884452,2.1,313.3,,,,,,,,,6.4,0.82,,,,,millions,USD
+Q2 2018,1660.4,441.8,,,,,,114.9,6.920019272464466,0.62,530.9,,,4513.1,16230.5,11717.4,3141.0,652.2,182.6,,0.41,,,,,millions,USD
+Q3 2018,1778.5,508.8,,,,,,127.6,7.174585324711835,0.68,191.3,,,4612.7,16114.7,11502.0,3141.2,605.0,183.7,,0.41,,,,,millions,USD
+Q4 2018,1657.4,,,,,,,117.3,7.077350066369011,,,,,,,,,,,,,,,,,millions,USD
+FY2018,6934.0,1816.0,,,,,,633.5,9.136140755696568,3.4,765.1,,,4569.7,16334.0,11764.3,3091.4,607.2,184.0,13.7,1.64,,,,,millions,USD
+Q1 2019,1990.6,382.5,,,,,,334.1,16.78388425600322,1.77,-96.2,,,4958.2,18631.4,13673.2,3690.3,871.5,185.3,3.6,0.43,,,,,millions,USD
+H1-2019,3648.4,674.5,,,,,,444.2,12.17520008770968,2.35,419.6,,,,,,,,,7.1,0.86,,,,,millions,USD
+Q2 2019,1657.8,292.0,,,,,,110.1,6.64133188563156,0.58,515.8000000000001,,,4947.8,19200.3,14252.5,3815.6,512.3,186.1,,0.43,,,,,millions,USD
+Q3 2019,1825.2,397.4,,,,,,126.1,6.908831908831909,0.66,349.5,,,4912.0,19173.8,14261.8,3815.8,578.9,186.5,,0.43,,,,,millions,USD
+Q4 2019,1721.4,,,,,,,98.5,5.722086673637737,0.51,,,,,,,,,,,,,,,,millions,USD
+FY2019,7195.0,1352.8,,,,,,668.8,9.295343988881166,3.52,1191.1,,,5215.5,19634.8,14419.3,3816.1,604.8,188.1,14.0,1.72,,,,,millions,USD
+Q1 2020,1866.9,185.4,,,,,,346.3,18.54946703090685,1.79,108.6,,,5070.1,20836.5,15766.4,4315.1,352.8,189.6,3.3,0.45,,,,,millions,USD
+H1-2020,3450.9,346.6,,,,,,500.0,14.488973890869048,2.58,802.2,,,,,,,,,6.7,0.9,,,,,millions,USD
+Q2 2020,1584.0,161.2,,,,,,153.7,9.703282828282827,0.79,693.6,,,5534.5,21306.2,15771.7,4315.4,349.7,191.5,,0.45,,,,,millions,USD
+Q3 2020,1849.1,319.2,,,,,,176.6,9.55059217997945,0.9,585.3999999999999,,,5818.2,21814.9,15996.7,4265.7,629.9,192.3,,0.45,,,,,millions,USD
+Q4 2020,1703.6,,,,,,,142.2,8.347029819206387,0.72,,,,,,,,,,,,,,,,millions,USD
+FY2020,7003.6,882.1,,,,,,818.8,11.691130275858129,4.2,1807.1,,,6232.7,22331.4,16098.7,4266.0,664.6,193.7,13.6,1.8,,,,,millions,USD
+Q1 2021,2165.0,309.1,,,,,,393.7,18.18475750577367,1.92,218.7,,,6779.5,24414.5,17635.0,4366.3,526.3,195.9,3.7,0.48,,,,,millions,USD
+H1-2021,4098.5,577.9,,,,,,572.3,13.963645236061971,2.83,688.9,,,,,,,,,8.2,0.96,,,,,millions,USD
+Q2 2021,1933.5,268.8,,,,,,201.8,10.437031290406,0.92,470.2,,,8354.0,27817.2,19463.2,5712.2,3204.1,206.8,,0.48,,,,,millions,USD
+Q3 2021,2138.2,366.1,,,,,,225.1,10.527546534468245,1.06,521.4,,,8470.1,26915.8,18445.7,5072.4,2735.1,207.3,,0.48,,,,,millions,USD
+FY2021,8209.4,1173.2,,,,,,906.8,11.045874241722903,4.37,1392.4,,,8560.1,33236.1,24784.9,5810.2,402.6,208.5,13.4,1.92,,,,,millions,USD
+Q1 2022,2435.3,22.9,,,,,,439.1,18.030632776249334,2.05,216.6,,,9043.1,42897.5,34118.4,5760.9,734.4,210.1,2.4,0.51,,,,,millions,USD
+H1-2022,4478.3,22.9,,,,,,722.9,16.142286135363864,3.38,140.4,,,,,,,,,9.5,1.02,,,,,millions,USD
+Q2 2022,2043.0,,,,,,,285.1,13.954968184043077,1.33,-76.19999999999999,,,8861.8,39850.8,31128.6,9.4,552.9,210.3,,0.51,,,,,millions,USD
+Q3 2022,2044.0,,,,,,,255.8,12.5146771037182,1.19,641.7,,,8629.1,38517.2,30038.7,9.3,629.8,210.8,,0.51,,,,,millions,USD
+FY2022,8550.6,22.9,,,,,,1114.2,13.030664514770892,5.19,1390.0,,,9190.0,38358.4,29168.2,5562.8,738.4,211.9,24.4,2.04,,,,,millions,USD
+Q1 2023,2706.1,,,,,,,486.6,17.98159713240457,2.24,428.5,,,9858.3,45094.4,35236.1,6022.1,1345.7,214.2,3.8,0.55,,,,,millions,USD
+H1-2023,5148.0,,,,,,,721.0,14.005439005439005,3.31,440.9,,,,,,,,,11.9,1.1,,,,,millions,USD
+Q2 2023,2441.9,,,,,,,235.8,9.656415086612883,1.07,12.399999999999977,,,10440.0,54365.2,43925.2,6022.9,777.9,215.5,,0.55,,,,,millions,USD
+Q3 2023,2492.0,,,,,,,280.7,11.264044943820224,1.28,897.1999999999999,,,10510.0,53203.9,42693.9,6023.6,857.6,215.9,,0.55,,,,,millions,USD
+FY2023,10072.0,,,,,,,970.0,9.630659253375695,4.42,2032.0,,,10815.0,51616.0,40800.5,7006.0,,216.7,31.0,2.2,,,,,millions,USD
+Q1 2024,3256.7,,,,,,,612.7,18.813522891270306,2.74,789.3,,,11344.2,60975.9,49631.7,7989.6,,218.5,11.1,0.6,,,,,millions,USD
+H1-2024,6032.1,,,,,,,891.8,14.784237661842475,4.01,908.8,,,,,,,,,21.1,1.2,,,,,millions,USD
+Q2 2024,2775.4,,,,,,,285.4,10.283202421272609,1.27,119.5,,,11599.3,63007.7,51408.4,7790.9,,219.1,,0.6,,,,,millions,USD
+Q3 2024,2806.8,,,,,,,312.6,11.137238135955537,1.39,934.8,,,12209.6,57242.7,45033.1,7791.9,,219.4,,0.6,,,,,millions,USD
+FY2024,11555.0,,,,,,,1463.0,12.661185633924706,6.5,2583.0,,,20154.0,64255.0,44075.0,12732.0,,250.0,42.0,2.4,,,,,millions,USD
+Q1 2025,3727.0,,,,,,,709.0,19.02334317145157,2.72,872.0,,,22354.0,74096.0,51742.0,12419.8,,256.1,14.0,0.65,,,,,millions,USD
+H1-2025,6949.0,,,,,,,1072.0,15.426680097855808,4.12,448.0,,,,,,,,,25.0,1.3,,,,,millions,USD
+Q2 2025,3222.0,,,,,,,368.0,11.421477343265053,1.4,-424.0,,,23056.0,80123.0,57066.3,12097.9,,256.4,,0.65,,,,,millions,USD
+Q3 2025,3365.6,,,,,,,272.7,8.102567149988115,1.04,729.0,,,23205.8,79067.9,55831.0,12100.9,,256.8,,0.65,,,,,millions,USD
+FY2025,13942.0,,,,,,,1494.0,10.715822694018074,5.74,1930.0,,,23321.0,70665.0,47318.0,12873.0,,257.0,49.0,2.6,,,,,millions,USD
+Q1 2026,4758.0,,,,,,,823.0,17.297183690626312,3.16,957.0,,,23802.0,78301.0,54499.0,12077.0,,256.9,17.0,0.7,,,,,millions,USD
+H1-2026,8761.0,,,,,,,1146.0,13.080698550393791,4.41,967.0,,,,,,,,,41.0,1.4,,,,,millions,USD
+Q2 2026,4003.0,,,,,,,324.0,8.093929552835373,1.25,10.0,,,23717.0,81808.0,58061.0,11955.0,,256.3,,0.7,,,,,millions,USD`;
+
+const analysis = {
+ "ticker": "AJG",
+ "company_name": "Arthur J. Gallagher & Co.",
+ "analysis_date": "2026-09-25",
+ "overview": "Arthur J. Gallagher & Co. is a global insurance brokerage, risk management, and consulting firm founded in 1927 and headquartered in Rolling Meadows, Illinois. The company operates through two segments -- Brokerage (retail, wholesale, and reinsurance placement plus benefits consulting) and Risk Management (third-party claims administration and loss-control consulting via Gallagher Bassett) -- serving commercial, industrial, public, and nonprofit clients across roughly 850 offices in over 60 countries. AJG is the third-largest global insurance broker by revenue, having significantly scaled via serial acquisitions, most recently the $13.8 billion purchase of AssuredPartners that closed August 18, 2025.",
+ "business_model": {
+  "summary": "AJG earns commissions and fees for placing property/casualty and employee benefits insurance on behalf of clients (Brokerage, ~89% of revenue) plus fee-based third-party claims administration and risk-management consulting through its Gallagher Bassett subsidiary (Risk Management, ~11% of revenue). Revenue is largely recurring (policy renewals, multi-year claims administration contracts) supplemented by contingent/supplemental commissions tied to underwriting profitability and volume with carriers, and by an aggressive tuck-in M&A program that adds inorganic growth on top of organic commission growth.",
+  "revenue_streams": [
+   {
+    "name": "Brokerage - Retail/Wholesale/Reinsurance commissions & fees",
+    "percent": 89,
+    "trend": "growing"
+   },
+   {
+    "name": "Risk Management (Gallagher Bassett claims/consulting fees)",
+    "percent": 11,
+    "trend": "growing"
+   }
+  ],
+  "customer_type": "B2B - commercial, industrial, public sector, religious, and nonprofit entities, plus underwriting enterprises (carriers) as counterparties for wholesale/MGA business",
+  "geographic_mix": "US ~67%, International ~33% (primarily UK, Australia, Canada, New Zealand)"
+ },
+ "competitive_position": {
+  "main_competitors": [
+   "Marsh McLennan (MMC)",
+   "Aon plc (AON)",
+   "Willis Towers Watson (WTW)",
+   "Brown & Brown (BRO)",
+   "Hub International",
+   "Lockton Companies",
+   "USI Holdings"
+  ],
+  "market_position": "Third/fourth-largest global insurance broker; roughly 4.4% of the US brokerage market (tied with Marsh McLennan), behind market leader Aon at ~6.9%; a top-tier consolidator among the 'Big 4' global brokers alongside Aon, Marsh McLennan, and WTW",
+  "moat_factors": [
+   {
+    "factor": "Scale and specialization",
+    "strength": "strong",
+    "description": "Broad national/global footprint with specialty practice groups gives access to markets and pricing leverage that smaller regional brokers lack"
+   },
+   {
+    "factor": "Switching costs",
+    "strength": "moderate",
+    "description": "Multi-year client relationships, embedded renewal cycles, and claims administration contracts create moderate stickiness, though brokerage relationships can be re-tendered"
+   },
+   {
+    "factor": "M&A platform / acquisition integration capability",
+    "strength": "strong",
+    "description": "Decades of disciplined tuck-in acquisitions plus now large-scale deals (AssuredPartners) with a repeatable integration playbook and identified cost synergies is a structural advantage over less acquisitive peers"
+   },
+   {
+    "factor": "Fee-based, capital-light model",
+    "strength": "moderate",
+    "description": "Brokerage does not assume underwriting risk, generating high-margin, capital-light cash flow, though this is shared with all major brokers"
+   },
+   {
+    "factor": "Brand/reputation",
+    "strength": "moderate",
+    "description": "Long operating history (since 1927) and global network support relationships with carriers and large clients"
+   }
+  ],
+  "weaknesses": [
+   "Sub-scale relative to Aon and Marsh McLennan in global reach and largest global accounts",
+   "Heavy reliance on continued M&A to sustain growth; organic growth alone is more modest",
+   "Contingent commission arrangements create earnings variability tied to carrier profitability, and AJG has voluntarily limited some such arrangements, ceding an advantage to less-restricted competitors",
+   "Exposure to softening property/casualty pricing cycle, particularly property renewal premiums (down ~10% in Q2 2026)"
+  ]
+ },
+ "growth_drivers": [
+  "Continued tuck-in and platform M&A (AssuredPartners integration, historical ~$1B+/year of smaller acquisitions)",
+  "AssuredPartners synergy capture: $160 million run-rate synergies targeted by end of 2026, scaling to $325 million by early 2028",
+  "Gallagher Bassett (Risk Management) organic growth outperformance (9-12% guided for FY2026) driven by new business wins and client retention",
+  "Cross-sell of benefits consulting, specialty/wholesale lines, and international expansion (UK, Australia, Canada, New Zealand)",
+  "Secular growth in complexity of commercial risk (cyber, climate, litigation/social inflation) increasing demand for broker advisory services",
+  "Operating leverage from shared services/global support centers driving margin expansion (40-60 bps guided for FY2026)"
+ ],
+ "risks": {
+  "business": [
+   {
+    "risk": "Intense competition from larger global brokers",
+    "severity": "high",
+    "description": "Competes with Aon, Marsh McLennan, and WTW, each with greater worldwide revenues and scale in the largest global accounts"
+   },
+   {
+    "risk": "Contingent commission dependence",
+    "severity": "moderate",
+    "description": "A portion of revenue is variable contingent/supplemental commissions tied to prior-year underwriting volume and profitability; less predictable than standard commissions, and self-imposed limits cede advantage to brokers using contingent arrangements more freely"
+   },
+   {
+    "risk": "Soft P&C pricing cycle",
+    "severity": "moderate",
+    "description": "Property renewal premiums declined roughly 10% in Q2 2026, pressuring commission revenue even as exposure units grow"
+   },
+   {
+    "risk": "Employee benefits growth plateau",
+    "severity": "low",
+    "description": "Benefits organic growth has been running a modest 3-4% with limited near-term acceleration expected"
+   }
+  ],
+  "financial": [
+   {
+    "risk": "Elevated leverage from AssuredPartners deal",
+    "severity": "moderate",
+    "description": "Financed via $5.0B senior notes issuance (Dec 2024) plus ~$9.8B equity raise; net debt/EBITDA around 3.0x as of late 2026, above AJG's historical norm"
+   },
+   {
+    "risk": "Foreign currency exposure",
+    "severity": "low",
+    "description": "~33% of revenue generated internationally (UK, Australia, Canada, NZ) exposes reported results to FX translation"
+   },
+   {
+    "risk": "Interest expense",
+    "severity": "moderate",
+    "description": "Interest coverage of ~4.6x is comfortable but has compressed from the added acquisition debt"
+   }
+  ],
+  "regulatory": [
+   {
+    "risk": "Antitrust/HSR scrutiny of large M&A",
+    "severity": "moderate",
+    "description": "AssuredPartners deal required a Hart-Scott-Rodino second request in March 2025 before closing in August 2025; future large deals face similar scrutiny"
+   },
+   {
+    "risk": "Insurance broker compensation regulation",
+    "severity": "low",
+    "description": "Regulatory attention to contingent commission disclosure and broker compensation practices persists across US states and international jurisdictions"
+   },
+   {
+    "risk": "Data privacy / cybersecurity regulation",
+    "severity": "moderate",
+    "description": "Handles sensitive client and claims data across jurisdictions; breach could trigger regulatory action, legal liability and reputational damage"
+   }
+  ],
+  "macro": [
+   {
+    "risk": "Insurance pricing cycle (softening market)",
+    "severity": "moderate",
+    "description": "A prolonged soft P&C pricing market reduces commission revenue growth industry-wide, independent of AJG's exposure-unit growth"
+   },
+   {
+    "risk": "Interest rate sensitivity on fiduciary/investment income and debt service costs",
+    "severity": "low",
+    "description": "Elevated leverage post-AssuredPartners increases sensitivity to rate moves on floating-rate debt and refinancing"
+   },
+   {
+    "risk": "Macro/economic slowdown",
+    "severity": "low",
+    "description": "Commercial insurance demand is relatively resilient but payroll- and revenue-linked exposures (workers' comp, benefits) can soften in a downturn"
+   }
+  ],
+  "execution": [
+   {
+    "risk": "AssuredPartners integration execution",
+    "severity": "high",
+    "description": "Largest acquisition in company history ($13.8B); realizing $160M-$325M of targeted synergies and integrating a comparably large organization carries meaningful execution risk, and management already had to remove built-in Q4 2026 acceleration from guidance"
+   },
+   {
+    "risk": "M&A pipeline sustainability / valuation discipline",
+    "severity": "moderate",
+    "description": "Growth strategy depends on continued availability of attractively priced tuck-in targets in a competitive, well-capitalized consolidation market"
+   }
+  ]
+ },
+ "macro_factors": {
+  "industry_outlook": "Global commercial insurance brokerage is a mature, moderately growing industry (roughly mid-single-digit organic growth industry-wide) undergoing continued consolidation among the top four global brokers (Aon, Marsh McLennan, WTW, Gallagher); property pricing has begun to soften after several hard-market years while casualty and professional lines remain firmer",
+  "cyclicality": "Moderate - brokerage commissions track both economic activity (payrolls, exposure units, business formation) and the insurance underwriting pricing cycle (currently transitioning from hard to softer property pricing), while risk management (claims) revenue is comparatively more resilient/counter-cyclical",
+  "interest_rate_sensitivity": "Moderate - elevated leverage post-AssuredPartners increases debt service sensitivity; fiduciary funds held on behalf of clients generate some interest income that benefits from higher rates",
+  "key_input_costs": [
+   "Compensation and benefits for producers/brokers (largest expense)",
+   "Acquisition financing costs (debt service)",
+   "Technology/cybersecurity infrastructure spend"
+  ]
+ },
+ "recent_developments": [
+  {
+   "date": "2025-08-18",
+   "event": "Closed acquisition of AssuredPartners for $13.8 billion gross consideration, financed via a $8.5B+ follow-on equity offering and $5.0B senior notes issuance completed in December 2024/January 2025"
+  },
+  {
+   "date": "2026-07-30",
+   "event": "Reported Q2 2026 results: combined Brokerage + Risk Management revenue grew 24% (6% organic); Gallagher Bassett delivered 16% revenue growth (12% organic); EPS beat estimates but shares fell on growth-outlook concerns"
+  },
+  {
+   "date": "2026-09-23/24",
+   "event": "Held investor update lowering FY2026 Brokerage organic growth outlook to approximately 5% from approximately 5.5%, removing previously assumed Q4 acceleration; Risk Management organic growth outlook (9-12%) reaffirmed"
+  },
+  {
+   "date": "2026-09-24",
+   "event": "Multiple analysts cut price targets following the investor update: Wells Fargo to $291 (from $296, Overweight maintained), RBC Capital to $290 (from $310, Outperform maintained), KBW to $250 (from $271, Market Perform maintained); Cantor Fitzgerald reiterated Neutral at $300"
+  },
+  {
+   "date": "2026-Q2",
+   "event": "Property renewal premiums declined approximately 10% year-over-year during the quarter, while casualty (+3%) and professional lines (+1%) remained positive, reflecting a bifurcated/softening P&C pricing cycle"
+  }
+ ],
+ "guidance": {
+  "as_of": "September 2026 Investor Update (following Q2 2026 earnings, reported 2026-07-30)",
+  "fiscal_year": "FY2026",
+  "items": [
+   {
+    "metric": "Brokerage segment organic growth",
+    "target": "~5%",
+    "period": "FY2026",
+    "vs_prior": "lowered",
+    "notes": "Reduced from ~5.5% at the September 2026 investor update; removes previously assumed Q4 2026 acceleration and reflects AssuredPartners' own Q4 organic growth being folded into the consolidated forecast"
+   },
+   {
+    "metric": "Risk Management (Gallagher Bassett) organic growth",
+    "target": "9%-12%",
+    "period": "FY2026",
+    "vs_prior": "maintained",
+    "notes": "Reaffirmed at the September update; driven by new business wins and strong client retention"
+   },
+   {
+    "metric": "Total combined organic growth (Brokerage + Risk Management)",
+    "target": "~6%",
+    "period": "FY2026",
+    "vs_prior": "maintained (per Q2 reaffirmation, prior to Brokerage-specific cut)",
+    "notes": "Q2 2026 release reaffirmed ~6% total organic growth outlook; subsequent September update specifically lowered the Brokerage component"
+   },
+   {
+    "metric": "Underlying (Brokerage) margin expansion",
+    "target": "+40 to +60 bps",
+    "period": "FY2026",
+    "vs_prior": "maintained",
+    "notes": "Forecast for full-year underlying margin expansion excluding acquisition-related noise"
+   },
+   {
+    "metric": "Brokerage segment adjusted EBITDAC margin",
+    "target": "33.6%-34.2%",
+    "period": "FY2026",
+    "vs_prior": "maintained",
+    "notes": "Guided range provided alongside Q2 2026 results"
+   },
+   {
+    "metric": "AssuredPartners run-rate cost synergies",
+    "target": "$160 million by end of 2026; up to $325 million by early 2028",
+    "period": "FY2026 / early FY2028",
+    "vs_prior": "maintained",
+    "notes": "Synergy targets tied to integration milestones for the $13.8B acquisition"
+   },
+   {
+    "metric": "Q3 2026 organic growth (Brokerage)",
+    "target": "~5%",
+    "period": "Q3 2026",
+    "vs_prior": "maintained",
+    "notes": "Company maintained its previously communicated third-quarter expectation even as the full-year figure was trimmed"
+   }
+  ],
+  "management_commentary": "Management characterized the lowered full-year Brokerage organic growth guidance as primarily a function of incorporating AssuredPartners' own organic growth trajectory into the consolidated forecast and removing an implied Q4 acceleration that analysts viewed as aggressive, rather than a signal of broad-based demand deterioration. Management continued to emphasize that broker organic growth has proven more resilient than headline P&C pricing softness (particularly in property), and reaffirmed confidence in Risk Management's double-digit organic growth and the AssuredPartners synergy capture timeline."
+ },
+ "bull_case": [
+  "Scaled, capital-light fee/commission model with a long history of double-digit total revenue growth through a combination of organic growth and disciplined M&A",
+  "AssuredPartners acquisition meaningfully expands US middle-market distribution and offers a multi-year, quantified synergy runway ($160M by end-2026, up to $325M by 2028) that is largely self-funding upside not yet in the base",
+  "Gallagher Bassett (Risk Management) is compounding organic growth in the double digits (9-12% guided) with less cyclicality than brokerage, diversifying the earnings base",
+  "Casualty and professional lines pricing remains firm even as property softens, showing the overall commission base is more resilient than a single pricing cycle read would suggest",
+  "Consensus remains majority Buy/Outperform (66% Buy) even after recent target cuts, with analysts framing the guidance trim as tactical rather than fundamental"
+ ],
+ "bear_case": [
+  "September 2026 guidance cut on Brokerage organic growth (5.5% to ~5%) and the accompanying wave of price-target reductions (RBC, Wells Fargo, KBW) signal the market is losing confidence in near-term growth momentum immediately after closing its largest-ever acquisition",
+  "Elevated leverage (net debt/EBITDA ~3.0x) following the $13.8B AssuredPartners deal narrows financial flexibility and raises execution stakes on integration and synergy delivery",
+  "Softening property insurance pricing (renewal premiums down ~10% in Q2 2026) is a genuine headwind to commission revenue that could persist if the broader P&C market continues to soften",
+  "Premium valuation (trailing P/E near 38-39x) leaves little room for error if organic growth or synergy realization disappoints further",
+  "Structural reliance on continuous, well-priced M&A to sustain the growth algorithm is a repeatable but not guaranteed formula, and voluntary limits on contingent commission arrangements can cede some competitive ground to less-restricted rivals"
+ ]
+};
+
+const dcfData = {
+ "ticker": "AJG",
+ "company_name": "Arthur J. Gallagher & Co.",
+ "valuation_date": "2026-09-25",
+ "current_price": 227.13,
+ "model": "owner_fcf_dcf_component",
+ "historical_growth": {
+  "revenue_3yr_cagr": 17.7,
+  "revenue_5yr_cagr": 14.8,
+  "eps_3yr_cagr": 3.4,
+  "eps_5yr_cagr": 6.4,
+  "equity_3yr_cagr": 36.4,
+  "equity_5yr_cagr": 30.2,
+  "fcf_3yr_cagr": -2.8,
+  "fcf_5yr_cagr": 3.2,
+  "selected_growth_rate": 6.0,
+  "growth_rate_source": "management_guidance_not_historical_cagr",
+  "growth_divergence_warning": "Equity CAGR (36.4%/30.2%) diverges massively (>30%) from Revenue (17.7%/14.8%), EPS (3.4%/6.4%) and FCF (-2.8%/3.2%) CAGRs. This is NOT organic value creation: AJG raised ~$9.8B of fresh equity in Dec 2024/Jan 2025 to fund the $13.8B AssuredPartners acquisition, mechanically inflating book value and shares outstanding (250M->257M) while transaction costs, step-up D&A and deal financing interest simultaneously depressed EPS and FCF. None of the standard historical CAGRs is used directly as the forward growth driver; see inputs.notes for the guidance-anchored approach used instead."
+ },
+ "scenario_narratives": {
+  "base": "Management delivers its own just-lowered guidance (~5% Brokerage organic, 9-12% Risk Management organic) while AssuredPartners integration proceeds on the stated synergy timeline and AJG resumes its historical tuck-in M&A pace; margin expands toward a ~30% mature adjusted EBITDA level via guided 40-60bps/yr underlying expansion plus synergy capture.",
+  "bull": "AssuredPartners synergies beat the $325M ceiling and land early, Gallagher Bassett sustains the top of its double-digit organic range, casualty/professional-lines pricing strength offsets property softness so total organic growth reaccelerates, and disciplined tuck-in M&A continues at historical pace -- pushing the mature margin toward the low-33% area.",
+  "bear": "The September 2026 guidance cut is the leading edge of a broader P&C pricing-cycle turn rather than a one-off Q4 timing fix; AssuredPartners integration underdelivers on its synergy targets as outsized brokerage mega-deals often do, elevated post-deal leverage constrains further tuck-in M&A, and the mature margin stalls in the mid-to-high-20s% rather than reaching 30%+ -- though the recurring, high-retention commission base keeps growth modestly positive throughout rather than going negative."
+ },
+ "valuation_philosophy": {
+  "summary": "AJG is a capital-light, fee/commission-based global insurance brokerage (third/fourth-largest globally) with a decades-long algorithm of mid-single-digit organic growth plus continuous tuck-in M&A, now digesting its largest-ever acquisition (AssuredPartners, $13.8B, closed August 2025). The valuation is built on an owner-FCF component DCF anchored to management's own (recently trimmed) FY2026 guidance rather than historical CAGRs, which are badly distorted by the AssuredPartners equity raise and deal-related D&A/interest. Elevated D&A (~7.5%-8% of revenue, mostly purchase-accounting intangible amortization) is genuinely non-cash and is added back correctly in the FCF build; the near-term normalized EBITDA margin (27.5% ramping to 30%) sits meaningfully below AJG's own guided Brokerage-segment-only EBITDAC range (33.6-34.2%) to reflect the lower-margin Risk Management mix and corporate costs, which is a deliberately conservative blend. FY2025 reported FCF ($1,785M, 12.8% margin) is a trough distorted by acquisition-close transaction costs and fiduciary-fund working-capital timing -- TTM OCF through Q2-2026 recovered to $2,449M -- so the base FCF for the DCF is built from normalized components rather than carried forward from the depressed FY2025 actual.",
+  "key_risks_to_valuation": [
+   "AssuredPartners integration execution -- the largest deal in company history; realizing $160M-$325M of targeted synergies carries meaningful execution risk, and management already removed an assumed Q4 2026 acceleration from guidance",
+   "Softening P&C pricing cycle (property renewals -10% in Q2 2026) could spread into casualty/professional lines, which have so far remained firm and are propping up the organic growth guide",
+   "Elevated leverage (~3.0x net debt/EBITDA) narrows financial flexibility for further tuck-in M&A and increases interest-expense sensitivity to rates",
+   "Premium valuation historically afforded to AJG (trailing P/E ~38-39x pre-cut) leaves little room for further guidance disappointments",
+   "Structural reliance on continuous, well-priced M&A to sustain the growth algorithm; a thinner or more expensive acquisition pipeline would compress the long-run growth assumption",
+   "D&A build is a modeling judgment (7.5% of revenue tapering to 6.0%) calibrated to disclosed intangible-amortization schedules but sensitive to the pace and size of future tuck-in acquisitions, which reset the amortization base each time"
+  ]
+ },
+ "data_sources": {
+  "price": "Yahoo Finance chart API at inputs.price_as_of; 52-week range 190.75-313.55",
+  "financials": "research/AJG/Reports/AJG_Metrics.csv (core_metrics, SEC XBRL-sourced) plus direct SEC XBRL companyconcept API queries (CIK 0000354190) for FY2021-2025 capex (PaymentsForCapitalImprovements), D&A (DepreciationAmortizationAndAccretionNet), SBC (ShareBasedCompensation), debt (LongTermDebtNoncurrent) and cash (CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents) to fill CapEx/FreeCashFlow gaps in the CSV for FY2023-2025, which the acquisition-era filings left unpopulated",
+  "qualitative": "research/AJG/Reports/AJG_Analysis.json (2026-09-25) -- AssuredPartners acquisition detail, September 2026 guidance cut, bull/bear cases, competitive position"
+ },
+ "inputs": {
+  "base_revenue": 13942.0,
+  "shares_outstanding": 256.3,
+  "annual_share_growth_pct": 0.0,
+  "net_debt": 10569.0,
+  "total_debt": 11955.0,
+  "cash": 1386.0,
+  "last_fcf": 1736.0,
+  "reported_fcf": 1785.0,
+  "sbc": 49.0,
+  "sbc_incl_equity_taxes": 49.0,
+  "interest_income": 0,
+  "sbc_source": "SEC XBRL companyconcept ShareBasedCompensation (us-gaap), CIK 0000354190, FY2025 10-K cash-flow add-back = $49.0M. No separate equity-award tax-withholding tag found in XBRL; AJG's SBC intensity is immaterial (~0.35% of revenue vs 3-15% for SaaS issuers) so equity-award taxes are not separately material and are not added.",
+  "buyback_cash": 480.0,
+  "projected_shares": [
+   256.3,
+   256.3,
+   256.3,
+   256.3,
+   256.3,
+   256.3,
+   256.3,
+   256.3,
+   256.3,
+   256.3
+  ],
+  "share_count_basis": "Fully diluted shares outstanding per Q2 2026 10-Q (CommonStockSharesOutstanding, 2026-06-30) = 256.3M. Held FLAT: SBC is fully expensed in the flows (charging both would double-count). H1-2026 buyback_cash of $480M funds the flat count post-AssuredPartners (FY2024/2025 share count rose ~250M->257M from the AssuredPartners-related equity raise, which is genuine non-SBC issuance already reflected in the current base count -- no further dilution modeled).",
+  "currency": "USD",
+  "quote_currency": "USD",
+  "units": "millions",
+  "fy0": "FY2025",
+  "fiscal_year_end": "31 December",
+  "price_as_of": "2026-09-24T20:00:03Z regular close (Yahoo Finance chart API); 52-week range 190.75-313.55",
+  "balance_sheet_date": "2026-06-30",
+  "share_count_date": "2026-06-30",
+  "wacc_rationale": "8.5% built on a US large-cap risk-free rate (~4.3% 10yr UST) plus an equity risk premium of ~5.5% levered to AJG's beta (~0.9-1.0, moderately cyclical fee-based brokerage with elevated post-deal leverage ~3.0x net debt/EBITDA); a touch below the house 9-10% US-tech default reflecting AJG's highly recurring, non-cyclical-relative-to-tech commission revenue base and investment-grade credit profile, but above a pure bond-like utility given P&C pricing-cycle and integration risk.",
+  "lease_treatment": "Office leases are operating leases under ASC 842, immaterial relative to flows for a people/commission business (no owned real estate, no heavy plant); not separately modeled -- lease expense sits inside the EBITDA margin as a normal opex item, consistent with treatment A (expensed in EBITDA, no separate net-debt lease liability add-back).",
+  "nci_treatment": "No material non-controlling interest disclosed; consolidated net income is materially all attributable to AJG shareholders (Gallagher Bassett and international subsidiaries are wholly or near-wholly owned).",
+  "notes": "MODEL: Owner-FCF component DCF per .claude/skills/dcf-methods/SKILL.md routing table (fee/commission-based insurance brokerage -- capital-light, no underwriting risk carried on AJG's own balance sheet, distinguishing it from the Residual-income-on-book model used for banks/deposit-takers and the BVPS-compounding model used for risk-carrying insurers like FRFHF/IAG.AX). AJG is confirmed NOT an underwriter: it earns commissions/fees for placing risk with third-party carriers (Brokerage, 89% of revenue) and third-party claims administration/consulting fees (Risk Management/Gallagher Bassett, 11%); it holds client premium in a fiduciary capacity (not its own balance-sheet risk) and its investing/financing cash flows are ordinary corporate finance, not underwriting reserves. FCF BASE NORMALIZATION: FY2025 reported OCF ($1,930M) and FCF ($1,785M, 12.8% margin) are depressed by one-off AssuredPartners transaction/integration costs and fiduciary-fund working-capital timing around the 2025-08-18 close (quarterly OCF swung from -$424M in Q2-2025 to +$753M implied in Q4-2025); TTM OCF through Q2-2026 recovered to $2,449M (computed as FY2025 $1,930M - H1-2025 $448M + H1-2026 $967M), confirming FY2025 understates the run-rate. Rather than carry the depressed FY2025 margin forward or the noisy TTM figure, the component build starts EBITDA margin at 27.5% (below AJG's own guided Brokerage-segment EBITDAC range of 33.6-34.2% to reflect Risk Management's lower-margin mix at 11% of revenue plus corporate costs) and ramps to 30% by Year 5 per management's guided +40-60bps/yr underlying margin expansion plus AssuredPartners synergy capture ($160M run-rate by end-2026, up to $325M by early 2028), producing an owner-FCF margin path of 22.2% (Year 1) rising to 24.0% (mature) -- comfortably inside AJG's actual FY2021-2022 pre-mega-deal FCF margins of 19-23%, so this is a normalization, not an aggressive assumption. D&A is set at 7.5% of revenue near-term (vs actual FY2025 D&A of $1,122M = 8.0% of revenue per XBRL DepreciationAmortizationAndAccretionNet, and FY2026 guided intangible amortization of $1,105M per FiniteLivedIntangibleAssetsAmortizationExpenseNextTwelveMonths), tapering to 6.0% by Year 10 as the AssuredPartners acquisition intangibles season and are only partially replaced by ongoing tuck-in amortization -- this D&A is genuinely non-cash (purchase-accounting intangible amortization, not maintenance capex) and is added back correctly in the owner-FCF build. HISTORICAL CAGR DIVERGENCE: Equity 3yr/5yr CAGR (36.4%/30.2%) is inflated by the ~$9.8B AssuredPartners-related equity raise, not organic book compounding; EPS CAGR (3.4%/6.4%) and owner-FCF-proxy CAGR (roughly flat to slightly negative over 2022-2025) are depressed by acquisition dilution, transaction costs and elevated D&A/interest expense from deal financing. None of the standard CAGRs is a clean organic-growth proxy for a company that just completed its largest-ever acquisition, so forward growth is anchored instead on management's own guidance (Brokerage organic ~5% for FY2026, cut from ~5.5% at the September 2026 investor update; Risk Management organic 9-12%, reaffirmed; blended total organic ~6%) plus AJG's decades-long tuck-in M&A algorithm (historically ~$1B+/year of smaller acquisitions on top of organic growth), moderating from a high-single-digit blended rate in Year 1-2 (reflecting the AssuredPartners full-year consolidation step plus continued tuck-ins) toward a long-run mid-single-digit organic-plus-modest-M&A rate, tapering to a 2.5% terminal growth rate. TAX: cash tax rate ramps from 19% (below AJG's ~21-23% GAAP effective rate, reflecting continued acquisition-related tax shields/interest deductibility in the near term) to a steady-state 21% (US federal statutory) by Year 5, consistent with interest expense on the AssuredPartners debt ($5.0B senior notes) providing a genuine, non-repeating near-term shield that fades as the debt amortizes/refinances. WORKING CAPITAL: set to 0% capture -- AJG's cash-flow swings are dominated by fiduciary-fund timing (client premiums held briefly before remittance to carriers), which is a balance-sheet/agency item that nets to roughly zero economically over a year and does not scale cleanly with revenue growth the way SaaS deferred revenue does; modeling a non-zero capture would risk mistaking fiduciary-fund noise for a genuine growth-linked tailwind or drag. HORIZON: 10 years, since the Year-5 owner-FCF margin (23.6%) is still short of the Year-10 mature margin (24.0%) and AssuredPartners synergy capture continues through early 2028."
+ },
+ "assumptions": {
+  "bear": {
+   "growth_rates": [
+    3.0,
+    2.5,
+    3.0,
+    3.0,
+    3.0,
+    3.0,
+    2.5,
+    2.5,
+    2.0,
+    2.0
+   ],
+   "ebitda_margin_path": [
+    25.5,
+    25.5,
+    26.0,
+    26.0,
+    26.5,
+    26.5,
+    27.0,
+    27.0,
+    27.0,
+    27.0
+   ],
+   "sbc_pct_path": [
+    0.35,
+    0.35,
+    0.35,
+    0.35,
+    0.35,
+    0.35,
+    0.35,
+    0.35,
+    0.35,
+    0.35
+   ],
+   "da_pct_path": [
+    7.8,
+    7.8,
+    7.6,
+    7.6,
+    7.4,
+    7.4,
+    7.2,
+    7.2,
+    7.0,
+    7.0
+   ],
+   "capex_pct_path": [
+    1.3,
+    1.3,
+    1.25,
+    1.25,
+    1.2,
+    1.2,
+    1.2,
+    1.2,
+    1.2,
+    1.2
+   ],
+   "cash_tax_rate_path": [
+    20.0,
+    21.0,
+    22.0,
+    22.0,
+    22.0,
+    22.0,
+    22.0,
+    22.0,
+    22.0,
+    22.0
+   ],
+   "wc_capture_pct": 0.0,
+   "wacc": 10.0,
+   "terminal_growth": 2.0,
+   "terminal_cap_multiple": 14,
+   "narrative": "Bear case: the September 2026 guidance cut proves to be the leading edge of broader deceleration rather than a one-off Q4-timing adjustment -- property pricing softness spreads into casualty and professional lines as the broader P&C market turns, Brokerage organic growth settles near 3% rather than recovering toward the historical mid-single-digit algorithm, and AssuredPartners integration proves harder than guided (realized synergies land well below the $160M/$325M targets as historically seen with outsized brokerage mega-deals), keeping the adjusted EBITDA margin closer to 26-27% rather than reaching the guided maturity level. Elevated leverage (~3.0x net debt/EBITDA post-deal) constrains the pace of further tuck-in M&A, and higher-for-longer rates keep interest expense on the $5.0B AssuredPartners notes a persistent drag, holding the cash tax rate up via reduced interest-deduction benefit versus the base case. Growth still stays modestly positive throughout (a mature, largely non-discretionary commercial-insurance-adjacent revenue base with high renewal retention does not go into outright decline even in a soft cycle) so the terminal value is not zero-floored, but the compounding algorithm that has driven AJG's premium multiple visibly stalls.",
+   "horizon_years": 10
+  },
+  "base": {
+   "growth_rates": [
+    7.5,
+    7.0,
+    6.5,
+    6.0,
+    5.5,
+    5.0,
+    4.5,
+    4.0,
+    3.0,
+    2.5
+   ],
+   "ebitda_margin_path": [
+    27.5,
+    28.0,
+    28.5,
+    29.0,
+    29.5,
+    30.0,
+    30.0,
+    30.0,
+    30.0,
+    30.0
+   ],
+   "sbc_pct_path": [
+    0.35,
+    0.35,
+    0.35,
+    0.35,
+    0.35,
+    0.35,
+    0.35,
+    0.35,
+    0.35,
+    0.35
+   ],
+   "da_pct_path": [
+    7.5,
+    7.3,
+    7.1,
+    6.9,
+    6.7,
+    6.5,
+    6.3,
+    6.2,
+    6.1,
+    6.0
+   ],
+   "capex_pct_path": [
+    1.2,
+    1.15,
+    1.1,
+    1.1,
+    1.05,
+    1.05,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "cash_tax_rate_path": [
+    19.0,
+    19.5,
+    20.0,
+    20.5,
+    21.0,
+    21.0,
+    21.0,
+    21.0,
+    21.0,
+    21.0
+   ],
+   "wc_capture_pct": 0.0,
+   "wacc": 8.5,
+   "terminal_growth": 2.5,
+   "terminal_cap_multiple": 18,
+   "narrative": "Base case: management delivers on its own (just-lowered) guidance -- ~5% Brokerage organic growth, 9-12% Risk Management organic growth, blended ~6% total organic for FY2026 -- while AssuredPartners integration proceeds roughly on the stated timeline ($160M synergies by end-2026, up to $325M by early 2028), and AJG continues its historical ~$1B+/year tuck-in M&A pace on top of organic growth. Property pricing softness (-10% renewal premiums in Q2 2026) is a genuine but partial offset, absorbed within the organic growth guide rather than derailing it, since casualty (+3%) and professional lines (+1%) remain firm. Margin expands 40-60bps/yr as guided plus synergy capture, reaching a mature ~30% adjusted EBITDA margin by Year 5-6 as Risk Management's lower-margin mix is diluted by scale in claims administration and shared-services leverage offsets corporate costs. Growth decelerates from a high-single-digit rate (AssuredPartners full-year consolidation effect plus tuck-ins) to a mid-single-digit long-run algorithm as the deal fully laps and the M&A pipeline normalizes.",
+   "horizon_years": 10
+  },
+  "bull": {
+   "growth_rates": [
+    10.0,
+    9.0,
+    8.0,
+    7.5,
+    7.0,
+    6.5,
+    6.0,
+    5.0,
+    4.0,
+    3.0
+   ],
+   "ebitda_margin_path": [
+    28.5,
+    29.5,
+    30.5,
+    31.5,
+    32.0,
+    32.5,
+    32.5,
+    32.5,
+    32.5,
+    32.5
+   ],
+   "sbc_pct_path": [
+    0.35,
+    0.35,
+    0.35,
+    0.35,
+    0.35,
+    0.35,
+    0.35,
+    0.35,
+    0.35,
+    0.35
+   ],
+   "da_pct_path": [
+    7.3,
+    7.0,
+    6.7,
+    6.4,
+    6.1,
+    5.9,
+    5.7,
+    5.5,
+    5.4,
+    5.3
+   ],
+   "capex_pct_path": [
+    1.15,
+    1.1,
+    1.05,
+    1.0,
+    1.0,
+    0.95,
+    0.95,
+    0.9,
+    0.9,
+    0.9
+   ],
+   "cash_tax_rate_path": [
+    18.5,
+    19.0,
+    19.5,
+    20.0,
+    20.5,
+    21.0,
+    21.0,
+    21.0,
+    21.0,
+    21.0
+   ],
+   "wc_capture_pct": 0.0,
+   "wacc": 8.0,
+   "terminal_growth": 3.0,
+   "terminal_cap_multiple": 20,
+   "narrative": "Bull case: AssuredPartners synergies are captured ahead of schedule and exceed the $325M ceiling as cross-sell between AJG's specialty practice groups and AssuredPartners' middle-market distribution outperforms, Gallagher Bassett sustains double-digit organic growth at the top of its 9-12% guided range, casualty/professional-lines pricing strength more than offsets property softness so total organic growth reaccelerates past the ~6% guide, and AJG continues sourcing well-priced tuck-ins at its historical pace without bidding the M&A market up. Operating leverage from shared global support centers compounds faster than guided, pushing adjusted EBITDA margin toward the low-33% area (still below Brokerage-segment-only guidance of 33.6-34.2%, appropriately blended down for Risk Management mix) as scale economies broaden.",
+   "horizon_years": 10
+  }
+ },
+ "projections": {
+  "bear": {
+   "years": [
+    "FY2026",
+    "FY2027",
+    "FY2028",
+    "FY2029",
+    "FY2030",
+    "FY2031",
+    "FY2032",
+    "FY2033",
+    "FY2034",
+    "FY2035"
+   ],
+   "growth_rates": [
+    3.0,
+    2.5,
+    3.0,
+    3.0,
+    3.0,
+    3.0,
+    2.5,
+    2.5,
+    2.0,
+    2.0
+   ],
+   "revenue": [
+    14360.3,
+    14719.3,
+    15160.8,
+    15615.7,
+    16084.1,
+    16566.7,
+    16980.8,
+    17405.4,
+    17753.5,
+    18108.5
+   ],
+   "adj_ebitda": [
+    3661.9,
+    3753.4,
+    3941.8,
+    4060.1,
+    4262.3,
+    4390.2,
+    4584.8,
+    4699.4,
+    4793.4,
+    4889.3
+   ],
+   "sbc": [
+    50.3,
+    51.5,
+    53.1,
+    54.7,
+    56.3,
+    58.0,
+    59.4,
+    60.9,
+    62.1,
+    63.4
+   ],
+   "lease_cost": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "d_and_a": [
+    1120.1,
+    1148.1,
+    1152.2,
+    1186.8,
+    1190.2,
+    1225.9,
+    1222.6,
+    1253.2,
+    1242.7,
+    1267.6
+   ],
+   "ebit": [
+    2491.5,
+    2553.8,
+    2736.5,
+    2818.6,
+    3015.8,
+    3106.2,
+    3302.8,
+    3385.3,
+    3488.6,
+    3558.3
+   ],
+   "cash_tax_rate": [
+    20.0,
+    21.0,
+    22.0,
+    22.0,
+    22.0,
+    22.0,
+    22.0,
+    22.0,
+    22.0,
+    22.0
+   ],
+   "cash_tax": [
+    498.3,
+    536.3,
+    602.0,
+    620.1,
+    663.5,
+    683.4,
+    726.6,
+    744.8,
+    767.5,
+    782.8
+   ],
+   "nopat": [
+    1993.2,
+    2017.5,
+    2134.5,
+    2198.5,
+    2352.3,
+    2422.9,
+    2576.2,
+    2640.6,
+    2721.1,
+    2775.5
+   ],
+   "capex": [
+    186.7,
+    191.4,
+    189.5,
+    195.2,
+    193.0,
+    198.8,
+    203.8,
+    208.9,
+    213.0,
+    217.3
+   ],
+   "working_capital": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "fcf": [
+    2926.6,
+    2974.2,
+    3097.2,
+    3190.1,
+    3349.5,
+    3450.0,
+    3595.0,
+    3684.9,
+    3750.8,
+    3825.8
+   ],
+   "owner_fcf_margin": [
+    20.4,
+    20.2,
+    20.4,
+    20.4,
+    20.8,
+    20.8,
+    21.2,
+    21.2,
+    21.1,
+    21.1
+   ],
+   "discount_factors": [
+    0.9091,
+    0.8264,
+    0.7513,
+    0.683,
+    0.6209,
+    0.5645,
+    0.5132,
+    0.4665,
+    0.4241,
+    0.3855
+   ],
+   "pv_fcf": [
+    2660.6,
+    2458.1,
+    2327.0,
+    2178.9,
+    2079.8,
+    1947.4,
+    1844.8,
+    1719.0,
+    1590.7,
+    1475.0
+   ]
+  },
+  "base": {
+   "years": [
+    "FY2026",
+    "FY2027",
+    "FY2028",
+    "FY2029",
+    "FY2030",
+    "FY2031",
+    "FY2032",
+    "FY2033",
+    "FY2034",
+    "FY2035"
+   ],
+   "growth_rates": [
+    7.5,
+    7.0,
+    6.5,
+    6.0,
+    5.5,
+    5.0,
+    4.5,
+    4.0,
+    3.0,
+    2.5
+   ],
+   "revenue": [
+    14987.7,
+    16036.8,
+    17079.2,
+    18103.9,
+    19099.6,
+    20054.6,
+    20957.1,
+    21795.4,
+    22449.2,
+    23010.5
+   ],
+   "adj_ebitda": [
+    4121.6,
+    4490.3,
+    4867.6,
+    5250.1,
+    5634.4,
+    6016.4,
+    6287.1,
+    6538.6,
+    6734.8,
+    6903.1
+   ],
+   "sbc": [
+    52.5,
+    56.1,
+    59.8,
+    63.4,
+    66.8,
+    70.2,
+    73.3,
+    76.3,
+    78.6,
+    80.5
+   ],
+   "lease_cost": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "d_and_a": [
+    1124.1,
+    1170.7,
+    1212.6,
+    1249.2,
+    1279.7,
+    1303.6,
+    1320.3,
+    1351.3,
+    1369.4,
+    1380.6
+   ],
+   "ebit": [
+    2945.1,
+    3263.5,
+    3595.2,
+    3937.6,
+    4287.9,
+    4642.6,
+    4893.5,
+    5111.0,
+    5286.8,
+    5442.0
+   ],
+   "cash_tax_rate": [
+    19.0,
+    19.5,
+    20.0,
+    20.5,
+    21.0,
+    21.0,
+    21.0,
+    21.0,
+    21.0,
+    21.0
+   ],
+   "cash_tax": [
+    559.6,
+    636.4,
+    719.0,
+    807.2,
+    900.5,
+    975.0,
+    1027.6,
+    1073.3,
+    1110.2,
+    1142.8
+   ],
+   "nopat": [
+    2385.5,
+    2627.1,
+    2876.1,
+    3130.4,
+    3387.4,
+    3667.7,
+    3865.8,
+    4037.7,
+    4176.6,
+    4299.2
+   ],
+   "capex": [
+    179.9,
+    184.4,
+    187.9,
+    199.1,
+    200.5,
+    210.6,
+    209.6,
+    218.0,
+    224.5,
+    230.1
+   ],
+   "working_capital": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "fcf": [
+    3329.7,
+    3613.4,
+    3900.9,
+    4180.4,
+    4466.5,
+    4760.7,
+    4976.6,
+    5171.1,
+    5321.5,
+    5449.7
+   ],
+   "owner_fcf_margin": [
+    22.2,
+    22.5,
+    22.8,
+    23.1,
+    23.4,
+    23.7,
+    23.7,
+    23.7,
+    23.7,
+    23.7
+   ],
+   "discount_factors": [
+    0.9217,
+    0.8495,
+    0.7829,
+    0.7216,
+    0.665,
+    0.6129,
+    0.5649,
+    0.5207,
+    0.4799,
+    0.4423
+   ],
+   "pv_fcf": [
+    3068.9,
+    3069.4,
+    3054.0,
+    3016.5,
+    2970.5,
+    2918.0,
+    2811.4,
+    2692.4,
+    2553.7,
+    2410.3
+   ]
+  },
+  "bull": {
+   "years": [
+    "FY2026",
+    "FY2027",
+    "FY2028",
+    "FY2029",
+    "FY2030",
+    "FY2031",
+    "FY2032",
+    "FY2033",
+    "FY2034",
+    "FY2035"
+   ],
+   "growth_rates": [
+    10.0,
+    9.0,
+    8.0,
+    7.5,
+    7.0,
+    6.5,
+    6.0,
+    5.0,
+    4.0,
+    3.0
+   ],
+   "revenue": [
+    15336.2,
+    16716.5,
+    18053.8,
+    19407.8,
+    20766.4,
+    22116.2,
+    23443.1,
+    24615.3,
+    25599.9,
+    26367.9
+   ],
+   "adj_ebitda": [
+    4370.8,
+    4931.4,
+    5506.4,
+    6113.5,
+    6645.2,
+    7187.8,
+    7619.0,
+    8000.0,
+    8320.0,
+    8569.6
+   ],
+   "sbc": [
+    53.7,
+    58.5,
+    63.2,
+    67.9,
+    72.7,
+    77.4,
+    82.1,
+    86.2,
+    89.6,
+    92.3
+   ],
+   "lease_cost": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "d_and_a": [
+    1119.5,
+    1170.2,
+    1209.6,
+    1242.1,
+    1266.7,
+    1304.9,
+    1336.3,
+    1353.8,
+    1382.4,
+    1397.5
+   ],
+   "ebit": [
+    3197.6,
+    3702.7,
+    4233.6,
+    4803.4,
+    5305.8,
+    5805.5,
+    6200.7,
+    6560.0,
+    6848.0,
+    7079.8
+   ],
+   "cash_tax_rate": [
+    18.5,
+    19.0,
+    19.5,
+    20.0,
+    20.5,
+    21.0,
+    21.0,
+    21.0,
+    21.0,
+    21.0
+   ],
+   "cash_tax": [
+    591.6,
+    703.5,
+    825.6,
+    960.7,
+    1087.7,
+    1219.2,
+    1302.1,
+    1377.6,
+    1438.1,
+    1486.8
+   ],
+   "nopat": [
+    2606.0,
+    2999.2,
+    3408.1,
+    3842.7,
+    4218.1,
+    4586.3,
+    4898.6,
+    5182.4,
+    5409.9,
+    5593.0
+   ],
+   "capex": [
+    176.4,
+    183.9,
+    189.6,
+    194.1,
+    207.7,
+    210.1,
+    222.7,
+    221.5,
+    230.4,
+    237.3
+   ],
+   "working_capital": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "fcf": [
+    3549.2,
+    3985.5,
+    4428.1,
+    4890.8,
+    5277.2,
+    5681.1,
+    6012.1,
+    6314.7,
+    6561.9,
+    6753.2
+   ],
+   "owner_fcf_margin": [
+    23.1,
+    23.8,
+    24.5,
+    25.2,
+    25.4,
+    25.7,
+    25.6,
+    25.7,
+    25.6,
+    25.6
+   ],
+   "discount_factors": [
+    0.9259,
+    0.8573,
+    0.7938,
+    0.735,
+    0.6806,
+    0.6302,
+    0.5835,
+    0.5403,
+    0.5002,
+    0.4632
+   ],
+   "pv_fcf": [
+    3286.3,
+    3416.9,
+    3515.2,
+    3594.9,
+    3591.6,
+    3580.1,
+    3508.0,
+    3411.6,
+    3282.6,
+    3128.0
+   ]
+  }
+ },
+ "valuation": {
+  "bear": {
+   "sum_pv_fcf": 20281.3,
+   "tv_gordon": 48778.8,
+   "tv_cap": 53561.0,
+   "terminal_value": 48778.8,
+   "terminal_value_bound": "gordon",
+   "pv_terminal": 18806.3,
+   "enterprise_value": 39087.6,
+   "net_debt": 10569.0,
+   "equity_value": 28518.6,
+   "intrinsic_value": 111.27,
+   "street_intrinsic_value": 113.82,
+   "upside": -51.0,
+   "terminal_pct_of_value": 48.1,
+   "implied_exit_multiple": 12.7,
+   "implied_terminal_ev_to_ebitda": 10.0
+  },
+  "base": {
+   "sum_pv_fcf": 28565.1,
+   "tv_gordon": 93098.7,
+   "tv_cap": 98094.3,
+   "terminal_value": 93098.7,
+   "terminal_value_bound": "gordon",
+   "pv_terminal": 41176.2,
+   "enterprise_value": 69741.3,
+   "net_debt": 10569.0,
+   "equity_value": 59172.3,
+   "intrinsic_value": 230.87,
+   "street_intrinsic_value": 234.93,
+   "upside": 1.6,
+   "terminal_pct_of_value": 59.0,
+   "implied_exit_multiple": 17.1,
+   "implied_terminal_ev_to_ebitda": 13.5
+  },
+  "bull": {
+   "sum_pv_fcf": 34315.1,
+   "tv_gordon": 139116.2,
+   "tv_cap": 135064.3,
+   "terminal_value": 135064.3,
+   "terminal_value_bound": "cap",
+   "pv_terminal": 62560.9,
+   "enterprise_value": 96876.0,
+   "net_debt": 10569.0,
+   "equity_value": 86307.0,
+   "intrinsic_value": 336.74,
+   "street_intrinsic_value": 342.05,
+   "upside": 48.3,
+   "terminal_pct_of_value": 64.6,
+   "implied_exit_multiple": 20.0,
+   "implied_terminal_ev_to_ebitda": 15.8
+  }
+ },
+ "entry_price": {
+  "hurdle_rate": 0.15,
+  "bear": {
+   "years_to_terminal": 10,
+   "pv_interim_fcf_at_hurdle": 16379.1,
+   "terminal_value_at_hurdle": 30017.7,
+   "terminal_value_bound": "gordon",
+   "pv_terminal_at_hurdle": 7419.9,
+   "net_debt": 10569.0,
+   "entry_price": 51.62,
+   "entry_discount_from_current": -77.3
+  },
+  "base": {
+   "years_to_terminal": 10,
+   "pv_interim_fcf_at_hurdle": 21282.6,
+   "terminal_value_at_hurdle": 44687.4,
+   "terminal_value_bound": "gordon",
+   "pv_terminal_at_hurdle": 11046.0,
+   "net_debt": 10569.0,
+   "entry_price": 84.9,
+   "entry_discount_from_current": -62.6
+  },
+  "bull": {
+   "years_to_terminal": 10,
+   "pv_interim_fcf_at_hurdle": 24746.5,
+   "terminal_value_at_hurdle": 57965.1,
+   "terminal_value_bound": "gordon",
+   "pv_terminal_at_hurdle": 14328.1,
+   "net_debt": 10569.0,
+   "entry_price": 111.22,
+   "entry_discount_from_current": -51.0
+  },
+  "weighted_entry_price": 83.16
+ },
+ "required_return_table": {
+  "scenario": "base",
+  "returns": [
+   8.5,
+   9,
+   10,
+   11,
+   12,
+   15
+  ],
+  "value_per_share": [
+   230.87,
+   209.18,
+   174.52,
+   148.07,
+   127.23,
+   84.9
+  ],
+  "note": "Each row rebuilds the terminal value at that row's rate (max(0, min(Gordon@r, 18x FCF_N))); the WACC row is valuation.base.intrinsic_value and the hurdle row is entry_price.base.entry_price."
+ },
+ "sensitivity": {
+  "scenario": "base",
+  "wacc_range": [
+   6.5,
+   7.5,
+   8.5,
+   9.5,
+   10.5
+  ],
+  "terminal_growth_range": [
+   1.5,
+   2.0,
+   2.5,
+   3.0,
+   3.5
+  ],
+  "matrix": [
+   [
+    285.8,
+    285.8,
+    285.8,
+    285.8,
+    285.8
+   ],
+   [
+    250.37,
+    261.55,
+    261.55,
+    261.55,
+    261.55
+   ],
+   [
+    206.58,
+    217.79,
+    230.87,
+    239.49,
+    239.49
+   ],
+   [
+    173.83,
+    181.66,
+    190.61,
+    200.93,
+    212.97
+   ],
+   [
+    148.44,
+    154.1,
+    160.46,
+    167.68,
+    175.92
+   ]
+  ],
+  "terminal_cap_multiple": 18.0,
+  "note": "Rows are WACC, columns terminal growth; each cell rebuilds its own terminal value."
+ },
+ "probability_weighted": {
+  "weights": {
+   "bear": 0.25,
+   "base": 0.5,
+   "bull": 0.25
+  },
+  "weighted_iv": 227.44,
+  "street_weighted_iv": 231.43,
+  "weighted_upside_pct": 0.1,
+  "band_position": -7.8,
+  "weights_rationale": "Bear weight raised from the house default 15% to 25% (and bull correspondingly trimmed to 25%) because AJG enters this valuation immediately after its largest-ever acquisition ($13.8B AssuredPartners, closed 2025-08-18) with net debt/EBITDA near 3.0x -- above its historical norm -- and has JUST cut its FY2026 Brokerage organic growth guidance (5.5% -> ~5%) alongside a wave of sell-side price-target reductions (RBC, Wells Fargo, KBW). This is a live, unresolved integration-execution risk (management itself removed a previously assumed Q4 2026 acceleration from guidance) layered on top of ordinary P&C pricing-cycle softness (property renewals -10% in Q2 2026), which is more than the generic 'growth disappoints' bear case the house default is calibrated for. Bull weight is trimmed symmetrically rather than base, since the base case already embeds management's own (already-lowered) guidance as the central estimate."
+ },
+ "engine": {
+  "name": "dcf_engine",
+  "version": 1,
+  "built_at": "2026-09-25T09:32:59Z",
+  "drivers": "AJG_Drivers.json"
+ },
+ "sanity_check": {
+  "ran": true,
+  "passed": true,
+  "model": "owner_fcf",
+  "basis": "SBC-adjusted on both sides (EPS less SBC/share; EBITDA less SBC), so these deliberately do not match GAAP screener multiples.",
+  "rules_evaluated": [
+   "pe",
+   "pb",
+   "p_sales"
+  ],
+  "rules_not_evaluated": [
+   "ev_ebitda"
+  ],
+  "fy_end_month": 12,
+  "fy_end_month_source": "December (fallback: no fiscal_year_end and no annual filing)",
+  "implied_multiples": {
+   "pe": 41.0613,
+   "pb": 2.5442,
+   "ev_ebitda": null,
+   "p_sales": 4.2557
+  },
+  "historical_averages_ex_outliers": {
+   "pe_avg": 35.2046,
+   "pe_max": 51.8972,
+   "pe_min": 21.8793,
+   "pb_avg": 3.4723,
+   "pb_max": 4.5059,
+   "pb_min": 2.4538,
+   "ev_ebitda_avg": null,
+   "ev_ebitda_max": null,
+   "ev_ebitda_min": null,
+   "p_sales_avg": 3.6062,
+   "p_sales_max": 6.1413,
+   "p_sales_min": 1.6309
+  },
+  "price_position_in_10yr_range": 0.5979,
+  "trip_reasons": [],
+  "diagnosis": [],
+  "historical_table": [
+   {
+    "period": "FY2007",
+    "price": null,
+    "pe": null,
+    "pb": null,
+    "ev_ebitda": null,
+    "p_sales": null
+   },
+   {
+    "period": "FY2008",
+    "price": null,
+    "pe": null,
+    "pb": null,
+    "ev_ebitda": null,
+    "p_sales": null
+   },
+   {
+    "period": "FY2009",
+    "price": null,
+    "pe": null,
+    "pb": null,
+    "ev_ebitda": null,
+    "p_sales": null
+   },
+   {
+    "period": "FY2010",
+    "price": null,
+    "pe": null,
+    "pb": null,
+    "ev_ebitda": null,
+    "p_sales": null
+   },
+   {
+    "period": "FY2011",
+    "price": null,
+    "pe": null,
+    "pb": null,
+    "ev_ebitda": null,
+    "p_sales": null
+   },
+   {
+    "period": "FY2012",
+    "price": null,
+    "pe": null,
+    "pb": null,
+    "ev_ebitda": null,
+    "p_sales": null
+   },
+   {
+    "period": "FY2013",
+    "price": null,
+    "pe": null,
+    "pb": null,
+    "ev_ebitda": null,
+    "p_sales": null
+   },
+   {
+    "period": "FY2014",
+    "price": null,
+    "pe": null,
+    "pb": null,
+    "ev_ebitda": null,
+    "p_sales": null
+   },
+   {
+    "period": "FY2015",
+    "price": null,
+    "pe": null,
+    "pb": null,
+    "ev_ebitda": null,
+    "p_sales": null
+   },
+   {
+    "period": "FY2016",
+    "price": 51.96,
+    "pe": 24.2462,
+    "pb": 2.4538,
+    "ev_ebitda": null,
+    "p_sales": 1.6309
+   },
+   {
+    "period": "FY2017",
+    "price": 63.28,
+    "pe": 24.6847,
+    "pb": 2.6638,
+    "ev_ebitda": null,
+    "p_sales": 1.8329
+   },
+   {
+    "period": "FY2018",
+    "price": 73.7,
+    "pe": 21.8793,
+    "pb": 2.9675,
+    "ev_ebitda": null,
+    "p_sales": 1.9557
+   },
+   {
+    "period": "FY2019",
+    "price": 95.23,
+    "pe": 27.3561,
+    "pb": 3.4345,
+    "ev_ebitda": null,
+    "p_sales": 2.4896
+   },
+   {
+    "period": "FY2020",
+    "price": 123.71,
+    "pe": 29.7598,
+    "pb": 3.8447,
+    "ev_ebitda": null,
+    "p_sales": 3.4215
+   },
+   {
+    "period": "FY2021",
+    "price": 169.67,
+    "pe": 39.5973,
+    "pb": 4.1327,
+    "ev_ebitda": null,
+    "p_sales": 4.3092
+   },
+   {
+    "period": "FY2022",
+    "price": 188.54,
+    "pe": 36.6596,
+    "pb": 4.3473,
+    "ev_ebitda": null,
+    "p_sales": 4.6724
+   },
+   {
+    "period": "FY2023",
+    "price": 224.88,
+    "pe": 51.8972,
+    "pb": 4.5059,
+    "ev_ebitda": null,
+    "p_sales": 4.8383
+   },
+   {
+    "period": "FY2024",
+    "price": 283.85,
+    "pe": 49.9384,
+    "pb": 3.521,
+    "ev_ebitda": null,
+    "p_sales": 6.1413
+   },
+   {
+    "period": "FY2025",
+    "price": 258.79,
+    "pe": 46.027,
+    "pb": 2.8519,
+    "ev_ebitda": null,
+    "p_sales": 4.7704
+   }
+  ],
+  "computed_by": "scripts/sanity_check.py",
+  "computed_at": "2026-09-25T09:33:27.091801Z"
+ }
+};
+
+// Numbers the DCF cards must show at each scenario's own defaults. The
+// interactive model below is a generic 5-year Gordon toy; it scales these
+// anchors by the ratio it implies, it never replaces them.
+const dcfAnchors = {
+ "bear": {
+  "iv": 111.27,
+  "entry": 51.62
+ },
+ "base": {
+  "iv": 230.87,
+  "entry": 84.9
+ },
+ "bull": {
+  "iv": 336.74,
+  "entry": 111.22
+ }
+};
+
+// Chart configuration from the Spec, and the series pre-computed from the CSV.
+const chartSpecs = [
+ {
+  "id": "revenueChart",
+  "series": [
+   {
+    "label": "Revenue",
+    "column": "Revenue",
+    "kind": "bar"
+   },
+   {
+    "label": "YoY %",
+    "derive": "yoy:Revenue",
+    "kind": "line",
+    "axis": "y1",
+    "color": "warning"
+   }
+  ],
+  "y1_title": "YoY %"
+ },
+ {
+  "id": "marginsChart",
+  "series": [
+   {
+    "label": "Net margin",
+    "column": "NetMargin",
+    "kind": "line"
+   }
+  ],
+  "percent": true
+ },
+ {
+  "id": "profitChart",
+  "series": [
+   {
+    "label": "Net income",
+    "column": "NetIncome",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "epsDpsChart",
+  "series": [
+   {
+    "label": "EPS",
+    "column": "EPS",
+    "kind": "bar"
+   },
+   {
+    "label": "Dividend per share",
+    "column": "DividendPerShare",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "fcfChart",
+  "series": [
+   {
+    "label": "Net income",
+    "column": "NetIncome",
+    "kind": "bar"
+   },
+   {
+    "label": "Reported FCF",
+    "column": "FreeCashFlow",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "ocfCapexChart",
+  "series": [
+   {
+    "label": "Operating cash flow",
+    "column": "OperatingCashFlow",
+    "kind": "bar"
+   },
+   {
+    "label": "CapEx",
+    "column": "CapEx",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "cashDebtChart",
+  "series": [
+   {
+    "label": "Cash & equivalents",
+    "column": "CashAndEquivalents",
+    "kind": "bar"
+   },
+   {
+    "label": "Total debt",
+    "column": "TotalDebt",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "balanceChart",
+  "series": [
+   {
+    "label": "Total assets",
+    "column": "TotalAssets",
+    "kind": "line"
+   },
+   {
+    "label": "Shareholders' equity",
+    "column": "ShareholdersEquity",
+    "kind": "line"
+   },
+   {
+    "label": "Total liabilities",
+    "column": "TotalLiabilities",
+    "kind": "line"
+   }
+  ]
+ },
+ {
+  "id": "sbcChart",
+  "series": [
+   {
+    "label": "Stock-based comp",
+    "column": "StockBasedComp",
+    "kind": "bar"
+   },
+   {
+    "label": "Shares outstanding (m)",
+    "column": "SharesOutstanding",
+    "kind": "line",
+    "axis": "y1"
+   }
+  ],
+  "y1_title": "shares (m)"
+ }
+];
+const chartData = {
+ "revenueChart": {
+  "annual": {
+   "labels": [
+    "FY07",
+    "FY08",
+    "FY09",
+    "FY10",
+    "FY11",
+    "FY12",
+    "FY13",
+    "FY14",
+    "FY15",
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25"
+   ],
+   "data": [
+    [
+     null,
+     1645.0,
+     1729.3,
+     1864.2,
+     2134.7,
+     2520.3,
+     3179.6,
+     4626.5,
+     5392.4,
+     5680.5,
+     6249.0,
+     6934.0,
+     7195.0,
+     7003.6,
+     8209.4,
+     8550.6,
+     10072.0,
+     11555.0,
+     13942.0
+    ],
+    [
+     null,
+     null,
+     5.124620060790271,
+     7.800844272248892,
+     14.510245681793787,
+     18.063428116362974,
+     26.15958417648691,
+     45.50572399043905,
+     16.554630930509013,
+     5.342704547140427,
+     10.007921837866384,
+     10.961753880620899,
+     3.7640611479665416,
+     -2.660180681028487,
+     17.216859900622524,
+     4.156211172558296,
+     17.79290342198208,
+     14.723987291501192,
+     20.65772392903505
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "quarterly",
+   "labels": [
+    "Q2'09",
+    "Q3'09",
+    "Q1'10",
+    "Q2'10",
+    "Q3'10",
+    "Q4'10",
+    "Q1'11",
+    "Q2'11",
+    "Q3'11",
+    "Q4'11",
+    "Q1'12",
+    "Q2'12",
+    "Q3'12",
+    "Q4'12",
+    "Q1'13",
+    "Q2'13",
+    "Q3'13",
+    "Q4'13",
+    "Q1'14",
+    "Q2'14",
+    "Q3'14",
+    "Q4'14",
+    "Q1'15",
+    "Q2'15",
+    "Q3'15",
+    "Q4'15",
+    "Q1'16",
+    "Q2'16",
+    "Q3'16",
+    "Q4'16",
+    "Q1'17",
+    "Q2'17",
+    "Q3'17",
+    "Q4'17",
+    "Q1'18",
+    "Q2'18",
+    "Q3'18",
+    "Q4'18",
+    "Q1'19",
+    "Q2'19",
+    "Q3'19",
+    "Q4'19",
+    "Q1'20",
+    "Q2'20",
+    "Q3'20",
+    "Q4'20",
+    "Q1'21",
+    "Q2'21",
+    "Q3'21",
+    "Q1'22",
+    "Q2'22",
+    "Q3'22",
+    "Q1'23",
+    "Q2'23",
+    "Q3'23",
+    "Q1'24",
+    "Q2'24",
+    "Q3'24",
+    "Q1'25",
+    "Q2'25",
+    "Q3'25",
+    "Q1'26",
+    "Q2'26"
+   ],
+   "data": [
+    [
+     453.6,
+     439.5,
+     482.4,
+     459.5,
+     463.2,
+     459.1,
+     447.4,
+     546.1,
+     562.8,
+     578.4,
+     546.8,
+     649.9,
+     650.4,
+     673.2,
+     674.1,
+     779.5,
+     835.8,
+     890.2,
+     915.0,
+     1179.3,
+     1286.8,
+     1245.4,
+     1231.3,
+     1371.4,
+     1454.8,
+     1334.9,
+     1300.4,
+     1427.1,
+     1482.3,
+     1385.0,
+     1646.4,
+     1489.5,
+     1593.7,
+     1519.4,
+     1837.7,
+     1660.4,
+     1778.5,
+     1657.4,
+     1990.6,
+     1657.8,
+     1825.2,
+     1721.4,
+     1866.9,
+     1584.0,
+     1849.1,
+     1703.6,
+     2165.0,
+     1933.5,
+     2138.2,
+     2435.3,
+     2043.0,
+     2044.0,
+     2706.1,
+     2441.9,
+     2492.0,
+     3256.7,
+     2775.4,
+     2806.8,
+     3727.0,
+     3222.0,
+     3365.6,
+     4758.0,
+     4003.0
+    ],
+    [
+     null,
+     null,
+     null,
+     1.300705467372129,
+     5.392491467576789,
+     null,
+     -7.255389718076286,
+     18.846572361262247,
+     21.502590673575124,
+     25.98562404704856,
+     22.217255252570403,
+     19.007507782457417,
+     15.565031982942438,
+     16.390041493775946,
+     23.2809070958303,
+     19.94152946607171,
+     28.50553505535055,
+     32.234105763517526,
+     35.736537605696476,
+     51.28928800513148,
+     53.960277578368036,
+     39.901145809930355,
+     34.56830601092896,
+     16.289324175358274,
+     13.055641902393536,
+     7.1864461217279585,
+     5.611954844473333,
+     4.061542948811421,
+     1.8902941985152597,
+     3.7530901191100385,
+     26.607197785296833,
+     4.372503678789159,
+     7.515347770356884,
+     9.70397111913358,
+     11.619290573372203,
+     11.47364887546157,
+     11.59565790299303,
+     9.082532578649467,
+     8.320182837242198,
+     -0.15658877378945654,
+     2.625808265392187,
+     3.861469771931941,
+     -6.214206771827581,
+     -4.451682953311615,
+     1.3094455402147633,
+     -1.034042058789368,
+     15.967646901280192,
+     22.064393939393938,
+     15.63463306473419,
+     12.484988452655896,
+     5.663304887509697,
+     -4.405574782527352,
+     11.119779903913264,
+     19.525208027410677,
+     21.91780821917808,
+     20.346624293263364,
+     13.657397927843073,
+     12.632423756019268,
+     14.440998556821327,
+     16.091374216329175,
+     19.908792931452176,
+     27.66299973168768,
+     24.239602731222842
+    ]
+   ]
+  }
+ },
+ "marginsChart": {
+  "annual": {
+   "labels": [
+    "FY07",
+    "FY08",
+    "FY09",
+    "FY10",
+    "FY11",
+    "FY12",
+    "FY13",
+    "FY14",
+    "FY15",
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25"
+   ],
+   "data": [
+    [
+     null,
+     4.699088145896656,
+     7.436535014167582,
+     9.339126703143439,
+     6.750363048671945,
+     7.737174145935007,
+     8.447603472134862,
+     6.557873122230627,
+     6.616719827905943,
+     6.985300589736819,
+     7.702032325172027,
+     9.136140755696568,
+     9.295343988881166,
+     11.691130275858129,
+     11.045874241722903,
+     13.030664514770892,
+     9.630659253375695,
+     12.661185633924706,
+     10.715822694018074
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "quarterly",
+   "labels": [
+    "Q2'09",
+    "Q3'09",
+    "Q1'10",
+    "Q2'10",
+    "Q3'10",
+    "Q4'10",
+    "Q1'11",
+    "Q2'11",
+    "Q3'11",
+    "Q4'11",
+    "Q1'12",
+    "Q2'12",
+    "Q3'12",
+    "Q4'12",
+    "Q1'13",
+    "Q2'13",
+    "Q3'13",
+    "Q4'13",
+    "Q1'14",
+    "Q2'14",
+    "Q3'14",
+    "Q4'14",
+    "Q1'15",
+    "Q2'15",
+    "Q3'15",
+    "Q4'15",
+    "Q1'16",
+    "Q2'16",
+    "Q3'16",
+    "Q4'16",
+    "Q1'17",
+    "Q2'17",
+    "Q3'17",
+    "Q4'17",
+    "Q1'18",
+    "Q2'18",
+    "Q3'18",
+    "Q4'18",
+    "Q1'19",
+    "Q2'19",
+    "Q3'19",
+    "Q4'19",
+    "Q1'20",
+    "Q2'20",
+    "Q3'20",
+    "Q4'20",
+    "Q1'21",
+    "Q2'21",
+    "Q3'21",
+    "Q1'22",
+    "Q2'22",
+    "Q3'22",
+    "Q1'23",
+    "Q2'23",
+    "Q3'23",
+    "Q1'24",
+    "Q2'24",
+    "Q3'24",
+    "Q1'25",
+    "Q2'25",
+    "Q3'25",
+    "Q1'26",
+    "Q2'26"
+   ],
+   "data": [
+    [
+     9.656084656084655,
+     9.465301478953355,
+     6.053067993366501,
+     9.57562568008705,
+     9.974093264248705,
+     11.914615552167284,
+     3.3974072418417522,
+     7.635964109137521,
+     8.297796730632552,
+     7.0020746887966805,
+     5.13899049012436,
+     11.032466533312817,
+     9.486469864698648,
+     4.976232917409388,
+     6.008010680907877,
+     11.994868505452214,
+     8.925580282364201,
+     6.740058413839586,
+     5.387978142076502,
+     9.242771135419318,
+     7.27385763133354,
+     4.1352176007708366,
+     1.7786079753106472,
+     10.15750328131836,
+     9.162771514984879,
+     4.667016255899318,
+     3.575822823746539,
+     10.510826150935463,
+     8.284422856371854,
+     6.866425992779783,
+     13.896987366375122,
+     4.699563611950319,
+     6.964924389784777,
+     4.7058049229959185,
+     14.893617021276595,
+     6.920019272464466,
+     7.174585324711835,
+     7.077350066369011,
+     16.78388425600322,
+     6.64133188563156,
+     6.908831908831909,
+     5.722086673637737,
+     18.54946703090685,
+     9.703282828282827,
+     9.55059217997945,
+     8.347029819206387,
+     18.18475750577367,
+     10.437031290406,
+     10.527546534468245,
+     18.030632776249334,
+     13.954968184043077,
+     12.5146771037182,
+     17.98159713240457,
+     9.656415086612883,
+     11.264044943820224,
+     18.813522891270306,
+     10.283202421272609,
+     11.137238135955537,
+     19.02334317145157,
+     11.421477343265053,
+     8.102567149988115,
+     17.297183690626312,
+     8.093929552835373
+    ]
+   ]
+  }
+ },
+ "profitChart": {
+  "annual": {
+   "labels": [
+    "FY07",
+    "FY08",
+    "FY09",
+    "FY10",
+    "FY11",
+    "FY12",
+    "FY13",
+    "FY14",
+    "FY15",
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25"
+   ],
+   "data": [
+    [
+     null,
+     77.3,
+     128.6,
+     174.1,
+     144.1,
+     195.0,
+     268.6,
+     303.4,
+     356.8,
+     396.8,
+     481.3,
+     633.5,
+     668.8,
+     818.8,
+     906.8,
+     1114.2,
+     970.0,
+     1463.0,
+     1494.0
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "quarterly",
+   "labels": [
+    "Q2'09",
+    "Q3'09",
+    "Q1'10",
+    "Q2'10",
+    "Q3'10",
+    "Q4'10",
+    "Q1'11",
+    "Q2'11",
+    "Q3'11",
+    "Q4'11",
+    "Q1'12",
+    "Q2'12",
+    "Q3'12",
+    "Q4'12",
+    "Q1'13",
+    "Q2'13",
+    "Q3'13",
+    "Q4'13",
+    "Q1'14",
+    "Q2'14",
+    "Q3'14",
+    "Q4'14",
+    "Q1'15",
+    "Q2'15",
+    "Q3'15",
+    "Q4'15",
+    "Q1'16",
+    "Q2'16",
+    "Q3'16",
+    "Q4'16",
+    "Q1'17",
+    "Q2'17",
+    "Q3'17",
+    "Q4'17",
+    "Q1'18",
+    "Q2'18",
+    "Q3'18",
+    "Q4'18",
+    "Q1'19",
+    "Q2'19",
+    "Q3'19",
+    "Q4'19",
+    "Q1'20",
+    "Q2'20",
+    "Q3'20",
+    "Q4'20",
+    "Q1'21",
+    "Q2'21",
+    "Q3'21",
+    "Q1'22",
+    "Q2'22",
+    "Q3'22",
+    "Q1'23",
+    "Q2'23",
+    "Q3'23",
+    "Q1'24",
+    "Q2'24",
+    "Q3'24",
+    "Q1'25",
+    "Q2'25",
+    "Q3'25",
+    "Q1'26",
+    "Q2'26"
+   ],
+   "data": [
+    [
+     43.8,
+     41.6,
+     29.2,
+     44.0,
+     46.2,
+     54.7,
+     15.2,
+     41.7,
+     46.7,
+     40.5,
+     28.1,
+     71.7,
+     61.7,
+     33.5,
+     40.5,
+     93.5,
+     74.6,
+     60.0,
+     49.3,
+     109.0,
+     93.6,
+     51.5,
+     21.9,
+     139.3,
+     133.3,
+     62.3,
+     46.5,
+     150.0,
+     122.8,
+     95.1,
+     228.8,
+     70.0,
+     111.0,
+     71.5,
+     273.7,
+     114.9,
+     127.6,
+     117.3,
+     334.1,
+     110.1,
+     126.1,
+     98.5,
+     346.3,
+     153.7,
+     176.6,
+     142.2,
+     393.7,
+     201.8,
+     225.1,
+     439.1,
+     285.1,
+     255.8,
+     486.6,
+     235.8,
+     280.7,
+     612.7,
+     285.4,
+     312.6,
+     709.0,
+     368.0,
+     272.7,
+     823.0,
+     324.0
+    ]
+   ]
+  }
+ },
+ "epsDpsChart": {
+  "annual": {
+   "labels": [
+    "FY07",
+    "FY08",
+    "FY09",
+    "FY10",
+    "FY11",
+    "FY12",
+    "FY13",
+    "FY14",
+    "FY15",
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25"
+   ],
+   "data": [
+    [
+     null,
+     0.82,
+     1.28,
+     1.66,
+     1.28,
+     1.59,
+     2.06,
+     1.97,
+     2.06,
+     2.22,
+     2.64,
+     3.4,
+     3.52,
+     4.2,
+     4.37,
+     5.19,
+     4.42,
+     6.5,
+     5.74
+    ],
+    [
+     null,
+     1.28,
+     1.28,
+     1.28,
+     1.32,
+     1.36,
+     1.4,
+     1.44,
+     1.48,
+     1.52,
+     1.56,
+     1.64,
+     1.72,
+     1.8,
+     1.92,
+     2.04,
+     2.2,
+     2.4,
+     2.6
+    ]
+   ]
+  }
+ },
+ "fcfChart": {
+  "annual": {
+   "labels": [
+    "FY07",
+    "FY08",
+    "FY09",
+    "FY10",
+    "FY11",
+    "FY12",
+    "FY13",
+    "FY14",
+    "FY15",
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25"
+   ],
+   "data": [
+    [
+     null,
+     77.3,
+     128.6,
+     174.1,
+     144.1,
+     195.0,
+     268.6,
+     303.4,
+     356.8,
+     396.8,
+     481.3,
+     633.5,
+     668.8,
+     818.8,
+     906.8,
+     1114.2,
+     970.0,
+     1463.0,
+     1494.0
+    ],
+    [
+     null,
+     128.6,
+     188.0,
+     204.4,
+     238.1,
+     292.0,
+     256.29999999999995,
+     null,
+     null,
+     431.8,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "quarterly",
+   "labels": [
+    "Q2'09",
+    "Q3'09",
+    "Q1'10",
+    "Q2'10",
+    "Q3'10",
+    "Q4'10",
+    "Q1'11",
+    "Q2'11",
+    "Q3'11",
+    "Q4'11",
+    "Q1'12",
+    "Q2'12",
+    "Q3'12",
+    "Q4'12",
+    "Q1'13",
+    "Q2'13",
+    "Q3'13",
+    "Q4'13",
+    "Q1'14",
+    "Q2'14",
+    "Q3'14",
+    "Q4'14",
+    "Q1'15",
+    "Q2'15",
+    "Q3'15",
+    "Q4'15",
+    "Q1'16",
+    "Q2'16",
+    "Q3'16",
+    "Q4'16",
+    "Q1'17",
+    "Q2'17",
+    "Q3'17",
+    "Q4'17",
+    "Q1'18",
+    "Q2'18",
+    "Q3'18",
+    "Q4'18",
+    "Q1'19",
+    "Q2'19",
+    "Q3'19",
+    "Q4'19",
+    "Q1'20",
+    "Q2'20",
+    "Q3'20",
+    "Q4'20",
+    "Q1'21",
+    "Q2'21",
+    "Q3'21",
+    "Q1'22",
+    "Q2'22",
+    "Q3'22",
+    "Q1'23",
+    "Q2'23",
+    "Q3'23",
+    "Q1'24",
+    "Q2'24",
+    "Q3'24",
+    "Q1'25",
+    "Q2'25",
+    "Q3'25",
+    "Q1'26",
+    "Q2'26"
+   ],
+   "data": [
+    [
+     43.8,
+     41.6,
+     29.2,
+     44.0,
+     46.2,
+     54.7,
+     15.2,
+     41.7,
+     46.7,
+     40.5,
+     28.1,
+     71.7,
+     61.7,
+     33.5,
+     40.5,
+     93.5,
+     74.6,
+     60.0,
+     49.3,
+     109.0,
+     93.6,
+     51.5,
+     21.9,
+     139.3,
+     133.3,
+     62.3,
+     46.5,
+     150.0,
+     122.8,
+     95.1,
+     228.8,
+     70.0,
+     111.0,
+     71.5,
+     273.7,
+     114.9,
+     127.6,
+     117.3,
+     334.1,
+     110.1,
+     126.1,
+     98.5,
+     346.3,
+     153.7,
+     176.6,
+     142.2,
+     393.7,
+     201.8,
+     225.1,
+     439.1,
+     285.1,
+     255.8,
+     486.6,
+     235.8,
+     280.7,
+     612.7,
+     285.4,
+     312.6,
+     709.0,
+     368.0,
+     272.7,
+     823.0,
+     324.0
+    ],
+    [
+     null,
+     113.9,
+     -2.5,
+     79.1,
+     117.70000000000002,
+     null,
+     -16.700000000000003,
+     90.7,
+     76.3,
+     null,
+     -62.6,
+     99.0,
+     106.9,
+     null,
+     41.900000000000006,
+     -4.0000000000000036,
+     170.9,
+     null,
+     56.3,
+     108.40000000000002,
+     8.799999999999976,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   ]
+  }
+ },
+ "ocfCapexChart": {
+  "annual": {
+   "labels": [
+    "FY07",
+    "FY08",
+    "FY09",
+    "FY10",
+    "FY11",
+    "FY12",
+    "FY13",
+    "FY14",
+    "FY15",
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25"
+   ],
+   "data": [
+    [
+     null,
+     160.6,
+     211.5,
+     229.5,
+     284.0,
+     343.0,
+     349.9,
+     null,
+     null,
+     649.6,
+     854.2,
+     765.1,
+     1191.1,
+     1807.1,
+     1392.4,
+     1390.0,
+     2032.0,
+     2583.0,
+     1930.0
+    ],
+    [
+     null,
+     32.0,
+     23.5,
+     25.1,
+     45.9,
+     51.0,
+     93.6,
+     81.5,
+     99.0,
+     217.8,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "quarterly",
+   "labels": [
+    "Q2'09",
+    "Q3'09",
+    "Q1'10",
+    "Q2'10",
+    "Q3'10",
+    "Q4'10",
+    "Q1'11",
+    "Q2'11",
+    "Q3'11",
+    "Q4'11",
+    "Q1'12",
+    "Q2'12",
+    "Q3'12",
+    "Q4'12",
+    "Q1'13",
+    "Q2'13",
+    "Q3'13",
+    "Q4'13",
+    "Q1'14",
+    "Q2'14",
+    "Q3'14",
+    "Q4'14",
+    "Q1'15",
+    "Q2'15",
+    "Q3'15",
+    "Q4'15",
+    "Q1'16",
+    "Q2'16",
+    "Q3'16",
+    "Q4'16",
+    "Q1'17",
+    "Q2'17",
+    "Q3'17",
+    "Q4'17",
+    "Q1'18",
+    "Q2'18",
+    "Q3'18",
+    "Q4'18",
+    "Q1'19",
+    "Q2'19",
+    "Q3'19",
+    "Q4'19",
+    "Q1'20",
+    "Q2'20",
+    "Q3'20",
+    "Q4'20",
+    "Q1'21",
+    "Q2'21",
+    "Q3'21",
+    "Q1'22",
+    "Q2'22",
+    "Q3'22",
+    "Q1'23",
+    "Q2'23",
+    "Q3'23",
+    "Q1'24",
+    "Q2'24",
+    "Q3'24",
+    "Q1'25",
+    "Q2'25",
+    "Q3'25",
+    "Q1'26",
+    "Q2'26"
+   ],
+   "data": [
+    [
+     null,
+     118.0,
+     3.5,
+     86.1,
+     122.80000000000001,
+     null,
+     -8.4,
+     104.7,
+     89.3,
+     null,
+     -49.6,
+     112.6,
+     116.4,
+     null,
+     51.2,
+     22.599999999999994,
+     204.8,
+     null,
+     76.1,
+     130.70000000000002,
+     26.399999999999977,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     332.30000000000007,
+     null,
+     -217.6,
+     530.9,
+     191.3,
+     null,
+     -96.2,
+     515.8000000000001,
+     349.5,
+     null,
+     108.6,
+     693.6,
+     585.3999999999999,
+     null,
+     218.7,
+     470.2,
+     521.4,
+     216.6,
+     -76.19999999999999,
+     641.7,
+     428.5,
+     12.399999999999977,
+     897.1999999999999,
+     789.3,
+     119.5,
+     934.8,
+     872.0,
+     -424.0,
+     729.0,
+     957.0,
+     10.0
+    ],
+    [
+     null,
+     4.100000000000001,
+     6.0,
+     7.0,
+     5.100000000000001,
+     null,
+     8.3,
+     14.0,
+     12.999999999999996,
+     null,
+     13.0,
+     13.600000000000001,
+     9.5,
+     null,
+     9.3,
+     26.599999999999998,
+     33.9,
+     null,
+     19.8,
+     22.3,
+     17.6,
+     null,
+     17.8,
+     27.7,
+     26.299999999999997,
+     null,
+     61.9,
+     41.199999999999996,
+     35.70000000000002,
+     null,
+     29.3,
+     36.3,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   ]
+  }
+ },
+ "cashDebtChart": {
+  "annual": {
+   "labels": [
+    "FY07",
+    "FY08",
+    "FY09",
+    "FY10",
+    "FY11",
+    "FY12",
+    "FY13",
+    "FY14",
+    "FY15",
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25"
+   ],
+   "data": [
+    [
+     255.9,
+     194.4,
+     205.9,
+     249.8,
+     291.2,
+     302.1,
+     298.1,
+     314.4,
+     480.4,
+     545.5,
+     681.2,
+     607.2,
+     604.8,
+     664.6,
+     402.6,
+     738.4,
+     null,
+     null,
+     null
+    ],
+    [
+     null,
+     null,
+     550.0,
+     550.0,
+     675.0,
+     725.0,
+     825.0,
+     2125.0,
+     2071.7,
+     2144.6,
+     2691.9,
+     3091.4,
+     3816.1,
+     4266.0,
+     5810.2,
+     5562.8,
+     7006.0,
+     12732.0,
+     12873.0
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "quarterly",
+   "labels": [
+    "Q2'09",
+    "Q3'09",
+    "Q1'10",
+    "Q2'10",
+    "Q3'10",
+    "Q4'10",
+    "Q1'11",
+    "Q2'11",
+    "Q3'11",
+    "Q4'11",
+    "Q1'12",
+    "Q2'12",
+    "Q3'12",
+    "Q4'12",
+    "Q1'13",
+    "Q2'13",
+    "Q3'13",
+    "Q4'13",
+    "Q1'14",
+    "Q2'14",
+    "Q3'14",
+    "Q4'14",
+    "Q1'15",
+    "Q2'15",
+    "Q3'15",
+    "Q4'15",
+    "Q1'16",
+    "Q2'16",
+    "Q3'16",
+    "Q4'16",
+    "Q1'17",
+    "Q2'17",
+    "Q3'17",
+    "Q4'17",
+    "Q1'18",
+    "Q2'18",
+    "Q3'18",
+    "Q4'18",
+    "Q1'19",
+    "Q2'19",
+    "Q3'19",
+    "Q4'19",
+    "Q1'20",
+    "Q2'20",
+    "Q3'20",
+    "Q4'20",
+    "Q1'21",
+    "Q2'21",
+    "Q3'21",
+    "Q1'22",
+    "Q2'22",
+    "Q3'22",
+    "Q1'23",
+    "Q2'23",
+    "Q3'23",
+    "Q1'24",
+    "Q2'24",
+    "Q3'24",
+    "Q1'25",
+    "Q2'25",
+    "Q3'25",
+    "Q1'26",
+    "Q2'26"
+   ],
+   "data": [
+    [
+     226.1,
+     237.9,
+     227.1,
+     230.0,
+     296.3,
+     null,
+     333.2,
+     263.2,
+     241.4,
+     null,
+     301.8,
+     282.1,
+     305.2,
+     null,
+     224.0,
+     240.0,
+     286.9,
+     null,
+     739.2,
+     973.5,
+     290.5,
+     null,
+     276.8,
+     321.7,
+     369.7,
+     null,
+     425.4,
+     411.1,
+     531.8,
+     null,
+     564.0,
+     587.8,
+     564.9,
+     null,
+     697.9,
+     652.2,
+     605.0,
+     null,
+     871.5,
+     512.3,
+     578.9,
+     null,
+     352.8,
+     349.7,
+     629.9,
+     null,
+     526.3,
+     3204.1,
+     2735.1,
+     734.4,
+     552.9,
+     629.8,
+     1345.7,
+     777.9,
+     857.6,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     null,
+     null,
+     null,
+     550.0,
+     550.0,
+     null,
+     675.0,
+     675.0,
+     675.0,
+     null,
+     675.0,
+     675.0,
+     725.0,
+     null,
+     725.0,
+     925.0,
+     825.0,
+     null,
+     1425.0,
+     2125.0,
+     2125.0,
+     null,
+     2125.0,
+     2125.0,
+     2125.0,
+     null,
+     2071.8,
+     2344.4,
+     2044.6,
+     null,
+     2144.7,
+     2644.8,
+     2741.7,
+     null,
+     2792.1,
+     3141.0,
+     3141.2,
+     null,
+     3690.3,
+     3815.6,
+     3815.8,
+     null,
+     4315.1,
+     4315.4,
+     4265.7,
+     null,
+     4366.3,
+     5712.2,
+     5072.4,
+     5760.9,
+     9.4,
+     9.3,
+     6022.1,
+     6022.9,
+     6023.6,
+     7989.6,
+     7790.9,
+     7791.9,
+     12419.8,
+     12097.9,
+     12100.9,
+     12077.0,
+     11955.0
+    ]
+   ]
+  }
+ },
+ "balanceChart": {
+  "annual": {
+   "labels": [
+    "FY07",
+    "FY08",
+    "FY09",
+    "FY10",
+    "FY11",
+    "FY12",
+    "FY13",
+    "FY14",
+    "FY15",
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25"
+   ],
+   "data": [
+    [
+     null,
+     null,
+     3250.3,
+     3596.0,
+     4483.5,
+     5352.3,
+     6860.5,
+     10010.0,
+     10913.8,
+     13528.2,
+     14909.7,
+     16334.0,
+     19634.8,
+     22331.4,
+     33236.1,
+     38358.4,
+     51616.0,
+     64255.0,
+     70665.0
+    ],
+    [
+     715.5,
+     738.5,
+     892.9,
+     1106.7,
+     1243.6,
+     1672.8,
+     2114.8,
+     3305.1,
+     3688.2,
+     3775.5,
+     4299.7,
+     4569.7,
+     5215.5,
+     6232.7,
+     8560.1,
+     9190.0,
+     10815.0,
+     20154.0,
+     23321.0
+    ],
+    [
+     null,
+     null,
+     2357.4,
+     2489.3,
+     3239.9,
+     3693.7,
+     4775.0,
+     6704.9,
+     7222.3,
+     7833.8,
+     10610.0,
+     11764.3,
+     14419.3,
+     16098.7,
+     24784.9,
+     29168.2,
+     40800.5,
+     44075.0,
+     47318.0
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "quarterly",
+   "labels": [
+    "Q2'09",
+    "Q3'09",
+    "Q1'10",
+    "Q2'10",
+    "Q3'10",
+    "Q4'10",
+    "Q1'11",
+    "Q2'11",
+    "Q3'11",
+    "Q4'11",
+    "Q1'12",
+    "Q2'12",
+    "Q3'12",
+    "Q4'12",
+    "Q1'13",
+    "Q2'13",
+    "Q3'13",
+    "Q4'13",
+    "Q1'14",
+    "Q2'14",
+    "Q3'14",
+    "Q4'14",
+    "Q1'15",
+    "Q2'15",
+    "Q3'15",
+    "Q4'15",
+    "Q1'16",
+    "Q2'16",
+    "Q3'16",
+    "Q4'16",
+    "Q1'17",
+    "Q2'17",
+    "Q3'17",
+    "Q4'17",
+    "Q1'18",
+    "Q2'18",
+    "Q3'18",
+    "Q4'18",
+    "Q1'19",
+    "Q2'19",
+    "Q3'19",
+    "Q4'19",
+    "Q1'20",
+    "Q2'20",
+    "Q3'20",
+    "Q4'20",
+    "Q1'21",
+    "Q2'21",
+    "Q3'21",
+    "Q1'22",
+    "Q2'22",
+    "Q3'22",
+    "Q1'23",
+    "Q2'23",
+    "Q3'23",
+    "Q1'24",
+    "Q2'24",
+    "Q3'24",
+    "Q1'25",
+    "Q2'25",
+    "Q3'25",
+    "Q1'26",
+    "Q2'26"
+   ],
+   "data": [
+    [
+     null,
+     null,
+     null,
+     3555.8,
+     3460.7,
+     null,
+     3691.1,
+     4581.9,
+     4247.2,
+     null,
+     4602.7,
+     5133.6,
+     5009.3,
+     null,
+     5225.1,
+     5562.1,
+     5970.2,
+     null,
+     7275.6,
+     10019.3,
+     9988.0,
+     null,
+     9730.9,
+     10716.1,
+     10510.4,
+     null,
+     10712.6,
+     11384.3,
+     11200.3,
+     null,
+     11780.6,
+     12569.6,
+     12810.4,
+     null,
+     16127.5,
+     16230.5,
+     16114.7,
+     null,
+     18631.4,
+     19200.3,
+     19173.8,
+     null,
+     20836.5,
+     21306.2,
+     21814.9,
+     null,
+     24414.5,
+     27817.2,
+     26915.8,
+     42897.5,
+     39850.8,
+     38517.2,
+     45094.4,
+     54365.2,
+     53203.9,
+     60975.9,
+     63007.7,
+     57242.7,
+     74096.0,
+     80123.0,
+     79067.9,
+     78301.0,
+     81808.0
+    ],
+    [
+     null,
+     null,
+     null,
+     965.4,
+     1011.4,
+     null,
+     1147.1,
+     1202.8,
+     1219.3,
+     null,
+     1356.6,
+     1472.9,
+     1636.2,
+     null,
+     1664.7,
+     1702.0,
+     1932.2,
+     null,
+     2144.2,
+     3249.6,
+     3256.0,
+     null,
+     3145.2,
+     3638.5,
+     3652.4,
+     null,
+     3597.1,
+     3599.9,
+     3686.5,
+     null,
+     3662.5,
+     3844.7,
+     4110.0,
+     null,
+     4584.5,
+     4513.1,
+     4612.7,
+     null,
+     4958.2,
+     4947.8,
+     4912.0,
+     null,
+     5070.1,
+     5534.5,
+     5818.2,
+     null,
+     6779.5,
+     8354.0,
+     8470.1,
+     9043.1,
+     8861.8,
+     8629.1,
+     9858.3,
+     10440.0,
+     10510.0,
+     11344.2,
+     11599.3,
+     12209.6,
+     22354.0,
+     23056.0,
+     23205.8,
+     23802.0,
+     23717.0
+    ],
+    [
+     null,
+     null,
+     null,
+     2590.4,
+     2449.3,
+     null,
+     2544.0,
+     3379.1,
+     3027.9,
+     null,
+     3246.1,
+     3660.7,
+     3373.1,
+     null,
+     3560.4,
+     3860.1,
+     4038.0,
+     null,
+     5131.4,
+     6769.7,
+     6732.0,
+     null,
+     6511.3,
+     7004.6,
+     6802.5,
+     null,
+     7060.3,
+     7728.5,
+     7459.1,
+     null,
+     8053.3,
+     8659.6,
+     8638.2,
+     null,
+     11543.0,
+     11717.4,
+     11502.0,
+     null,
+     13673.2,
+     14252.5,
+     14261.8,
+     null,
+     15766.4,
+     15771.7,
+     15996.7,
+     null,
+     17635.0,
+     19463.2,
+     18445.7,
+     34118.4,
+     31128.6,
+     30038.7,
+     35236.1,
+     43925.2,
+     42693.9,
+     49631.7,
+     51408.4,
+     45033.1,
+     51742.0,
+     57066.3,
+     55831.0,
+     54499.0,
+     58061.0
+    ]
+   ]
+  }
+ },
+ "sbcChart": {
+  "annual": {
+   "labels": [
+    "FY07",
+    "FY08",
+    "FY09",
+    "FY10",
+    "FY11",
+    "FY12",
+    "FY13",
+    "FY14",
+    "FY15",
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25"
+   ],
+   "data": [
+    [
+     null,
+     11.4,
+     9.9,
+     9.0,
+     14.3,
+     7.5,
+     7.7,
+     10.6,
+     11.2,
+     14.7,
+     17.3,
+     13.7,
+     14.0,
+     13.6,
+     13.4,
+     24.4,
+     31.0,
+     42.0,
+     49.0
+    ],
+    [
+     null,
+     null,
+     102.5,
+     108.4,
+     114.7,
+     125.6,
+     133.6,
+     164.6,
+     176.9,
+     178.3,
+     181.0,
+     184.0,
+     188.1,
+     193.7,
+     208.5,
+     211.9,
+     216.7,
+     250.0,
+     257.0
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "quarterly",
+   "labels": [
+    "Q2'09",
+    "Q3'09",
+    "Q1'10",
+    "Q2'10",
+    "Q3'10",
+    "Q4'10",
+    "Q1'11",
+    "Q2'11",
+    "Q3'11",
+    "Q4'11",
+    "Q1'12",
+    "Q2'12",
+    "Q3'12",
+    "Q4'12",
+    "Q1'13",
+    "Q2'13",
+    "Q3'13",
+    "Q4'13",
+    "Q1'14",
+    "Q2'14",
+    "Q3'14",
+    "Q4'14",
+    "Q1'15",
+    "Q2'15",
+    "Q3'15",
+    "Q4'15",
+    "Q1'16",
+    "Q2'16",
+    "Q3'16",
+    "Q4'16",
+    "Q1'17",
+    "Q2'17",
+    "Q3'17",
+    "Q4'17",
+    "Q1'18",
+    "Q2'18",
+    "Q3'18",
+    "Q4'18",
+    "Q1'19",
+    "Q2'19",
+    "Q3'19",
+    "Q4'19",
+    "Q1'20",
+    "Q2'20",
+    "Q3'20",
+    "Q4'20",
+    "Q1'21",
+    "Q2'21",
+    "Q3'21",
+    "Q1'22",
+    "Q2'22",
+    "Q3'22",
+    "Q1'23",
+    "Q2'23",
+    "Q3'23",
+    "Q1'24",
+    "Q2'24",
+    "Q3'24",
+    "Q1'25",
+    "Q2'25",
+    "Q3'25",
+    "Q1'26",
+    "Q2'26"
+   ],
+   "data": [
+    [
+     null,
+     null,
+     1.0,
+     null,
+     null,
+     null,
+     0.8,
+     0.9,
+     0.8,
+     null,
+     1.0,
+     1.1,
+     1.5,
+     null,
+     0.9,
+     1.5,
+     2.0,
+     null,
+     2.4,
+     null,
+     null,
+     null,
+     2.2,
+     null,
+     null,
+     null,
+     3.3,
+     null,
+     null,
+     null,
+     4.1,
+     null,
+     null,
+     null,
+     4.8,
+     null,
+     null,
+     null,
+     3.6,
+     null,
+     null,
+     null,
+     3.3,
+     null,
+     null,
+     null,
+     3.7,
+     null,
+     null,
+     2.4,
+     null,
+     null,
+     3.8,
+     null,
+     null,
+     11.1,
+     null,
+     null,
+     14.0,
+     null,
+     null,
+     17.0,
+     null
+    ],
+    [
+     null,
+     null,
+     null,
+     105.2,
+     106.0,
+     null,
+     110.3,
+     112.2,
+     112.9,
+     null,
+     118.3,
+     121.0,
+     124.4,
+     null,
+     126.8,
+     127.7,
+     131.5,
+     null,
+     135.1,
+     159.0,
+     161.4,
+     null,
+     166.7,
+     174.5,
+     176.7,
+     null,
+     177.1,
+     177.0,
+     177.9,
+     null,
+     179.5,
+     180.2,
+     180.8,
+     null,
+     182.1,
+     182.6,
+     183.7,
+     null,
+     185.3,
+     186.1,
+     186.5,
+     null,
+     189.6,
+     191.5,
+     192.3,
+     null,
+     195.9,
+     206.8,
+     207.3,
+     210.1,
+     210.3,
+     210.8,
+     214.2,
+     215.5,
+     215.9,
+     218.5,
+     219.1,
+     219.4,
+     256.1,
+     256.4,
+     256.8,
+     256.9,
+     256.3
+    ]
+   ]
+  }
+ }
+};
+
+const metricDescriptions = {
+ "balanceSheet": {
+  "title": "Balance sheet",
+  "content": "<p><strong>Shareholders' equity<\/strong> is assets less liabilities; plotted against <strong>total liabilities<\/strong> to show leverage.<\/p><div class=\"metric-highlight\"><strong>For Arthur J. Gallagher & Co.:<\/strong> equity that grows only through revaluations or share issues is not the same as retained earnings.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Liabilities growing faster than equity<\/li><li>Goodwill share of equity after acquisitions<\/li><\/ul>"
+ },
+ "cashDebt": {
+  "title": "Cash and debt",
+  "content": "<p><strong>Cash &amp; equivalents<\/strong> against <strong>total borrowings<\/strong> (leases excluded unless noted).<\/p><div class=\"metric-highlight\"><strong>For Arthur J. Gallagher & Co.:<\/strong> the DCF's net-debt bridge uses these balances at the latest balance-sheet date.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Net debt trend versus EBITDA<\/li><li>Refinancing dates and covenants in the filings<\/li><\/ul>"
+ },
+ "epsDps": {
+  "title": "EPS and dividends",
+  "content": "<p><strong>EPS<\/strong> is net income per share; <strong>DPS<\/strong> is the cash dividend paid per share. Both are in major currency units.<\/p><div class=\"metric-highlight\"><strong>For Arthur J. Gallagher & Co.:<\/strong> the payout ratio (DPS / EPS) shows how much of earnings is returned versus reinvested.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>EPS growth versus net income growth (dilution)<\/li><li>Dividends funded from earnings, not debt<\/li><\/ul>"
+ },
+ "fcf": {
+  "title": "Free cash flow",
+  "content": "<p><strong>Reported FCF<\/strong> is operating cash flow less capital expenditure. <strong>Owner FCF<\/strong> (from the DCF) further deducts stock-based compensation, interest income and lease principal -- the cash an owner could actually take out.<\/p><div class=\"metric-highlight\"><strong>For Arthur J. Gallagher & Co.:<\/strong> the gap between net income and owner FCF is the earnings-quality question the valuation is built on.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>FCF persistently below net income<\/li><li>Working-capital swings inflating one year's FCF<\/li><\/ul>"
+ },
+ "margins": {
+  "title": "Margins",
+  "content": "<p><strong>Gross margin<\/strong> is revenue less cost of revenue; <strong>operating margin<\/strong> deducts operating expenses; <strong>net margin<\/strong> is after interest and tax.<\/p><div class=\"metric-highlight\"><strong>For Arthur J. Gallagher & Co.:<\/strong> the spread between gross and operating margin is the cost of running the business; a widening spread with flat gross margin means opex is growing faster than sales.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Direction of operating margin over several years, not one<\/li><li>One-offs (impairments, disposals) that distort net margin<\/li><\/ul>"
+ },
+ "ocfCapex": {
+  "title": "Operating cash flow and CapEx",
+  "content": "<p><strong>Operating cash flow<\/strong> is cash generated by operations; <strong>CapEx<\/strong> is cash invested in fixed and intangible assets.<\/p><div class=\"metric-highlight\"><strong>For Arthur J. Gallagher & Co.:<\/strong> CapEx here is shown as stored (sign convention varies by ticker); the DCF splits it into stay-in-business and growth where disclosed.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>CapEx rising faster than revenue<\/li><li>OCF that diverges from EBITDA<\/li><\/ul>"
+ },
+ "profit": {
+  "title": "Profit lines",
+  "content": "<p><strong>Gross profit<\/strong> is revenue less cost of revenue; <strong>operating income<\/strong> deducts operating expenses; <strong>net income<\/strong> is after interest, tax and one-offs.<\/p><div class=\"metric-highlight\"><strong>For Arthur J. Gallagher & Co.:<\/strong> the three lines together show where margin is made and lost between the top line and the bottom.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Operating income growing slower than gross profit (opex creep)<\/li><li>Net income far from operating income (interest, tax, one-offs)<\/li><\/ul>"
+ },
+ "revenue": {
+  "title": "Revenue",
+  "content": "<p><strong>Revenue<\/strong> is the top line: what customers paid for goods and services in the period, before any costs.<\/p><div class=\"metric-highlight\"><strong>For Arthur J. Gallagher & Co.:<\/strong> the growth rate matters more than the level; compare it with the DCF's base-case growth path below.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Acceleration or deceleration in YoY growth<\/li><li>Whether growth is organic or acquired<\/li><li>Interim rows show seasonality<\/li><\/ul>"
+ },
+ "sbc": {
+  "title": "Stock-based compensation and share count",
+  "content": "<p><strong>Stock-based comp<\/strong> is the expense of equity awards; <strong>shares outstanding<\/strong> shows the dilution it causes net of buybacks.<\/p><div class=\"metric-highlight\"><strong>For Arthur J. Gallagher & Co.:<\/strong> the DCF charges SBC as a cash cost and holds the share count flat, so this chart is the check on that assumption.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Share count rising while buybacks are advertised<\/li><li>SBC as a percentage of revenue<\/li><\/ul>"
+ }
+};
+
+// ============================================================
+// OVERVIEW & GUIDANCE
+// ============================================================
+function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function renderGuidance() {
+    const g = analysis.guidance;
+    const section = document.getElementById('guidanceSection');
+    if (!g || !g.items || g.items.length === 0) { section.style.display = 'none'; return; }
+    document.getElementById('guidanceAsOf').textContent = g.as_of || '';
+    document.getElementById('guidanceFY').textContent = g.fiscal_year || '';
+    document.getElementById('guidanceGrid').innerHTML = g.items.map(item => {
+        const vp = item.vs_prior ? String(item.vs_prior) : '';
+        const vsClass = vp ? (vp.toLowerCase().replace(/[^a-z]/g, '') || 'na') : 'new';
+        const vsLabel = vp ? (vp === 'n/a' ? 'N/A' : vp.charAt(0).toUpperCase() + vp.slice(1)) : 'New';
+        return `<div class="guidance-card">
+            <div class="guidance-metric">${esc(item.metric)}</div>
+            <div class="guidance-target">${esc(item.target)}</div>
+            <div class="guidance-period">${esc(item.period)}</div>
+            <span class="guidance-vs-prior ${vsClass}">${esc(vsLabel)}</span>
+            ${item.notes ? `<div class="guidance-notes">${esc(item.notes)}</div>` : ''}
+        </div>`;
+    }).join('');
+    const c = document.getElementById('guidanceCommentary');
+    if (g.management_commentary) { c.textContent = g.management_commentary; c.style.display = 'block'; }
+    else { c.style.display = 'none'; }
+}
+
+function renderOverview() {
+    const bm = analysis.business_model || {};
+    const cp = analysis.competitive_position || {};
+    const risks = analysis.risks || {};
+    const cats = { business: 'Business', financial: 'Financial', regulatory: 'Regulatory', macro: 'Macro', execution: 'Execution' };
+    const allRisks = [];
+    for (const k of Object.keys(risks)) {
+        (risks[k] || []).forEach(r => allRisks.push({ ...r, cat: cats[k] || k }));
+    }
+    const sevClass = s => s === 'high' ? 'risk-high' : s === 'moderate' || s === 'medium' ? 'risk-moderate' : 'risk-low';
+    const trendClass = t => /grow/i.test(t || '') ? 'trend-growing' : /declin/i.test(t || '') ? 'trend-declining' : 'trend-stable';
+    const list = xs => (xs || []).map(x => `<li>${esc(x)}</li>`).join('');
+    document.getElementById('overviewGrid').innerHTML = `
+        <div class="overview-card"><h3>Company Overview</h3><p>${esc(analysis.overview)}</p></div>
+        <div class="overview-card"><h3>Business Model</h3><p>${esc(bm.summary)}</p>
+            <ul>${(bm.revenue_streams || []).map(r => `<li class="revenue-stream"><span>${esc(r.name)} <span class="${trendClass(r.trend)}">(${esc(r.trend)})</span></span><span class="percent">${r.percent != null ? esc(r.percent) + '%' : ''}</span></li>`).join('')}</ul></div>
+        <div class="overview-card"><h3>Competitive Position</h3>
+            <p><strong>Competitors:</strong> ${esc((cp.main_competitors || []).join(', '))}</p>
+            ${cp.market_position ? `<p>${esc(cp.market_position)}</p>` : ''}
+            <p><strong>Moat factors:</strong></p>
+            <ul>${(cp.moat_factors || []).map(m => `<li><strong>${esc(m.factor)}</strong> (${esc(m.strength)}) &mdash; ${esc(m.description)}</li>`).join('')}</ul></div>
+        <div class="overview-card"><h3>Growth Drivers</h3><ul>${list(analysis.growth_drivers)}</ul></div>
+        <div class="overview-card risks"><h3>Key Risks</h3>
+            <ul>${allRisks.map(r => `<li><span class="${sevClass(r.severity)}">&#9679; ${esc(String(r.severity || '').toUpperCase())}</span> [${esc(r.cat)}] <strong>${esc(r.risk)}</strong> &mdash; ${esc(r.description)}</li>`).join('')}</ul></div>
+        <div class="overview-card bull"><h3>Bull Case</h3><ul>${list(analysis.bull_case)}</ul></div>
+        <div class="overview-card bear"><h3>Bear Case</h3><ul>${list(analysis.bear_case)}</ul></div>
+        <div class="overview-card"><h3>Recent Developments</h3>
+            <ul>${(analysis.recent_developments || []).map(d => `<li><strong>${esc(d.date)}:</strong> ${esc(d.event)}</li>`).join('')}</ul></div>`;
+}
+
+function toggleOverview() {
+    document.querySelector('.overview-toggle').classList.toggle('active');
+    document.getElementById('overviewContent').classList.toggle('active');
+}
+
+// ============================================================
+// CHARTS
+// ============================================================
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } } },
+    scales: {
+        x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+// Every chart gets its OWN scales object so a log toggle changes only that chart.
+function freshScales() {
+    return { x: { ...chartDefaults.scales.x }, y: { ...chartDefaults.scales.y } };
+}
+const colors = {
+    primary: '#00d4aa', secondary: '#00b894', tertiary: '#0984e3',
+    quaternary: '#6c5ce7', warning: '#fdcb6e', danger: '#ff6b6b'
+};
+const palette = [colors.primary, colors.warning, colors.tertiary, colors.quaternary, colors.danger, colors.secondary];
+
+const chartRegistry = {};
+const chartSeries = {};
+
+// A brighter 2px grid line before each Q1 so a fiscal year reads as one group.
+function scaleXFor(labels, kind) {
+    const x = { ...chartDefaults.scales.x };
+    if (kind === 'quarterly') {
+        x.grid = {
+            color: ctx => (labels[ctx.index] || '').startsWith('Q1') ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.05)',
+            lineWidth: ctx => (labels[ctx.index] || '').startsWith('Q1') ? 2 : 1
+        };
+    }
+    return x;
+}
+
+function toggleLogScale(canvasId, btn) {
+    const chart = chartRegistry[canvasId];
+    if (!chart) return;
+    const toLog = chart.options.scales.y.type !== 'logarithmic';
+    chart.options.scales.y.type = toLog ? 'logarithmic' : 'linear';
+    btn.classList.toggle('active', toLog);
+    chart.update();
+}
+
+function setPeriodView(canvasId, view, btn) {
+    const chart = chartRegistry[canvasId], s = chartSeries[canvasId];
+    if (!chart || !s || !s[view]) return;
+    chart.data.labels = s[view].labels;
+    s[view].data.forEach((d, i) => { if (chart.data.datasets[i]) chart.data.datasets[i].data = d; });
+    if (chart.options.scales.x) chart.options.scales.x = s[view].scaleX;
+    btn.parentNode.querySelectorAll('.view-toggle').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    chart.update();
+}
+
+function buildChart(spec) {
+    const cd = chartData[spec.id];
+    const el = document.getElementById(spec.id);
+    if (!cd || !el) return;
+    const annual = cd.annual;
+    const hasY1 = spec.series.some(s => s.axis === 'y1');
+    const kindOf = s => s.kind || spec.type || 'bar';
+    const hasBars = spec.series.some(s => kindOf(s) === 'bar');
+    const datasets = spec.series.map((s, i) => {
+        const color = colors[s.color] || palette[i % palette.length];
+        const kind = kindOf(s);
+        // Chart.js paints ascending `order`, so lines need a LOWER order than
+        // bars to land on top of them -- otherwise a YoY line hides behind its bars.
+        const ds = { type: kind, label: s.label, data: annual.data[i], yAxisID: s.axis || 'y',
+                     spanGaps: true, order: (kind === 'bar' ? 100 : 0) + i };
+        if (kind === 'bar') { ds.backgroundColor = color; ds.borderRadius = 4; }
+        else {
+            ds.borderColor = color; ds.backgroundColor = spec.fill ? color.replace(')', ',0.15)').replace('rgb', 'rgba') : color;
+            ds.tension = 0.3; ds.fill = !!spec.fill;
+            if (hasBars) {
+                // Over bars a hairline disappears: give it weight and dotted
+                // points haloed in the card background so it stays legible.
+                ds.borderWidth = 3;
+                ds.pointRadius = 3.5;
+                ds.pointBackgroundColor = color;
+                ds.pointBorderColor = 'rgba(22, 26, 46, 0.9)';
+                ds.pointBorderWidth = 1.5;
+                ds.pointHoverRadius = 5.5;
+            }
+        }
+        return ds;
+    });
+    const scales = freshScales();
+    scales.x = scaleXFor(annual.labels, 'annual');
+    if (spec.y_title) scales.y.title = { display: true, text: spec.y_title, color: '#888' };
+    if (hasY1) {
+        scales.y.position = 'left';
+        scales.y1 = { position: 'right', ticks: { color: '#888' }, grid: { display: false } };
+        if (spec.y1_title) scales.y1.title = { display: true, text: spec.y1_title, color: '#888' };
+    }
+    const chart = new Chart(el.getContext('2d'), {
+        data: { labels: annual.labels, datasets: datasets },
+        options: { ...chartDefaults, scales: scales }
+    });
+    chartRegistry[spec.id] = chart;
+    chartSeries[spec.id] = { annual: { labels: annual.labels, data: annual.data, scaleX: scales.x } };
+    if (cd.interim) {
+        chartSeries[spec.id].interim = {
+            labels: cd.interim.labels, data: cd.interim.data, scaleX: scaleXFor(cd.interim.labels, cd.interim.kind)
+        };
+    }
+}
+
+function initCharts() { chartSpecs.forEach(buildChart); }
+
+// ============================================================
+// MODALS
+// ============================================================
+function openModal(key) {
+    const m = metricDescriptions[key];
+    if (!m) return;
+    document.getElementById('modalTitle').textContent = m.title;
+    document.getElementById('modalBody').innerHTML = m.content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ============================================================
+// DCF VALUATION
+// ============================================================
+let currentScenario = 'base';
+
+// Display symbols for currencies whose ISO code is not what a reader
+// expects to see against a share price. Anything not listed renders as its
+// own code, which is the right answer for USD/EUR/AUD/NZD-style tickers.
+const CURRENCY_SYMBOLS = { hkd: 'HK$', rmb: 'RMB', cny: 'RMB', usd: 'US$', gbp: '\u00a3', jpy: '\u00a5' };
+// Minor-unit quote codes are case-sensitive: GBp (pence) is not GBP (pounds).
+// A per-share figure in pence takes a 'p' suffix; lowercasing GBp to gbp
+// rendered WISE.L's 920p as "\u00a3920", 100x the real price.
+const PENCE_CODES = { GBp: 'p', GBX: 'p', ZAc: 'c' };
+function penceSuffix(code) {
+    return code ? (PENCE_CODES[String(code)] || null) : null;
+}
+function currencySymbol(code) {
+    if (!code) return null;
+    if (penceSuffix(code)) return '';
+    return CURRENCY_SYMBOLS[String(code).toLowerCase()] || String(code);
+}
+// PER-SHARE quantities (intrinsic value, weighted IV, entry price, current
+// price, every sensitivity cell) are denominated in the QUOTE currency,
+// because runEngine multiplies its model-currency result by quoteFxRate and
+// the analyst stores intrinsic_value in the quote currency too. The FLOWS
+// (owner FCF, net cash, the equity bridge) stay in inputs.currency and are
+// formatted by formatMoney, which is deliberately left alone. Labelling a
+// HKD share price "RMB192" is wrong by the 1.08 rate and invites a reader to
+// compare it against the RMB financials elsewhere on the page.
+function perShareCurrency() {
+    const inputs = (dcfData && dcfData.inputs) || {};
+    const quote = currencySymbol(inputs.quote_currency);   // '' for a pence quote, null if unset
+    if (quote !== null) return quote;
+    return currencySymbol(inputs.currency) || '$';
+}
+
+function fmtIV(v) {
+    const c = perShareCurrency();
+    if (v == null || !isFinite(v)) return '-';
+    const a = Math.abs(v);
+    const dp = a >= 100 ? 0 : a >= 10 ? 1 : a >= 1 ? 2 : 4;
+    const inputs = (dcfData && dcfData.inputs) || {};
+    const suffix = penceSuffix(inputs.quote_currency) || '';
+    return c + v.toFixed(dp) + suffix;
+}
+
+function scenarioDefaults(sc) {
+    const a = dcfData.assumptions;
+    const cur = a[sc] || a.base;
+    const growth = (Array.isArray(cur.growth_rates) && cur.growth_rates.length)
+        ? cur.growth_rates[0] : dcfData.historical_growth.selected_growth_rate;
+    return {
+        growth: growth,
+        wacc: cur.wacc != null ? cur.wacc : a.base.wacc,
+        terminal: cur.terminal_growth != null ? cur.terminal_growth : a.base.terminal_growth
+    };
+}
+
+// ---- Valuation engine --------------------------------------------------
+// Reproduces the analyst's model from `assumptions[scenario]` so the sliders
+// recompute real numbers. Three families, detected from the fields present:
+//   component    : revenue path x (ebitda margin - sbc - lease - D&A) -> tax ->
+//                  + D&A - capex + wc capture on revenue change (owner-fcf.md s2)
+//   sum-of-parts : component OpCo leg (WACC) + a second embedded-lender leg
+//                  (assumptions[sc].monee: book_growth/roa_path/cost_of_equity,
+//                  discounted separately at its own cost of equity) + surplus
+//                  net cash, for models where one FCF stream cannot price a
+//                  credit book (dcf-methods sum-of-the-parts routing)
+//   fcf-margin   : revenue path x fcf margin path
+//   fcf-growth   : last_fcf compounded along the growth path
+// Each is validated at the scenario's own defaults against
+// valuation[scenario].intrinsic_value; a family that cannot reproduce the
+// JSON within ENGINE_TOL is not trusted and the page falls back to the
+// generic scaler below. Displayed numbers are always the JSON's own at
+// defaults; the engine supplies the ratio when the sliders move.
+const ENGINE_TOL = 0.015;
+const dcfEngineStatus = {};
+
+function asPath(v, n, fallback) {
+    if (Array.isArray(v) && v.length) {
+        const out = v.slice(0, n).map(Number);
+        while (out.length < n) out.push(out[out.length - 1]);
+        return out;
+    }
+    if (typeof v === 'number') return Array(n).fill(v);
+    return fallback == null ? null : Array(n).fill(fallback);
+}
+function firstOf(a, names) {
+    for (const k of names) if (a[k] != null) return a[k];
+    return null;
+}
+function growthPathOf(a) {
+    const g = firstOf(a, ['growth_rates', 'revenue_growth_pct_path', 'revenue_growth_rates', 'revenue_growth_pct', 'growth_rate']);
+    if (Array.isArray(g) && g.length) return g.map(Number);
+    if (typeof g === 'number') return Array(a.horizon_years || 5).fill(g);
+    return null;
+}
+function baseRevenueOf(sc, g0) {
+    const inputs = dcfData.inputs || {};
+    const proj = (dcfData.projections || {})[sc];
+    if (proj && Array.isArray(proj.revenue) && proj.revenue.length && isFinite(g0)) return proj.revenue[0] / (1 + g0 / 100);
+    for (const k of ['last_revenue', 'revenue', 'base_revenue']) if (inputs[k] != null) return Number(inputs[k]);
+    for (const k of Object.keys(inputs)) if (/^revenue_fy\d{4}$/.test(k)) return Number(inputs[k]);
+    return null;
+}
+// A separately-valued stream that the operating sliders deliberately do not
+// drive: a payment processor's merchant settlement float (ADYEN.AS) is valued
+// on its own interest spread, not on the operating growth path. It is a real
+// term in the equity bridge, so an engine that omits it undershoots and
+// silently falls back to the toy model. Read from valuation[sc] because that
+// is where the analyst records the already-discounted value.
+function sideStreamValue(sc) {
+    const v = (dcfData.valuation || {})[sc] || {};
+    const n = Number(firstOf(v, ['merchant_float_value', 'float_value', 'side_stream_value',
+                                'non_operating_assets']));
+    return isFinite(n) ? n : 0;
+}
+function engineFamily(sc) {
+    const a = (dcfData.assumptions || {})[sc];
+    if (!a) return null;
+    const g = growthPathOf(a);
+    if (!g) return null;
+    const hasMargin = firstOf(a, ['ebitda_margin_path', 'ebitda_margin_path_pct', 'ebitda_margin']) != null;
+    if (hasMargin && a.monee && baseRevenueOf(sc, g[0]) != null) return 'sum-of-parts';
+    if (hasMargin && baseRevenueOf(sc, g[0]) != null) return 'component';
+    if (firstOf(a, ['fcf_margin', 'fcf_margins', 'fcf_margin_path']) != null && baseRevenueOf(sc, g[0]) != null) return 'fcf-margin';
+    if ((dcfData.inputs || {}).last_fcf != null) return 'fcf-growth';
+    return null;
+}
+// Second, independently-discounted leg for sum-of-the-parts DCFs: an
+// embedded lender/insurer valued on distributable earnings (post-tax
+// earnings less a fixed share of loan/book growth retained as capital) at
+// its own cost of equity, not the OpCo WACC. Detected from assumptions[sc]
+// .monee = {book_growth[], roa_path[], capital_ratio_pct, cost_of_equity,
+// terminal_growth, exit_pe_cap}; book0 is backed out from
+// projections[sc].monee.loan_book_year_end[0] and the first book_growth
+// rate so the leg still works if the growth slider is not wired to it.
+function moneeLeg(sc) {
+    const a = (dcfData.assumptions || {})[sc] || {};
+    const m = a.monee;
+    const proj = ((dcfData.projections || {})[sc] || {}).monee;
+    if (!m || !proj || !Array.isArray(proj.loan_book_year_end) || !proj.loan_book_year_end.length) return null;
+    const bookGrowth = m.book_growth, roa = m.roa_path;
+    if (!Array.isArray(bookGrowth) || !Array.isArray(roa)) return null;
+    const n = bookGrowth.length;
+    const coe = Number(m.cost_of_equity);
+    const capRatio = Number(m.capital_ratio_pct || 0);
+    if (!isFinite(coe)) return null;
+    let book = proj.loan_book_year_end[0] / (1 + bookGrowth[0] / 100);
+    const distrib = [];
+    for (let i = 0; i < n; i++) {
+        const prev = book;
+        book *= (1 + bookGrowth[i] / 100);
+        const avgBook = (book + prev) / 2;
+        const earnings = avgBook * roa[i] / 100;
+        const retained = (book - prev) * capRatio / 100;
+        distrib.push(earnings - retained);
+    }
+    const tg = Number(m.terminal_growth), cap = Number(m.exit_pe_cap || 12);
+    const last = distrib[n - 1];
+    const gordon = (coe - tg) > 0 ? last * (1 + tg / 100) / ((coe - tg) / 100) : last * cap;
+    const tv = Math.max(0, Math.min(gordon, last * cap));
+    return { distrib: distrib, tv: tv, coe: coe, n: n };
+}
+// Shift the growth path by the slider delta at year 1, tapering to zero by
+// the final year so the long-run rate is untouched.
+function shiftedGrowth(path, startGrowth) {
+    if (startGrowth == null || !isFinite(startGrowth)) return path.slice();
+    const n = path.length, delta = startGrowth - path[0];
+    return path.map((g, i) => i === 0 ? startGrowth : g + delta * Math.max(0, 1 - i / Math.max(1, n - 1)));
+}
+// The engine builds value out of the PROJECTIONS, so its result is
+// denominated in the model currency (inputs.currency). The headline
+// `intrinsic_value` may be reported in the QUOTE currency instead -- for a
+// dual-listed filer the canonical-weighted-iv rule picks the currency the
+// primary listing trades in (9999.HK: RMB financials, HKD per-share values).
+// Comparing the two directly fails by exactly the FX rate and silently drops
+// every scenario to the toy model. The rate is derived from the JSON's OWN
+// paired intrinsic_value_<cur> keys rather than any hardcoded assumption, so
+// it stays correct when the analyst refreshes FX, and returns 1 whenever the
+// two currencies agree or the pair is absent.
+function quoteFxRate(sc) {
+    const v = ((dcfData.valuation || {})[sc] || {});
+    const inputs = dcfData.inputs || {};
+    const model = String(inputs.currency || '').toLowerCase();
+    const quote = String(inputs.quote_currency || '').toLowerCase();
+    if (!model || !quote || model === quote) return 1;
+    const iv = Number(v.intrinsic_value);
+    const modelIv = Number(v['intrinsic_value_' + model]);
+    if (isFinite(iv) && isFinite(modelIv) && modelIv !== 0) return iv / modelIv;
+    return 1;
+}
+function runEngine(sc, ov) {
+    const family = engineFamily(sc);
+    if (!family) return null;
+    const a = dcfData.assumptions[sc], inputs = dcfData.inputs || {};
+    const wacc = (ov && ov.wacc != null) ? ov.wacc : a.wacc;
+    const tg = (ov && ov.terminal != null) ? ov.terminal : a.terminal_growth;
+    if (wacc == null || tg == null) return null;
+    const growth = shiftedGrowth(growthPathOf(a), ov && ov.growth);
+    const n = growth.length;
+    const fcfs = [];
+    if (family === 'fcf-growth') {
+        let f = Number(inputs.last_fcf);
+        for (let i = 0; i < n; i++) { f *= (1 + growth[i] / 100); fcfs.push(f); }
+    } else {
+        let rev = baseRevenueOf(sc, growth[0]);
+        if (family === 'fcf-margin') {
+            const m = asPath(firstOf(a, ['fcf_margins', 'fcf_margin_path', 'fcf_margin']), n);
+            for (let i = 0; i < n; i++) { rev *= (1 + growth[i] / 100); fcfs.push(rev * m[i] / 100); }
+        } else {
+            const m = asPath(firstOf(a, ['ebitda_margin_path', 'ebitda_margin_path_pct', 'ebitda_margin']), n);
+            const sbc = asPath(firstOf(a, ['sbc_pct_path', 'sbc_pct']), n, 0);
+            const lease = asPath(firstOf(a, ['lease_cost_pct', 'lease_cost_pct_path', 'lease_principal_pct_path', 'lease_principal_pct']), n, 0);
+            const da = asPath(firstOf(a, ['da_pct_path', 'da_pct']), n, 0);
+            const capex = asPath(firstOf(a, ['capex_pct_path', 'capex_pct']), n, 0);
+            const tax = asPath(firstOf(a, ['cash_tax_rate_path', 'cash_tax_rate_path_pct', 'cash_tax_rate', 'tax_rate']), n, 0);
+            const wc = Number(firstOf(a, ['wc_capture_pct']) || 0);
+            for (let i = 0; i < n; i++) {
+                const prev = rev;
+                rev *= (1 + growth[i] / 100);
+                const ebit = rev * (m[i] - sbc[i] - lease[i] - da[i]) / 100;
+                const nopat = ebit - Math.max(0, ebit) * tax[i] / 100;
+                fcfs.push(nopat + rev * da[i] / 100 - rev * capex[i] / 100 + (rev - prev) * wc / 100);
+            }
+        }
+    }
+    const cap = Number(firstOf(a, ['terminal_cap_multiple', 'terminal_fcf_multiple_cap', 'terminal_multiple_cap']) || 20);
+    const last = fcfs[n - 1];
+    // Terminal value depends on the discount rate through the Gordon spread
+    // (r - g), so it must be rebuilt at whichever rate is doing the
+    // discounting -- WACC for the intrinsic value, the entry-price hurdle
+    // rate for the entry price. Reusing the WACC-built `tv` for the hurdle
+    // leg overstated every slider-moved entry price (SPN.NZ: $4.38 vs the
+    // correct $3.51 at defaults for the same reason).
+    const tvAt = (rate) => {
+        const g = (rate - tg) > 0 ? last * (1 + tg / 100) / ((rate - tg) / 100) : last * cap;
+        return Math.max(0, Math.min(g, last * cap));
+    };
+    const tv = tvAt(wacc);
+    const netDebt = Number(inputs.net_debt || 0);
+    const shares = (inputs.projected_shares && inputs.projected_shares.length >= n)
+        ? Number(inputs.projected_shares[n - 1]) : Number(inputs.shares_outstanding);
+    if (!shares) return null;
+    const pv = (rate) => fcfs.reduce((s, f, i) => s + f / Math.pow(1 + rate / 100, i + 1), 0);
+    if (family === 'sum-of-parts') {
+        // The Monee (or equivalent embedded-lender) leg is not driven by the
+        // OpCo sliders: its own book-growth/ROA/cost-of-equity path is a
+        // separate, unlisted-elsewhere model the growth/WACC/terminal
+        // sliders intentionally do not touch (see the DCF section note).
+        const leg = moneeLeg(sc);
+        if (!leg) return null;
+        const pvLeg = (rate) => leg.distrib.reduce((s, f, i) => s + f / Math.pow(1 + rate / 100, i + 1), 0);
+        const moneeEquity = pvLeg(leg.coe) + leg.tv / Math.pow(1 + leg.coe / 100, leg.n);
+        const surplusCash = -netDebt;
+        const ev = pv(wacc) + tv / Math.pow(1 + wacc / 100, n);
+        const equityValue = ev + moneeEquity + surplusCash;
+        const hurdle = ((dcfData.entry_price || {}).hurdle_rate || 0.15) * 100;
+        const tvHurdle = tvAt(hurdle);
+        const entryEquity = pv(hurdle) + tvHurdle / Math.pow(1 + hurdle / 100, n)
+            + pvLeg(hurdle) + leg.tv / Math.pow(1 + hurdle / 100, leg.n) + surplusCash;
+        const fxSop = quoteFxRate(sc);
+        return { family: family, iv: equityValue / shares * fxSop,
+                 entryPrice: entryEquity / shares * fxSop,
+                 fcfList: fcfs, growthRates: growth };
+    }
+    const ev = pv(wacc) + tv / Math.pow(1 + wacc / 100, n);
+    const hurdle = ((dcfData.entry_price || {}).hurdle_rate || 0.15) * 100;
+    const side = sideStreamValue(sc);
+    const tvHurdle = tvAt(hurdle);
+    const entry = (pv(hurdle) + tvHurdle / Math.pow(1 + hurdle / 100, n) + side - netDebt) / shares;
+    const fx = quoteFxRate(sc);
+    return { family: family, iv: (ev + side - netDebt) / shares * fx, entryPrice: entry * fx, fcfList: fcfs, growthRates: growth };
+}
+function validateEngines() {
+    for (const sc of ['base', 'bull', 'bear']) {
+        const r = runEngine(sc);
+        const target = ((dcfData.valuation || {})[sc] || {}).intrinsic_value;
+        const ok = !!(r && target && isFinite(r.iv) && Math.abs(r.iv - target) <= ENGINE_TOL * Math.abs(target));
+        dcfEngineStatus[sc] = { family: r ? r.family : null, ok: ok, iv: r ? r.iv : null, target: target };
+    }
+}
+
+// Generic 5-year Gordon model: the fallback when no engine family validates
+// (older JSONs without component fields). Only ever used as a ratio.
+function toyDCF(startGrowth, wacc, terminalGrowth) {
+    const years = 5;
+    const hurdle = 0.15;
+    const inputs = dcfData.inputs;
+    let pvFCF = 0, pvFCFHurdle = 0, projectedFCF = inputs.last_fcf;
+    const endGrowth = 10;
+    for (let i = 0; i < years; i++) {
+        const yearGrowth = startGrowth > endGrowth ? startGrowth - (startGrowth - endGrowth) * (i / 4) : startGrowth;
+        projectedFCF *= (1 + yearGrowth / 100);
+        pvFCF += projectedFCF / Math.pow(1 + wacc / 100, i + 1);
+        pvFCFHurdle += projectedFCF / Math.pow(1 + hurdle, i + 1);
+    }
+    const spread = Math.max(wacc / 100 - terminalGrowth / 100, 0.005);
+    const terminalValue = projectedFCF * (1 + terminalGrowth / 100) / spread;
+    const pvTerminal = terminalValue / Math.pow(1 + wacc / 100, years);
+    const enterpriseValue = pvFCF + pvTerminal;
+    const equityValue = enterpriseValue - (inputs.net_debt || 0);
+    const exitShares = (inputs.projected_shares && inputs.projected_shares.length >= years)
+        ? inputs.projected_shares[years - 1]
+        : inputs.shares_outstanding * Math.pow(1 + (inputs.annual_share_growth_pct || 0) / 100, years);
+    return { iv: equityValue / exitShares,
+             entryPrice: (pvFCFHurdle + terminalValue / Math.pow(1 + hurdle, years) - (inputs.net_debt || 0)) / exitShares };
+}
+
+// The model behind the sliders for one scenario: the validated engine, else the toy.
+function calculateDCF(sc, growth, wacc, terminal) {
+    const st = dcfEngineStatus[sc];
+    if (st && st.ok) {
+        const r = runEngine(sc, { growth: growth, wacc: wacc, terminal: terminal });
+        if (r && isFinite(r.iv)) return r;
+    }
+    return toyDCF(growth, wacc, terminal);
+}
+
+function canScale() {
+    const i = dcfData.inputs || {};
+    return i.last_fcf != null && (i.shares_outstanding != null || (i.projected_shares && i.projected_shares.length));
+}
+
+// Anchor the selected scenario's stored number (iv | entry) and scale it by
+// the model's ratio when the sliders leave that scenario's defaults.
+function anchored(field, growth, wacc, terminal) {
+    const stored = (dcfAnchors[currentScenario] || {})[field];
+    const d = scenarioDefaults(currentScenario);
+    const atDefaults = growth === d.growth && wacc === d.wacc && terminal === d.terminal;
+    if (stored != null && atDefaults) return stored;
+    const st = dcfEngineStatus[currentScenario];
+    if (!(st && st.ok) && !canScale()) return stored;
+    const key = field === 'iv' ? 'iv' : 'entryPrice';
+    const now = calculateDCF(currentScenario, growth, wacc, terminal)[key];
+    if (stored == null) return now;
+    // The entry price is returned STRAIGHT from the engine once a slider has
+    // moved, never scaled onto the stored number. Every DCF JSON written
+    // before the terminal-value-at-hurdle fix has a stored entry_price built
+    // with the WACC terminal value, so `stored * (now / ref)` re-injects the
+    // very bug the engine corrects -- on the TPW fixture a correct 2.943
+    // comes back out as 3.254.
+    //
+    // IV keeps its anchor: it is not what that fix changed, and anchoring
+    // stops a tab click nudging the headline number off the JSON.
+    if (key === 'entryPrice') return now;
+    const ref = calculateDCF(currentScenario, d.growth, d.wacc, d.terminal)[key];
+    if (!ref || !isFinite(ref) || !isFinite(now)) return stored;
+    return stored * (now / ref);
+}
+
+function isWeightedLive() {
+    const pw = dcfData.probability_weighted || {};
+    const w = pw.weights, a = dcfData.assumptions;
+    if (!w || !a || !a.base || !a.bull || !a.bear) return false;
+    // Two different things are needed before the weighted IV may be rescaled.
+    //
+    // `ok` is strict: the engine reproduced the stored IV within ENGINE_TOL. An
+    // engine can miss that and still be perfectly usable for a RATIO -- it only
+    // has to move the same way the model does -- so `ok` alone is too harsh and
+    // would freeze the sliders on dashboards that model fine.
+    //
+    // What must not happen is trusting an engine that modelled NOTHING. A
+    // finite-mine DCF (SMI.NZ) has no FCF projection to discount: family
+    // resolves null and the engine returns ~0.027 against a 1.011 target. The
+    // ratio stored * (now / ref) then divides two meaningless near-zero numbers,
+    // and once ref crosses zero the sign flips -- which published a +0.919
+    // weighted IV as NZD-5.59 (-1017%) while the header still read +51%.
+    //
+    // canScale() cannot stand in for this: it only says the inputs for a
+    // proportional rescale exist (last_fcf + shares), which a pre-revenue miner
+    // burning cash still satisfies.
+    const engineModels = ['base', 'bull', 'bear'].every(sc => {
+        const st = dcfEngineStatus[sc];
+        return st && st.family && isFinite(st.iv) && st.iv > 0;
+    });
+    if (!engineModels) return false;
+    const total = (w.bull || 0) + (w.base || 0) + (w.bear || 0);
+    return Math.abs(total - 1) <= 0.001;
+}
+
+// Probability-weighted IV: the stored weighted_iv at the selected scenario's
+// defaults (so a tab click never moves it), scaled by re-weighting all three
+// scenarios with the user's slider deltas applied to each.
+function weightedIV(growth, wacc, terminal) {
+    const pw = dcfData.probability_weighted || {};
+    const stored = pw.weighted_iv;
+    if (stored == null || !isWeightedLive()) return stored;
+    const d = scenarioDefaults(currentScenario);
+    if (growth === d.growth && wacc === d.wacc && terminal === d.terminal) return stored;
+    const w = pw.weights;
+    const at = (g, k, t) => {
+        let sum = 0;
+        for (const sc of ['bull', 'base', 'bear']) {
+            const sd = scenarioDefaults(sc);
+            const sg = sd.growth + (g - d.growth), sk = sd.wacc + (k - d.wacc), st = sd.terminal + (t - d.terminal);
+            sum += w[sc] * calculateDCF(sc, sg, Math.max(sk, st + 0.5), st).iv;
+        }
+        return sum;
+    };
+    const ref = at(d.growth, d.wacc, d.terminal);
+    if (!ref || !isFinite(ref)) return stored;
+    const now = at(growth, wacc, terminal);
+    if (!now || !isFinite(now)) return stored;
+    return stored * (now / ref);
+}
+
+function renderHeaderValuation() {
+    const el = document.getElementById('headerValuation');
+    if (!el) return;
+    const pw = dcfData.probability_weighted || {};
+    const wiv = pw.weighted_iv, price = dcfData.current_price;
+    if (wiv == null || price == null) return;
+    // A price must be denominated like the IV that divides it (WISE.L: GBp
+    // quote vs USD model). Suppress the chip rather than print -98%.
+    const ratio = wiv / price;
+    if (ratio > 20 || ratio < 0.05) return;
+    const up = (wiv - price) / price * 100;
+    const cls = up >= 0 ? 'positive' : 'negative', sign = up >= 0 ? '+' : '';
+    el.innerHTML = `<div class="hv-item"><span class="hv-label">Prob-Weighted IV</span><span class="hv-value">${fmtIV(wiv)}</span></div>
+        <div class="hv-item"><span class="hv-label">Current Price</span><span class="hv-value">${fmtIV(price)}</span></div>
+        <div class="hv-item"><span class="hv-label">Upside</span><span class="hv-value ${cls}">${sign}${up.toFixed(0)}%</span></div>`;
+    el.style.display = 'flex';
+}
+
+function formatMoney(n) {
+    const inputs = dcfData.inputs || {};
+    const currency = inputs.currency || '$';
+    const units = inputs.units === 'millions' ? 'M' : inputs.units === 'billions' ? 'B' : '';
+    if (n == null || !isFinite(n)) return '-';
+    if (Math.abs(n) >= 1000 && inputs.units === 'millions') return currency + (n / 1000).toFixed(1) + 'B';
+    return currency + n.toFixed(1) + units;
+}
+
+function renderDCFInputs() {
+    const inputs = dcfData.inputs || {};
+    document.getElementById('baseFCF').textContent = formatMoney(inputs.last_fcf);
+    const sbcEl = document.getElementById('sbcBreakdown');
+    if (inputs.sbc_source === 'unavailable') {
+        sbcEl.innerHTML = '<span style="color:#fdcb6e">&#9888; SBC not disclosed &mdash; FCF unadjusted, IV overstated</span>';
+    } else if (inputs.sbc != null && inputs.reported_fcf != null) {
+        const sbcAmt = inputs.sbc_incl_equity_taxes != null ? inputs.sbc_incl_equity_taxes : inputs.sbc;
+        let parts = `${formatMoney(inputs.reported_fcf)} reported − ${formatMoney(sbcAmt)} SBC`;
+        if (inputs.interest_income) parts += ` − ${formatMoney(inputs.interest_income)} interest`;
+        if (inputs.lease_principal_paid) parts += ` − ${formatMoney(inputs.lease_principal_paid)} leases`;
+        sbcEl.textContent = parts;
+    } else {
+        sbcEl.textContent = 'Starting point for projections';
+    }
+    const shares = inputs.shares_outstanding;
+    document.getElementById('sharesOut').textContent = shares == null ? '-'
+        : shares >= 1000 ? (shares / 1000).toFixed(2) + 'B' : shares.toFixed(1) + 'M';
+    const g = inputs.annual_share_growth_pct;
+    document.getElementById('dilutionNote').textContent = (g > 0)
+        ? `+${g.toFixed(1)}%/yr from non-SBC issuance` : 'Flat — SBC expensed in cash flows';
+    const netDebt = inputs.net_debt;
+    const ndEl = document.getElementById('netDebt');
+    ndEl.textContent = netDebt == null ? '-' : (netDebt < 0 ? '-' : '') + formatMoney(Math.abs(netDebt));
+    if (netDebt < 0) ndEl.style.color = '#00d4aa';
+    renderFCFProjections();
+}
+
+// The analyst's own projection when present; otherwise the toy model's path.
+function renderFCFProjections() {
+    const table = document.getElementById('fcfProjectionTable');
+    const proj = dcfData.projections && dcfData.projections[currentScenario];
+    let values = null, years = [];
+    const st = dcfEngineStatus[currentScenario];
+    if (st && st.ok) {
+        const s = sliderValues();
+        const r = runEngine(currentScenario, { growth: s.growth, wacc: s.wacc, terminal: s.terminal });
+        if (r) {
+            values = r.fcfList;
+            years = (proj && Array.isArray(proj.years) && proj.years.length === values.length)
+                ? proj.years : values.map((_, i) => 'Yr ' + (i + 1));
+        }
+    }
+    if (!values && proj && Array.isArray(proj.owner_fcf || proj.fcf)) {
+        values = proj.owner_fcf || proj.fcf;
+        years = Array.isArray(proj.years) ? proj.years : values.map((_, i) => 'Yr ' + (i + 1));
+    } else if (proj && Array.isArray(proj)) {
+        values = proj.map(p => p.owner_fcf != null ? p.owner_fcf : p.fcf);
+        years = proj.map((p, i) => p.year || p.fiscal_year || ('Yr ' + (i + 1)));
+    }
+    if (!values || !values.length) {
+        const startGrowth = parseFloat(document.getElementById('growthSlider').value);
+        let fcf = dcfData.inputs.last_fcf;
+        values = [];
+        for (let i = 0; i < 5; i++) {
+            const rate = startGrowth > 10 ? startGrowth - (startGrowth - 10) * (i / 4) : startGrowth;
+            fcf = fcf * (1 + rate / 100);
+            values.push(fcf);
+            years.push('Year ' + (i + 1));
+        }
+    }
+    const base = dcfData.inputs.last_fcf;
+    const cols = [['Base', base, null]].concat(values.map((v, i) => [years[i], v, i === 0 ? base : values[i - 1]]));
+    table.style.gridTemplateColumns = `repeat(${cols.length}, 1fr)`;
+    let html = cols.map(c => `<div class="fcf-projection-item header">${esc(c[0])}</div>`).join('');
+    html += cols.map(c => {
+        const g = (c[2] != null && c[2] !== 0 && c[1] != null) ? ((c[1] - c[2]) / Math.abs(c[2]) * 100) : null;
+        return `<div class="fcf-projection-item"><div class="fcf-value">${formatMoney(c[1])}</div>
+            <div class="growth-rate">${g == null ? '-' : (g >= 0 ? '+' : '') + g.toFixed(0) + '%'}</div></div>`;
+    }).join('');
+    table.innerHTML = html;
+}
+
+function sliderValues() {
+    return {
+        growth: parseFloat(document.getElementById('growthSlider').value),
+        wacc: parseFloat(document.getElementById('waccSlider').value),
+        terminal: parseFloat(document.getElementById('terminalSlider').value)
+    };
+}
+
+window.updateDCFDisplay = function() {
+    const s = sliderValues();
+    document.getElementById('growthValue').textContent = s.growth + '%';
+    document.getElementById('waccValue').textContent = s.wacc + '%';
+    document.getElementById('terminalValue').textContent = s.terminal + '%';
+    renderFCFProjections();
+
+    const iv = anchored('iv', s.growth, s.wacc, s.terminal);
+    const entry = anchored('entry', s.growth, s.wacc, s.terminal);
+    const price = dcfData.current_price;
+    document.getElementById('dcfIV').textContent = fmtIV(iv);
+    document.getElementById('dcfEntry').textContent = fmtIV(entry);
+    const upEl = document.getElementById('dcfUpside');
+    if (iv != null && price) {
+        const up = (iv - price) / price * 100;
+        upEl.textContent = (up >= 0 ? '+' : '') + up.toFixed(0) + '% ' + (up >= 0 ? 'upside' : 'downside');
+        upEl.className = 'dcf-change ' + (up >= 0 ? 'positive' : 'negative');
+    }
+    const wiv = weightedIV(s.growth, s.wacc, s.terminal);
+    document.getElementById('dcfWeighted').textContent = fmtIV(wiv);
+    const wUpEl = document.getElementById('dcfWeightedUpside');
+    if (wiv != null && price) {
+        const wUp = (wiv - price) / price * 100;
+        wUpEl.textContent = (wUp >= 0 ? '+' : '') + wUp.toFixed(0) + '% ' + (wUp >= 0 ? 'upside' : 'downside');
+        wUpEl.className = 'dcf-change ' + (wUp >= 0 ? 'positive' : 'negative');
+    }
+    renderAssumptions(s, iv, entry);
+};
+
+function renderAssumptions(s, iv, entry) {
+    const a = dcfData.assumptions[currentScenario] || {};
+    const items = [['Year 1 Growth', s.growth + '%']];
+    if (Array.isArray(a.growth_rates) && a.growth_rates.length > 1) {
+        items.push([`Year ${a.growth_rates.length} Growth`, a.growth_rates[a.growth_rates.length - 1] + '%']);
+    }
+    for (const k of Object.keys(a)) {
+        if (/margin/.test(k) && Array.isArray(a[k]) && a[k].length) {
+            items.push([k.replace(/_/g, ' ').replace(/ path$/, '') + ' (Y1 → end)', a[k][0] + '% → ' + a[k][a[k].length - 1] + '%']);
+            break;
+        }
+        if (/margin/.test(k) && typeof a[k] === 'number') { items.push([k.replace(/_/g, ' '), a[k] + '%']); break; }
+    }
+    items.push(['WACC', s.wacc + '%'], ['Terminal Growth', s.terminal + '%']);
+    if (a.terminal_cap_multiple) items.push(['Terminal cap', a.terminal_cap_multiple + 'x']);
+    items.push(['Intrinsic Value', fmtIV(iv)], ['Entry Price', fmtIV(entry)]);
+    document.getElementById('assumptionGrid').innerHTML = items.map(([l, v], i) =>
+        `<div class="assumption-item"><div class="label">${esc(l)}</div><div class="value"${i >= items.length - 2 ? ' style="color:#00d4aa"' : ''}>${esc(v)}</div></div>`).join('');
+}
+
+window.switchScenario = function(scenario) {
+    currentScenario = scenario;
+    document.querySelectorAll('.scenario-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.scenario === scenario);
+    });
+    const d = scenarioDefaults(scenario);
+    document.getElementById('growthSlider').value = d.growth;
+    document.getElementById('waccSlider').value = d.wacc;
+    document.getElementById('terminalSlider').value = d.terminal;
+    const nar = document.getElementById('scenarioNarrative');
+    const narratives = dcfData.scenario_narratives || {};
+    const text = narratives[scenario];
+    nar.textContent = typeof text === 'string' ? text : (text && text.summary) || '';
+    updateDCFDisplay();
+};
+
+function renderHistoricalGrowth() {
+    const growth = dcfData.historical_growth || {};
+    const selected = growth.growth_rate_source;
+    const keys = Object.keys(growth).filter(k => /cagr/.test(k) && typeof growth[k] === 'number');
+    document.getElementById('growthGrid').innerHTML = keys.map(k => {
+        const rate = growth[k];
+        const label = k.replace(/_cagr$/, '').replace(/_(\d+)yr/, ' $1Y').replace(/_/g, ' ');
+        return `<div class="growth-item ${k === selected ? 'selected' : ''}">
+            <div class="metric">${esc(label)}</div>
+            <div class="rate ${rate >= 0 ? 'positive' : 'negative'}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div></div>`;
+    }).join('');
+}
+
+// The grid is not always WACC x terminal growth: a multiple-exit model
+// (no Gordon terminal) ships e.g. coe_range x exit_multiple_range. Find the
+// two axes by shape -- rows match matrix.length, cols match the row width --
+// so any well-formed grid renders instead of being discarded.
+const SENS_AXES = {
+    wacc_range: { label: 'WACC', unit: '%', base: b => b.wacc },
+    coe_range: { label: 'Cost of equity', unit: '%', base: b => b.cost_of_equity ?? b.coe ?? b.wacc },
+    terminal_growth_range: { label: 'Term G', unit: '%', base: b => b.terminal_growth },
+    exit_multiple_range: { label: 'Exit multiple', unit: 'x', base: b => b.exit_multiple },
+    growth_range: { label: 'Growth', unit: '%', base: b => b.growth },
+};
+
+function pickSensAxis(sens, len, exclude) {
+    const keys = Object.keys(sens).filter(k =>
+        k !== exclude && Array.isArray(sens[k]) && sens[k].length === len && sens[k] !== sens.matrix);
+    // prefer a known axis name, else fall back to any range-shaped array
+    return keys.find(k => SENS_AXES[k]) || keys.find(k => /_range$/.test(k)) || null;
+}
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const table = document.getElementById('sensitivityMatrix');
+    const rows = sens && Array.isArray(sens.matrix) ? sens.matrix : null;
+    const rowKey = rows && rows.length ? pickSensAxis(sens, rows.length, null) : null;
+    const colKey = rowKey && Array.isArray(rows[0]) ? pickSensAxis(sens, rows[0].length, rowKey) : null;
+    if (!rowKey || !colKey) {
+        table.innerHTML = '<tr><td>No sensitivity grid in the DCF JSON</td></tr>';
+        return;
+    }
+    const price = dcfData.current_price;
+    const base = dcfData.assumptions.base || {};
+    const rowAx = SENS_AXES[rowKey] || { label: rowKey.replace(/_range$/, ''), unit: '', base: () => undefined };
+    const colAx = SENS_AXES[colKey] || { label: colKey.replace(/_range$/, ''), unit: '', base: () => undefined };
+    const rowBase = rowAx.base(base), colBase = colAx.base(base);
+    let html = `<tr><th>${rowAx.label} \\ ${colAx.label}</th>`
+        + sens[colKey].map(c => `<th>${c}${colAx.unit}</th>`).join('') + '</tr>';
+    sens[rowKey].forEach((rv, i) => {
+        html += `<tr><th>${rv}${rowAx.unit}</th>`;
+        (rows[i] || []).forEach((val, j) => {
+            const hl = rv === rowBase && sens[colKey][j] === colBase;
+            const cls = hl ? 'highlight' : (val >= price ? 'above-current' : 'below-current');
+            html += `<td class="${cls}">${fmtIV(val)}</td>`;
+        });
+        html += '</tr>';
+    });
+    table.innerHTML = html;
+}
+
+function philosophyLabel(key) {
+    const t = key.replace(/_/g, ' ').trim();
+    return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/* `valuation_philosophy` is a string on some DCF JSONs and a nested object on
+   others (52 of them). Interpolating the object rendered "[object Object]". */
+function philosophyParts(value, label) {
+    if (value === null || value === undefined || value === '') return [];
+    if (Array.isArray(value)) return value.flatMap(v => philosophyParts(v, label));
+    if (typeof value === 'object') {
+        return Object.keys(value).flatMap(k => philosophyParts(value[k], philosophyLabel(k)));
+    }
+    return [{ label: label, text: String(value) }];
+}
+
+function renderPhilosophy(value, el) {
+    if (!el) return;
+    const parts = philosophyParts(value, '');
+    if (!parts.length) { el.style.display = 'none'; return; }
+    const body = parts
+        .map(p => (p.label ? `<strong>${esc(p.label)}:</strong> ` : '') + esc(p.text))
+        .join('<br>');
+    el.innerHTML = `<strong>Valuation philosophy:</strong> ${body}`;
+}
+
+function initDCF() {
+    if (!dcfData || !dcfData.valuation || !dcfData.assumptions) return;
+    validateEngines();
+    const eng = document.getElementById('dcfEngineNote');
+    if (eng) {
+        const okAll = ['base', 'bull', 'bear'].every(sc => dcfEngineStatus[sc].ok);
+        eng.textContent = okAll
+            ? `Sliders re-run the ${dcfEngineStatus.base.family} model from the DCF's own assumptions.`
+            : 'Sliders scale the stored valuation with a generic model — the DCF JSON lacks the fields to rebuild it exactly.';
+    }
+    document.getElementById('dcfCurrent').textContent = fmtIV(dcfData.current_price);
+    renderPhilosophy(dcfData.valuation_philosophy, document.getElementById('dcfPhilosophy'));
+    const hg = dcfData.historical_growth || {};
+    if (hg.growth_divergence_warning) {
+        document.getElementById('growthWarning').style.display = 'flex';
+        document.getElementById('warningText').textContent = hg.growth_divergence_warning;
+    }
+    const wsub = document.getElementById('dcfWeightedSublabel');
+    const wts = (dcfData.probability_weighted || {}).weights;
+    if (wts) {
+        const pct = x => Math.round((x || 0) * 100);
+        let txt = `${pct(wts.bull)}% Bull / ${pct(wts.base)}% Base / ${pct(wts.bear)}% Bear`;
+        if (!isWeightedLive()) txt += ' — fixed from model';
+        wsub.textContent = txt;
+    }
+    renderHeaderValuation();
+    renderDCFInputs();
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    switchScenario('base');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+renderGuidance();
+renderOverview();
+initCharts();
+initDCF();
+</script>
+</body>
+</html>
