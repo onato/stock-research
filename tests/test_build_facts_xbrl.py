@@ -307,6 +307,53 @@ class TestCollect:
 
     def test_no_data_returns_none_and_usd_default(self):
         assert bfx.collect({}, ["Revenues"]) == (None, {}, "USD")
+
+    def test_same_filing_subset_tag_loses_to_the_larger_concept(self):
+        # AVB case: the FY2018 10-K (one accession) tags BOTH concepts for
+        # FY2016 -- RevenueFromContractWithCustomer...  $5.599m (ancillary
+        # fee income only) and Revenues $2,045.255m (the real total). This
+        # is not a PayPal-style tag switch-over (that shows each concept in
+        # a DIFFERENT accession) -- it is the preferred concept being a
+        # narrower line item, so list order must not win.
+        facts = {"facts": {"us-gaap": {
+            "RevenueFromContractWithCustomerExcludingAssessedTax": {
+                "units": {"USD": [
+                    {"start": "2016-01-01", "end": "2016-12-31",
+                     "val": 5599000, "accn": "0000915912-19-000004",
+                     "form": "10-K", "filed": "2019-02-22"},
+                ]}},
+            "Revenues": {
+                "units": {"USD": [
+                    {"start": "2016-01-01", "end": "2016-12-31",
+                     "val": 2045255000, "accn": "0000915912-19-000004",
+                     "form": "10-K", "filed": "2019-02-22"},
+                ]}},
+        }}}
+        _, values, _ = bfx.collect(facts, bfx.CONCEPTS["revenue"])
+        assert values["FY2016"] == 2045255000
+
+    def test_tag_switch_over_across_different_filings_is_unaffected(self):
+        # Same shape as the PayPal fixture case, inline: FY2023 tagged
+        # under the old concept in one accession and the new concept in a
+        # LATER accession. Different accessions -- not a same-filing
+        # subset -- so ordinary concept-preference/later-filing rules
+        # still decide it.
+        facts = {"facts": {"us-gaap": {
+            "RevenueFromContractWithCustomerExcludingAssessedTax": {
+                "units": {"USD": [
+                    {"start": "2023-01-01", "end": "2023-12-31",
+                     "val": 29000000000, "accn": "0000000001-23-000001",
+                     "form": "10-K", "filed": "2023-02-01"},
+                ]}},
+            "Revenues": {
+                "units": {"USD": [
+                    {"start": "2023-01-01", "end": "2023-12-31",
+                     "val": 30000000000, "accn": "0000000001-24-000001",
+                     "form": "10-K", "filed": "2024-02-01"},
+                ]}},
+        }}}
+        _, values, _ = bfx.collect(facts, bfx.CONCEPTS["revenue"])
+        assert values["FY2023"] == 30000000000
         assert bfx.collect(
             {"facts": {"us-gaap": {}}}, ["GrossProfit"]) == (None, {}, "USD")
 
@@ -387,6 +434,22 @@ class TestDerivedColumns:
         con.close()
         assert (ocf, capex) == (9000.0, 600.0)
         assert fcf == 8400.0
+
+    def test_capex_falls_back_to_productive_assets_tag(self, xbrl_repo,
+                                                        monkeypatch):
+        """Some filers (APTV FY2025) drop PaymentsToAcquirePropertyPlant-
+        AndEquipment for PaymentsToAcquireProductiveAssets. capex should
+        pick up the fallback tag rather than leaving the period NULL."""
+        assert run_main(monkeypatch, "TRIM") == 0
+        con = duckdb.connect(
+            str(xbrl_repo / "research" / "TRIM" / "Reports" / "TRIM.duckdb"),
+            read_only=True)
+        capex, fcf = con.execute(
+            "SELECT capex, free_cash_flow"
+            " FROM core_metrics WHERE period = 'FY2025'").fetchone()
+        con.close()
+        assert capex == 656.0
+        assert fcf == pytest.approx(9800.0 - 656.0)
 
     def test_margins_derived_as_percentages(self, xbrl_repo, monkeypatch):
         # Revenue 40bn, gross profit 24bn, net income 6bn.
@@ -481,10 +544,10 @@ class TestMainWritesDb:
         n_core = con.execute("SELECT count(*) FROM core_metrics").fetchone()[0]
         n_kpis = con.execute("SELECT count(*) FROM kpis").fetchone()[0]
         con.close()
-        # FY2022-24, H1-2024, Q1 2024, plus Q2/Q3 2024 decumulated from the
+        # FY2022-25, H1-2024, Q1 2024, plus Q2/Q3 2024 decumulated from the
         # cumulative cash-flow spans. The 9M-2024 scaffolding span that made
         # Q3 derivable is dropped rather than written.
-        assert n_core == 7
+        assert n_core == 8
         assert n_kpis == 1
 
     def test_check_mode_writes_nothing(self, xbrl_repo, monkeypatch, capsys):

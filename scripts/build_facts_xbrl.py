@@ -51,7 +51,8 @@ CONCEPTS = {
     "net_income": ["NetIncomeLoss", "ProfitLoss"],
     "eps": ["EarningsPerShareDiluted", "EarningsPerShareBasic"],
     "operating_cash_flow": ["NetCashProvidedByUsedInOperatingActivities"],
-    "capex": ["PaymentsToAcquirePropertyPlantAndEquipment"],
+    "capex": ["PaymentsToAcquirePropertyPlantAndEquipment",
+              "PaymentsToAcquireProductiveAssets"],
     "shareholders_equity": ["StockholdersEquity",
                             "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"],
     "total_assets": ["Assets"],
@@ -254,9 +255,22 @@ def collect(facts: dict[str, Any],
     first concept that has *any* data would silently drop half the
     history, so merge them and let concept order break ties within a
     period.
+
+    A different case: a filer that tags BOTH concepts for the SAME period
+    in the SAME accession -- not a switch-over, but the preferred concept
+    naming a narrower line item. AVB's 10-Ks tag
+    RevenueFromContractWithCustomerExcludingAssessedTax as ancillary fee
+    income ($5.6m) alongside Revenues as the real total ($2,045m) for the
+    same FY2016, in the same filing. List-order preference alone would
+    take the $5.6m figure for every period the filer dual-tags. Two
+    concepts landing on the same period from the same accession is the
+    signal a switch-over never produces (each concept there comes from a
+    DIFFERENT accession), so when that happens the larger value wins
+    regardless of concept order.
     """
     gaap = facts.get("facts", {}).get("us-gaap", {})
     out: dict[str, tuple[Any, Any]] = {}
+    accn_seen: dict[tuple[Any, str], dict[str, Any]] = {}
     used: list[str] = []
     unit_seen: str | None = None
     fy_end = fiscal_year_end_month(facts)
@@ -274,6 +288,24 @@ def collect(facts: dict[str, Any],
                 p = period_label(f, fy_end)
                 if not p:
                     continue
+                # Same accession already reported a value for this period
+                # under a different concept: not a switch-over (those span
+                # different accessions), so this is one concept naming a
+                # subset of another. Keep whichever value is larger.
+                accn = f.get("accn")
+                prior = accn_seen.get((accn, p)) if accn else None
+                if prior is not None and prior["concept"] != concept:
+                    if abs(f["val"]) <= abs(prior["val"]):
+                        continue
+                    # The new value supersedes the smaller same-accession
+                    # figure already recorded for this period.
+                    out[p] = (f["val"], prior["rank"])
+                    if accn:
+                        accn_seen[(accn, p)] = {"val": f["val"], "concept": concept,
+                                                 "rank": prior["rank"]}
+                    if concept not in used:
+                        used.append(concept)
+                    continue
                 # Prefer an annual statement over a 10-Q restatement, a
                 # later filing over an earlier one, and an earlier-listed
                 # concept over a later one.
@@ -290,6 +322,9 @@ def collect(facts: dict[str, Any],
                 if p not in out or rank > out[p][1]:
                     out[p] = (f["val"], rank)
                     got = True
+                    if accn:
+                        accn_seen[(accn, p)] = {"val": f["val"], "concept": concept,
+                                                 "rank": rank}
         if got:
             used.append(concept)
     return ("+".join(used) if used else None,
