@@ -51,15 +51,16 @@ def result(cost=None, is_error=False):
     return ev
 
 
-def write_joblog(tmp_path, *rows):
-    """rows are (seq, runtime, exitval, command-tail)."""
-    path = tmp_path / "state" / "joblog.tsv"
+def write_joblog(tmp_path, *rows, name="joblog.tsv", start=0):
+    """rows are (seq, runtime, exitval, command-tail); `start` is the
+    Starttime written on every row."""
+    path = tmp_path / "state" / name
     path.parent.mkdir(parents=True, exist_ok=True)
     header = "\t".join(["Seq", "Host", "Starttime", "JobRuntime", "Send",
                         "Receive", "Exitval", "Signal", "Command"])
     lines = [header]
     for seq, runtime, exitval, ticker in rows:
-        lines.append(f"{seq}\t:\t0\t{runtime}\t0\t0\t{exitval}\t0\t"
+        lines.append(f"{seq}\t:\t{start}\t{runtime}\t0\t0\t{exitval}\t0\t"
                      f"/x/research_one.sh {ticker}")
     path.write_text("\n".join(lines) + "\n")
     return path
@@ -414,3 +415,49 @@ class TestCli:
         # banner would become a phantom ticker.
         write_log(tmp_path, "A.NZ", tool("Bash"), result(cost=1.0))
         assert self._run(monkeypatch, capsys, tmp_path, "--active") == ""
+
+
+class TestLiveJoblog:
+    """state/joblog.tsv is copied from the run's timestamped joblog only when
+    the run ENDS. On 2026-09-25 a live batch re-ran seven tickers that the
+    previous run had stood down (exit 5); all finished and were committed,
+    but the table kept showing them stood-down with 0m00 of work, read from
+    the previous run's file. The newest entry per ticker must win."""
+
+    def test_the_live_run_beats_the_stale_stable_joblog(self, tmp_path):
+        write_log(tmp_path, "ZIP.AX", tool("Bash"), result(cost=4.65))
+        write_joblog(tmp_path, (8, 0.02, 5, "ZIP.AX"), start=1000)
+        write_joblog(tmp_path, (3, 908.6, 0, "ZIP.AX"),
+                     name="joblog.20260925-182624.tsv", start=2000)
+        out = run_status.render(tmp_path)
+        line = next(ln for ln in out.splitlines() if ln.startswith("ZIP.AX"))
+        assert "done" in line
+        assert "stood-down" not in line
+        assert "15m08" in line
+
+    def test_latest_rows_keep_the_newest_start_per_ticker(self, tmp_path):
+        write_joblog(tmp_path, (1, 60, 4, "SUN.AX"), (2, 0.02, 5, "A"),
+                     name="joblog.20260925-170234.tsv", start=1000)
+        write_joblog(tmp_path, (1, 900, 0, "A"),
+                     name="joblog.20260925-182624.tsv", start=2000)
+        got = run_status.latest_joblog_rows(tmp_path, since=0)
+        assert got["A"]["exit"] == 0
+        assert got["SUN.AX"]["exit"] == 4          # only in an older run
+
+    def test_a_real_stand_down_still_shows(self, tmp_path):
+        write_log(tmp_path, "WBC.NZ", tool("Bash"))
+        write_joblog(tmp_path, (1, 0, 5, "WBC.NZ"),
+                     name="joblog.20260925-174735.tsv", start=2000)
+        assert "stood-down" in run_status.render(tmp_path)
+
+    def test_an_explicit_joblog_still_pins_one_file(self, tmp_path):
+        write_log(tmp_path, "ZIP.AX", tool("Bash"), result())
+        stable = write_joblog(tmp_path, (8, 0.02, 5, "ZIP.AX"), start=1000)
+        write_joblog(tmp_path, (3, 908.6, 0, "ZIP.AX"),
+                     name="joblog.20260925-182624.tsv", start=2000)
+        assert "stood-down" in run_status.render(tmp_path, stable)
+
+    def test_joblog_rows_carry_the_start_time(self, tmp_path):
+        p = write_joblog(tmp_path, (1, 10, 0, "A.NZ"), start=1234.5)
+        assert run_status.joblog_rows(p)["A.NZ"] == {"exit": 0, "runtime": 10.0,
+                                                     "start": 1234.5}

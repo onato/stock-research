@@ -79,10 +79,11 @@ def discover(root: pathlib.Path) -> list[str]:
 
 
 def joblog_rows(path: pathlib.Path | str) -> dict[str, dict[str, Any]]:
-    """{ticker: {"exit": int, "runtime": float}} from parallel's joblog.
+    """{ticker: {"exit": int, "runtime": float, "start": float}} from
+    parallel's joblog.
 
-    Column 7 is the exit status and column 9 the command, whose last field is
-    the ticker. A short row is a run still in flight (or a truncated write)
+    Column 3 is the start time, 4 the runtime, 7 the exit status and 9 the
+    command, whose last field is the ticker. A short row is a run still in flight (or a truncated write)
     and is skipped rather than guessed at.
     """
     path = pathlib.Path(path)
@@ -99,14 +100,42 @@ def joblog_rows(path: pathlib.Path | str) -> dict[str, dict[str, Any]]:
         if not ticker:
             continue
         try:
-            out[ticker] = {"exit": int(parts[6]), "runtime": float(parts[3])}
+            out[ticker] = {"exit": int(parts[6]), "runtime": float(parts[3]),
+                           "start": float(parts[2])}
         except ValueError:
             continue
     return out
 
 
+def latest_joblog_rows(root: pathlib.Path, since: float = DEFAULT_SINCE,
+                       now: float | None = None) -> dict[str, dict[str, Any]]:
+    """Each ticker's newest joblog entry across the stable joblog and every
+    per-run timestamped one.
+
+    run_loop.sh copies a run's timestamped joblog over state/joblog.tsv only
+    when the run ENDS, so during a live batch the stable file is the previous
+    run's record. On 2026-09-25 that showed seven tickers as stood-down (exit
+    5, 0m00) while the live run had finished and committed every one of them.
+    The entry with the latest start time wins; files untouched for longer
+    than `since` (0 = no bound) belong to earlier batches and are skipped.
+    """
+    now = time.time() if now is None else now
+    state = pathlib.Path(root) / "state"
+    out: dict[str, dict[str, Any]] = {}
+    for path in [state / "joblog.tsv", *sorted(state.glob("joblog.2*.tsv"))]:
+        try:
+            if since and now - path.stat().st_mtime > since:
+                continue
+        except OSError:
+            continue
+        for ticker, entry in joblog_rows(path).items():
+            if ticker not in out or entry["start"] >= out[ticker]["start"]:
+                out[ticker] = entry
+    return out
+
+
 def ticker_row(root: pathlib.Path, ticker: str,
-               joblog: pathlib.Path | str | None = None,
+               joblog: pathlib.Path | str | dict[str, dict[str, Any]] | None = None,
                now: float | None = None) -> dict[str, Any]:
     """Everything the table shows for one ticker."""
     root = pathlib.Path(root)
@@ -165,7 +194,8 @@ def ticker_row(root: pathlib.Path, ticker: str,
     # can end on an is_error result and still have produced everything, which
     # research_one.sh reports as exit 0.
     if joblog is not None:
-        entry = joblog_rows(joblog).get(ticker)
+        rows = joblog if isinstance(joblog, dict) else joblog_rows(joblog)
+        entry = rows.get(ticker)
         if entry is not None:
             row["elapsed"] = int(entry["runtime"])
             row["state"] = STATE_FOR_EXIT.get(entry["exit"], "failed")
@@ -225,16 +255,18 @@ def render(root: pathlib.Path, joblog: pathlib.Path | str | None = None,
     definition and is kept regardless of age; `since=0` shows everything.
     """
     root = pathlib.Path(root)
-    if joblog is None:
-        candidate = root / "state" / "joblog.tsv"
-        joblog = candidate if candidate.is_file() else None
+    # An explicit path pins one file; by default each ticker's newest entry
+    # across the stable and per-run joblogs, so a live run is not shown
+    # through the previous run's record.
+    jobs = (joblog_rows(joblog) if joblog is not None
+            else latest_joblog_rows(root, since=since, now=now))
 
     tickers = discover(root)
     if not tickers:
         return "no run found (no transcripts in state/logs/)"
 
-    in_run = set(joblog_rows(joblog)) if joblog is not None else set()
-    rows = [ticker_row(root, t, joblog, now) for t in tickers]
+    in_run = set(jobs)
+    rows = [ticker_row(root, t, jobs, now) for t in tickers]
     if since:
         rows = [r for r in rows
                 if r["idle"] <= since or r["ticker"] in in_run]
