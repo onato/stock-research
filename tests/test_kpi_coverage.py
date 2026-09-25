@@ -452,3 +452,23 @@ class TestCapitalReturnPromotion:
         make_db(patch_repo, "SYN", ["CapitalReturn"])
         assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
         assert schema.promote_header("CapitalReturn") == "CapitalReturn"
+
+
+class TestBNPLLenderPromotion:
+    """A BNPL lender's receivables book and restricted cash (Zip Co, ZIP.AX).
+
+    CustomerReceivables is the loan book size -- the core driver of a
+    lender's business, comparable to a bank's loan portfolio -- with 11
+    populated periods (FY2020-FY2026 plus half-years). RestrictedCash
+    distinguishes cash pledged to warehouse funding facilities from cash
+    genuinely available to the business, which a blended CashAndEquivalents
+    figure hides. Both were absent from PROMOTE_KPIS, so a dashboard could
+    only show the topline P&L/balance-sheet columns and neither driver of
+    the funding model was visible.
+    """
+
+    def test_receivables_and_restricted_cash_are_promoted(self, patch_repo):
+        make_db(patch_repo, "SYN", ["CustomerReceivables", "RestrictedCash"])
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        assert schema.promote_header("CustomerReceivables") == "CustomerReceivables"
+        assert schema.promote_header("RestrictedCash") == "RestrictedCash"

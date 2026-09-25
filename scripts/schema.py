@@ -219,6 +219,14 @@ PROMOTE_KPIS: dict[str, str] = {
     # dilution history is a named risk (TWL.NZ has raised via placement/SPP
     # in nearly every year since IPO).
     "ShareIssuanceProceeds": "ShareIssuanceProceeds",
+    # BNPL lender's receivables book and funding-facility cash (Zip Co,
+    # ZIP.AX): CustomerReceivables is the loan book size -- the core driver
+    # of the business, analogous to a bank's loan portfolio -- with history
+    # back to FY2020. RestrictedCash is cash pledged to warehouse funding
+    # facilities, distinct from cash genuinely available to the business; a
+    # blended CashAndEquivalents figure hides that split.
+    "CustomerReceivables": "CustomerReceivables",
+    "RestrictedCash": "RestrictedCash",
     # Segment revenue (WasteCo Group, WCO.NZ): three operating lines --
     # waste collection, sweeping services, industrial cleaning -- reverse-
     # listed into a shell in FY2023, so a single blended Revenue column
