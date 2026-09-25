@@ -262,6 +262,23 @@ PROMOTE_KPIS: dict[str, str] = {
     # contract options disclosed separately from the firm order book.
     "OrderBook": "OrderBook",
     "OrderBookWithOptions": "OrderBookWithOptions",
+    # Seed capital vs core operating cash flow (multi-affiliate fund manager
+    # Pinnacle Investment Management, PNI.AX): statutory operating cash flow
+    # swings from -A$145m (FY2025) to +A$348m (FY2026) purely on seed-fund
+    # subscriptions/redemptions timing, not the underlying management-fee
+    # business. Both series have 22 populated periods (FY2016-FY2026 plus
+    # half-years) but were absent from PROMOTE_KPIS, so the dashboard could
+    # only show the noisy statutory OCF column.
+    "OperatingCashFlowExSeed": "OperatingCashFlowExSeed",
+    "NetSeedInvestmentFlow": "NetSeedInvestmentFlow",
+    # Property advertising vs financial services revenue split (REA Group,
+    # REA.AX): the core listings business, financial services (Mortgage
+    # Choice) is a bolt-on segment whose revenue steps up sharply -- from
+    # ~$100m to ~$325m in FY2022 on the Mortgage Choice acquisition -- so a
+    # single Revenue column hides the margin-mix shift toward the lower-margin
+    # broking business.
+    "PropertyAdvertisingRevenue": "PropertyAdvertisingRevenue",
+    "FinancialServicesRevenue": "FinancialServicesRevenue",
     # Five-segment revenue split (Breville Group, BRG.AX): the FY report
     # discloses revenue by APAC, Americas, EMEA, Global Product and
     # Distribution rather than a single blended Revenue line, and the mix is

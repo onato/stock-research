@@ -251,6 +251,14 @@ class TestRedefinedKpiSeries:
     def test_plain_arr_still_promotes(self):
         assert schema.promote_header("ARR") == "ARR"
 
+    def test_promotes_rea_group_segment_revenue_split(self):
+        """REA.AX: property advertising vs financial services (Mortgage
+        Choice) is the core segment split, not noise."""
+        assert (schema.promote_header("PropertyAdvertisingRevenue")
+                == "PropertyAdvertisingRevenue")
+        assert (schema.promote_header("FinancialServicesRevenue")
+                == "FinancialServicesRevenue")
+
 
 class TestTotalAUMPromotion:
     """AMP.AX reports 'Total AUM' as its own named KPI, distinct from the
