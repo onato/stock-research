@@ -472,3 +472,29 @@ class TestBNPLLenderPromotion:
         assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
         assert schema.promote_header("CustomerReceivables") == "CustomerReceivables"
         assert schema.promote_header("RestrictedCash") == "RestrictedCash"
+
+
+class TestCarpetManufacturerInsuranceAndInventoryPromotion:
+    """Cyclone Gabrielle insurance proceeds distorting OCF (Bremworth, BRW.NZ).
+
+    $42.2m of Cyclone Gabrielle insurance proceeds landed in FY2025
+    operating cash flow, making that year's statutory OCF/EBITDA read as a
+    strong recovery when the underlying carpet-manufacturing business was
+    still loss-making (normalised FY2025 EBITDA was -$13.2m).
+    OperatingCashFlowExInsurance is the cleaner comparable series;
+    CycloneInsuranceCashInOCF is the one-off itself. Inventory is a
+    standard balance-sheet line with no existing home in core_metrics or
+    PROMOTE_KPIS. All three were absent from PROMOTE_KPIS, so none reached
+    the CSV.
+    """
+
+    def test_insurance_and_inventory_kpis_are_promoted(self, patch_repo):
+        names = [
+            "CycloneInsuranceCashInOCF",
+            "OperatingCashFlowExInsurance",
+            "Inventory",
+        ]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n

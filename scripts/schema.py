@@ -690,6 +690,26 @@ PROMOTE_KPIS: dict[str, str] = {
     # shareholders (A$2,267m in FY2022, A$1,249m in FY2026) that explain why
     # book-value/equity CAGR looks negative despite healthy earnings.
     "CapitalReturn": "CapitalReturn",
+    # LIC income-statement components (Barramundi Limited, BRM.NZ, and other
+    # Fisher Funds-managed listed investment companies): a LIC's "revenue" is
+    # really three distinct sources -- dividend income received from the
+    # portfolio, the unrealised/realised net change in fair value of
+    # investments (the dominant, volatile swing line), and cash proceeds
+    # from BRMWI warrant exercises (a financing inflow, not income). Blending
+    # them into one Revenue figure hides which of the three moved.
+    "DividendIncome": "DividendIncome",
+    "NetChangeInFairValue": "NetChangeInFairValue",
+    "WarrantExerciseProceeds": "WarrantExerciseProceeds",
+    # Cyclone Gabrielle insurance proceeds distorting operating cash flow
+    # (Bremworth Limited, BRW.NZ): $42.2m of business-interruption/asset
+    # insurance proceeds landed in FY2025 operating cash flow, making that
+    # year's statutory OCF/EBITDA read as a strong recovery when the
+    # underlying carpet-manufacturing business was still loss-making
+    # (normalised FY2025 EBITDA was -$13.2m). ExInsurance is the cleaner
+    # comparable series; CashInOCF is the one-off itself.
+    "CycloneInsuranceCashInOCF": "CycloneInsuranceCashInOCF",
+    "OperatingCashFlowExInsurance": "OperatingCashFlowExInsurance",
+    "Inventory": "Inventory",
 }
 
 # Owner-FCF components and core-column duplicates. Listed explicitly so a
