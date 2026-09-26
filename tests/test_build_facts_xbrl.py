@@ -496,6 +496,59 @@ class TestCollect:
         # value must be rejected even though it clears 100,000.
         assert "FY2008" not in values
 
+    def test_shares_outstanding_rejects_a_decade_of_thousands_scaling(self):
+        # ConocoPhillips (CIK 1163165) tagged
+        # WeightedAverageNumberOfDilutedSharesOutstanding in THOUSANDS for
+        # ten straight annual periods (FY2010-FY2019: 1491067, 1387100, ...,
+        # 1123536 instead of 1491067000, ..., 1123536000), each from its own
+        # accession with no later filing ever re-tagging the period
+        # correctly -- unlike Agilent/Ball, there is no self-heal here, so
+        # "no correcting duplicate" alone under-rejects. Every value in the
+        # run clears MIN_PLAUSIBLE_SHARE_COUNT (862,000) because the
+        # thousands-scale COP share count (~1.1-1.6 million) is itself
+        # bigger than a real small-cap's raw share count, so the absolute
+        # floor passes all ten periods through. They must instead be
+        # rejected by comparison against the correctly-scaled FY2007-2009
+        # and FY2020-2025 values in the same series (~1.1-1.6 BILLION):
+        # a period 1e-3x the series median is the same mis-tagging, just
+        # never self-healed.
+        facts = {"facts": {"us-gaap": {
+            "WeightedAverageNumberOfDilutedSharesOutstanding": {"units": {
+                "shares": [
+                    {"start": "2007-01-01", "end": "2007-12-31",
+                     "val": 1645919000, "accn": "acc-2007", "form": "10-K",
+                     "filed": "2008-02-15"},
+                    {"start": "2009-01-01", "end": "2009-12-31",
+                     "val": 1497608000, "accn": "acc-2009", "form": "10-K",
+                     "filed": "2010-02-15"},
+                    {"start": "2010-01-01", "end": "2010-12-31",
+                     "val": 1491067, "accn": "acc-2010", "form": "10-K",
+                     "filed": "2011-02-15"},
+                    {"start": "2015-01-01", "end": "2015-12-31",
+                     "val": 1241919, "accn": "acc-2015", "form": "10-K",
+                     "filed": "2016-02-15"},
+                    {"start": "2019-01-01", "end": "2019-12-31",
+                     "val": 1123536, "accn": "acc-2019", "form": "10-K",
+                     "filed": "2020-02-15"},
+                    {"start": "2020-01-01", "end": "2020-12-31",
+                     "val": 1078030000, "accn": "acc-2020", "form": "10-K",
+                     "filed": "2021-02-15"},
+                ],
+            }},
+        }}}
+        _, values, _ = bfx.collect(
+            facts, bfx.CONCEPTS["shares_outstanding"])
+        # Correctly-scaled periods survive.
+        assert values["FY2007"] == 1645919000
+        assert values["FY2009"] == 1497608000
+        assert values["FY2020"] == 1078030000
+        # Thousands-scaled periods, each 1e-3x the series' genuine scale
+        # with no correcting duplicate, must be rejected rather than kept
+        # as a plausible-looking small value.
+        assert "FY2010" not in values
+        assert "FY2015" not in values
+        assert "FY2019" not in values
+
 
 def db_row(repo, period):
     con = duckdb.connect(

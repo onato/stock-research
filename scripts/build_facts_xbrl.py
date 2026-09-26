@@ -371,9 +371,67 @@ def collect(facts: dict[str, Any],
                                                  "rank": rank}
         if got:
             used.append(concept)
+    if unit_seen == "shares":
+        _reject_scale_outliers(out)
     return ("+".join(used) if used else None,
             {p: v[0] for p, v in out.items()},
             unit_seen or "USD")
+
+
+# The absolute MIN_PLAUSIBLE_SHARE_COUNT floor only catches a mis-scaled
+# value small enough to look like noise (Agilent's millions-scaled 406).
+# ConocoPhillips (CIK 1163165) tagged WeightedAverageNumberOfDilutedShares-
+# Outstanding in THOUSANDS for ten straight annual periods (FY2010-2019:
+# 1491067 instead of 1491067000) -- a share count that, read as raw shares,
+# is ~1.1-1.6 million and clears the 862,000 floor easily, because COP is a
+# large-cap and its thousands-scaled value is bigger than a small-cap's
+# genuine raw count. Unlike Agilent/Ball, no later filing ever re-tags these
+# periods correctly, so "reject the unhealed value" alone does not apply --
+# every one of the ten years is unhealed. What marks them is comparison
+# against the OTHER resolved periods in the same series (FY2007-2009 and
+# FY2020-2025, correctly tagged at ~1.1-1.6 BILLION): a period sitting at
+# roughly 1e-3x (thousands) or 1e-6x (millions) of the series' own median is
+# the same filer mistagging, just never self-healed by a later accession.
+_SCALE_SLIP_RATIOS = (1e-3, 1e-6)
+_SCALE_SLIP_TOLERANCE = 0.25  # +/-25% around the exact 1e-3 / 1e-6 ratio
+
+
+def _reject_scale_outliers(out: dict[str, tuple[Any, Any]]) -> None:
+    """Drop shares-unit values that sit at ~1e-3x/1e-6x the majority scale.
+
+    A plain median is not safe here: ConocoPhillips mistagged TEN of its
+    sixteen resolved years, so the median itself lands on a mis-scaled
+    value. Instead, cluster periods by order of magnitude (round(log10(v)))
+    and treat the LARGEST cluster with at least 2 members as the genuine
+    scale -- the century of periods across the whole warehouse establishes
+    that a filer restates its true share count far more often than it
+    mistags one, so the biggest consistent cluster wins regardless of
+    whether it happens to be a minority of this one concept's rows. Needs
+    at least 5 resolved periods total before trusting any of this -- with
+    fewer, a genuine outlier (a buyback, a split) could be mistaken for a
+    scale slip.
+    """
+    vals = [abs(v[0]) for v in out.values() if v[0] is not None and v[0] > 0]
+    if len(vals) < 5:
+        return
+    import math
+    clusters: dict[int, list[float]] = {}
+    for v in vals:
+        clusters.setdefault(round(math.log10(v)), []).append(v)
+    eligible = {k: vs for k, vs in clusters.items() if len(vs) >= 2}
+    if not eligible:
+        return
+    best_magnitude = max(eligible, key=lambda k: len(eligible[k]))
+    genuine_scale = sum(eligible[best_magnitude]) / len(eligible[best_magnitude])
+    for period in list(out.keys()):
+        val = out[period][0]
+        if val is None or val <= 0:
+            continue
+        ratio = abs(val) / genuine_scale
+        for slip in _SCALE_SLIP_RATIOS:
+            if abs(ratio - slip) <= slip * _SCALE_SLIP_TOLERANCE:
+                del out[period]
+                break
 
 
 def collect_sum(facts: dict[str, Any],
