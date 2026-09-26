@@ -51,9 +51,36 @@ CONCEPTS = {
     # rows in 2017-2018 with no annual coverage, Revenues doesn't exist for
     # this filer, and SalesRevenueNet stops at FY2017 -- so without this
     # entry BALL's revenue is NULL for every period FY2018-2025.
+    #
+    # REIT filers (Camden Property Trust, CIK 0000906345) tag their real
+    # top line -- "Property revenues" on the face of the income statement
+    # -- as OperatingLeaseLeaseIncome or RealEstateRevenueNet, and never
+    # tag Revenues at all. RevenueFromContractWithCustomer...Excluding
+    # AssessedTax still exists for these filers but names only a minor
+    # "Fee and asset management" line ($7.1m vs $1,543.8m for CPT
+    # FY2024) -- the ASC-606 tag's usual meaning for an operating company,
+    # but a narrow subset here, same shape as AVB's ancillary-fee mistag.
+    # Without these two concepts in the list, that fee line is the ONLY
+    # concept with any data and wins by default, understating revenue by
+    # ~200x; with them present, the same-accession/larger-value-wins rule
+    # in collect() picks the real total.
+    #
+    # These two sit AFTER IncludingAssessedTax, not before it: Copart
+    # (CIK 0000900075) also tags OperatingLeaseLeaseIncome, but there it
+    # names a genuinely minor ancillary lease-income line ($17.6m vs
+    # $4,236.8m FY2024 real revenue), and IncludingAssessedTax is the
+    # correct total for Copart. IncludingAssessedTax sits in
+    # NEVER_OVERRIDES_SAME_ACCESSION (it must never beat Excluding), which
+    # as a side effect means nothing can be *displaced by* a same-accession
+    # override once IncludingAssessedTax already lost to an earlier-listed
+    # smaller concept -- so OperatingLeaseLeaseIncome ahead of it would
+    # freeze Copart's revenue at the small figure. Listing REIT concepts
+    # last avoids that: they only apply when nothing earlier (including
+    # IncludingAssessedTax) has any data at all, which is CPT's case.
     "revenue": ["RevenueFromContractWithCustomerExcludingAssessedTax",
                 "Revenues", "SalesRevenueNet",
-                "RevenueFromContractWithCustomerIncludingAssessedTax"],
+                "RevenueFromContractWithCustomerIncludingAssessedTax",
+                "OperatingLeaseLeaseIncome", "RealEstateRevenueNet"],
     "cost_of_revenue": ["CostOfRevenue", "CostOfGoodsAndServicesSold"],
     "gross_profit": ["GrossProfit"],
     "operating_income": ["OperatingIncomeLoss"],

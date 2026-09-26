@@ -424,6 +424,61 @@ class TestCollect:
         _, values, _ = bfx.collect(facts, bfx.CONCEPTS["revenue"])
         assert values["FY2017"] == 2994000000
 
+    def test_reit_property_revenue_beats_ancillary_fee_tag(self):
+        # Camden Property Trust (CIK 0000906345), FY2024 10-K (accn
+        # 0000906345-25-000008): RevenueFromContractWithCustomer...
+        # ExcludingAssessedTax is tagged as a narrow "Fee and asset
+        # management" line ($7.137m) while the real top line -- "Property
+        # revenues" on the face of the income statement, $1,543.842m -- is
+        # tagged OperatingLeaseLeaseIncome. Unlike AVB, Camden never tags
+        # Revenues at all, so the ASC-606 fee tag was the ONLY concept in
+        # the list with any data and won by default, understating revenue
+        # by ~216x. OperatingLeaseLeaseIncome must be in the concept list
+        # so the same-accession/larger-wins rule can even compare them.
+        facts = {"facts": {"us-gaap": {
+            "RevenueFromContractWithCustomerExcludingAssessedTax": {
+                "units": {"USD": [
+                    {"start": "2024-01-01", "end": "2024-12-31",
+                     "val": 7137000, "accn": "0000906345-25-000008",
+                     "form": "10-K", "filed": "2025-02-13"},
+                ]}},
+            "OperatingLeaseLeaseIncome": {
+                "units": {"USD": [
+                    {"start": "2024-01-01", "end": "2024-12-31",
+                     "val": 1543842000, "accn": "0000906345-25-000008",
+                     "form": "10-K", "filed": "2025-02-13"},
+                ]}},
+        }}}
+        _, values, _ = bfx.collect(facts, bfx.CONCEPTS["revenue"])
+        assert values["FY2024"] == 1543842000
+
+    def test_reit_revenue_concepts_do_not_displace_copart_real_total(self):
+        # Copart (CIK 0000900075) also tags OperatingLeaseLeaseIncome, but
+        # there it is a genuinely minor ancillary lease-income line
+        # ($17.6m) alongside the real FY2024 total ($4,236.823m) tagged
+        # RevenueFromContractWithCustomerIncludingAssessedTax, in the same
+        # accession. IncludingAssessedTax is in
+        # NEVER_OVERRIDES_SAME_ACCESSION, so once OperatingLeaseLeaseIncome
+        # claims a period first (earlier in list order), IncludingAssessedTax
+        # can never displace it -- the REIT concepts must be listed AFTER
+        # IncludingAssessedTax so this ordering trap never triggers.
+        facts = {"facts": {"us-gaap": {
+            "OperatingLeaseLeaseIncome": {
+                "units": {"USD": [
+                    {"start": "2023-08-01", "end": "2024-07-31",
+                     "val": 17600000, "accn": "0000900075-24-000024",
+                     "form": "10-K", "filed": "2024-09-30"},
+                ]}},
+            "RevenueFromContractWithCustomerIncludingAssessedTax": {
+                "units": {"USD": [
+                    {"start": "2023-08-01", "end": "2024-07-31",
+                     "val": 4236823000, "accn": "0000900075-24-000024",
+                     "form": "10-K", "filed": "2024-09-30"},
+                ]}},
+        }}}
+        _, values, _ = bfx.collect(facts, bfx.CONCEPTS["revenue"])
+        assert values["FY2024"] == 4236823000
+
     def test_shares_outstanding_rejects_pre_scaled_filer_error(self):
         # Agilent's FY2009 10-K (accn 0001047469-09-010861, filed
         # 2009-12-21) tagged WeightedAverageNumberOfDilutedSharesOutstanding
