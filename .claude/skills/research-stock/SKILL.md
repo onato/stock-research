@@ -301,6 +301,14 @@ Create a DCF valuation model based on the financial data and qualitative analysi
 
 Spawn the `dcf-analyst` agent (`.claude/agents/dcf-analyst.md`).
 
+**If it returns "You've reached your Fable limit", do not re-spawn it and never pass a
+`model` override.** Stop the run there, with no DCF, and say the Fable limit was hit.
+The batch shell (`research_one.sh`) detects the refusal in the log, records the reset
+and re-runs the ticker with Fable agents on **opus** (Stephen's fallback tier) for every
+worker until the reset. It only does that when the run ends without a DCF. On
+2026-09-26 the orchestrator re-spawned on `model: sonnet` itself, so the shell never
+engaged and seven tickers shipped Sonnet-built valuations.
+
 **Do not restate the valuation method here.** The agent routes the ticker to the right
 model via `.claude/skills/dcf-methods/SKILL.md` and reads that model's reference file —
 an owner-FCF DCF for operating companies, and something else entirely for banks, REITs,
