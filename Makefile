@@ -1,8 +1,9 @@
 # Stock research pipeline. `make` alone lists the targets.
 #
 # The usual thing is `make run`: pick the next few tickers, research them,
-# score them, show what to fix, and rank the whole portfolio. Everything
-# else in here is one piece of that.
+# score them, show what to fix, and rank the whole portfolio. Prices are
+# separate: `make update-prices` rewrites every DCF's price-derived numbers
+# from live quotes (free, no model). Everything else is one piece of those.
 
 SCRIPTS := scripts
 PY      := uv run python3
@@ -28,7 +29,7 @@ LEADERBOARD ?= 15   # rows shown by `make screen`
 .DEFAULT_GOAL := help
 .PHONY: help run digest status screen integrity missing prune-stubs standardize-scale research facts evals evals-all dashboard-spec \
         fix cost gaps exchange-eval facts-xbrl adjudicate fetch-asx fetch-filings dcf-context build-dcf check-dcf warehouse dashboard kpi-coverage screen-metrics check-currency ledger ledger-backfill queue-prune sanity-check \
-        screen-fundamentals backfill-units canonical-iv sync-portfolio commit-refreshed commit-scores screen-deferred screen-deferred-report \
+        screen-fundamentals backfill-units canonical-iv sync-portfolio update-prices commit-refreshed commit-scores screen-deferred screen-deferred-report \
         test test-country lint coverage typecheck
 
 help: ## Show this help
@@ -45,19 +46,7 @@ run: ## Research the next few tickers, score them, report fixes, then rank every
 	@echo "==> baseline (so the cost delta is measurable afterwards)"
 	@$(PY) $(SCRIPTS)/cost_report.py --baseline $(STATE)/cost_baseline.json \
 	  >/dev/null 2>&1 || true
-	@# Free numeric write-back first. A stale price does not invalidate a
-	@# valuation -- weighted_iv and entry_price are price-independent -- so
-	@# refreshing the derived upsides here keeps tickers off the ~$$6
-	@# research path when only the market moved.
-	@echo "==> refreshing drifted prices (free, no model; at most once a day)"
-	@$(MAKE) --no-print-directory refresh-price APPLY=1 DAILY=1 || true
-	@# refresh-price rewrites EVERY drifted ticker, but the run only commits
-	@# the one it researches (commit_ticker stages research/$$TICKER alone), so
-	@# the rest stayed dirty indefinitely -- 133 DCFs were uncommitted on
-	@# 2026-09-01, some refreshed as far back as 2026-08-20. Commit them here,
-	@# where they are written.
-	@$(MAKE) --no-print-directory commit-refreshed || true
-	@echo
+	@# Prices are no longer refreshed here -- that is `make update-prices`.
 	@# The selector reads the portfolio tracker live; this keeps the
 	@# committed fallback (used by CI, which lacks the sibling repo) current.
 	@$(MAKE) --no-print-directory sync-portfolio
@@ -111,14 +100,31 @@ commit-scores: ## Commit eval scorecards + screener output left by `make run`
 	  && echo "committed $$n scorecard(s)"; \
 	fi
 
+update-prices: ## Refresh every DCF's price-derived numbers from live quotes and commit them (no model; DAILY=1 skips if done today)
+	@# A stale price does not invalidate a valuation -- weighted_iv and
+	@# entry_price are price-independent -- so refreshing the derived upsides
+	@# keeps tickers off the ~$$6 research path when only the market moved.
+	@# Split out of `make run` on 2026-09-29 so prices and research run on
+	@# their own schedules.
+	@echo "==> refreshing drifted prices (free, no model)"
+	@$(MAKE) --no-print-directory refresh-price APPLY=1 $(if $(DAILY),DAILY=1,) || true
+	@# refresh-price rewrites EVERY drifted ticker; commit them where they are
+	@# written, or they sit dirty indefinitely (133 DCFs were uncommitted on
+	@# 2026-09-01, some refreshed as far back as 2026-08-20).
+	@$(MAKE) --no-print-directory commit-refreshed || true
+
 commit-refreshed: ## Commit price-only DCF/dashboard rewrites left by refresh-price
-	@git add -A -- research state/last_screen.json index.html 2>/dev/null || true
+	@# Tracked DCF/dashboard files only (-u): `git add -A -- research` also
+	@# swept in a concurrent research run's untracked, half-written Reports,
+	@# which matters now that update-prices can run while a batch is live.
+	@git add -u -- 'research/*/Reports/*_DCF.json' 'research/*/Reports/*_Dashboard.html' \
+	  index.html 2>/dev/null || true
 	@if git diff --cached --quiet; then \
 	  echo "no refreshed prices to commit"; \
 	else \
 	  n=$$(git diff --cached --name-only | grep -c '_DCF.json' || true); \
 	  git commit -q -m "chore: refresh prices on $$n DCF(s)" \
-	    -m "Automated price write-back via make run; no model, no valuation change." \
+	    -m "Automated price write-back via make update-prices; no model, no valuation change." \
 	  && echo "committed price refresh across $$n DCF(s)"; \
 	fi
 
