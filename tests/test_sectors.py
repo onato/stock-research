@@ -49,6 +49,12 @@ class TestSectorKeywords:
         assert sectors.bucket("Banking / Specialist Lending", None) == "bank"
         assert sectors.bucket("Financials / Non-bank Lending (NZ Non-Bank Deposit Taker)", None) == "bank"
 
+    def test_bare_financials_sector_is_bank(self):
+        # info.json's `sector` field is often the single word "Financials"
+        # (GS, GL, NAB.AX, IAG.AX) with no "financial services"/"bank"/etc
+        # qualifier -- that bare string must still route to the bank template.
+        assert sectors.bucket("Financials", None) == "bank"
+
     def test_unknown_is_operating(self):
         assert sectors.bucket("Seafood / Aquaculture", None) == "operating"
         assert sectors.bucket(None, None) == "operating"
