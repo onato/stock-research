@@ -216,34 +216,113 @@ class TestPeriodLabel:
         dashboard: FY2021 and FY2022 were off by one place in the CSV, and
         DB FY2022 (2019-12-30/13-mo-shifted duration) held FY2020's value).
 
-        An annual duration ending within the near-year-end window, in
-        January, belongs to the PRIOR calendar year.
+        `january_year_ends` (what collect() actually passes, computed by
+        january_year_end_dates) names the confirmed dates; a duration ending
+        on one of them belongs to the PRIOR calendar year.
         """
+        confirmed = frozenset({"2021-01-03", "2022-01-02", "2023-01-01"})
         assert bfx.period_label(
             {"start": "2019-12-30", "end": "2021-01-03"},
-            fy_end_month=12) == "FY2020"
+            fy_end_month=12, january_year_ends=confirmed) == "FY2020"
         assert bfx.period_label(
             {"start": "2021-01-04", "end": "2022-01-02"},
-            fy_end_month=12) == "FY2021"
+            fy_end_month=12, january_year_ends=confirmed) == "FY2021"
         assert bfx.period_label(
             {"start": "2022-01-03", "end": "2023-01-01"},
-            fy_end_month=12) == "FY2022"
-        # The in-December year ends are unaffected.
+            fy_end_month=12, january_year_ends=confirmed) == "FY2022"
+        # The in-December year ends are unaffected -- not in the confirmed set.
         assert bfx.period_label(
             {"start": "2023-01-02", "end": "2023-12-31"},
-            fy_end_month=12) == "FY2023"
+            fy_end_month=12, january_year_ends=confirmed) == "FY2023"
         assert bfx.period_label(
             {"start": "2018-12-31", "end": "2019-12-29"},
-            fy_end_month=12) == "FY2019"
+            fy_end_month=12, january_year_ends=confirmed) == "FY2019"
 
-    def test_new_year_drift_uses_the_start_year_even_for_a_single_roll(self):
-        """The same rule for a filer that only rolls into January once --
-        a plain Dec-31 filer whose year end happens to fall on Jan 1 (a
-        weekend roll) is fiscal year `start`'s year by the same logic, not
-        a special case of it."""
+    def test_an_unconfirmed_january_date_is_never_relabeled(self):
+        """The whole reason january_year_ends exists rather than a bare
+        date-math check: American Express (a plain Dec-31 filer) tags an
+        accounting-standard-transition instant at exactly 2016-01-01, a date
+        _near_fiscal_year_end alone cannot tell apart from SFM's genuine
+        2017-01-01 year end. Without evidence in the confirmed set, no
+        rollback happens, whatever the date looks like."""
         assert bfx.period_label(
-            {"start": "2024-01-01", "end": "2025-01-01"},
-            fy_end_month=12) == "FY2024"
+            {"end": "2016-01-01"}, fy_end_month=12) == "FY2016"
+        assert bfx.period_label(
+            {"start": "2015-01-01", "end": "2016-01-01"},
+            fy_end_month=12) == "FY2016"
+
+    def test_instant_year_end_also_drifts_across_the_new_year_boundary(self):
+        """The balance-sheet (instant) branch has the identical collision:
+        SFM's FY2022 balance sheet is AT 2023-01-01, and FY2023's is AT
+        2023-12-31 -- both `end[:4] == "2023"`. Given the same confirmed
+        dates collect() would compute from the filer's own durations, the
+        instant branch needs the identical year-minus-one rollback, or the
+        two years' equity, cash and share count collide on "FY2023" with no
+        start date available to disambiguate by."""
+        confirmed = frozenset({"2021-01-03", "2022-01-02", "2023-01-01"})
+        assert bfx.period_label(
+            {"end": "2021-01-03"}, fy_end_month=12,
+            january_year_ends=confirmed) == "FY2020"
+        assert bfx.period_label(
+            {"end": "2022-01-02"}, fy_end_month=12,
+            january_year_ends=confirmed) == "FY2021"
+        assert bfx.period_label(
+            {"end": "2023-01-01"}, fy_end_month=12,
+            january_year_ends=confirmed) == "FY2022"
+        assert bfx.period_label(
+            {"end": "2023-12-31"}, fy_end_month=12,
+            january_year_ends=confirmed) == "FY2023"
+
+
+class TestJanuaryYearEndDates:
+    """january_year_end_dates: which January `end` dates are trustworthy.
+
+    This is where the AmEx-vs-SFM discrimination actually happens -- see the
+    function's own docstring. collect() passes its result to every
+    period_label call for that filer.
+    """
+
+    def test_a_genuine_52_53_week_close_is_confirmed(self):
+        facts = {"facts": {"us-gaap": {"Revenues": {"units": {"USD": [
+            {"start": "2019-12-30", "end": "2021-01-03", "val": 1},
+            {"start": "2021-01-04", "end": "2022-01-02", "val": 2},
+            {"start": "2022-01-03", "end": "2023-01-01", "val": 3},
+            {"start": "2023-01-02", "end": "2023-12-31", "val": 4},
+        ]}}}}}
+        assert bfx.january_year_end_dates(facts, 12) == {
+            "2021-01-03", "2022-01-02", "2023-01-01"}
+
+    def test_an_unrelated_transition_instant_is_not_confirmed(self):
+        """AmEx: a Jan-1 INSTANT (no start/duration) proves nothing -- only a
+        duration counts as year-end evidence."""
+        facts = {"facts": {"us-gaap": {
+            "Assets": {"units": {"USD": [
+                {"start": "2023-01-01", "end": "2023-12-31", "val": 1},
+                {"start": "2024-01-01", "end": "2024-12-31", "val": 2},
+            ]}},
+            "CumulativeEffectOfNewAccountingPrincipleInPeriodOfAdoption":
+                {"units": {"USD": [{"end": "2024-01-01", "val": 3}]}},
+        }}}
+        assert bfx.january_year_end_dates(facts, 12) == set()
+
+    def test_a_short_duration_ending_in_january_is_not_confirmed(self):
+        """A Q1 (ending in a Jan/Feb/Mar fiscal quarter) must never be
+        mistaken for a rolled fiscal year end."""
+        facts = {"facts": {"us-gaap": {"Revenues": {"units": {"USD": [
+            {"start": "2023-01-01", "end": "2023-12-31", "val": 1},
+            {"start": "2024-11-01", "end": "2025-01-31", "val": 2},
+        ]}}}}}
+        assert bfx.january_year_end_dates(facts, 12) == set()
+
+    def test_a_non_december_filer_is_never_flagged(self):
+        """The rollback only ever applies to a December-modal filer -- a
+        January date near a September year end is an ordinary Q1, not a
+        wrapped year end, and needs no confirmation to say so."""
+        facts = {"facts": {"us-gaap": {"Revenues": {"units": {"USD": [
+            {"start": "2023-10-01", "end": "2024-09-30", "val": 1},
+            {"start": "2024-01-01", "end": "2025-01-03", "val": 2},
+        ]}}}}}
+        assert bfx.january_year_end_dates(facts, 9) == set()
 
 
 class TestFiscalYearEndMonth:

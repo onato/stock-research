@@ -205,8 +205,49 @@ def _near_fiscal_year_end(end: str, fy_end_month: int,
     return False
 
 
-def period_label(fact: dict[str, Any],
-                 fy_end_month: int | None = None) -> str | None:
+def january_year_end_dates(facts: dict[str, Any],
+                           fy_end_month: int | None) -> set[str]:
+    """Which January `end` dates are a genuine December-closer's year end.
+
+    A December-modal filer can still close in the first days of January
+    (SFM, AVY and DPZ all close on a fixed weekday nearest Dec 31; some
+    years land a few days early, in December, and some a few days late, in
+    January). But a January `end` date on its own is not evidence of that --
+    American Express and dozens of other plain calendar-year filers tag
+    unrelated one-off concepts (an accounting-standard transition amount,
+    typically) at exactly `Jan 1`, and `_near_fiscal_year_end`'s tolerance
+    window cannot tell that apart from a true 52/53-week close by date shape
+    alone: a genuine close can equally land exactly on `Jan 1` (SFM's own
+    FY2016 did). What DOES distinguish them is duration evidence -- only a
+    real fiscal year end has an annual (~365-day) duration fact ending on
+    it, because a transition-adjustment instant reports a single balance,
+    never a period. So this collects the `end` dates of every duration
+    ending in January that both (a) is near the filer's own December
+    boundary and (b) is at least 300 days long, and only those dates get
+    the year-minus-one rollback -- an instant on any OTHER January date is
+    left alone, however close it sits to a year boundary.
+    """
+    if fy_end_month != 12:
+        return set()
+    dates: set[str] = set()
+    gaap = (facts.get("facts") or {}).get("us-gaap") or {}
+    for entry in gaap.values():
+        for rows in (entry.get("units") or {}).values():
+            for f in rows:
+                start, end = f.get("start"), f.get("end")
+                if not start or not end or int(end[5:7]) != 1:
+                    continue
+                try:
+                    if ((_d(end) - _d(start)).days > 300
+                            and _near_fiscal_year_end(end, fy_end_month)):
+                        dates.add(end)
+                except (ValueError, IndexError):
+                    continue
+    return dates
+
+
+def period_label(fact: dict[str, Any], fy_end_month: int | None = None,
+                 january_year_ends: frozenset[str] = frozenset()) -> str | None:
     """Derive the period from the fact's own dates, not its `fy`.
 
     A 10-K restates prior years, so `fy` is the filing's year rather than
@@ -219,12 +260,24 @@ def period_label(fact: dict[str, Any],
     revenue and no balance sheet -- and, per concept, every non-year-end
     quarter was dropped by the rank tie-break. Without `fy_end_month` the
     caller has no fiscal context, so the old annual labeling stands.
+
+    `january_year_ends` (see january_year_end_dates) names the specific
+    January `end` dates confirmed, by duration evidence, to be a real
+    December-closer's fiscal year end -- and end[:4] then names the wrong
+    year (2021-01-03 is fiscal 2020, not 2021). Two DIFFERENT fiscal years
+    (one closing in January, the next in December) would otherwise collide
+    on the identical "FY{year}" label, and collect()'s later-filing-wins
+    tie-break silently drops one instead of raising anything: SFM's true
+    FY2022 revenue, $6.404bn, vanished from core_metrics this way (found
+    2026-09-28 auditing a stale dashboard).
     """
     end = fact.get("end", "")
     start = fact.get("start")
     if not end:
         return None
     year = end[:4]
+    if end in january_year_ends:
+        year = str(int(year) - 1)
     if not start:                       # instant (balance sheet)
         month = int(end[5:7])
         if fy_end_month is None or month == fy_end_month:
@@ -240,29 +293,12 @@ def period_label(fact: dict[str, Any],
         # The window is days rather than a month: a Nov-closing filer's Q1
         # ends in early March, and anything wide enough to catch that would
         # give every filer a phantom second FY row.
-        if _near_fiscal_year_end(end, fy_end_month):
+        if end in january_year_ends or _near_fiscal_year_end(end, fy_end_month):
             return f"FY{year}"
         q = (month - 1) // 3 + 1
         return f"Q{q} {year}"
     days = (_d(end) - _d(start)).days
     if days > 300:
-        # A 52/53-week filer's year end drifts a few days either side of its
-        # modal month, and when that modal month is December the drift can
-        # cross the new year: Sprouts Farmers Market closes on the Sunday
-        # nearest Dec 31, so FY2020 ended 2021-01-03 and FY2022 ended
-        # 2023-01-01. `end[:4]` reads both as one year later than the
-        # filer's own fiscal year -- and worse, two DIFFERENT fiscal years
-        # (one closing in January, the next in December) then collide on
-        # the same "FY{year}" label, so collect()'s later-filing-wins
-        # tie-break silently drops one rather than raising anything (SFM's
-        # true FY2022 revenue, $6.404bn, vanished from core_metrics this
-        # way -- found 2026-09-28 auditing a stale dashboard). Sprouts calls
-        # the year ending 2021-01-03 "fiscal 2020" -- a 53-week year that
-        # overran into January -- so the fiscal year is `end`'s year minus
-        # one whenever the drift has carried it past New Year's.
-        if (fy_end_month is not None and int(end[5:7]) == 1
-                and start[:4] != year and _near_fiscal_year_end(end, fy_end_month)):
-            return f"FY{int(year) - 1}"
         return f"FY{year}"
     if days > 200:
         # 9-month 10-Q YTD. It is not a canonical reporting period -- and
@@ -361,6 +397,7 @@ def collect(facts: dict[str, Any],
     used: list[str] = []
     unit_seen: str | None = None
     fy_end = fiscal_year_end_month(facts)
+    jan_year_ends = frozenset(january_year_end_dates(facts, fy_end))
     for pref, concept in enumerate(concepts):
         entry = gaap.get(concept)
         if not entry:
@@ -372,7 +409,7 @@ def collect(facts: dict[str, Any],
                 if (unit == "shares" and f.get("val") is not None
                         and 0 < abs(f["val"]) < MIN_PLAUSIBLE_SHARE_COUNT):
                     continue
-                p = period_label(f, fy_end)
+                p = period_label(f, fy_end, jan_year_ends)
                 if not p:
                     continue
                 # Same accession already reported a value for this period
