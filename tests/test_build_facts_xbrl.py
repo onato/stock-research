@@ -200,6 +200,51 @@ class TestPeriodLabel:
         # A genuine quarter end, a month clear of the boundary, is unaffected.
         assert bfx.period_label({"end": "2024-10-31"}, fy_end_month=7) == "Q4 2024"
 
+    def test_year_end_drifting_across_the_new_year_boundary(self):
+        """Sprouts Farmers Market closes on the Sunday nearest Dec 31, so its
+        year end lands in December some years and the first days of January
+        in others -- fy_end_month comes out as 12 either way (the modal
+        month), but `end[:4]` silently mislabels the January closers.
+
+        Worse than the ADBE case (which only drifted the month): two
+        genuinely different fiscal years both stringify to the same label.
+        FY2022 ended 2023-01-01 (end[:4] == "2023") and FY2023 ended
+        2023-12-31 (end[:4] == "2023" too) -- both "FY2023". collect()'s
+        later-filing-wins tie-break then picked one and the other, FY2022's
+        real $6.404bn revenue, vanished from core_metrics entirely rather
+        than raising anything (found 2026-09-28 auditing a stale SFM
+        dashboard: FY2021 and FY2022 were off by one place in the CSV, and
+        DB FY2022 (2019-12-30/13-mo-shifted duration) held FY2020's value).
+
+        An annual duration ending within the near-year-end window, in
+        January, belongs to the PRIOR calendar year.
+        """
+        assert bfx.period_label(
+            {"start": "2019-12-30", "end": "2021-01-03"},
+            fy_end_month=12) == "FY2020"
+        assert bfx.period_label(
+            {"start": "2021-01-04", "end": "2022-01-02"},
+            fy_end_month=12) == "FY2021"
+        assert bfx.period_label(
+            {"start": "2022-01-03", "end": "2023-01-01"},
+            fy_end_month=12) == "FY2022"
+        # The in-December year ends are unaffected.
+        assert bfx.period_label(
+            {"start": "2023-01-02", "end": "2023-12-31"},
+            fy_end_month=12) == "FY2023"
+        assert bfx.period_label(
+            {"start": "2018-12-31", "end": "2019-12-29"},
+            fy_end_month=12) == "FY2019"
+
+    def test_new_year_drift_uses_the_start_year_even_for_a_single_roll(self):
+        """The same rule for a filer that only rolls into January once --
+        a plain Dec-31 filer whose year end happens to fall on Jan 1 (a
+        weekend roll) is fiscal year `start`'s year by the same logic, not
+        a special case of it."""
+        assert bfx.period_label(
+            {"start": "2024-01-01", "end": "2025-01-01"},
+            fy_end_month=12) == "FY2024"
+
 
 class TestFiscalYearEndMonth:
     """The FY-end month comes from the filer's own annual durations.

@@ -246,6 +246,23 @@ def period_label(fact: dict[str, Any],
         return f"Q{q} {year}"
     days = (_d(end) - _d(start)).days
     if days > 300:
+        # A 52/53-week filer's year end drifts a few days either side of its
+        # modal month, and when that modal month is December the drift can
+        # cross the new year: Sprouts Farmers Market closes on the Sunday
+        # nearest Dec 31, so FY2020 ended 2021-01-03 and FY2022 ended
+        # 2023-01-01. `end[:4]` reads both as one year later than the
+        # filer's own fiscal year -- and worse, two DIFFERENT fiscal years
+        # (one closing in January, the next in December) then collide on
+        # the same "FY{year}" label, so collect()'s later-filing-wins
+        # tie-break silently drops one rather than raising anything (SFM's
+        # true FY2022 revenue, $6.404bn, vanished from core_metrics this
+        # way -- found 2026-09-28 auditing a stale dashboard). Sprouts calls
+        # the year ending 2021-01-03 "fiscal 2020" -- a 53-week year that
+        # overran into January -- so the fiscal year is `end`'s year minus
+        # one whenever the drift has carried it past New Year's.
+        if (fy_end_month is not None and int(end[5:7]) == 1
+                and start[:4] != year and _near_fiscal_year_end(end, fy_end_month)):
+            return f"FY{int(year) - 1}"
         return f"FY{year}"
     if days > 200:
         # 9-month 10-Q YTD. It is not a canonical reporting period -- and
