@@ -498,3 +498,108 @@ class TestCarpetManufacturerInsuranceAndInventoryPromotion:
         assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
         for n in names:
             assert schema.promote_header(n) == n
+
+
+class TestDealershipFundingAndMinorityInterestPromotion:
+    """Dealership funding structure and NCI (Colonial Motor Company, CMO.NZ).
+
+    CMO runs its own internal finance function for vehicle inventory --
+    VehicleFloorplanFinance is a revolving, self-liquidating facility tied
+    to stock on hand, not general borrowings, and AtCallDeposits is the
+    retail funding side of that book; blending either into
+    TotalDebt/CashAndEquivalents hides how much of group funding is
+    floorplan-specific versus core leverage. NonControllingInterestProfit is
+    the minority share of group NPAT carved out by partly-owned dealership
+    subsidiaries (including the BYD joint-venture dealerships). All three
+    were absent from PROMOTE_KPIS, so none reached the CSV.
+    """
+
+    def test_floorplan_and_nci_kpis_are_promoted(self, patch_repo):
+        names = [
+            "VehicleFloorplanFinance",
+            "AtCallDeposits",
+            "NonControllingInterestProfit",
+        ]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestImpairmentAndNormalisedEBITPromotion:
+    """FY2026 goodwill impairment and non-GAAP EBIT (EROAD, ERD.NZ).
+
+    EROAD took a NZ$134.7m goodwill/other-asset impairment on its North
+    American CGU in FY2026, which dominates reported NetIncome that year;
+    without a labelled series alongside it, a swing from ~$1.4m to -$161m
+    reads as a data error rather than a one-off non-cash charge.
+    NormalisedEBIT is management's own non-GAAP operating measure used
+    throughout their results presentations, distinct from the statutory
+    OperatingIncome column. Both names were absent from PROMOTE_KPIS.
+    """
+
+    def test_impairment_and_normalised_ebit_are_promoted(self, patch_repo):
+        names = ["ImpairmentGoodwillAndOtherAssets", "NormalisedEBIT"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestInterestPaidPromotion:
+    """Cash interest paid (Fonterra Co-operative Group, FCG.NZ).
+
+    Interest paid fell from ~$446m FY2018 to ~$202m FY2026 as the
+    co-operative deleveraged -- the trend a dashboard should chart -- but
+    the name was absent from PROMOTE_KPIS, so 16 populated periods sat
+    stranded in the `kpis` table instead of reaching the CSV.
+    """
+
+    def test_interest_paid_is_promoted(self, patch_repo):
+        make_db(patch_repo, "SYN", ["InterestPaid"])
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        assert schema.promote_header("InterestPaid") == "InterestPaid"
+
+
+class TestAmortisationAndTermDepositsPromotion:
+    """Amortisation and term deposits (ikeGPS Group, IKE.NZ).
+
+    Depreciation is already promoted, but Amortisation -- its smaller
+    companion in D&A -- was absent from PROMOTE_KPIS. TermDeposits is
+    material: IKE's DCF treats net cash as cash-and-equivalents PLUS term
+    deposits (~NZ$21.1m of the ~NZ$32.8m net cash figure at FY2026), so
+    leaving it stranded in `kpis` understates cash on the dashboard by
+    roughly two-thirds.
+    """
+
+    def test_amortisation_and_term_deposits_are_promoted(self, patch_repo):
+        names = ["Amortisation", "TermDeposits"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestLeverageAndImpactPromotion:
+    """Demant A/S (DEMANT.CO) leverage and disclosed-impact KPIs.
+
+    Demant reports gearing (net interest-bearing debt / EBITDA) as its own
+    covenant measure -- ~3.0x at H1 FY2026 against a 2.0-2.5x target -- and
+    the underlying NIBD balance, but both names were absent from
+    PROMOTE_KPIS so 10+ years of history sat stranded in `kpis` while the
+    dashboard could only show TotalDebt (gross, no netting). Net income also
+    includes discontinued operations, so ProfitContinuingOperations is the
+    comparable line to Revenue/OperatingIncome, which are continuing-ops
+    restated. LivesImprovedMillion is the company's own disclosed patient-
+    impact metric. Acquisitions cash outflow explains the FY2025 gearing
+    spike (a ~6.3bn DKK deal year).
+    """
+
+    def test_leverage_and_impact_kpis_are_promoted(self, patch_repo):
+        names = ["net_interest_bearing_debt", "gearing_multiple",
+                  "lives_improved_million", "profit_continuing_operations",
+                  "acquisitions"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) is not None

@@ -119,6 +119,12 @@ class TestPromotableKpiVocabulary:
         assert schema.promote_header("OrderBook") == "OrderBook"
         assert schema.promote_header("OrderBookWithOptions") == "OrderBookWithOptions"
 
+    def test_promotes_revpar(self):
+        """Hotel revenue per available room (Millennium & Copthorne Hotels
+        New Zealand Limited, MCK.NZ) is a hotel-specific operating KPI, not
+        derivable from the CSV's Revenue/Occupancy columns alone."""
+        assert schema.promote_header("RevPAR") == "RevPAR"
+
     def test_unknown_kpi_name_is_not_promoted(self):
         """Opt-in, not opt-out: an unrecognised name stays out of the CSV."""
         assert schema.promote_header("WaferShipments") is None

@@ -319,6 +319,17 @@ PROMOTE_KPIS: dict[str, str] = {
     "SegmentEBITLightBuildingProducts": "SegmentEBITLightBuildingProducts",
     "SegmentEBITResidentialAndDevelopment": "SegmentEBITResidentialAndDevelopment",
     "SignificantItems": "SignificantItems",
+    # Consolidated-vs-attributable split for a majority-owned holding company
+    # (PCCW Limited, 0008.HK, ~52% of HKT): PCCW consolidates 100% of HKT's
+    # profit and equity, but most of it belongs to non-controlling interests
+    # before reaching PCCW's own shareholders -- ProfitForPeriodTotal (group,
+    # positive) and TotalEquityInclNCI (group, positive) are far larger than
+    # the attributable NetIncome/ShareholdersEquity columns (both negative in
+    # FY2025), which is the central minority-interest story for this ticker.
+    "ProfitForPeriodTotal": "ProfitForPeriodTotal",
+    "TotalEquityInclNCI": "TotalEquityInclNCI",
+    "CapexPPE": "CapexPPE",
+    "CapexIntangibles": "CapexIntangibles",
     # Property / financial sector staples
     "AFFO": "AFFO",
     "AISC": "AISC",                       # gold miners: all-in sustaining cost per oz
@@ -338,6 +349,13 @@ PROMOTE_KPIS: dict[str, str] = {
     # -- continuing operations actually lost A$118.4m that year.
     "NetIncomeContinuing": "NetIncomeContinuing",
     "DiscontinuedOpsProfit": "DiscontinuedOpsProfit",
+    # Fortive (FTV): the Jun-2025 Ralliant spin-off means core_metrics
+    # net_income/operating_cash_flow are whole-company (incl. divested
+    # Ralliant) through FY2025, while these kpis rows are the go-forward
+    # continuing-operations-only view -- charting only the whole-company
+    # column overstates FY2024/2025 margins by as much as ~50% on OCF.
+    "NetIncomeDiscontinued": "NetIncomeDiscontinued",
+    "OperatingCashFlowContinuing": "OperatingCashFlowContinuing",
     "NAVPerShare": "NAVPerShare",
     "NTAPerShare": "NTAPerShare",
     # Funds From Operations (REIT/stapled-security non-IFRS cash measure,
@@ -351,6 +369,10 @@ PROMOTE_KPIS: dict[str, str] = {
     "PreTaxFFOPerShare": "PreTaxFFOPerShare",
     "Gearing": "Gearing",
     "Occupancy": "Occupancy",
+    # Hotel revenue per available room (Millennium & Copthorne Hotels New
+    # Zealand Limited, MCK.NZ) -- the industry-standard yield metric,
+    # distinct from Occupancy (a rate) and Revenue (not per-room).
+    "RevPAR": "RevPAR",
     "WALT": "WALT",
     "AUM": "AUM",
     # A wealth manager's own named "Total AUM" figure (AMP.AX: Platforms,
@@ -515,6 +537,11 @@ PROMOTE_KPIS: dict[str, str] = {
     "SettledUnits": "SettledUnits",
     "PreSaleBook": "PreSaleBook",
     "AvgRevenuePerUnit": "AvgRevenuePerUnit",
+    # Bottler-industry standard volume KPI (Coca-Cola Europacific Partners,
+    # CCEP): billions of unit cases sold in the period, the metric management
+    # itself leads with alongside revenue -- distinct from revenue growth
+    # since it strips out pricing/mix.
+    "UnitCaseVolume": "UnitCaseVolume",
     "SupplierCommissionsRevenue": "SupplierCommissionsRevenue",
     "ServicesRevenue": "ServicesRevenue",
     "OtherRevenue": "OtherRevenue",
@@ -710,6 +737,98 @@ PROMOTE_KPIS: dict[str, str] = {
     "CycloneInsuranceCashInOCF": "CycloneInsuranceCashInOCF",
     "OperatingCashFlowExInsurance": "OperatingCashFlowExInsurance",
     "Inventory": "Inventory",
+    # Dealership funding structure (Colonial Motor Company, CMO.NZ): the group
+    # runs its own internal finance function for vehicle inventory --
+    # floorplan finance is a revolving, self-liquidating facility tied
+    # directly to stock on hand, not general borrowings, and at-call deposits
+    # are the retail funding side of that book. Blending either into
+    # TotalDebt/CashAndEquivalents hides how much of group funding is
+    # floorplan-specific versus core leverage.
+    "VehicleFloorplanFinance": "VehicleFloorplanFinance",
+    "AtCallDeposits": "AtCallDeposits",
+    # Non-controlling interest in profit (CMO.NZ): partly-owned dealership
+    # subsidiaries -- including the BYD joint-venture dealerships -- mean
+    # reported NetIncome is not all attributable to CMO shareholders; this is
+    # the minority share carved out of group NPAT.
+    "NonControllingInterestProfit": "NonControllingInterestProfit",
+    # FY2026 goodwill/other-asset impairment on the North American CGU
+    # (EROAD, ERD.NZ): NZ$134.7m, dominating reported NetIncome that year
+    # (a swing to -$161.1m). NormalisedEBIT is management's own non-GAAP
+    # operating measure used throughout their results presentations,
+    # distinct from the statutory OperatingIncome column.
+    "ImpairmentGoodwillAndOtherAssets": "ImpairmentGoodwillAndOtherAssets",
+    "NormalisedEBIT": "NormalisedEBIT",
+    # Cash interest paid (Fonterra Co-operative Group, FCG.NZ): the
+    # co-operative's own deleveraging story is told in cash interest, not
+    # the statutory net-margin line -- interest paid fell from ~$446m
+    # FY2018 to ~$202m FY2026 as debt was paid down, which is invisible in
+    # the generic TotalDebt/CashAndEquivalents pair alone.
+    "InterestPaid": "InterestPaid",
+    # Amortisation and term deposits (ikeGPS Group, IKE.NZ): Amortisation is
+    # Depreciation's smaller companion in D&A but is a distinct concept, not
+    # an alias of it, and is not an owner-FCF component -- it belongs
+    # promoted, not blocked. TermDeposits is material: the DCF's net-cash
+    # figure is cash-and-equivalents PLUS term deposits (~NZ$21.1m of the
+    # ~NZ$32.8m FY2026 net cash), so leaving it in `kpis` understated cash
+    # on the dashboard by roughly two-thirds.
+    "Amortisation": "Amortisation",
+    "TermDeposits": "TermDeposits",
+    # Investment-holding company whose equity-accounted JV/associate
+    # portfolio IS the business (Power Assets Holdings, 0006.HK): statutory
+    # Revenue is ~85% understated (it is mostly shareholder-loan interest
+    # and excludes JV/associate dividends entirely), so ShareOfJVProfit/
+    # ShareOfAssociateProfit (equity-accounted earnings) and the actual cash
+    # received -- DividendsReceivedJV, DividendsReceivedAssociates,
+    # DistributionFromAssociate, LoanInterestIncomeJVAssociates -- are what
+    # the DCF's base_revenue is built from (see DCF JSON inputs.
+    # base_revenue_basis), not the CSV's Revenue column. GainOnDisposalJV
+    # is the one-off ~HK$11.3bn UK Power Networks sale gain booked in H1
+    # FY2026, which must be flagged as non-recurring rather than read as
+    # organic earnings growth.
+    "ShareOfJVProfit": "ShareOfJVProfit",
+    "ShareOfAssociateProfit": "ShareOfAssociateProfit",
+    "DividendsReceivedJV": "DividendsReceivedJV",
+    "DividendsReceivedAssociates": "DividendsReceivedAssociates",
+    "DistributionFromAssociate": "DistributionFromAssociate",
+    "LoanInterestIncomeJVAssociates": "LoanInterestIncomeJVAssociates",
+    "GainOnDisposalJV": "GainOnDisposalJV",
+    # Core trading revenue vs investment income (Hong Kong Exchanges and
+    # Clearing, 0388.HK): the statutory Revenue line blends the exchange's
+    # own trading/clearing/listing fees with investment income earned on
+    # clearing-participant margin money, which swings with interest rates
+    # independent of trading activity (GrossInvestmentIncome went from
+    # HK$1.35bn in FY2021 to HK$10.97bn in FY2023 on rate hikes alone).
+    # PrincipalOperatingCashFlow is HKEX's own disclosed cash-flow measure
+    # that excludes movements in participant margin/clearing balances the
+    # statutory OperatingCashFlow column does not separate out.
+    "CoreRevenue": "CoreRevenue",
+    "GrossInvestmentIncome": "GrossInvestmentIncome",
+    "PrincipalOperatingCashFlow": "PrincipalOperatingCashFlow",
+    # Leverage covenant measure and disclosed patient-impact metric (Demant
+    # A/S, DEMANT.CO): gearing (net interest-bearing debt / EBITDA) is the
+    # company's own covenant ratio -- ~3.0x at H1 FY2026 against a 2.0-2.5x
+    # target -- distinct from the gross TotalDebt column, which nets nothing.
+    # ProfitContinuingOperations is the comparable earnings line to
+    # Revenue/OperatingIncome (both continuing-ops restated), since reported
+    # NetIncome still includes discontinued operations. Acquisitions cash
+    # outflow explains the FY2025 gearing spike (~6.3bn DKK deal year).
+    "net_interest_bearing_debt": "NetInterestBearingDebt",
+    "gearing_multiple": "GearingMultiple",
+    "lives_improved_million": "LivesImprovedMillion",
+    "profit_continuing_operations": "ProfitContinuingOperations",
+    "acquisitions": "Acquisitions",
+    # Non-GAAP "Core" EPS (AstraZeneca, AZN): management's own adjusted
+    # earnings measure, distinct from the Reported/IFRS EPS in core_metrics.
+    # Populated FY2019-FY2021 and H1/Q3/Q1 from FY2021 on -- not every period,
+    # so the chart must tolerate gaps rather than assume full history.
+    "CoreEPS": "CoreEPS",
+    # Licensing/milestone intangible-asset purchases (AZN): a distinct
+    # pharma capital-allocation line from PP&E CapEx, disclosed separately
+    # in the cash flow statement every period since FY2015.
+    "PurchaseOfIntangibles": "PurchaseOfIntangibles",
+    # Cash settlement of employee share awards (AZN): a financing/SBC-
+    # adjacent cash outflow disclosed alongside the equity award programme.
+    "ShareAwardSettlement": "ShareAwardSettlement",
 }
 
 # Owner-FCF components and core-column duplicates. Listed explicitly so a
@@ -788,6 +907,7 @@ KPI_ALIASES: dict[str, str] = {
     "navpershare": "NAVPerShare",
     "ntapershare": "NTAPerShare",
     "occupancy": "Occupancy",
+    "revpar": "RevPAR",
     "walt": "WALT",
     "aum": "AUM",
     "totalaum": "TotalAUM",
