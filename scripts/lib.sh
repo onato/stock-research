@@ -12,6 +12,26 @@
 # Expects the caller to have set: REPO_ROOT, LOG_DIR, PUSH.
 
 # ---------------------------------------------------------------------------
+# route_prompt <ticker>
+#
+# Prints the skill prompt refresh_route.py picks for this ticker (empty means
+# no model). FORCE=1 pins the full /research-stock. REVALUE=1 bypasses the
+# router for /revalue-stock, which rebuilds only the DCF: the router calls a
+# freshly researched ticker tier 1 (skip), and /refresh-stock keeps the old DCF
+# when the narrative has not moved (2026-09-26: 89 DCFs built on Sonnet after
+# the Fable limit ran out needed redoing with neither).
+# ---------------------------------------------------------------------------
+route_prompt() {
+  if [ -n "${REVALUE:-}" ]; then
+    echo "/revalue-stock $1"
+    return 0
+  fi
+  uv run --project "$REPO_ROOT" python3 \
+    "$REPO_ROOT/scripts/refresh_route.py" --ticker "$1" --prompt \
+    ${FORCE:+--force}
+}
+
+# ---------------------------------------------------------------------------
 # research_ticker <ticker> [--quiet]
 #
 # Runs the skill this ticker needs -- /research-stock for a tier-3 ticker
@@ -46,15 +66,14 @@ research_ticker() {
   # numbers that cannot have moved. refresh_route returns the empty string
   # when no model should run at all (tier 0/1).
   #
-  # FORCE=1 pins this to the full re-research regardless of tier.
+  # FORCE=1 pins this to the full re-research regardless of tier; REVALUE=1
+  # to the DCF-only /revalue-stock (see route_prompt).
   #
   # A routing *failure* and a legitimate "no work" both produce no usable
   # prompt, and they must not be confused: skipping a ticker because the
   # router crashed would silently drop it from the run. So the exit status
   # decides, and only a clean exit is allowed to mean "skip".
-  if skill_prompt=$(uv run --project "$REPO_ROOT" python3 \
-       "$REPO_ROOT/scripts/refresh_route.py" --ticker "$ticker" --prompt \
-       ${FORCE:+--force} 2>/dev/null); then
+  if skill_prompt=$(route_prompt "$ticker" 2>/dev/null); then
     if [ -z "$skill_prompt" ]; then
       echo "[$ticker] nothing to do (tier 0/1) -- skipping the model."
       return 0
