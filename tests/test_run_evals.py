@@ -854,6 +854,30 @@ class TestEntryPriceHurdleConsistency:
         assert r
         assert r[0]["status"] == "skip", r
 
+    def test_declining_projected_shares_used_over_flat_outstanding(self):
+        """dcf_engine.py's entry-price block divides by the projected share
+        count at year N (`_projected_shares(inputs, n)[-1]`), not the flat
+        `shares_outstanding` anchor -- a buyback-driven declining count
+        (DOW.NZ: 668.2m now -> 629.7m by year 10) means the two diverge by
+        several percent. The check must recompute against the same share
+        count the engine used, or it fails a correctly-built DCF."""
+        d = self._dcf(0.0)
+        d["inputs"]["projected_shares"] = [
+            647.0, 645.0, 643.1, 641.2, 639.2,
+            637.3, 635.4, 633.5, 631.6, 629.7,
+        ]
+        fcf = d["projections"]["base"]["fcf"]
+        pv = sum(f / 1.15 ** (i + 1) for i, f in enumerate(fcf))
+        gordon = fcf[-1] * 1.015 / (0.15 - 0.015)
+        tv = min(gordon, fcf[-1] * 15)
+        exp = (pv + tv / 1.15 ** 10 - 11045.0) / 629.7
+        d["entry_price"]["base"]["entry_price"] = round(exp, 2)
+        card = E.Card()
+        E.check_entry_price_hurdle(d, card)
+        r = [c for c in card.checks if c["id"] == "dcf_entry_price_hurdle"]
+        assert r
+        assert r[0]["status"] == "pass", r
+
     def test_book_value_model_with_dividend_flows_skips(self):
         """RYM.NZ discounts DIVIDENDS to an exit P/B on a BVPS path. Its entry
         prices are already correct at the hurdle, but comparing them against a

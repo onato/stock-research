@@ -88,6 +88,28 @@ def _rl(xs: list[float], n: int) -> list[float]:
     return [_r(x, n) for x in xs]
 
 
+def _r_twin(x: float) -> float:
+    """Round a MODEL-currency per-share twin (the `_{cur}` suffixed fields
+    beside a quote-currency headline) to 4dp rather than the headline's 2dp.
+
+    Both the headline (`intrinsic_value`, in quote currency) and its twin
+    (`intrinsic_value_<model>`) are rounded independently from the same
+    unrounded per-share value, one before and one after multiplying by
+    `fx_rate`. dashboard.html's slider engine has no access to the unrounded
+    number, so it reconstructs the FX rate as the ratio of the two STORED,
+    already-rounded figures (quoteFxRate()). At 2dp that ratio is accurate
+    to a fraction of a cent on either side -- immaterial for a $10 stock, but
+    for a small per-share value (MHJ.NZ bear case: NZ$0.28 / A$0.22) that
+    same absolute rounding is a large fraction of the number, and the
+    reconstructed ratio can miss the true fx_rate by more than
+    dashboard.html's ENGINE_TOL (1.5%), tipping an otherwise-exact scenario
+    into the generic-scaler fallback. Rounding the twin to 4dp instead keeps
+    the reconstructed ratio within a few basis points of the true rate
+    regardless of magnitude, without changing the 2dp headline a reader sees.
+    """
+    return _r(x, 4)
+
+
 def _first(a: dict[str, Any], names: tuple[str, ...]) -> Any:
     for k in names:
         if a.get(k) is not None:
@@ -384,8 +406,8 @@ def build(drivers: dict[str, Any]) -> dict[str, Any]:
                                               if s.raw["adj_ebitda"][-1] else None),
         })
         if sfx:
-            v[f"intrinsic_value{sfx}"] = _r(iv, 2)
-            v[f"street_intrinsic_value{sfx}"] = _r(street, 2)
+            v[f"intrinsic_value{sfx}"] = _r_twin(iv)
+            v[f"street_intrinsic_value{sfx}"] = _r_twin(street)
         valuation[sc] = v
 
         tvh = terminal_value(fcfs[-1], hurdle, s.tg, s.cap)
@@ -401,14 +423,14 @@ def build(drivers: dict[str, Any]) -> dict[str, Any]:
             "entry_discount_from_current": _r((ep * s.fx / price - 1) * 100, 1),
         }
         if sfx:
-            e[f"entry_price{sfx}"] = _r(ep, 2)
+            e[f"entry_price{sfx}"] = _r_twin(ep)
         entry[sc] = e
 
     fx = scen["base"].fx
     w_entry = sum(weights[sc] * entry_model[sc] for sc in SCENARIOS)
     entry["weighted_entry_price"] = _r(w_entry * fx, 2)
     if sfx:
-        entry[f"weighted_entry_price{sfx}"] = _r(w_entry, 2)
+        entry[f"weighted_entry_price{sfx}"] = _r_twin(w_entry)
 
     base = scen["base"]
     returns: list[float] = [base.wacc] + [r for r in REQUIRED_RETURNS if r != base.wacc]
@@ -454,8 +476,8 @@ def build(drivers: dict[str, Any]) -> dict[str, Any]:
         "band_position": band,
     }
     if sfx:
-        pw[f"weighted_iv{sfx}"] = _r(w_iv, 2)
-        pw[f"street_weighted_iv{sfx}"] = _r(w_street, 2)
+        pw[f"weighted_iv{sfx}"] = _r_twin(w_iv)
+        pw[f"street_weighted_iv{sfx}"] = _r_twin(w_street)
     for k, v in pw_in.items():
         if k not in pw:
             pw[k] = v

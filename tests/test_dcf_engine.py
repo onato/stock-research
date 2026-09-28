@@ -215,9 +215,12 @@ class TestCurrency:
         apa["current_price"] = 11.9
         dcf = dcf_engine.build(apa)
         v = dcf["valuation"]["base"]
-        assert v["intrinsic_value_aud"] == 8.0
+        # The model-currency twin is stored to 4dp (not the headline's 2dp)
+        # so the dashboard's FX-ratio reconstruction stays accurate for
+        # small per-share values -- see _r_twin.
+        assert v["intrinsic_value_aud"] == pytest.approx(8.0, abs=0.01)
         assert v["intrinsic_value"] == 8.8
-        assert dcf["probability_weighted"]["weighted_iv_aud"] == 7.33
+        assert dcf["probability_weighted"]["weighted_iv_aud"] == pytest.approx(7.33, abs=0.01)
         assert dcf["probability_weighted"]["weighted_iv"] == pytest.approx(8.06, abs=0.01)
         assert dcf["entry_price"]["base"]["entry_price"] == pytest.approx(-2.64 * 1.1, abs=0.01)
 
@@ -225,6 +228,30 @@ class TestCurrency:
         apa["inputs"]["quote_currency"] = "NZD"
         with pytest.raises(dcf_engine.DriversError, match="fx_rate"):
             dcf_engine.build(apa)
+
+    def test_dual_currency_small_per_share_value_survives_2dp_rounding(self, apa):
+        # MHJ.NZ (2026-09-26): dashboard.html's quoteFxRate() reconstructs the
+        # FX rate for its slider engine as
+        # valuation[sc].intrinsic_value / valuation[sc].intrinsic_value_<model>
+        # -- both already rounded to 2dp. For a bear-case per-share value near
+        # $0.20-0.30 that reconstructed ratio can drift far enough from the
+        # true fx_rate (MHJ bear: 1.27 reconstructed vs 1.2402 actual, a 2.6%
+        # error) to blow ENGINE_TOL (1.5%) and fall back to the generic
+        # scaler, even though dcf_engine's own build is exact. Scale APA's
+        # share count up so its bear IV lands in that same cents-per-share
+        # danger zone, then assert the two STORED currency twins
+        # reconstruct fx_rate to within ENGINE_TOL.
+        apa["inputs"]["shares_outstanding"] = 21_400.0
+        apa["inputs"]["projected_shares"] = [21_400.0] * 10
+        apa["inputs"]["quote_currency"] = "NZD"
+        apa["inputs"]["fx_rate"] = 1.2402
+        apa["current_price"] = 0.42
+        dcf = dcf_engine.build(apa)
+        v = dcf["valuation"]["bear"]
+        assert v["intrinsic_value_aud"] not in (0, None)
+        reconstructed_fx = v["intrinsic_value"] / v["intrinsic_value_aud"]
+        engine_tol = 0.015
+        assert abs(reconstructed_fx - 1.2402) <= engine_tol * 1.2402
 
 
 class TestContract:

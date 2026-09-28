@@ -1397,7 +1397,19 @@ function validateEngines() {
     for (const sc of ['base', 'bull', 'bear']) {
         const r = runEngine(sc);
         const target = ((dcfData.valuation || {})[sc] || {}).intrinsic_value;
-        const ok = !!(r && target && isFinite(r.iv) && Math.abs(r.iv - target) <= ENGINE_TOL * Math.abs(target));
+        // Absolute floor alongside the relative tolerance: a distressed/
+        // going-concern scenario's stored intrinsic_value is rounded to 2dp
+        // at the source (dcf_engine.py's _r(iv, 2)), so for a near-zero
+        // target (ENS.NZ base -0.01, bear -0.26) that rounding alone can
+        // exceed a pure RELATIVE tolerance even when the JS engine agrees
+        // with the stored value to better than half a cent. Mirrors
+        // dcf_engine.py's check(): max(tol * abs(target), 0.005). Also,
+        // `target` must be checked with isFinite, not truthiness -- a
+        // stored intrinsic_value of exactly 0 is a legitimate target and
+        // was previously rejected by `target &&`.
+        const hasTarget = isFinite(target);
+        const tol = hasTarget ? Math.max(ENGINE_TOL * Math.abs(target), 0.005) : 0;
+        const ok = !!(r && hasTarget && isFinite(r.iv) && Math.abs(r.iv - target) <= tol);
         dcfEngineStatus[sc] = { family: r ? r.family : null, ok: ok, iv: r ? r.iv : null, target: target };
     }
 }

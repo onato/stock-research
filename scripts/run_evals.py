@@ -665,7 +665,6 @@ def check_entry_price_hurdle(dcf: dict[str, Any], card: Card) -> None:
         return
 
     inputs = dcf.get("inputs") or {}
-    shares = F.num(inputs.get("shares_outstanding"))
     net_debt = F.num(inputs.get("net_debt"))
     proj = (dcf.get("projections") or {}).get("base") or {}
     asm = (dcf.get("assumptions") or {}).get("base") or {}
@@ -693,6 +692,19 @@ def check_entry_price_hurdle(dcf: dict[str, Any], card: Card) -> None:
     horizon = F.num(base_blk.get("years_to_terminal"))
     if fcf_raw is not None and horizon and 0 < int(horizon) <= len(fcf_raw):
         fcf_raw = fcf_raw[:int(horizon)]
+
+    # dcf_engine.py's entry-price block divides by the projected share count
+    # at year N (`_projected_shares(inputs, n)[-1]`), not the flat
+    # `shares_outstanding` anchor -- a buyback- or issuance-driven path
+    # diverges from the flat count by several percent over a 10-year
+    # horizon (DOW.NZ: 668.2m now vs 629.7m projected by year 10).
+    proj_shares = inputs.get("projected_shares")
+    shares = None
+    if (isinstance(proj_shares, list) and fcf_raw
+            and len(proj_shares) >= len(fcf_raw)):
+        shares = F.num(proj_shares[len(fcf_raw) - 1])
+    if shares is None:
+        shares = F.num(inputs.get("shares_outstanding"))
 
     # An exit multiple that is an explicit judgement -- P/B on a BVPS path
     # (RYM.NZ), P/E on capitalized earnings (SUM.NZ) -- is not a rate-derived

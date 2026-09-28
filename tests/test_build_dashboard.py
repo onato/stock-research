@@ -420,6 +420,46 @@ class TestValuationEngine:
         assert out["moved"]["entry"] == pytest.approx(2.943, abs=0.01)
         assert 'id="dcfEngineNote"' in html      # the note initDCF fills at runtime
 
+    def test_engine_check_tolerates_rounding_on_penny_scenarios(self, spec, analysis, csv_text, tmp_path):
+        """ENS.NZ-shaped bug: a distressed/going-concern ticker's scenario
+        IVs land near zero per share (base -0.01, bear -0.26). The JSON
+        rounds `intrinsic_value` to 2dp, so 2dp rounding alone can exceed
+        ENGINE_TOL's pure RELATIVE tolerance once the target's magnitude is
+        small -- the JS engine agrees with the stored value to better than
+        half a cent and still reports FALLBACK. scripts/dcf_engine.py's own
+        Python-side `check()` already guards this with an absolute floor
+        (`max(tol * abs(target), 0.005)`, see `test_check_tolerates_half_a_cent_near_zero`
+        in test_dcf_engine.py) -- the JS validator in dashboard.html must
+        apply the same floor, not relative tolerance alone.
+
+        Scaling shares_outstanding up 1000x on the TPW fixture shrinks every
+        scenario's IV by ~1000x while leaving assumptions/projections (and
+        so the engine's own recomputation) fully self-consistent -- bear
+        lands at ~0.00139, i.e. exactly the ENS.NZ magnitude, once rounded
+        to 2dp (0.0).
+        """
+        dcf = load("TPW_DCF.json")
+        shares = dcf["inputs"]["shares_outstanding"] * 1000
+        dcf["inputs"]["shares_outstanding"] = shares
+        dcf["inputs"]["projected_shares"] = [shares] * len(dcf["inputs"]["projected_shares"])
+        html = bd.render("TPW.AX", spec, csv_text, analysis, dcf)
+        out = self.run(html, tmp_path)
+        engine_iv = out["engine"]["bear"]["iv"]
+        assert abs(engine_iv) < 0.01          # confirms the near-zero regime
+        # 2dp rounding of a near-zero engine IV: the stored value the
+        # analyst's build would actually emit.
+        stored = round(engine_iv, 2)
+        dcf["valuation"]["bear"]["intrinsic_value"] = stored
+        html2 = bd.render("TPW.AX", spec, csv_text, analysis, dcf)
+        out2 = self.run(html2, tmp_path)
+        diff = abs(out2["engine"]["bear"]["iv"] - stored)
+        assert diff <= 0.005, "test setup must land inside the intended absolute floor"
+        assert out2["engine"]["bear"]["ok"] is True, (
+            f"engine={out2['engine']['bear']['iv']} stored={stored} diff={diff} "
+            "-- JS validateEngines() needs the same absolute floor as dcf_engine.check()"
+        )
+
+
     def test_sum_of_parts_model_validates_and_drives_sliders(self, spec, analysis, csv_text, tmp_path):
         """A DCF whose value is an OpCo FCF leg PLUS an independently
         discounted embedded-lender leg (SE: Monee, valued on distributable
