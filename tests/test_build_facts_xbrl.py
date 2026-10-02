@@ -122,6 +122,32 @@ class TestPeriodLabel:
         assert bfx.period_label(
             {"start": "2024-07-01", "end": "2024-12-31"}) == "H2-2024"
 
+    def test_half_year_uses_fiscal_year_not_calendar_year_of_end_month(self):
+        # STZ closes its fiscal year in late February. Its H1 (Mar-Aug)
+        # ends in August of the EARLIER calendar year, so `year = end[:4]`
+        # with no fiscal adjustment labeled fiscal H1 2024 (Mar 2023-Aug
+        # 2023, i.e. the first half of FY2024) as "H1-2023" -- the same
+        # calendar year its real H1 FY2023 (Mar 2022-Aug 2022) used,
+        # colliding two different fiscal halves onto one label and
+        # silently dropping whichever lost the later-filing tie-break.
+        # The quarter branch below already rolls the year forward when
+        # end_month > fye; the half-year branch must do the same.
+        assert bfx.period_label(
+            {"start": "2023-03-01", "end": "2023-08-31"},
+            fy_end_month=2) == "H1-2024"
+        assert bfx.period_label(
+            {"start": "2022-03-01", "end": "2022-08-31"},
+            fy_end_month=2) == "H1-2023"
+        # H2 (Sep-Feb) ends in the fiscal year's own calendar year already,
+        # so it must be unaffected.
+        assert bfx.period_label(
+            {"start": "2023-09-01", "end": "2024-02-29"},
+            fy_end_month=2) == "H2-2024"
+        # December fiscal year end (the common case) must not regress.
+        assert bfx.period_label(
+            {"start": "2024-01-01", "end": "2024-06-30"},
+            fy_end_month=12) == "H1-2024"
+
     def test_quarter_uses_space_separator(self):
         # "Q1 2024", not "Q1-2024" -- export_csv.sort_key splits on both, so
         # the space form sorts correctly, but the shape is pinned here.
@@ -163,6 +189,51 @@ class TestPeriodLabel:
         assert bfx.period_label(
             {"start": "2024-10-01", "end": "2024-12-31"},
             fy_end_month=12) == "Q4 2024"
+
+    def test_quarter_end_drifting_past_a_month_boundary_december_fye(self):
+        """VLTO (Veralto) is a December-FYE 52/53-week filer whose quarter
+        ends drift a few days into the next calendar month: its real fiscal
+        Q1 (Jan 1 - early Apr) ended 2025-04-04, pushing end_month to 4.
+        Using end_month raw gave `(4 - 12 - 1) % 12 // 3 + 1 == 2`, mislabeling
+        the quarter "Q2 2025" -- SEC's own fp metadata says fp=Q1 -- and
+        colliding with the real Q2 2025 (Apr 5 - Jul 4) once that was also
+        filed, silently dropping one of the two quarters from core_metrics.
+        """
+        assert bfx.period_label(
+            {"start": "2025-01-01", "end": "2025-04-04"},
+            fy_end_month=12) == "Q1 2025"
+        assert bfx.period_label(
+            {"start": "2025-04-05", "end": "2025-07-04"},
+            fy_end_month=12) == "Q2 2025"
+        assert bfx.period_label(
+            {"start": "2025-07-05", "end": "2025-10-03"},
+            fy_end_month=12) == "Q3 2025"
+        assert bfx.period_label(
+            {"start": "2026-01-01", "end": "2026-04-03"},
+            fy_end_month=12) == "Q1 2026"
+
+    def test_instant_quarter_end_drifting_past_a_month_boundary(self):
+        """The balance-sheet (instant) case has the same drift as the
+        duration case, but no start date to snap on. VLTO's Q1-2026 balance
+        sheet landed on 2026-04-03 -- the SAME date as the Q1 2026 duration
+        fact's end -- but the raw-month fallback `(month - 1) // 3 + 1` reads
+        month=4 and labels it "Q2 2026", so the dashboard's Q2 2026 row had
+        a Q1 balance sheet (cash/debt/shares) under figures that were really
+        one quarter old, while the real Q2 2026 balance sheet was never
+        fetched at all (SEC XBRL has no Q2 2026 data yet as of 2026-10-03).
+        """
+        assert bfx.period_label(
+            {"end": "2026-04-03"}, fy_end_month=12) == "Q1 2026"
+        assert bfx.period_label(
+            {"end": "2025-04-04"}, fy_end_month=12) == "Q1 2025"
+        assert bfx.period_label(
+            {"end": "2025-07-04"}, fy_end_month=12) == "Q2 2025"
+        assert bfx.period_label(
+            {"end": "2025-10-03"}, fy_end_month=12) == "Q3 2025"
+        assert bfx.period_label(
+            {"end": "2024-03-29"}, fy_end_month=12) == "Q1 2024"
+        assert bfx.period_label(
+            {"end": "2024-06-28"}, fy_end_month=12) == "Q2 2024"
 
     def test_nine_month_ytd_gets_a_label_that_cannot_collide(self):
         # A 273-day 10-Q YTD span is neither a half nor a quarter. Labeling
@@ -577,6 +648,71 @@ class TestCollect:
         }}}
         _, values, _ = bfx.collect(facts, bfx.CONCEPTS["revenue"])
         assert values["FY2017"] == 2994000000
+
+    def test_net_revenue_survives_same_accession_gross_revenues_tag(self):
+        # Republic Services (CIK 1060391) tags BOTH concepts for the SAME
+        # FY2025 period in the SAME accession (0001060391-26-000094, the
+        # FY2025 10-K, confirmed against SEC's companyconcept API):
+        # RevenueFromContractWithCustomerExcludingAssessedTax $16,591m (net
+        # revenue -- the correct headline figure, matching the 10-K income
+        # statement) and Revenues $19,027m (a gross figure that includes
+        # items beyond ASC-606 contract revenue). Unlike AVB (Excluding
+        # $5.6m vs Revenues $2,045m -- an accidental narrow line item,
+        # where Revenues correctly wins), RSG's Excluding is the real net
+        # total and Revenues the gross one -- the same net-vs-gross shape
+        # as Brown-Forman's Excluding/IncludingAssessedTax pair. No
+        # magnitude rule separates this reliably from AVB across every US
+        # filer (checked against the whole XBRL cache -- some filers
+        # genuinely do tag ExcludingAssessedTax as a narrow fee subset of
+        # Revenues, others as a net figure bigger than Revenues), so RSG
+        # is protected by CIK via
+        # REVENUES_NEVER_OVERRIDES_EXCLUDING_ASSESSED_TAX. Without it, the
+        # naive "same accession, larger value wins" rule picks the gross
+        # $19,027m every period since at least FY2016, inflating revenue
+        # by ~13-15% every year.
+        facts = {"cik": 1060391, "facts": {"us-gaap": {
+            "RevenueFromContractWithCustomerExcludingAssessedTax": {
+                "units": {"USD": [
+                    {"start": "2025-01-01", "end": "2025-12-31",
+                     "val": 16591000000, "accn": "0001060391-26-000094",
+                     "form": "10-K", "filed": "2026-02-18"},
+                ]}},
+            "Revenues": {
+                "units": {"USD": [
+                    {"start": "2025-01-01", "end": "2025-12-31",
+                     "val": 19027000000, "accn": "0001060391-26-000094",
+                     "form": "10-K", "filed": "2026-02-18"},
+                ]}},
+        }}}
+        _, values, _ = bfx.collect(facts, bfx.CONCEPTS["revenue"])
+        assert values["FY2025"] == 16591000000
+
+    def test_net_revenue_protection_is_scoped_to_rsgs_cik(self):
+        # The same dual-tag shape for a DIFFERENT filer (no "cik" key, so
+        # it can never match REVENUES_NEVER_OVERRIDES_EXCLUDING_ASSESSED_TAX)
+        # must still resolve the AVB way -- Revenues wins -- because this
+        # protection is deliberately NOT a general concept-pair rule: real
+        # filers in the XBRL cache (Capital One, KeyCorp, Citizens
+        # Financial, Crown Castle, SBA Communications) tag
+        # ExcludingAssessedTax as a genuinely narrow fee-income subset of
+        # Revenues, the AVB shape, and a blanket rule would freeze their
+        # revenue at the narrow figure.
+        facts = {"facts": {"us-gaap": {
+            "RevenueFromContractWithCustomerExcludingAssessedTax": {
+                "units": {"USD": [
+                    {"start": "2025-01-01", "end": "2025-12-31",
+                     "val": 16591000000, "accn": "0001060391-26-000094",
+                     "form": "10-K", "filed": "2026-02-18"},
+                ]}},
+            "Revenues": {
+                "units": {"USD": [
+                    {"start": "2025-01-01", "end": "2025-12-31",
+                     "val": 19027000000, "accn": "0001060391-26-000094",
+                     "form": "10-K", "filed": "2026-02-18"},
+                ]}},
+        }}}
+        _, values, _ = bfx.collect(facts, bfx.CONCEPTS["revenue"])
+        assert values["FY2025"] == 19027000000
 
     def test_reit_property_revenue_beats_ancillary_fee_tag(self):
         # Camden Property Trust (CIK 0000906345), FY2024 10-K (accn
@@ -994,6 +1130,39 @@ class TestTotalDebt:
         del facts["facts"]["us-gaap"]["DebtCurrent"]
         _, values, _ = bfx.collect_sum(facts, bfx.SUM_CONCEPTS["total_debt"])
         assert values["FY2024"] == 5_000_000_000
+
+    def test_long_term_debt_already_a_total_is_not_double_counted(self):
+        """Wabtec (CIK 943452) tags LongTermDebt as current+noncurrent combined.
+
+        ADBE's LongTermDebt means noncurrent-only, which is what SUM_CONCEPTS
+        was built around: sum it with DebtCurrent/LongTermDebtCurrent to get
+        the total. But Wabtec tags LongTermDebtNoncurrent AND LongTermDebt
+        for the same period in the same accession, and LongTermDebt there
+        already equals LongTermDebtNoncurrent + LongTermDebtCurrent (e.g.
+        2026-06-30: 6,571M = 4,915M + 1,656M). Summing LongTermDebt with the
+        current component again doubled the current portion into total_debt
+        -- $8,227M instead of the filed $6,571M.
+
+        LongTermDebtNoncurrent is unambiguous by taxonomy definition (never
+        includes the current portion), so it must win over LongTermDebt
+        whenever both are tagged for the same period.
+        """
+        facts = companyfacts()
+        facts["facts"]["us-gaap"]["LongTermDebtNoncurrent"] = {
+            "units": {"USD": [
+                {"end": "2024-12-31", "val": 4_000_000_000,
+                 "accn": "0000000001-25-000001", "fy": 2024, "fp": "FY",
+                 "form": "10-K", "filed": "2025-02-01"},
+            ]},
+        }
+        # Same accession's LongTermDebt is already the combined total.
+        facts["facts"]["us-gaap"]["LongTermDebt"]["units"]["USD"][1] = {
+            "end": "2024-12-31", "val": 6_000_000_000,
+            "accn": "0000000001-25-000001", "fy": 2024, "fp": "FY",
+            "form": "10-K", "filed": "2025-02-01",
+        }
+        _, values, _ = bfx.collect_sum(facts, bfx.SUM_CONCEPTS["total_debt"])
+        assert values["FY2024"] == 6_000_000_000  # not 8,000,000,000
 
 
 class TestCumulativeCashFlowIsDecumulated:

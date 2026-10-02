@@ -122,8 +122,18 @@ CONCEPTS = {
 # LongTermDebtNoncurrent after 2015) -- so each component resolves to one
 # value per period, and the components are then added.
 SUM_CONCEPTS: dict[str, list[list[str]]] = {
+    # LongTermDebtNoncurrent is listed ahead of LongTermDebt: its taxonomy
+    # definition excludes the current portion unambiguously, whereas
+    # LongTermDebt does not -- ADBE tags it noncurrent-only (and does not
+    # concurrently tag LongTermDebtNoncurrent after 2015), but Wabtec (CIK
+    # 943452) tags LongTermDebt as the current+noncurrent COMBINED total
+    # alongside a separate LongTermDebtNoncurrent for the same period, and
+    # summing the combined figure with DebtCurrent again double-counted the
+    # current portion ($8,227M vs the filed $6,571M at 2026-06-30). Where a
+    # filer tags only LongTermDebt (ADBE), this list still falls through to
+    # it, so ADBE's resolution is unaffected.
     "total_debt": [
-        ["LongTermDebt", "LongTermDebtNoncurrent",
+        ["LongTermDebtNoncurrent", "LongTermDebt",
          "LongTermDebtAndCapitalLeaseObligations"],
         ["DebtCurrent", "LongTermDebtCurrent",
          "LongTermDebtAndCapitalLeaseObligationsCurrent"],
@@ -295,7 +305,27 @@ def period_label(fact: dict[str, Any], fy_end_month: int | None = None,
         # give every filer a phantom second FY row.
         if end in january_year_ends or _near_fiscal_year_end(end, fy_end_month):
             return f"FY{year}"
-        q = (month - 1) // 3 + 1
+        # The quarter number is the CALENDAR quarter of end_month (fiscal
+        # context only decides the FY-vs-quarter split above, not which
+        # quarter) -- but a 52/53-week filer's quarter end drifts a few
+        # days either side of a calendar-quarter-month boundary too, same
+        # as the fiscal year end above. VLTO/Veralto's Q1-2026 balance
+        # sheet landed on 2026-04-03, the same drifted date as the Q1 2026
+        # duration fact's end, and raw month=4 gave `(4 - 1) // 3 + 1 == 2`,
+        # mislabeling it "Q2 2026" -- so the Q2 2026 row carried a Q1
+        # balance sheet while the real Q2 2026 one was never looked for.
+        # Snap to a calendar-quarter-end month (Mar/Jun/Sep/Dec) only within
+        # the same +/-7 day tolerance _near_fiscal_year_end uses, so a
+        # genuine mid-quarter date (Cisco's Oct 31, a month clear of any
+        # boundary) is never pulled onto a neighbouring quarter.
+        end_d = _d(end)
+        snapped_month = month
+        for cand_month in (3, 6, 9, 12):
+            for cand_year in (end_d.year - 1, end_d.year, end_d.year + 1):
+                boundary = datetime.date(cand_year, cand_month % 12 + 1, 1)
+                if abs((end_d - boundary).days) <= 7:
+                    snapped_month = cand_month
+        q = (snapped_month - 1) // 3 + 1
         return f"Q{q} {year}"
     days = (_d(end) - _d(start)).days
     if days > 300:
@@ -309,7 +339,19 @@ def period_label(fact: dict[str, Any], fy_end_month: int | None = None,
         # it and drop_scaffolding() removes it before the write.
         return f"9M-{year}"
     if days > 150:
-        half = "H1" if int(end[5:7]) <= 8 else "H2"
+        # Fiscal half relative to fy_end_month, not a fixed calendar-month
+        # split: `int(end[5:7]) <= 8` assumed a December year-end filer, so
+        # a Feb-FYE filer's H1 (Mar-Aug, ending in month 8 of the EARLIER
+        # calendar year) kept that calendar year's label instead of rolling
+        # into the fiscal year it is the first half of -- STZ's H1 FY2024
+        # (ended 2023-08-31) collided with its real H1 FY2023 under the
+        # identical "H1-2023" label. Mirrors the quarter branch below.
+        end_month = int(end[5:7])
+        fye = fy_end_month if fy_end_month is not None else 12
+        half_num = (end_month - fye - 1) % 12 // 6 + 1
+        half = f"H{half_num}"
+        if fye != 12 and end_month > fye:
+            year = str(int(year) + 1)
         return f"{half}-{year}"
     # Fiscal quarter relative to fy_end_month, not calendar quarter of the
     # end month: a June-FYE filer's Jul-Sep quarter is fiscal Q1, but
@@ -318,10 +360,34 @@ def period_label(fact: dict[str, Any], fy_end_month: int | None = None,
     # under the identical "Q1 2026"/"Q3 2025"-shaped labels. fy_end_month
     # absent (no fiscal context) falls back to calendar quarters, matching
     # the December-FYE case that is most filers.
+    #
     end_month = int(end[5:7])
-    fye = fy_end_month if fy_end_month is not None else 12
-    q = (end_month - fye - 1) % 12 // 3 + 1
-    if fye != 12 and end_month > fye:
+    if fy_end_month is None:
+        # No fiscal context: fall back to the calendar quarter of end_month,
+        # matching the December-FYE case that is most filers.
+        q = (end_month - 1) // 3 + 1
+        return f"Q{q} {year}"
+    # A 52/53-week filer's quarter boundary drifts a few days either side of
+    # the calendar month boundary, in EITHER direction, and neither the raw
+    # start month nor the raw end month is safe alone: VLTO/Veralto's fiscal
+    # Q1 start (2025-01-01) is clean but its end (2025-04-04) drifted past
+    # the Mar/Apr boundary, while its Q2 end (2024-06-28) is clean but its
+    # start (2024-03-30) drifted back past the same boundary the other way.
+    # Snap the START date to the nearest of the 4 fiscal-quarter-start
+    # boundaries by day distance, mirroring _near_fiscal_year_end's
+    # tolerance-window approach for the annual case, instead of trusting
+    # whichever raw calendar month either endpoint happens to fall in.
+    start_d = _d(start)
+    best_q, best_dist = 1, None
+    for i in range(4):
+        boundary_month = (fy_end_month + 3 * i) % 12 + 1
+        for cand_year in (start_d.year - 1, start_d.year, start_d.year + 1):
+            boundary = datetime.date(cand_year, boundary_month, 1)
+            dist = abs((start_d - boundary).days)
+            if best_dist is None or dist < best_dist:
+                best_dist, best_q = dist, i + 1
+    q = best_q
+    if fy_end_month != 12 and end_month > fy_end_month:
         year = str(int(year) + 1)
     return f"Q{q} {year}"
 
@@ -374,7 +440,52 @@ MIN_PLAUSIBLE_SHARE_COUNT = 862_000
 # including excise tax) for the same FY2017 period in the same accession;
 # letting the larger value win would silently replace 56 periods of correct
 # net revenue with the tax-inclusive gross figure.
-NEVER_OVERRIDES_SAME_ACCESSION = {"RevenueFromContractWithCustomerIncludingAssessedTax"}
+#
+# LongTermDebt is here for the same reason, one level down: Wabtec (CIK
+# 943452) tags LongTermDebtNoncurrent (the narrower, current-excluded
+# figure) alongside LongTermDebt (current+noncurrent combined) for the same
+# period and accession, and LongTermDebt is always the larger of the two by
+# construction. Without this entry, "larger value wins" would pick the
+# combined total as the noncurrent component in collect_sum's total_debt
+# sum, then add DebtCurrent again on top -- the current portion counted
+# twice ($8,227M vs the filed $6,571M at 2026-06-30).
+NEVER_OVERRIDES_SAME_ACCESSION = {
+    "RevenueFromContractWithCustomerIncludingAssessedTax",
+    "LongTermDebt",
+}
+
+# Republic Services (CIK 1060391) tags BOTH
+# RevenueFromContractWithCustomerExcludingAssessedTax $16,591m (net
+# revenue, the correct headline figure matching the 10-K income
+# statement) and Revenues $19,027m (gross, including items beyond ASC-606
+# contract revenue) for the SAME FY2025 period in the SAME accession
+# (0001060391-26-000094) -- the same net-vs-gross shape as the
+# Brown-Forman Excluding/IncludingAssessedTax pair above, just with
+# Revenues as the challenger instead of IncludingAssessedTax. RSG tags
+# both every year since at least FY2016, so the plain "larger value wins"
+# rule inflates its revenue by ~13-15% every period.
+#
+# This cannot be solved by concept identity or by a magnitude ratio the
+# way IncludingAssessedTax/REIT-ancillary cases are: unlike those,
+# Revenues-vs-ExcludingAssessedTax is NOT a superset by construction
+# across filers in general. Checking every US filer in the XBRL cache
+# that dual-tags these two concepts in one accession turns up a
+# continuous spread of ratios with no safe cutoff -- Capital One, KeyCorp,
+# Citizens Financial, Crown Castle and SBA Communications tag
+# ExcludingAssessedTax as a genuinely narrow fee-income subset (13-21% of
+# Revenues, the AVB shape, where Revenues correctly wins) while EQT,
+# Devon, Chevron, Freeport-McMoRan and KKR tag ExcludingAssessedTax LARGER
+# than Revenues in some periods (where keeping Revenues as a non-winner
+# is clearly wrong). RSG's own ratio (87%) sits in between, overlapping
+# both groups, so no threshold separates "net-of-something total" from
+# "narrow mistag" for every filer. This is filer-specific lore, the same
+# way Ball/Camden/Copart's concept quirks above are -- hence a CIK
+# allowlist rather than a general rule.
+REVENUES_NEVER_OVERRIDES_EXCLUDING_ASSESSED_TAX = {
+    1060391,  # Republic Services -- verified against SEC companyconcept
+              # API: ExcludingAssessedTax matches the 10-K income
+              # statement total for FY2016-FY2025; Revenues is gross.
+}
 
 
 def collect(facts: dict[str, Any],
@@ -401,7 +512,15 @@ def collect(facts: dict[str, Any],
     NEVER_OVERRIDES_SAME_ACCESSION, whose members are a superset by
     construction and so would otherwise win this comparison for the wrong
     reason.
+
+    A third, narrower case: a specific filer (identified by CIK, see
+    REVENUES_NEVER_OVERRIDES_EXCLUDING_ASSESSED_TAX) where Revenues is
+    verified to be the gross figure and ExcludingAssessedTax the correct
+    net total, the opposite of AVB's shape even though both involve the
+    same two concepts. No general magnitude rule separates this from AVB
+    across the whole filer universe, so it is handled per-CIK.
     """
+    cik = facts.get("cik")
     gaap = facts.get("facts", {}).get("us-gaap", {})
     out: dict[str, tuple[Any, Any]] = {}
     accn_seen: dict[tuple[Any, str], dict[str, Any]] = {}
@@ -430,8 +549,14 @@ def collect(facts: dict[str, Any],
                 accn = f.get("accn")
                 prior = accn_seen.get((accn, p)) if accn else None
                 if prior is not None and prior["concept"] != concept:
+                    protected_net_revenue = (
+                        cik in REVENUES_NEVER_OVERRIDES_EXCLUDING_ASSESSED_TAX
+                        and prior["concept"] ==
+                        "RevenueFromContractWithCustomerExcludingAssessedTax"
+                        and concept == "Revenues")
                     if (concept in NEVER_OVERRIDES_SAME_ACCESSION
-                            or abs(f["val"]) <= abs(prior["val"])):
+                            or abs(f["val"]) <= abs(prior["val"])
+                            or protected_net_revenue):
                         continue
                     # The new value supersedes the smaller same-accession
                     # figure already recorded for this period.
