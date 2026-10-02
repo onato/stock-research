@@ -129,10 +129,40 @@ class TestPeriodLabel:
             {"start": "2024-01-01", "end": "2024-03-31"}) == "Q1 2024"
 
     def test_quarter_is_calendar_quarter_of_end_month(self):
-        # A Feb-Apr fiscal quarter maps to calendar Q2 because only the end
-        # month is consulted.
+        # With no fiscal context (fy_end_month omitted), a Feb-Apr quarter
+        # falls back to its calendar quarter, Q2.
         assert bfx.period_label(
             {"start": "2024-02-01", "end": "2024-04-30"}) == "Q2 2024"
+
+    def test_quarter_is_fiscal_quarter_relative_to_fiscal_year_end(self):
+        # Parker Hannifin closes in June, so its fiscal year runs Jul-Jun.
+        # The quarter ending 2025-09-30 (Jul-Sep) is fiscal Q1 of FY2026 --
+        # SEC's own fy/fp metadata agrees (fy=2026, fp=Q1) -- not calendar
+        # Q3, which is what `(month - 1) // 3 + 1` gave every non-December
+        # filer: PH's own Jul-Sep quarter was mislabeled "Q3 2025" and its
+        # Jan-Mar quarter "Q1 2026", silently swapping two real quarters.
+        assert bfx.period_label(
+            {"start": "2025-07-01", "end": "2025-09-30"},
+            fy_end_month=6) == "Q1 2026"
+        assert bfx.period_label(
+            {"start": "2025-10-01", "end": "2025-12-31"},
+            fy_end_month=6) == "Q2 2026"
+        assert bfx.period_label(
+            {"start": "2026-01-01", "end": "2026-03-31"},
+            fy_end_month=6) == "Q3 2026"
+        assert bfx.period_label(
+            {"start": "2026-04-01", "end": "2026-06-30"},
+            fy_end_month=6) == "Q4 2026"
+
+    def test_fiscal_quarter_numbering_unaffected_for_december_year_end(self):
+        # The common case (December FYE, the vast majority of filers) must
+        # not regress: fiscal quarter equals calendar quarter.
+        assert bfx.period_label(
+            {"start": "2024-01-01", "end": "2024-03-31"},
+            fy_end_month=12) == "Q1 2024"
+        assert bfx.period_label(
+            {"start": "2024-10-01", "end": "2024-12-31"},
+            fy_end_month=12) == "Q4 2024"
 
     def test_nine_month_ytd_gets_a_label_that_cannot_collide(self):
         # A 273-day 10-Q YTD span is neither a half nor a quarter. Labeling

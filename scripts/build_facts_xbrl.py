@@ -311,7 +311,18 @@ def period_label(fact: dict[str, Any], fy_end_month: int | None = None,
     if days > 150:
         half = "H1" if int(end[5:7]) <= 8 else "H2"
         return f"{half}-{year}"
-    q = (int(end[5:7]) - 1) // 3 + 1
+    # Fiscal quarter relative to fy_end_month, not calendar quarter of the
+    # end month: a June-FYE filer's Jul-Sep quarter is fiscal Q1, but
+    # `(month - 1) // 3 + 1` called it calendar Q3 and its Jan-Mar quarter
+    # calendar Q1 -- silently swapping Parker Hannifin's real Q1 and Q3
+    # under the identical "Q1 2026"/"Q3 2025"-shaped labels. fy_end_month
+    # absent (no fiscal context) falls back to calendar quarters, matching
+    # the December-FYE case that is most filers.
+    end_month = int(end[5:7])
+    fye = fy_end_month if fy_end_month is not None else 12
+    q = (end_month - fye - 1) % 12 // 3 + 1
+    if fye != 12 and end_month > fye:
+        year = str(int(year) + 1)
     return f"Q{q} {year}"
 
 
