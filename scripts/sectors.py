@@ -24,9 +24,10 @@ _MODEL_RULES: list[tuple[str, str]] = [
     (r"\bnav\b|net asset value|net tangible assets per unit|nta[- ]based", "lic_nav"),
     ((r"bvps|book[_ -]value|tangible[_ -]book|residual[_ -]income|"
       r"earnings[_ -]based[_ -]cost[_ -]of[_ -]equity|"
+      r"(fcfe|free capital flow|earnings)[^.]*\bat[_ -]cost[_ -]of[_ -]equity\b|"
       r"distributable[_ -]earnings|dividend[_ -]discount"), "bank"),
     (r"risked|project[- ]npv", "miner_prerevenue"),
-    (r"\bora\b|underlying profit.*(village|retirement)|retirement", "retirement_ora"),
+    (r"\bora\b|underlying profit.*(village|retirement)|village.*retirement|retirement.*village", "retirement_ora"),
 ]
 
 _SECTOR_RULES: list[tuple[str, str]] = [

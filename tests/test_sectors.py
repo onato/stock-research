@@ -26,6 +26,19 @@ class TestModelLabelWins:
     def test_risked_project_npv_is_a_prerevenue_miner(self):
         assert sectors.bucket("Gold Mining / Exploration & Development", "risked-project-npv") == "miner_prerevenue"
 
+    def test_retirement_services_insurer_is_not_a_village(self):
+        # PFG's largest segment is literally named "Retirement and Income
+        # Solutions" -- the dcf-analyst's own model prose starts
+        # "Retirement-services and insurance FCFE ... at cost of equity",
+        # which must route on "at cost of equity" (bank/financial) before
+        # the bare word "retirement" is ever checked, or every insurer
+        # with a retirement segment mis-routes to the village/ORA template.
+        label = (
+            "Retirement-services and insurance FCFE (free capital flow) at "
+            "cost of equity, net debt held at zero (engine route)"
+        )
+        assert sectors.bucket("Financials", label) == "bank"
+
 
 class TestSectorKeywords:
     def test_saas(self):
