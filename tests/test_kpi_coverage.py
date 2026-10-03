@@ -603,3 +603,61 @@ class TestLeverageAndImpactPromotion:
         assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
         for n in names:
             assert schema.promote_header(n) is not None
+
+
+class TestGoldMinerVolumePromotion:
+    """Gold sold by managed operations is the production-volume driver.
+
+    AngloGold Ashanti discloses GoldSoldManagedOz alongside AISC and
+    GoldPriceAchieved (same sparse FY2024-FY2025-only coverage), but it was
+    absent from PROMOTE_KPIS so the dashboard could chart realised price and
+    cost per ounce without the ounces that make the revenue line move.
+    """
+
+    def test_gold_sold_managed_oz_is_promoted(self, patch_repo):
+        make_db(patch_repo, "SYN", ["GoldSoldManagedOz"])
+        assert kpi_coverage.survey(patch_repo)["SYN"]["promoted"] == [
+            "GoldSoldManagedOz"]
+
+
+class TestBankCapitalAndCreditQualityPromotion:
+    """Banco Bradesco (BBD) capital-adequacy and credit-quality KPIs.
+
+    CET1Ratio was already promoted, but its total-capital companion
+    BaselRatio was not. ExpandedLoanPortfolio (Bradesco's own broader loan-
+    book measure) and NPLRatio90d (the 90-day delinquency ratio analysts
+    watch a bank on) were stranded in `kpis`, as was
+    InsuranceRecurringNetIncome, the insurance segment's recurring profit
+    contribution -- all disclosed every quarter but absent from
+    PROMOTE_KPIS.
+    """
+
+    def test_bank_capital_and_credit_kpis_are_promoted(self, patch_repo):
+        names = ["BaselRatio", "ExpandedLoanPortfolio",
+                  "InsuranceRecurringNetIncome", "NPLRatio90d"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestDiversifiedMinerNCIAndOneOffPromotion:
+    """BHP Group's total-profit, NCI and petroleum-merger one-off KPIs.
+
+    core_metrics/CSV NetIncome is profit attributable to BHP shareholders
+    only. ProfitAfterTaxTotal (before the ~42.5% Escondida and other JV
+    minority partners' share is carved out) and ProfitAttributableNCI were
+    stranded in `kpis`, so a dashboard could not show how much of BHP's
+    total earnings power is shared with JV partners.
+    DiscontinuedOpsProfitPetroleum is the one-off ~$10.7bn FY2022 gain on
+    the Woodside petroleum merger, disclosed only that year -- without it
+    FY2022 looks like organic earnings growth rather than a merger gain.
+    """
+
+    def test_bhp_profit_and_nci_kpis_are_promoted(self, patch_repo):
+        names = ["ProfitAfterTaxTotal", "ProfitAttributableNCI",
+                  "DiscontinuedOpsProfitPetroleum"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n

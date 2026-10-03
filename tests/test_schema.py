@@ -374,6 +374,26 @@ class TestPromotedBankBalanceSheetKpis:
         assert schema.promote_header("customer_deposits") == "CustomerDeposits"
         assert schema.promote_header("net_loans_and_advances") == "NetLoansAndAdvances"
 
+    def test_total_common_equity_promotes(self):
+        """Bank of Nova Scotia (BNS): ShareholdersEquity/core_metrics includes
+        preferred shares and other equity instruments, while TotalCommonEquity
+        is equity attributable to common shareholders only -- the correct
+        basis for book-value-per-share and ROE-on-common, and it sat in kpis
+        unmapped to any CSV column."""
+        assert schema.promote_header("TotalCommonEquity") == "TotalCommonEquity"
+        assert schema.promote_header("total_common_equity") == "TotalCommonEquity"
+
+    def test_efficiency_ratio_and_pre_pcl_profit_promote(self):
+        """CIBC (CM): EfficiencyRatio (non-interest expense / revenue) and
+        PrePCLProfit (pre-provision, pre-credit-loss profit) are the two core
+        bank profitability KPIs management guides to each quarter, neither
+        derivable from the generic core_metrics columns, and both sat in
+        kpis unmapped to any CSV column."""
+        assert schema.promote_header("EfficiencyRatio") == "EfficiencyRatio"
+        assert schema.promote_header("efficiency_ratio") == "EfficiencyRatio"
+        assert schema.promote_header("PrePCLProfit") == "PrePCLProfit"
+        assert schema.promote_header("pre_pcl_profit") == "PrePCLProfit"
+
 
 class TestPromotedBoqLoanBookAndCashEpsKpis:
     """Bank of Queensland (BOQ.AX): the gross loan book and total deposit

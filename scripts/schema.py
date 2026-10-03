@@ -336,6 +336,7 @@ PROMOTE_KPIS: dict[str, str] = {
     "GoldProduction": "GoldProduction",
     "CopperProduction": "CopperProduction",
     "GoldPriceAchieved": "GoldPriceAchieved",
+    "GoldSoldManagedOz": "GoldSoldManagedOz",  # gold oz sold by managed ops
     "GoldProduction_Cowal": "GoldProduction_Cowal",
     "GoldProduction_ErnestHenry": "GoldProduction_ErnestHenry",
     "GoldProduction_Mungari": "GoldProduction_Mungari",
@@ -358,6 +359,11 @@ PROMOTE_KPIS: dict[str, str] = {
     "OperatingCashFlowContinuing": "OperatingCashFlowContinuing",
     "NAVPerShare": "NAVPerShare",
     "NTAPerShare": "NTAPerShare",
+    # Ambev's own headline non-GAAP profitability measure (Ambev S.A.,
+    # ABEV): disclosed every quarter in its press releases, distinct from
+    # the audited EBITDA core_metrics column the financial-parser built
+    # from income-from-operations + D&A rather than Ambev's own figure.
+    "NormalizedEBITDA": "NormalizedEBITDA",
     # Funds From Operations (REIT/stapled-security non-IFRS cash measure,
     # Stockland Group SGP.AX): FFO strips non-cash property revaluations and
     # straight-lining out of statutory NPAT and is the number a REIT's own
@@ -421,6 +427,14 @@ PROMOTE_KPIS: dict[str, str] = {
     "NetLoans": "NetLoans",
     "ReturnOnEquity": "ReturnOnEquity",
     "RiskWeightedAssets": "RiskWeightedAssets",
+    # Banco Bradesco (BBD): the total capital (Basel) ratio alongside
+    # CET1Ratio, Bradesco's own broader loan-book measure, the insurance
+    # segment's recurring profit contribution, and the 90-day non-performing
+    # loan ratio -- the credit-quality indicator analysts watch a bank on.
+    "BaselRatio": "BaselRatio",
+    "ExpandedLoanPortfolio": "ExpandedLoanPortfolio",
+    "InsuranceRecurringNetIncome": "InsuranceRecurringNetIncome",
+    "NPLRatio90d": "NPLRatio90d",
     "LiquidityCoverageRatio": "LiquidityCoverageRatio",
     "NetStableFundingRatio": "NetStableFundingRatio",
     # Bank of Queensland (BOQ.AX): the gross loan book and total deposit
@@ -829,6 +843,31 @@ PROMOTE_KPIS: dict[str, str] = {
     # Cash settlement of employee share awards (AZN): a financing/SBC-
     # adjacent cash outflow disclosed alongside the equity award programme.
     "ShareAwardSettlement": "ShareAwardSettlement",
+    # Total group profit vs NCI share (BHP Group, BHP): core_metrics/CSV
+    # NetIncome is profit attributable to BHP shareholders only.
+    # ProfitAfterTaxTotal is BEFORE the ~42.5% Escondida (and other JV)
+    # minority partners' share is carved out, so the gap between the two is
+    # earnings BHP consolidates but does not itself own. DiscontinuedOps-
+    # ProfitPetroleum is the one-off ~$10.7bn FY2022 gain on the Woodside
+    # petroleum merger, disclosed only that year -- without it FY2022 looks
+    # like organic earnings growth rather than a merger gain.
+    "ProfitAfterTaxTotal": "ProfitAfterTaxTotal",
+    "ProfitAttributableNCI": "ProfitAttributableNCI",
+    "DiscontinuedOpsProfitPetroleum": "DiscontinuedOpsProfitPetroleum",
+    # Equity attributable to common shareholders only (Bank of Nova Scotia,
+    # BNS): core_metrics/CSV ShareholdersEquity includes preferred shares and
+    # other equity instruments, so it overstates the basis for book-value-
+    # per-common-share and ROE-on-common -- the measures a bank's own
+    # disclosures and peer comparisons are built on.
+    "TotalCommonEquity": "TotalCommonEquity",
+    # CIBC (CM): the two core bank profitability KPIs management guides to
+    # each quarter. EfficiencyRatio (non-interest expense / revenue) is the
+    # cost-discipline measure; PrePCLProfit (pre-provision, pre-credit-loss
+    # profit) is earnings power before the credit cycle shows up, distinct
+    # from both the core_metrics NetIncome column and the CreditImpairment-
+    # Charge KPI already promoted.
+    "EfficiencyRatio": "EfficiencyRatio",
+    "PrePCLProfit": "PrePCLProfit",
 }
 
 # Owner-FCF components and core-column duplicates. Listed explicitly so a
@@ -919,6 +958,9 @@ KPI_ALIASES: dict[str, str] = {
     "customerdeposits": "CustomerDeposits",
     "netloansandadvances": "NetLoansAndAdvances",
     "operatingexpenses": "OperatingExpenses",
+    "totalcommonequity": "TotalCommonEquity",
+    "efficiencyratio": "EfficiencyRatio",
+    "prepclprofit": "PrePCLProfit",
     "healthcarerevenue": "HealthcareRevenue",
     "industrialrevenue": "IndustrialRevenue",
     "healthcareebit": "HealthcareEBIT",
