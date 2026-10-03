@@ -426,6 +426,22 @@ def _d(s: str) -> datetime.date:
 # shares-scale bug did, in that same gray zone).
 MIN_PLAUSIBLE_SHARE_COUNT = 862_000
 
+# The mirror-image error: Nomura Holdings (CIK 1163653) tags
+# WeightedAverageNumberOfDilutedSharesOutstanding with unit "shares" but
+# reports MOST periods ~1,000,000x too LARGE -- 3143092237000000 instead of
+# 3143092237 -- across a decade of 20-F/6-K accessions filed from 2020-06-30
+# onward, with only a single 6-K (filed 2025-12-12) ever tagging two periods
+# at the true scale before the next 20-F reverts to the inflated one. Because
+# the inflated value is the MAJORITY here (unlike ConocoPhillips, where the
+# thousands-scaled value was the minority and self-healed by later filings),
+# _reject_scale_outliers' "largest cluster wins" heuristic picks the inflated
+# cluster as "genuine" and rejects the two CORRECT periods instead. No real
+# company has 200 billion shares outstanding (even after the biggest splits
+# in the warehouse), so this absolute ceiling catches a value at that scale
+# before cluster comparison ever sees it, the same way MIN_PLAUSIBLE_SHARE_
+# COUNT already catches an implausibly small one.
+MAX_PLAUSIBLE_SHARE_COUNT = 200_000_000_000
+
 # Concepts that are a superset BY CONSTRUCTION -- tax/fee-inclusive tags
 # name (a strictly narrower concept) + (tax or fee) -- so they are almost
 # always the larger of the two whenever a filer tags both for real. The
@@ -537,7 +553,8 @@ def collect(facts: dict[str, Any],
             unit_seen = unit_seen or unit
             for f in rows:
                 if (unit == "shares" and f.get("val") is not None
-                        and 0 < abs(f["val"]) < MIN_PLAUSIBLE_SHARE_COUNT):
+                        and (0 < abs(f["val"]) < MIN_PLAUSIBLE_SHARE_COUNT
+                             or abs(f["val"]) > MAX_PLAUSIBLE_SHARE_COUNT)):
                     continue
                 p = period_label(f, fy_end, jan_year_ends)
                 if not p:

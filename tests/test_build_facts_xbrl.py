@@ -894,6 +894,51 @@ class TestCollect:
         assert "FY2015" not in values
         assert "FY2019" not in values
 
+    def test_shares_outstanding_rejects_a_million_times_over_scaled_filer_error(self):
+        # Nomura Holdings (CIK 1163653) tags WeightedAverageNumberOfDiluted-
+        # SharesOutstanding with unit "shares" but reports most periods
+        # ~1,000,000x too LARGE -- 3143092237000000 instead of 3143092237 --
+        # the mirror image of Agilent/Ball/ConocoPhillips (which under-scale).
+        # Only two periods (its most recent 6-K) are tagged correctly at the
+        # true ~3 billion share count; every other period, across a decade
+        # of 20-F/6-K accessions, carries the 1e6-inflated value with no
+        # correcting duplicate ever filed. _SCALE_SLIP_RATIOS only checks
+        # ratios of 1e-3/1e-6 (too small), so a ratio of 1e6 (too large)
+        # previously passed through untouched and survived the caller's
+        # /1e6 scaling as a share count 1e6x the real one (e.g. 3143092.237
+        # million "shares" instead of 3143.092237 million).
+        facts = {"facts": {"us-gaap": {
+            "WeightedAverageNumberOfDilutedSharesOutstanding": {"units": {
+                "shares": [
+                    {"start": "2019-04-01", "end": "2020-03-31",
+                     "val": 3276510404000000, "accn": "acc-fy2020",
+                     "form": "20-F", "filed": "2020-06-30"},
+                    {"start": "2020-04-01", "end": "2021-03-31",
+                     "val": 3147338609000000, "accn": "acc-fy2021",
+                     "form": "20-F", "filed": "2021-06-25"},
+                    {"start": "2021-04-01", "end": "2022-03-31",
+                     "val": 3158708013000000, "accn": "acc-fy2022",
+                     "form": "20-F", "filed": "2024-06-26"},
+                    {"start": "2024-04-01", "end": "2025-03-31",
+                     "val": 3066458811000000, "accn": "acc-fy2025",
+                     "form": "20-F", "filed": "2025-06-23"},
+                    {"start": "2025-04-01", "end": "2025-09-30",
+                     "val": 3045701918, "accn": "acc-6k-2025-12",
+                     "form": "6-K", "filed": "2025-12-12"},
+                ],
+            }},
+        }}}
+        _, values, _ = bfx.collect(
+            facts, bfx.CONCEPTS["shares_outstanding"])
+        # The correctly-tagged 6-K period survives untouched.
+        assert values["H1-2026"] == 3045701918
+        # Every 1e6-inflated period must be rejected rather than kept as a
+        # plausible-looking large value.
+        assert "FY2020" not in values
+        assert "FY2021" not in values
+        assert "FY2022" not in values
+        assert "FY2025" not in values
+
 
 def db_row(repo, period):
     con = duckdb.connect(
