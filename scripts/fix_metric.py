@@ -27,6 +27,7 @@ Usage:
   fix_metric.py T --kpi-unit ARR="USD millions" --kpi-unit Customers=count --source "..."
   fix_metric.py T --periods all --null net_margin --source "..."
   fix_metric.py T --periods all --scale revenue ... 0.001 --set-units millions --source "..."
+  fix_metric.py T --periods all --set-currency CNY --source "XBRL unit was CNY, mislabeled USD"
   ... [--apply] [--no-export] [--actor NAME]
 
 Expressions for --derive are plain arithmetic over core column names and
@@ -121,7 +122,20 @@ class SetUnits:
     periods: list[str] | None      # None = every period
 
 
-Op = Set | Scale | Derive | Null | Move | Kpi | KpiUnitDefault | KpiUnit | SetUnits
+@dataclass
+class SetCurrency:
+    """Relabel core_metrics.currency (a TEXT column --set cannot touch).
+
+    build_facts_xbrl.py hardcodes currency="USD" regardless of the unit the
+    filer's XBRL facts were actually tagged in (memory:
+    build-facts-xbrl-hardcodes-usd-currency) -- a foreign private issuer's
+    CNY/INR-denominated facts land in core_metrics mislabeled USD.
+    """
+    currency: str
+    periods: list[str] | None      # None = every period
+
+
+Op = Set | Scale | Derive | Null | Move | Kpi | KpiUnitDefault | KpiUnit | SetUnits | SetCurrency
 
 NUMERIC = [n for n, t, _ in schema.CORE_COLUMNS if t == "DOUBLE"]
 
@@ -261,7 +275,7 @@ def apply_ops(con: "DuckDBPyConnection", ops: list[Op], *, source: str,
         elif isinstance(op, Move):
             _periods(con, [op.period])
             _check_col(op.col)
-        elif isinstance(op, SetUnits):
+        elif isinstance(op, (SetUnits, SetCurrency)):
             _periods(con, op.periods)
         # A Kpi may name a period with no core row (a feasibility-study
         # year, a metric disclosed only quarterly), so it is not checked.
@@ -311,6 +325,15 @@ def apply_ops(con: "DuckDBPyConnection", ops: list[Op], *, source: str,
                 con.execute("UPDATE core_metrics SET units = ? WHERE period = ?",
                             [op.unit, period])
                 rec(period=period, col="units", unit=op.unit, op="set_units")
+        elif isinstance(op, SetCurrency):
+            for period in _periods(con, op.periods):
+                cur = con.execute("SELECT currency FROM core_metrics WHERE period = ?",
+                                  [period]).fetchone()
+                if cur is None or cur[0] == op.currency:
+                    continue
+                con.execute("UPDATE core_metrics SET currency = ? WHERE period = ?",
+                            [op.currency, period])
+                rec(period=period, col="currency", unit=op.currency, op="set_currency")
         elif isinstance(op, (KpiUnitDefault, KpiUnit)):
             if isinstance(op, KpiUnit):
                 rows = con.execute(
@@ -352,6 +375,9 @@ def replay(con: "DuckDBPyConnection", recs: list[Record]) -> int:
         target, op = r["target"], r["op"]
         if op == "set_units":
             con.execute("UPDATE core_metrics SET units = ? WHERE period = ?",
+                        [r.get("unit"), r["period"]])
+        elif op == "set_currency":
+            con.execute("UPDATE core_metrics SET currency = ? WHERE period = ?",
                         [r.get("unit"), r["period"]])
         elif target == "core_metrics":
             _write_core(con, r["period"], r["col"], r["new_value"])
@@ -484,6 +510,12 @@ def parse_ops(argv: list[str]) -> list[Op]:
                 raise FixError("--set-units LABEL")
             ops.append(SetUnits(" ".join(vals), scope))
             continue
+        if a == "--set-currency":
+            vals, i = values_after(i + 1)
+            if not vals:
+                raise FixError("--set-currency CODE")
+            ops.append(SetCurrency(" ".join(vals), scope))
+            continue
         # Flags handled by main() (--source, --apply, ...) and their values.
         if a.startswith("--"):
             _, i = values_after(i + 1)
@@ -529,7 +561,7 @@ def main() -> int:
         return 2
     if not ops:
         print("nothing to do: give at least one of --set/--scale/--derive/--null/"
-              "--move/--kpi/--kpi-unit-default/--set-units", file=sys.stderr)
+              "--move/--kpi/--kpi-unit-default/--set-units/--set-currency", file=sys.stderr)
         return 2
 
     reports = REPO / "research" / ticker / "Reports"

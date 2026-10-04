@@ -316,6 +316,51 @@ class TestSetUnits:
         assert fresh.execute("SELECT revenue FROM core_metrics WHERE period='FY2022'").fetchone()[0] == 143.6
 
 
+class TestSetCurrency:
+    """`--set-currency CODE` relabels core_metrics.currency.
+
+    build_facts_xbrl.py hardcodes currency="USD" for every SEC XBRL fact
+    regardless of the unit the filer actually tagged (memory:
+    build-facts-xbrl-hardcodes-usd-currency) -- confirmed on BILI, HDB, TCOM,
+    all CNY/INR filers mislabeled USD. There was no recorded, replayable way
+    to relabel a wrong currency; --set only accepts numeric columns.
+    """
+
+    def test_parse_set_currency_scoped_by_periods(self):
+        ops = FM.parse_ops(["--periods", "all", "--set-currency", "CNY"])
+        assert [type(o).__name__ for o in ops] == ["SetCurrency"]
+        assert ops[0].currency == "CNY"
+        assert ops[0].periods is None
+        ops = FM.parse_ops(["--period", "FY2022", "--set-currency", "INR"])
+        assert ops[0].currency == "INR"
+        assert ops[0].periods == ["FY2022"]
+
+    def test_set_currency_relabels_and_records(self, con):
+        recs = FM.apply_ops(con, [FM.SetCurrency("CNY", periods=None)], source=SRC, actor="t")
+        assert con.execute("SELECT DISTINCT currency FROM core_metrics").fetchall() == [("CNY",)]
+        assert len(recs) == 2
+        assert {r["op"] for r in recs} == {"set_currency"}
+        assert {r["unit"] for r in recs} == {"CNY"}
+        assert {r["col"] for r in recs} == {"currency"}
+        assert corrections(con)[0][6] == "set_currency"
+
+    def test_set_currency_skips_rows_already_labelled(self, con):
+        recs = FM.apply_ops(con, [FM.SetCurrency("USD", periods=None)], source=SRC, actor="t")
+        assert recs == []
+        assert corrections(con) == []
+
+    def test_replay_reapplies_set_currency(self, con):
+        recs = FM.apply_ops(con, [FM.SetCurrency("CNY", periods=["FY2022"])], source=SRC, actor="t")
+        fresh = duckdb.connect(":memory:")
+        fresh.execute(schema.create_sql())
+        fresh.execute("INSERT INTO core_metrics (period, revenue, currency) VALUES"
+                      " ('FY2021', 100.0, 'USD'), ('FY2022', 143.6, 'USD')")
+        assert FM.replay(fresh, [json.loads(json.dumps(r)) for r in recs]) == 1
+        assert fresh.execute("SELECT period, currency FROM core_metrics ORDER BY period").fetchall() == [
+            ("FY2021", "USD"), ("FY2022", "CNY")]
+        assert fresh.execute("SELECT revenue FROM core_metrics WHERE period='FY2022'").fetchone()[0] == 143.6
+
+
 class TestScaleRounding:
     def test_scale_does_not_record_float_representation_noise(self, con):
         con.execute("UPDATE core_metrics SET revenue = 268293.0, shares_outstanding = 185378.0"
