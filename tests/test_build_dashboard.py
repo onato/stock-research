@@ -1257,3 +1257,108 @@ class TestFmtValue:
         """WISE.L's 0.52% take rate rendered as "0.5%", erasing the 6bps cut."""
         assert bd.fmt_value(0.52, "pct", "$", "m") == "0.52%"
         assert bd.fmt_value(23.6, "pct", "$", "m") == "23.6%"
+
+
+def _fy(period, **cols):
+    return {"Period": period, **{k: str(v) for k, v in cols.items()}}
+
+
+class TestReturnsOnCapital:
+    ROWS: ClassVar[list] = [
+        _fy("FY2023", OperatingIncome=100, NetIncome=60, ShareholdersEquity=400, TotalDebt=200, CashAndEquivalents=100),
+        _fy("FY2024", OperatingIncome=120, NetIncome=70, ShareholdersEquity=440, TotalDebt=200, CashAndEquivalents=140),
+        _fy("FY2025", OperatingIncome=150, NetIncome=90, ShareholdersEquity=500, TotalDebt=180, CashAndEquivalents=180),
+    ]
+
+    def test_roic_is_after_statutory_tax_over_average_invested_capital(self):
+        r = bd.returns_on_capital("WISE.L", "payments", self.ROWS)
+        assert r["measure"] == "ROIC"
+        assert r["tax_rate"] == 0.25
+        # FY2025: 150 x 0.75 / avg(500, 500) = 22.5%
+        assert r["latest_period"] == "FY2025"
+        assert r["latest"] == pytest.approx(22.5)
+        # FY2023 point IC 500: 15.0; FY2024 90 / avg(500, 500): 18.0
+        assert r["avg3"] == pytest.approx((15.0 + 18.0 + 22.5) / 3)
+        assert r["avg5"] is None  # three years cannot make a five-year average
+
+    def test_us_listing_uses_the_us_rate(self):
+        assert bd.returns_on_capital("NFLX", "operating", self.ROWS)["tax_rate"] == 0.21
+
+    def test_financials_get_roe_on_average_equity(self):
+        r = bd.returns_on_capital("ANZ.AX", "bank", self.ROWS)
+        assert r["measure"] == "ROE"
+        assert r["tax_rate"] is None
+        assert r["latest"] == pytest.approx(90 / 470 * 100)
+
+    def test_unknown_listing_gives_no_number_rather_than_a_guessed_rate(self):
+        r = bd.returns_on_capital("XYZ.QQ", "operating", self.ROWS)
+        assert r["latest"] is None
+        assert r["tax_rate"] is None
+
+    def test_missing_cash_or_nonpositive_capital_is_not_a_number(self):
+        rows = [_fy("FY2025", OperatingIncome=150, ShareholdersEquity=500, TotalDebt=180)]
+        assert bd.returns_on_capital("NFLX", "operating", rows)["latest"] is None
+        rows = [_fy("FY2025", OperatingIncome=150, ShareholdersEquity=100, TotalDebt=0,
+                    CashAndEquivalents=300)]
+        assert bd.returns_on_capital("NFLX", "operating", rows)["latest"] is None
+
+    def test_a_gap_year_is_not_averaged_across(self):
+        rows = [self.ROWS[0], self.ROWS[2]]  # FY2023, FY2025
+        # FY2025 uses its own point IC (500), not avg with FY2023
+        assert bd.returns_on_capital("NFLX", "operating", rows)["latest"] == pytest.approx(150 * 0.79 / 500 * 100)
+
+
+    def test_thin_invested_capital_is_flagged_with_roe(self):
+        """WISE.L: net cash ~= equity leaves IC of $380m on $1.9bn equity and a
+        210% ROIC that swings with the cash balance -- say so, and show ROE."""
+        rows = [_fy("FY2024", OperatingIncome=100, NetIncome=80, ShareholdersEquity=500,
+                    TotalDebt=0, CashAndEquivalents=450),
+                _fy("FY2025", OperatingIncome=120, NetIncome=90, ShareholdersEquity=520,
+                    TotalDebt=0, CashAndEquivalents=470)]
+        r = bd.returns_on_capital("WISE.L", "payments", rows)
+        assert r["thin_capital"] is True
+        assert r["roe_latest"] == pytest.approx(90 / 510 * 100)
+        html = bd.render_returns(r)
+        assert "ROE FY2025" in html
+        assert "swings with the cash balance" in html
+        assert bd.returns_on_capital("WISE.L", "payments", self.ROWS)["thin_capital"] is False
+
+class TestFcfGrowth:
+    def _rows(self, fcf):
+        return [_fy(f"FY{2020 + i}", FreeCashFlow=v) for i, v in enumerate(fcf)]
+
+    def test_fills_a_horizon_the_dcf_left_null(self):
+        dcf = {"historical_growth": {"fcf_3yr_cagr": None, "fcf_5yr_cagr": None}}
+        g = bd.fcf_growth(dcf, self._rows([100, -5, 80, 120, 150, 200]))
+        assert [x["label"] for x in g] == ["FCF 3Y (reported)", "FCF 5Y (reported)"]
+        assert g[0]["rate"] == pytest.approx(((200 / 80) ** (1 / 3) - 1) * 100)
+        assert g[1]["rate"] == pytest.approx(((200 / 100) ** (1 / 5) - 1) * 100)
+
+    def test_never_overrides_a_dcf_figure(self):
+        dcf = {"historical_growth": {"reported_fcf_3yr_cagr": 35.9}}
+        g = bd.fcf_growth(dcf, self._rows([100, 110, 80, 120, 150, 200]))
+        assert [x["label"] for x in g] == ["FCF 5Y (reported)"]
+
+    def test_negative_endpoint_shows_na_with_the_reason(self):
+        # only the endpoints matter: a dip in between does not void the CAGR
+        g = bd.fcf_growth({}, self._rows([100, 110, 120, -40, 150, 200]))
+        assert g[0]["rate"] is not None
+        g = bd.fcf_growth({}, self._rows([100, 110, -20, 120, 150, 200]))
+        assert g[0]["rate"] is None
+        assert g[0]["reason"] == "FCF negative in FY2022"
+
+    def test_no_fcf_column_no_cards(self):
+        assert bd.fcf_growth({}, [_fy("FY2025", Revenue=1)]) == []
+
+
+class TestReturnsPanel:
+    def test_returns_and_fcf_growth_render_beside_the_cagr_grid(self, spec, analysis, dcf):
+        csv = ("Period,Revenue,OperatingIncome,NetIncome,FreeCashFlow,CashAndEquivalents,"
+               "TotalDebt,ShareholdersEquity,GrossMargin,EBITDA\n"
+               "FY2024,100,20,15,10,50,30,120,40,25\nFY2025,120,30,20,14,60,30,130,41,35\n")
+        page = bd.render("TEST", spec, csv, analysis, dcf)
+        panel = page[page.index('class="historical-growth"'):page.index('class="dcf-download"')]
+        assert 'id="growthGrid"' in panel
+        assert "Return on Invested Capital" in panel
+        assert "21% US statutory" in panel
+        assert "const csvGrowth =" in page

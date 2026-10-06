@@ -57,6 +57,7 @@ import tempfile
 from typing import Any
 
 import dcf_fields as F
+import fundamentals
 import periods
 import schema
 
@@ -287,6 +288,146 @@ def fmt_value(v: float | None, fmt: str, currency: str, units: str) -> str:
     return str(v)
 
 
+# Headline corporate rate of the listing country. A US-listed ADR (bare symbol)
+# gets the US rate whatever its domicile -- stated in the panel footnote.
+STATUTORY_TAX_BY_SUFFIX: dict[str, tuple[float, str]] = {
+    "": (0.21, "US"), "L": (0.25, "UK"), "NZ": (0.28, "NZ"), "AX": (0.30, "AU"),
+    "HK": (0.165, "HK"), "T": (0.306, "JP"), "TO": (0.265, "CA"), "V": (0.265, "CA"),
+    "U": (0.265, "CA"), "NS": (0.252, "IN"), "DE": (0.30, "DE"), "F": (0.30, "DE"),
+    "PA": (0.25, "FR"), "AS": (0.258, "NL"), "SI": (0.17, "SG"), "ST": (0.206, "SE"),
+    "MI": (0.24, "IT"), "CO": (0.22, "DK"), "BR": (0.25, "BE"),
+}
+# Capital IS the business here, so invested capital means nothing: show ROE.
+FINANCIAL_BUCKETS = frozenset({"bank", "reit", "lic_nav"})
+
+
+def statutory_tax(ticker: str) -> tuple[float, str] | None:
+    suffix = ticker.rsplit(".", 1)[1].upper() if "." in ticker else ""
+    return STATUTORY_TAX_BY_SUFFIX.get(suffix)
+
+
+def _window_mean(values: list[float | None], n: int) -> float | None:
+    window = values[-n:]
+    if len(window) < n or any(v is None for v in window):
+        return None
+    return sum(v for v in window if v is not None) / n
+
+
+def returns_on_capital(ticker: str, bucket: str | None,
+                       rows: list[dict[str, str]]) -> dict[str, Any]:
+    """ROIC (after statutory tax, on average invested capital), or ROE for financials.
+
+    Invested capital = equity + debt - cash. A missing input, non-positive
+    capital or an unknown listing yields None -- never an assumed value.
+    """
+    financial = bucket in FINANCIAL_BUCKETS
+    tax = None if financial else statutory_tax(ticker)
+    rate = tax[0] if tax else None
+    yearly: list[float | None] = []
+    prev_year: int | None = None
+    prev_base: float | None = None
+    prev_equity: float | None = None
+    latest_period = None
+    roe_latest: float | None = None
+    thin = False
+    for r in annual_rows(rows):
+        year = periods.parse(r["Period"]).fiscal_year
+        equity = num(r.get("ShareholdersEquity"))
+        if financial:
+            base = equity
+            ret = num(r.get("NetIncome"))
+        else:
+            debt, cash = num(r.get("TotalDebt")), num(r.get("CashAndEquivalents"))
+            base = (equity + debt - cash
+                    if equity is not None and debt is not None and cash is not None else None)
+            ebit = num(r.get("OperatingIncome"))
+            ret = ebit * (1 - rate) if ebit is not None and rate is not None else None
+        avg = base
+        if base is not None and prev_base is not None and year is not None \
+                and prev_year == year - 1:
+            avg = (base + prev_base) / 2
+        yearly.append(ret / avg * 100 if ret is not None and avg is not None and avg > 0 else None)
+        adjacent = year is not None and prev_year == year - 1
+        avg_eq = (equity + prev_equity) / 2 if equity is not None and prev_equity is not None \
+            and adjacent else equity
+        ni = num(r.get("NetIncome"))
+        roe_latest = ni / avg_eq * 100 if ni is not None and avg_eq is not None and avg_eq > 0 else None
+        # Net cash close to equity leaves little invested capital, and the
+        # ratio then swings with the cash balance rather than the business.
+        thin = not financial and base is not None and equity is not None and equity > 0 \
+            and base < 0.25 * equity
+        prev_year, prev_base, prev_equity, latest_period = year, base, equity, r["Period"]
+    return {"measure": "ROE" if financial else "ROIC", "tax_rate": rate,
+            "tax_country": tax[1] if tax else None, "latest_period": latest_period,
+            "latest": yearly[-1] if yearly else None,
+            "avg3": _window_mean(yearly, 3), "avg5": _window_mean(yearly, 5),
+            "thin_capital": thin, "roe_latest": roe_latest}
+
+
+def fcf_growth(dcf: dict[str, Any] | None, rows: list[dict[str, str]]) -> list[dict[str, Any]]:
+    """Reported-FCF CAGRs for the horizons the DCF's historical_growth leaves empty."""
+    growth = (dcf or {}).get("historical_growth") or {}
+    fcf: dict[int, float] = {}
+    for r in annual_rows(rows):
+        v, year = num(r.get("FreeCashFlow")), periods.parse(r["Period"]).fiscal_year
+        if v is not None and year is not None:
+            fcf[year] = v
+    if not fcf:
+        return []
+    end_year = max(fcf)
+    out = []
+    for n in (3, 5):
+        if any(isinstance(growth.get(k), (int, float)) and not isinstance(growth.get(k), bool)
+               for k in (f"fcf_{n}yr_cagr", f"reported_fcf_{n}yr_cagr")):
+            continue
+        start_year = end_year - n
+        item: dict[str, Any] = {"label": f"FCF {n}Y (reported)", "rate": None, "reason": None}
+        if start_year not in fcf:
+            item["reason"] = f"no FY{start_year} figure"
+        else:
+            neg = [y for y in (start_year, end_year) if fcf[y] <= 0]
+            if neg:
+                item["reason"] = f"FCF negative in FY{neg[0]}"
+            else:
+                cagr, _ = fundamentals._cagr({f"FY{start_year}": fcf[start_year],
+                                              f"FY{end_year}": fcf[end_year]}, n, [], "fcf")
+                item["rate"] = None if cagr is None else cagr * 100
+        out.append(item)
+    return out
+
+
+def render_returns(ret: dict[str, Any]) -> str:
+    """The returns block that sits beside the CAGR grid."""
+    measure = ret["measure"]
+    title = "Return on Equity" if measure == "ROE" else "Return on Invested Capital"
+    label = ret["latest_period"] or "latest FY"
+
+    def card(name: str, v: float | None) -> str:
+        cls = "" if v is None else ("positive" if v >= 0 else "negative")
+        text = "n/a" if v is None else f"{v:.1f}%"
+        return (f'<div class="growth-item"><div class="metric">{html.escape(name)}</div>'
+                f'<div class="rate {cls}">{text}</div></div>')
+
+    cards = (card(f"{measure} {label}", ret["latest"]) + card(f"{measure} 3Y avg", ret["avg3"])
+             + card(f"{measure} 5Y avg", ret["avg5"]))
+    if ret.get("thin_capital"):
+        cards += card(f"ROE {label}", ret.get("roe_latest"))
+    if measure == "ROE":
+        note = "Net income &divide; average shareholders' equity (ROIC is not meaningful for this business model)."
+    elif ret["tax_rate"] is None:
+        note = "No statutory tax rate on file for this listing, so ROIC is not shown."
+    else:
+        pct = f"{ret['tax_rate'] * 100:g}%"
+        note = (f"Operating income &times; (1 &minus; {pct} {ret['tax_country']} statutory rate) &divide; "
+                "average (equity + debt &minus; cash). Rate is by listing country, not domicile.")
+        if ret.get("thin_capital"):
+            note += (" Net cash covers most of equity, so invested capital is small and ROIC is very "
+                     "high and swings with the cash balance; ROE is shown for comparison.")
+    return (f'<div class="returns-block"><h4>{title}</h4>'
+            f'<div class="growth-grid">{cards}</div>'
+            f'<div class="returns-note">{note}</div></div>')
+
+
 def render_kpis(spec: dict[str, Any], rows: list[dict[str, str]],
                 dcf: dict[str, Any] | None) -> str:
     fy = annual_rows(rows)
@@ -438,7 +579,8 @@ def _fmt_slider(v: float) -> str:
     return f"{v:g}"
 
 
-def render_dcf_section(ticker: str, spec: dict[str, Any], dcf: dict[str, Any]) -> str:
+def render_dcf_section(ticker: str, spec: dict[str, Any], dcf: dict[str, Any],
+                       returns_html: str = "") -> str:
     labels = spec.get("dcf", {})
     r = _slider_range(dcf)
     g, w, t = r["growth"], r["wacc"], r["terminal"]
@@ -550,8 +692,11 @@ def render_dcf_section(ticker: str, spec: dict[str, Any], dcf: dict[str, Any]) -
   </div>
 
   <div class="historical-growth">
-    <h4>Historical Growth Rates (CAGR)</h4>
-    <div class="growth-grid" id="growthGrid"></div>
+    <div class="growth-block">
+      <h4>Historical Growth Rates (CAGR)</h4>
+      <div class="growth-grid" id="growthGrid"></div>
+    </div>
+    {returns_html}
   </div>
 
   <div class="dcf-download">
@@ -652,7 +797,10 @@ def render(ticker: str, spec: dict[str, Any], csv_text: str,
         "@@DESCRIPTOR@@": str(spec["descriptor"]),
         "@@KPI_CARDS@@": render_kpis(spec, rows, dcf),
         "@@SECTIONS@@": render_sections(spec, data),
-        "@@DCF_SECTION@@": render_dcf_section(ticker, spec, dcf) if dcf else "",
+        "@@DCF_SECTION@@": render_dcf_section(
+            ticker, spec, dcf,
+            render_returns(returns_on_capital(ticker, spec.get("bucket"), rows))) if dcf else "",
+        "@@CSV_GROWTH@@": _js(fcf_growth(dcf, rows)),
         "@@CSV@@": csv_body,
         "@@ANALYSIS_JSON@@": _js(analysis),
         "@@DCF_JSON@@": _js(dcf) if dcf else "null",
