@@ -281,6 +281,17 @@ class TestCharts:
         cd = bd.chart_data(spec, *bd.read_csv(csv)[1:], dcf)
         assert cd["revenueChart"]["interim"]["labels"] == ["Q1'25", "Q1'26"]
 
+    def test_no_interim_toggle_when_interims_lack_the_charts_columns(self, spec, analysis, dcf):
+        """WISE.L's quarters carry revenue only: a Q button on the cash chart
+        opened an empty canvas."""
+        csv = ("Period,Revenue,GrossMargin,EBITDA,FreeCashFlow,CashAndEquivalents\n"
+               "FY2024,100,40,10,5,50\nQ1 2025,30,,,,\nQ2 2025,35,,,,\n")
+        page = bd.render("TEST", spec, csv, analysis, dcf)
+        assert "setPeriodView('revenueChart', 'interim'" in page
+        assert "setPeriodView('cashChart'" not in page
+        cd = bd.chart_data(spec, *bd.read_csv(csv)[1:], dcf)
+        assert "interim" not in cd["cashChart"]
+
     def test_chart_data_series(self, spec, csv_text, dcf):
         _, rows = bd.read_csv(csv_text)
         cd = bd.chart_data(spec, rows, dcf)
@@ -1239,3 +1250,10 @@ class TestPlainTextEntities:
                       for ch in sec.get("charts", []) for se in ch.get("series", [])]
             texts += [k.get("label", "") for k in s.get("kpis", [])]
             assert not [t for t in texts if "&amp;" in t], p.name
+
+
+class TestFmtValue:
+    def test_pct_keeps_two_decimals_below_one_percent(self):
+        """WISE.L's 0.52% take rate rendered as "0.5%", erasing the 6bps cut."""
+        assert bd.fmt_value(0.52, "pct", "$", "m") == "0.52%"
+        assert bd.fmt_value(23.6, "pct", "$", "m") == "23.6%"

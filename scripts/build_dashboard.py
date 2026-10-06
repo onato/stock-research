@@ -281,7 +281,7 @@ def fmt_value(v: float | None, fmt: str, currency: str, units: str) -> str:
     if fmt == "money":
         return f"{currency}{v:,.1f}{units}"
     if fmt == "pct":
-        return f"{v:.1f}%"
+        return f"{v:.2f}%" if abs(v) < 1 else f"{v:.1f}%"
     if fmt == "number":
         return f"{v:,.1f}" if v != int(v) else f"{int(v):,}"
     return str(v)
@@ -340,9 +340,11 @@ def chart_data(spec: dict[str, Any], rows: list[dict[str, str]],
                            "data": [_series_values(s, fy, dcf) for s in ch["series"]]},
             }
             if kind and inter and ch.get("interim", True):
-                entry["interim"] = {"kind": kind,
-                                    "labels": [short_label(r["Period"]) for r in inter],
-                                    "data": [_series_values(s, inter, dcf) for s in ch["series"]]}
+                idata = [_series_values(s, inter, dcf) for s in ch["series"]]
+                if any(v is not None for s in idata for v in s):
+                    entry["interim"] = {"kind": kind,
+                                        "labels": [short_label(r["Period"]) for r in inter],
+                                        "data": idata}
             out[ch["id"]] = entry
     return out
 
