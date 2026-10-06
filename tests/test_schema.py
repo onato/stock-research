@@ -439,3 +439,15 @@ class TestPromotedAnsellSegmentKpis:
     def test_snake_case_segment_kpis_promote(self):
         assert schema.promote_header("healthcare_revenue") == "HealthcareRevenue"
         assert schema.promote_header("industrial_ebit_margin") == "IndustrialEBITMargin"
+
+
+class TestPromotedMoneyTransferVolumeAndHoldingsKpis:
+    """Wise (WISE.L): cross-border volume is the volume series behind the
+    take rate, and customer holdings (on-balance-sheet balances plus assets
+    under custody) drive the interest income that is ~a third of net
+    revenue. Both had full history in `kpis` but no CSV column."""
+
+    def test_wise_volume_and_holdings_kpis_promote(self):
+        for name in ("CrossBorderVolume", "CustomerHoldings",
+                     "CustomerBalances", "AssetsUnderCustody"):
+            assert schema.promote_header(name) == name

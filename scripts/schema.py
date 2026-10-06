@@ -182,6 +182,12 @@ PROMOTE_KPIS: dict[str, str] = {
     "TotalOrders": "TotalOrders",
     "ProcessedVolume": "ProcessedVolume",
     "GrossBookings": "GrossBookings",
+    # Money transfer (Wise, WISE.L): the volume behind the take rate, and the
+    # customer money that earns ~a third of net revenue as interest.
+    "CrossBorderVolume": "CrossBorderVolume",
+    "CustomerHoldings": "CustomerHoldings",
+    "CustomerBalances": "CustomerBalances",
+    "AssetsUnderCustody": "AssetsUnderCustody",
     # Unit economics
     "AOV": "AOV",
     "CAC": "CAC",
