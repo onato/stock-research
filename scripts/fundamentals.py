@@ -283,6 +283,9 @@ def _cagr(values: dict[str, float], years: int,
         # complex. AGL.NZ's earnings hit this routinely.
         reasons.append(f"cagr-nonpositive-base:{label}")
         return None, None
+    if end <= 0:
+        reasons.append(f"cagr-nonpositive-end:{label}")
+        return None, None
     total = end / start - 1
     return (end / start) ** (1 / years) - 1, total
 

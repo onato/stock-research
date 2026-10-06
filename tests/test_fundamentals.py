@@ -481,3 +481,14 @@ class TestCompletedYearStaleness:
         assert due(2026, "06-30", quarterly=False) == dt.date(2027, 3, 31)
         assert due(2025, "12-31", quarterly=True) == dt.date(2026, 5, 15)
         assert due(2026, "30 June", quarterly=False) is None
+
+
+class TestCagrEndpoints:
+    def test_negative_end_value_is_refused_not_complex(self):
+        """A positive base and a loss-making end year raised a negative ratio to
+        a fractional power, which Python returns as a complex number."""
+        reasons: list[str] = []
+        cagr, total = fundamentals._cagr({"FY2020": 100.0, "FY2023": -50.0}, 3,
+                                         reasons, "fcf")
+        assert (cagr, total) == (None, None)
+        assert reasons == ["cagr-nonpositive-end:fcf"]
