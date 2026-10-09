@@ -72,3 +72,19 @@ def test_negative_roic_is_red():
     cell = roic_cell({"measure": "ROIC", "latest": -5.0, "avg5": None,
                       "latest_period": "FY2025", "thin_capital": False})
     assert 'class="neg"' in cell
+
+
+def test_column_headings_stay_visible_when_scrolling(tmp_path):
+    """The card is the scroll container (overflow-x for phones), so a sticky
+    <th> only sticks if the card also scrolls vertically, capped to the
+    viewport; the heading needs an opaque background to cover the rows."""
+    out = tmp_path / "index.html"
+    screen.write_html([ROW], [], [], {"generated_at": "x", "live": False}, {}, {}, str(out))
+    css = out.read_text()
+    th_rule = css.split("\nth {", 1)[1].split("}", 1)[0]
+    card_rule = css.split(".card {", 1)[1].split("}", 1)[0]
+    assert "position: sticky" in th_rule
+    assert "top: 0" in th_rule
+    assert "background:" in th_rule
+    assert "max-height:" in card_rule
+    assert "overflow: auto" in card_rule

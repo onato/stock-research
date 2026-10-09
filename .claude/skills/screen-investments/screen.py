@@ -560,14 +560,22 @@ a {{ color: #00d4aa; text-decoration: none; }}
 a:hover {{ color: #00b894; }}
 .card {{
     background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 12px; padding: 10px; margin-bottom: 20px; overflow-x: auto;
+    border-radius: 12px; padding: 0 10px 10px; margin-bottom: 20px; overflow: auto;
     -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
+    /* overflow makes the card the scroll container a sticky <th> sticks to,
+       so the card scrolls vertically too, capped to the viewport; otherwise
+       the headings scroll away with the page. */
+    max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px);
 }}
 table {{ border-collapse: collapse; width: 100%; font-size: 0.92em; }}
 th {{
     color: #00d4aa; text-align: left; cursor: pointer; user-select: none;
     padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.15);
     white-space: nowrap;
+    position: sticky; top: 0; z-index: 1;
+    /* Opaque (the card's translucent tint over the page) so rows scrolling
+       underneath don't show through. */
+    background: #23283f;
 }}
 th.asc::after {{ content: " \\25B2"; font-size: 0.8em; }}
 th.desc::after {{ content: " \\25BC"; font-size: 0.8em; }}
@@ -591,7 +599,7 @@ td.co {{ white-space: normal; max-width: 280px; line-height: 1.3; }}
             padding-right: max(12px, env(safe-area-inset-right)); }}
     .header {{ padding: 16px; }}
     h1 {{ font-size: 1.3em; }}
-    .card {{ padding: 6px; border-radius: 10px; }}
+    .card {{ padding: 0 6px 6px; border-radius: 10px; }}
     table {{ font-size: 0.86em; }}
     th, td {{ padding: 10px 8px; }}
     /* Touch targets: a 7px-padded row is under the 44px minimum. */
