@@ -187,6 +187,36 @@ def _fy_end(info: dict[str, Any] | None) -> str | None:
     return raw
 
 
+def sector_and_bucket(info: dict[str, Any], analysis: dict[str, Any],
+                      dcf: dict[str, Any] | None) -> tuple[str, str]:
+    sector = str(info.get("sector") or analysis.get("sector") or "").strip()
+    if sector.lower() in ("none", "unknown"):
+        sector = ""
+    return sector, sectors.bucket(sector or None,
+                                  sectors.dcf_model_label(dcf, include_prose=False))
+
+
+def bucket_for(ticker: str, repo: pathlib.Path | None = None) -> str:
+    """The business-model bucket default_spec would pick for this ticker."""
+    repo = repo or REPO
+    reports = repo / "research" / ticker / "Reports"
+    return sector_and_bucket(_load_json(repo / "research" / ticker / "info.json") or {},
+                             _load_json(reports / f"{ticker}_Analysis.json") or {},
+                             _load_json(reports / f"{ticker}_DCF.json"))[1]
+
+
+def returns_for(ticker: str, repo: pathlib.Path | None = None) -> dict[str, Any] | None:
+    """The dashboard's ROIC/ROE summary, for callers outside the dashboard
+    (the index leaderboard). None when there is no Metrics.csv."""
+    repo = repo or REPO
+    csv_path = repo / "research" / ticker / "Reports" / f"{ticker}_Metrics.csv"
+    try:
+        _, rows = BD.read_csv(csv_path.read_text())
+    except OSError:
+        return None
+    return BD.returns_on_capital(ticker, bucket_for(ticker, repo), rows)
+
+
 def default_spec(ticker: str, repo: pathlib.Path | None = None) -> dict[str, Any]:
     repo = repo or REPO
     reports = repo / "research" / ticker / "Reports"
@@ -199,10 +229,7 @@ def default_spec(ticker: str, repo: pathlib.Path | None = None) -> dict[str, Any
     dcf = _load_json(reports / f"{ticker}_DCF.json")
 
     company = str(analysis.get("company_name") or info.get("name") or ticker)
-    sector = str(info.get("sector") or analysis.get("sector") or "").strip()
-    if sector.lower() in ("none", "unknown"):
-        sector = ""
-    which = sectors.bucket(sector or None, sectors.dcf_model_label(dcf, include_prose=False))
+    sector, which = sector_and_bucket(info, analysis, dcf)
     templates = load_templates()
     business = templates.get(which, templates["operating"])
 

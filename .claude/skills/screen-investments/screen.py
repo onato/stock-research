@@ -30,7 +30,13 @@ import json
 import os
 import pathlib
 import re
+import sys
 import urllib.request
+
+# ROIC comes from the dashboard's own function so the index and the dashboard
+# card cannot disagree; screen.py lives outside scripts/, so put it on the path.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[3] / "scripts"))
+import dashboard_spec
 
 YF_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{t}?range=1d&interval=1d"
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
@@ -308,6 +314,23 @@ def load_scores(root):
     return out
 
 
+def load_returns(root, tickers):
+    """{ticker: returns_on_capital summary}. `research/` sits inside the repo,
+    so the repo is the root's parent. A ticker whose CSV will not parse gets
+    no entry (an em dash) rather than taking the whole index down."""
+    repo = pathlib.Path(root).resolve().parent
+    out = {}
+    for t in tickers:
+        try:
+            ret = dashboard_spec.returns_for(t, repo)
+        except Exception as e:  # one bad CSV must not sink the page
+            print(f"  ROIC skipped for {t}: {e}")
+            continue
+        if ret:
+            out[t] = ret
+    return out
+
+
 def load_companies(root):
     """{ticker: {name, sector}} from state/companies.json (maintained by the
     research-stock skill). Missing file just means bare tickers on the page.
@@ -411,7 +434,31 @@ def company_td(co):
     return f'<td class="co">{inner}</td>'
 
 
-def row_html(i, r, summary, co):
+ROIC_GOOD = 15.0   # % at or above which the cell is coloured as good
+
+
+def roic_td(ret):
+    """Latest-FY ROIC (ROE for financials) from dashboard_spec.returns_for."""
+    latest = (ret or {}).get("latest")
+    if latest is None:
+        return num_td(None, "—")
+    txt = f"{latest:.1f}%"
+    tip = [ret.get("latest_period") or ""]
+    if ret.get("avg5") is not None:
+        tip.append(f"5y avg {ret['avg5']:.1f}%")
+    if ret.get("measure") == "ROE":
+        txt += ' <span class="cur">ROE</span>'
+        tip.append("ROE: ROIC is not meaningful for financials")
+    if ret.get("thin_capital"):
+        txt += '<span class="cur">*</span>'
+        tip.append("net cash ≈ equity; ROIC swings with cash")
+    cls = "pos" if latest >= ROIC_GOOD else ("neg" if latest < 0 else "")
+    cls_attr = f' class="{cls}"' if cls else ""
+    title = esc(" · ".join(t for t in tip if t))
+    return f'<td data-sort="{esc(latest)}"{cls_attr} title="{title}">{txt}</td>'
+
+
+def row_html(i, r, summary, co, ret=None):
     t = r.get("ticker", "?")
     cur = r.get("currency")
     live_cur = r.get("live_currency")
@@ -454,13 +501,14 @@ def row_html(i, r, summary, co):
         price_cell,
         num_td(iv, iv_txt),
         num_td(up, esc(up_txt), "pos" if (up or 0) >= 0 else "neg"),
+        roic_td(ret),
         num_td(age, f"{age}d" if age is not None else "—"),
         "<td>" + ("".join(badge_html(f) for f in flags) or '<span class="ok">ok</span>') + "</td>",
         score_cell,
     )) + "</tr>"
 
 
-def write_html(ranked, unranked, excluded, meta, scores, companies, path):
+def write_html(ranked, unranked, excluded, meta, scores, companies, path, returns=None):
     head = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -588,10 +636,11 @@ upside = weighted IV / price &minus; 1</p>
     if ranked:
         body_rows = "\n".join(
             row_html(i, r, scores.get(r.get("ticker")),
-                     companies.get(r.get("ticker"), {}))
+                     companies.get(r.get("ticker"), {}),
+                     (returns or {}).get(r.get("ticker")))
             for i, r in enumerate(ranked, 1))
     else:
-        body_rows = '<tr><td colspan="9">No ranked tickers — see unranked below.</td></tr>'
+        body_rows = '<tr><td colspan="10">No ranked tickers — see unranked below.</td></tr>'
 
     ranked_table = f"""<div class="card">
 <table id="lb">
@@ -599,7 +648,8 @@ upside = weighted IV / price &minus; 1</p>
 <th data-type="num">#</th><th data-type="str">Ticker</th>
 <th data-type="str">Company</th>
 <th data-type="num">Price</th><th data-type="num">Weighted IV</th>
-<th data-type="num">Upside</th><th data-type="num">Age</th>
+<th data-type="num">Upside</th><th data-type="num">ROIC</th>
+<th data-type="num">Age</th>
 <th data-type="str">Flags</th><th data-type="num">Eval</th>
 </tr></thead>
 <tbody>
@@ -825,7 +875,8 @@ def main():
         extras = [e for e in extras if e["ticker"] not in never]
         write_html(ranked, unranked + extras,
                    sorted(excluded + extra_excluded, key=lambda r: r["ticker"]),
-                   meta, load_scores(args.root), companies, args.html)
+                   meta, load_scores(args.root), companies, args.html,
+                   load_returns(args.root, [r["ticker"] for r in ranked]))
 
 
 if __name__ == "__main__":

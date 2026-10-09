@@ -229,3 +229,31 @@ class TestPenceDescriptor:
         assert "reported in USD" in spec["descriptor"]
         assert "quoted in GBp (pence)" in spec["descriptor"]
         assert "GBP" not in spec["descriptor"]
+
+
+class TestReturnsFor:
+    """The index leaderboard shows the same ROIC the dashboard card does, so
+    both read it through one function rather than re-deriving the bucket."""
+
+    def test_operating_company_gets_roic_matching_the_dashboard(self, tmp_path):
+        repo = make_ticker_files(tmp_path, ticker="SYN.NZ")
+        _, rows = build_dashboard.read_csv(
+            (repo / "research" / "SYN.NZ" / "Reports" / "SYN.NZ_Metrics.csv").read_text())
+        expected = build_dashboard.returns_on_capital("SYN.NZ", "operating", rows)
+        got = DS.returns_for("SYN.NZ", repo)
+        assert got["measure"] == "ROIC"
+        assert got["latest"] == expected["latest"]
+        assert got["latest"] is not None
+
+    def test_bank_gets_roe(self, tmp_path):
+        repo = make_ticker_files(tmp_path, ticker="BNK.NZ",
+                                 analysis={"company_name": "Bank Co", "sector": "Banking"})
+        assert DS.returns_for("BNK.NZ", repo)["measure"] == "ROE"
+
+    def test_missing_csv_is_none(self, tmp_path):
+        assert DS.returns_for("NOPE", tmp_path) is None
+
+    def test_bucket_for_matches_default_spec(self, tmp_path):
+        repo = make_ticker_files(tmp_path, csv=csv_text(extra_cols=("AFFO", "NTAPerShare", "Occupancy")),
+                                 dcf={"model": "AFFO capitalization at cost of equity", "inputs": {}})
+        assert DS.bucket_for("SYN", repo) == DS.default_spec("SYN", repo)["bucket"] == "reit"
