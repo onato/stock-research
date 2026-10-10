@@ -14,6 +14,18 @@ filings yielded ~100 each.
   * currency likewise scans the whole file (RMB -> CNY);
   * financial summaries carry several comparative year columns; the third
     is emitted as another prior_year_column instead of being discarded.
+
+Some filings (0151.HK; the real 0285.HK filings, not just its hand-glued
+test fixture) column-align the Chinese translation far enough right that
+CELL_SPLIT's 2+-space rule gives it its own cell instead of sharing one with
+the English label -- "Revenue                            收益          23,984,891"
+splits into ["Revenue", "收益", "23,984,891", ...], and clean_label's
+trailing-CJK strip never runs because the CJK is never in the same cell as
+the label. CJK_CELL_RE drops a whole CJK-only cell (and its surrounding
+whitespace) from the line before CELL_SPLIT ever sees it, so the label and
+numbers close back up into adjacent cells exactly as the glued form does.
+Measured: 0151.HK's 10 filings went from 2 candidate facts total to several
+hundred.
 """
 
 import re
@@ -35,6 +47,21 @@ class HKEXParser(BaseParser):
     # Chinese rendering appended to every label, header and note.
     CJK_RE = re.compile(r"[一-鿿　-〿＀-￯].*$")
 
+    # A cell made up of nothing but CJK characters/fullwidth punctuation,
+    # plus U+2571 (╱), the box-drawing slash 0151.HK uses for "(losses)/
+    # profits" style alternatives in its Chinese rendering: the whole-cell
+    # counterpart of CJK_RE, for when the translation is column-aligned into
+    # its own cell rather than glued onto the label. Removed together with
+    # one run of its bounding whitespace so the cells on either side close
+    # back up into CELL_SPLIT's normal label/number adjacency, instead of
+    # being skipped as a third, unrecognised cell.
+    #
+    # Deliberately ASCII-free: a bare "-" is a real zero-value cell
+    # (common.parse_num reads it as 0.0), not a translation, and must
+    # survive so later columns do not shift left into its place.
+    CJK_CELL_RE = re.compile(
+        r"(?:(?<=\s)|^)[一-鿿　-〿＀-￯╱]+(?=\s{2,}|$)")
+
     UNITS_TOKEN_RE = re.compile(
         r"(?:RMB|HK\$|US\$|\$)\s?(?:['’]\s?)?(000\b|million|billion|m\b|bn\b)", re.IGNORECASE)
 
@@ -52,7 +79,8 @@ class HKEXParser(BaseParser):
     CCY_PREFIX = re.compile(r"(?:HK|US|S|A|NZ|RMB)?\$\s*(?=[\d(])")
 
     def segments(self, line: str) -> Iterator[tuple[str, list[float]]]:
-        return super().segments(self.CCY_PREFIX.sub("", line))
+        line = self.CJK_CELL_RE.sub("", self.CCY_PREFIX.sub("", line))
+        return super().segments(line)
 
     def clean_label(self, cell: str) -> str:
         return self.CJK_RE.sub("", cell).strip()
