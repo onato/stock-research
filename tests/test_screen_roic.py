@@ -74,17 +74,21 @@ def test_negative_roic_is_red():
     assert 'class="neg"' in cell
 
 
-def test_column_headings_stay_visible_when_scrolling(tmp_path):
-    """The card is the scroll container (overflow-x for phones), so a sticky
-    <th> only sticks if the card also scrolls vertically, capped to the
-    viewport; the heading needs an opaque background to cover the rows."""
+def test_only_the_page_scrolls_and_headings_float_when_off_screen(tmp_path):
+    """The card scrolls sideways (phones) but never vertically -- only the page
+    does. A sticky <th> would stick to the card, not the viewport, so the
+    headings are instead cloned into a fixed bar once they leave the screen."""
     out = tmp_path / "index.html"
     screen.write_html([ROW], [], [], {"generated_at": "x", "live": False}, {}, {}, str(out))
-    css = out.read_text()
-    th_rule = css.split("\nth {", 1)[1].split("}", 1)[0]
-    card_rule = css.split(".card {", 1)[1].split("}", 1)[0]
-    assert "position: sticky" in th_rule
-    assert "top: 0" in th_rule
-    assert "background:" in th_rule
-    assert "max-height:" in card_rule
-    assert "overflow: auto" in card_rule
+    html = out.read_text()
+    th_rule = html.split("\nth {", 1)[1].split("}", 1)[0]
+    card_rule = html.split(".card {", 1)[1].split("}", 1)[0]
+    float_rule = html.split(".float-head {", 1)[1].split("}", 1)[0]
+    assert "max-height" not in card_rule
+    assert "overflow-x: auto" in card_rule
+    assert "overflow: auto" not in card_rule
+    assert "sticky" not in th_rule
+    assert "position: fixed" in float_rule
+    assert "top: 0" in float_rule
+    assert "background:" in float_rule
+    assert "float-head" in html.split("<script>", 1)[1]

@@ -560,23 +560,25 @@ a {{ color: #00d4aa; text-decoration: none; }}
 a:hover {{ color: #00b894; }}
 .card {{
     background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 12px; padding: 0 10px 10px; margin-bottom: 20px; overflow: auto;
+    border-radius: 12px; padding: 0 10px 10px; margin-bottom: 20px; overflow-x: auto;
     -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
-    /* overflow makes the card the scroll container a sticky <th> sticks to,
-       so the card scrolls vertically too, capped to the viewport; otherwise
-       the headings scroll away with the page. */
-    max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px);
 }}
 table {{ border-collapse: collapse; width: 100%; font-size: 0.92em; }}
 th {{
     color: #00d4aa; text-align: left; cursor: pointer; user-select: none;
     padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.15);
     white-space: nowrap;
-    position: sticky; top: 0; z-index: 1;
-    /* Opaque (the card's translucent tint over the page) so rows scrolling
-       underneath don't show through. */
-    background: #23283f;
 }}
+/* The card's overflow-x makes it the container a sticky <th> would stick to,
+   so the headings scroll away with the page; once they leave the screen a
+   clone is shown in this fixed bar instead. Opaque (the card's tint over the
+   page) so rows scrolling underneath don't show through. */
+.float-head {{
+    position: fixed; top: 0; z-index: 10; overflow: hidden; display: none;
+    background: #23283f; box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}}
+.float-head table {{ table-layout: fixed; }}
+.float-head th {{ box-sizing: border-box; }}
 th.asc::after {{ content: " \\25B2"; font-size: 0.8em; }}
 th.desc::after {{ content: " \\25BC"; font-size: 0.8em; }}
 td {{ padding: 7px 10px; border-bottom: 1px solid rgba(255,255,255,0.06); white-space: nowrap; }}
@@ -780,6 +782,53 @@ document.querySelector('#lb thead').addEventListener('click', (e) => {
             return dir === 'asc' ? c : -c;
         })
         .forEach(r => tbody.appendChild(r));
+});
+
+// Floating headings: the page is the only vertical scroller, so when a
+// table's heading row leaves the top of the screen, show a fixed clone of it
+// with the same column widths and horizontal offset (the card may be
+// scrolled sideways on a phone). Clicks on the clone sort the real table.
+document.querySelectorAll('.card > table').forEach(table => {
+    const card = table.parentNode, thead = table.tHead;
+    const bar = document.createElement('div');
+    bar.className = 'float-head';
+    const clone = document.createElement('table');
+    bar.appendChild(clone);
+    document.body.appendChild(bar);
+    const copy = () => clone.replaceChildren(thead.cloneNode(true));
+    const place = () => {
+        const t = table.getBoundingClientRect(), h = thead.getBoundingClientRect();
+        const show = h.top < 0 && t.bottom > h.height * 2;
+        bar.style.display = show ? 'block' : 'none';
+        if (!show) return;
+        const c = card.getBoundingClientRect(), left = c.left + card.clientLeft;
+        bar.style.left = left + 'px';
+        bar.style.width = card.clientWidth + 'px';
+        clone.style.width = t.width + 'px';
+        clone.style.transform = `translateX(${t.left - left}px)`;
+        const src = thead.rows[0].cells, dst = clone.tHead.rows[0].cells;
+        for (let i = 0; i < src.length; i++)
+            dst[i].style.width = src[i].getBoundingClientRect().width + 'px';
+    };
+    clone.addEventListener('click', (e) => {
+        const th = e.target.closest('th');
+        if (!th) return;
+        thead.rows[0].cells[th.cellIndex].click();
+        copy();
+        place();
+    });
+    let queued = false;
+    const schedule = () => {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(() => { queued = false; place(); });
+    };
+    window.addEventListener('scroll', schedule, {passive: true});
+    window.addEventListener('resize', schedule);
+    card.addEventListener('scroll', schedule, {passive: true});
+    search.addEventListener('input', schedule);
+    copy();
+    place();
 });
 
 // Offline shell. Registration is best-effort: the page is fully functional
