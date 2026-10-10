@@ -200,6 +200,14 @@ def terminal_value(last_fcf: float, rate: float, growth: float, cap: float) -> T
     return TerminalValue(max(0.0, cap_value), "cap" if cap_value > 0 else "floor", gordon, cap_value)
 
 
+def _currency(inputs: dict[str, Any], key: str, default: str = "") -> str:
+    """Raw currency code, case preserved: GBP (pounds) and GBp (pence) are
+    distinct tokens here, not a casing inconsistency to fold away -- see the
+    BT-A.L fx_rate bug this guards (upper()/lower() made GBP == GBp and the
+    x100 fx_rate was silently skipped)."""
+    return str(inputs.get(key) or default).strip()
+
+
 def _discount_factors(rate: float, n: int) -> list[float]:
     return [1 / (1 + rate / 100) ** (i + 1) for i in range(n)]
 
@@ -223,8 +231,8 @@ def _validate(drivers: dict[str, Any]) -> list[str]:
         errs.append("current_price: number required")
     errs.extend(f"{k}: string required" for k in ("ticker", "valuation_date")
                 if not isinstance(drivers.get(k), str) or not drivers[k])
-    cur = str(inputs.get("currency") or "").upper()
-    quote = str(inputs.get("quote_currency") or cur).upper()
+    cur = _currency(inputs, "currency")
+    quote = _currency(inputs, "quote_currency", cur)
     if cur and quote and cur != quote and not isinstance(inputs.get("fx_rate"), (int, float)):
         errs.append(f"inputs.fx_rate: required when currency ({cur}) differs from quote_currency ({quote})")
     a = drivers.get("assumptions")
@@ -320,8 +328,8 @@ def _scenario(drivers: dict[str, Any], sc: str) -> _Scenario:
     a = drivers["assumptions"][sc]
     raw = _project_raw(float(inputs["base_revenue"]), a)
     n = len(raw["fcf"])
-    cur = str(inputs.get("currency") or "").upper()
-    quote = str(inputs.get("quote_currency") or cur).upper()
+    cur = _currency(inputs, "currency")
+    quote = _currency(inputs, "quote_currency", cur)
     fx = float(inputs["fx_rate"]) if cur and quote and cur != quote else 1.0
     return _Scenario(
         raw=raw, wacc=float(a["wacc"]), tg=float(a["terminal_growth"]),
@@ -340,8 +348,8 @@ def build(drivers: dict[str, Any]) -> dict[str, Any]:
     inputs = dict(drivers["inputs"])
     price = float(drivers["current_price"])
     hurdle = float((drivers.get("entry_price") or {}).get("hurdle_rate") or DEFAULT_HURDLE) * 100
-    cur = str(inputs.get("currency") or "").upper()
-    quote = str(inputs.get("quote_currency") or cur).upper()
+    cur = _currency(inputs, "currency")
+    quote = _currency(inputs, "quote_currency", cur)
     dual = bool(cur and quote and cur != quote)
     sfx = f"_{cur.lower()}" if dual else None
     weights = {sc: float(drivers["probability_weighted"]["weights"][sc]) for sc in SCENARIOS}
@@ -566,14 +574,14 @@ def check(dcf: dict[str, Any], tol: float = ENGINE_TOL) -> dict[str, str]:
     MODEL currency (the stored intrinsic_value_<cur> when the headline is in
     the quote currency)."""
     inputs = dcf.get("inputs") or {}
-    cur = str(inputs.get("currency") or "").lower()
-    quote = str(inputs.get("quote_currency") or "").lower()
+    cur = _currency(inputs, "currency")
+    quote = _currency(inputs, "quote_currency")
     out: dict[str, str] = {}
     for sc in ("base", "bull", "bear"):
         v = (dcf.get("valuation") or {}).get(sc) or {}
         target = v.get("intrinsic_value")
-        if cur and quote and cur != quote and isinstance(v.get(f"intrinsic_value_{cur}"), (int, float)):
-            target = v[f"intrinsic_value_{cur}"]
+        if cur and quote and cur != quote and isinstance(v.get(f"intrinsic_value_{cur.lower()}"), (int, float)):
+            target = v[f"intrinsic_value_{cur.lower()}"]
         iv = _lenient_iv(dcf, sc)
         if iv is None or not isinstance(target, (int, float)):
             out[sc] = "no-engine"

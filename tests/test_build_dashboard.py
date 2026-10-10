@@ -860,6 +860,20 @@ class TestDualCurrencyEngine:
             assert out["engine"][sc]["iv"] == pytest.approx(
                 dcf["valuation"][sc]["intrinsic_value"], rel=0.015)
 
+    def test_same_letters_different_case_currency_still_converts(self, spec, analysis, csv_text, tmp_path):
+        """BT-A.L (2026-10-10): currency "GBP" and quote_currency "GBp" differ
+        only by the case of the final letter. quoteFxRate() lowercased both
+        before comparing, so "gbp" === "gbp" and it returned 1 instead of the
+        real ~100x pounds-to-pence ratio -- every scenario silently fell back
+        to the toy model, same failure mode as the RMB/HKD case above."""
+        dcf = load("BT_DCF.json")
+        html = bd.render("BT-A.L", spec, csv_text, analysis, dcf)
+        out = self.run(html, tmp_path)
+        for sc in ("base", "bull", "bear"):
+            assert out["engine"][sc]["ok"] is True, f"{sc} fell back to the toy model"
+            assert out["engine"][sc]["iv"] == pytest.approx(
+                dcf["valuation"][sc]["intrinsic_value"], rel=0.015)
+
 
 class TestPerShareCurrencyLabel:
     """Per-share money strings must carry the QUOTE currency, not the model

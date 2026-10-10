@@ -253,6 +253,27 @@ class TestCurrency:
         engine_tol = 0.015
         assert abs(reconstructed_fx - 1.2402) <= engine_tol * 1.2402
 
+    def test_gbp_filings_quoted_in_gbp_pence_apply_fx_rate(self, apa):
+        # BT-A.L (2026-10-10): currency "GBP" and quote_currency "GBp" differ
+        # only by the letter case of the final character, so a naive
+        # .upper()/.lower() fold on both sides makes them compare equal and
+        # the x100 fx_rate (pounds -> pence) is silently skipped. Confirmed
+        # the same bug on the already-committed BAB.L (GBP/GBp, fx_rate 100).
+        apa["inputs"]["currency"] = "GBP"
+        apa["inputs"]["quote_currency"] = "GBp"
+        apa["inputs"]["fx_rate"] = 100.0
+        apa["current_price"] = 880.0
+        dcf = dcf_engine.build(apa)
+        v = dcf["valuation"]["base"]
+        assert v["intrinsic_value_gbp"] == pytest.approx(8.0, abs=0.01)
+        assert v["intrinsic_value"] == pytest.approx(800.0, abs=1.0)
+
+    def test_gbp_quote_without_fx_is_refused(self, apa):
+        apa["inputs"]["currency"] = "GBP"
+        apa["inputs"]["quote_currency"] = "GBp"
+        with pytest.raises(dcf_engine.DriversError, match="fx_rate"):
+            dcf_engine.build(apa)
+
 
 class TestContract:
     def test_pass_through_blocks_survive(self, dcf, apa):
