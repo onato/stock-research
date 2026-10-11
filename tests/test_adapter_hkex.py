@@ -83,6 +83,16 @@ class TestPlan:
                                       ticker="0001.HK")
         assert {p[0] for p in plan} == {"0001.HK_HalfYear_H1-2026.pdf"}
 
+    def test_held_filings_are_not_planned_again(self, annuals, interims):
+        """The floor is the last completed year, so the current year's
+        interims come round again on every update run once held."""
+        plan = hkex.plan_from_filings(annuals, interims, [], after_year=2024,
+                                      ticker="0001.HK",
+                                      held={"0001.HK_HalfYear_H1-2025"})
+        names = {p[0] for p in plan}
+        assert "0001.HK_HalfYear_H1-2025.pdf" not in names
+        assert "0001.HK_HalfYear_H1-2026.pdf" in names
+
     def test_quarterlies_are_named_by_their_ordinal(self, quarterlies):
         plan = hkex.plan_from_filings([], [], quarterlies, after_year=0,
                                       ticker="0700.HK")
@@ -114,11 +124,22 @@ class TestPlan:
         kinds = [p[0].split("_")[1] for p in plan]
         assert kinds.count("Annual") > 1
 
-    def test_a_row_with_no_readable_year_is_dropped(self):
+    def test_a_row_with_no_readable_year_and_no_date_is_dropped(self):
         plan = hkex.plan_from_filings(
             [{"TITLE": "Annual Report", "FILE_LINK": "/x.pdf"}], [], [],
             after_year=0, ticker="0001.HK")
         assert plan == []
+
+    def test_an_annual_report_with_no_year_in_the_title_falls_back_to_the_posting_date(self):
+        """0003.HK (HK & China Gas) titles its annual reports with no year at
+        all -- just "Annual Report". The report posted in April names the
+        fiscal year that ended the previous December."""
+        plan = hkex.plan_from_filings(
+            [{"TITLE": "Annual Report", "FILE_LINK": "/x.pdf",
+              "DATE_TIME": "28/04/2026 16:55"}], [], [],
+            after_year=0, ticker="0003.HK")
+        assert plan == [("0003.HK_Annual_FY2025.pdf",
+                         "https://www1.hkexnews.hk/x.pdf", 2025)]
 
 
 class TestFetch:

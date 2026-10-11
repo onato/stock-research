@@ -22,6 +22,7 @@ import json
 import re
 import subprocess
 import sys
+from collections.abc import Set as AbstractSet
 from pathlib import Path
 from typing import Any
 
@@ -115,14 +116,25 @@ def _is_report(title: str, wanted: str) -> bool:
     return not any(w in lowered for w in EXCLUDE)
 
 
+def annual_year_from_date(date_time: str) -> int:
+    """Fallback for annual reports with no year in the title (0003.HK: just
+    "Annual Report"). Dec-FY-end annual reports post the following spring,
+    so the posting year minus one is the fiscal year."""
+    m = re.match(r"\d{2}/\d{2}/(\d{4})", date_time)
+    return int(m[1]) - 1 if m else 0
+
+
 def plan_from_filings(annual_rows: list[dict[str, Any]],
                       interim_rows: list[dict[str, Any]],
                       quarterly_rows: list[dict[str, Any]],
-                      after_year: int, ticker: str) -> list[tuple[str, str, int]]:
+                      after_year: int, ticker: str,
+                      held: AbstractSet[str] = frozenset()) -> list[tuple[str, str, int]]:
     """(filename, url, year) for every report worth fetching, newest first.
 
     `after_year` is an exclusive floor; 0 means seeding, which caps the
-    volume per kind rather than pulling a company's entire history.
+    volume per kind rather than pulling a company's entire history. The
+    floor is the last completed year, so `held` (filename stems on file)
+    keeps the current year's interims from being fetched twice.
     """
     plan: list[tuple[str, str, int]] = []
     seen: set[tuple[str, str]] = set()
@@ -131,6 +143,8 @@ def plan_from_filings(annual_rows: list[dict[str, Any]],
         if (kind, period) in seen:
             return          # date-sorted: keep the newest posting only
         seen.add((kind, period))
+        if f"{ticker}_{kind}_{period}" in held:
+            return
         plan.append((f"{ticker}_{kind}_{period}.pdf", BASE + row["FILE_LINK"], year))
 
     for rows, kind, wanted in ((annual_rows, "Annual", "annual report"),
@@ -140,6 +154,8 @@ def plan_from_filings(annual_rows: list[dict[str, Any]],
             if not _is_report(title, wanted):
                 continue
             year = title_year(title)
+            if not year and kind == "Annual":
+                year = annual_year_from_date(row.get("DATE_TIME", ""))
             if not year or (after_year and year <= after_year):
                 continue
             consider(kind, f"FY{year}" if kind == "Annual" else f"H1-{year}", row, year)
@@ -166,21 +182,23 @@ def plan_from_filings(annual_rows: list[dict[str, Any]],
 # --- planning with I/O -----------------------------------------------------
 
 def plan(ticker: str, after_year: int,
-         deadline: Deadline | None = None) -> list[tuple[str, str, int]]:
+         deadline: Deadline | None = None,
+         held: AbstractSet[str] = frozenset()) -> list[tuple[str, str, int]]:
     code = ticker.split(".")[0]
     sid = stock_id(code)
     if deadline is not None:
         deadline.check("the HKEX listings")
     return plan_from_filings(filings(sid, "40100"), filings(sid, "40200"),
-                             quarterly_filings(sid), after_year, ticker)
+                             quarterly_filings(sid), after_year, ticker, held)
 
 
 def fetch(ticker: str, dest: Path, after_year: int,
-          deadline_s: float = DEFAULT_DEADLINE) -> int:
+          deadline_s: float = DEFAULT_DEADLINE,
+          held: AbstractSet[str] = frozenset()) -> int:
     """Download every planned report into `dest`; returns files written."""
     deadline = Deadline(deadline_s)
     deadline.check("the HKEX listings")
-    todo = plan(ticker, after_year, deadline)
+    todo = plan(ticker, after_year, deadline, held)
     if not todo:
         print(f"hkex: nothing newer than {after_year} for {ticker}")
         return 0

@@ -37,7 +37,6 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import re
 import shutil
 import subprocess
 import sys
@@ -45,6 +44,7 @@ from pathlib import Path
 
 import fetch_asx
 import filing_gate
+import periods
 from adapters import DEFAULT_DEADLINE, annualreports, hkex, nzx
 
 REPO = Path(__file__).resolve().parents[1]
@@ -77,14 +77,19 @@ def holdings_count(ticker: str) -> int:
 
 
 def newest_year(ticker: str) -> int:
-    """The latest fiscal year already held -- the adapters' exclusive floor.
+    """The newest fiscal year whose annual report is held -- the adapters'
+    exclusive floor.
 
-    0 (nothing on file) puts an adapter in seed mode.
+    Only an annual finishes a year: a held Q1-2026 used to set the floor to
+    2026, so H1-2026, Q3-2026 and FY2026 itself were never fetched. The
+    current year's interims are re-planned instead and skipped as held.
+    0 (no annual on file) puts an adapter in seed mode.
     """
-    years = [int(y)
+    prefix = f"{ticker}_Annual_"
+    years = [periods.parse(stem[len(prefix):]).fiscal_year
              for stem in nzx.held_stems(ticker, REPO)
-             for y in re.findall(r"(20\d\d)", stem)]
-    return max(years, default=0)
+             if stem.startswith(prefix)]
+    return max((y for y in years if y), default=0)
 
 
 def extract(pdf: Path, out: Path) -> None:
@@ -158,10 +163,12 @@ def run_adapters(ticker: str, years: str | None, deadline_s: float,
             nzx.fetch(ticker, dest, after, repo=REPO, deadline_s=deadline_s)
     elif suffix == ".HK":
         if dry_run:
-            for name, url, _year in hkex.plan(ticker, after):
+            for name, url, _year in hkex.plan(ticker, after,
+                                              held=nzx.held_stems(ticker, REPO)):
                 print(f"  {name:40s} <- {url}")
         else:
-            hkex.fetch(ticker, dest, after, deadline_s=deadline_s)
+            hkex.fetch(ticker, dest, after, deadline_s=deadline_s,
+                       held=nzx.held_stems(ticker, REPO))
     elif suffix == ".AX":
         # fetch_asx is already deterministic and applies its own checks, so
         # it writes straight to research/{T}/PDFs rather than through staging.

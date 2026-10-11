@@ -277,3 +277,51 @@ class TestDeadlineArgument:
         monkeypatch.setattr(fetch_filings, "holdings_count", lambda t: 9)
         fetch_filings.main(["SYN.NZ", "--deadline", "45"])
         assert seen["deadline_s"] == 45
+
+
+def hold(repo: Path, ticker: str, *stems: str) -> None:
+    pdfs = repo / "research" / ticker / "PDFs"
+    pdfs.mkdir(parents=True, exist_ok=True)
+    for stem in stems:
+        (pdfs / f"{stem}.pdf").write_bytes(b"%PDF")
+
+
+class TestNewestYear:
+    """The floor is the newest fiscal year whose annual report is held.
+
+    An interim names the year it falls in, not a finished one: taking the max
+    year over every filename made a held Q1-2026 the floor, and the adapters'
+    exclusive `year > floor` then skipped H1-2026, Q3-2026 and the FY2026
+    annual for good (1211.HK sat on Q1 2026 into October).
+    """
+
+    def test_interims_of_an_unfinished_year_do_not_raise_the_floor(self, repo):
+        hold(repo, "SYN.HK", "SYN.HK_Annual_FY2025", "SYN.HK_Quarterly_Q1-2026",
+             "SYN.HK_HalfYear_H1-2026")
+        assert fetch_filings.newest_year("SYN.HK") == 2025
+
+    def test_the_newest_annual_sets_the_floor(self, repo):
+        hold(repo, "SYN.NZ", "SYN.NZ_Annual_FY2024", "SYN.NZ_Annual_FY2025",
+             "SYN.NZ_HalfYear_H1-2025")
+        assert fetch_filings.newest_year("SYN.NZ") == 2025
+
+    def test_a_stub_year_annual_still_counts(self, repo):
+        hold(repo, "SYN.NZ", "SYN.NZ_Annual_FY2017-15mo")
+        assert fetch_filings.newest_year("SYN.NZ") == 2017
+
+    def test_interims_alone_leave_seed_mode(self, repo):
+        hold(repo, "SYN.HK", "SYN.HK_HalfYear_H1-2026")
+        assert fetch_filings.newest_year("SYN.HK") == 0
+
+    def test_the_hkex_adapter_is_told_what_is_already_held(self, repo, monkeypatch,
+                                                           no_extract):
+        """With the floor lowered to the last annual, the adapter re-plans
+        the current year's interims; held ones must not be fetched again."""
+        hold(repo, "SYN.HK", "SYN.HK_Annual_FY2025", "SYN.HK_Quarterly_Q1-2026")
+        seen = {}
+        monkeypatch.setattr(fetch_filings.hkex, "fetch",
+                            lambda ticker, dest, after_year, **kw: seen.update(
+                                after_year=after_year, **kw) or 0)
+        fetch_filings.main(["SYN.HK"])
+        assert seen["after_year"] == 2025
+        assert "SYN.HK_Quarterly_Q1-2026" in seen["held"]
