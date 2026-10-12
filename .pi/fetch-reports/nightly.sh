@@ -1,7 +1,8 @@
 #!/bin/bash
-# Nightly gated report fetch over the international tickers (US bare symbols are
-# excluded — EDGAR is handled deterministically by the main pipeline).
-# Run by launchd at 02:00: ~/Library/LaunchAgents/com.swilliams.fetch-reports.plist
+# Fortnightly gated report fetch over the international tickers (US bare symbols
+# are excluded — EDGAR is handled deterministically by the main pipeline).
+# Fired by launchd at 02:00 daily, gated to every 14 days below:
+# ~/Library/LaunchAgents/com.swilliams.fetch-reports.plist
 #
 # Modes:
 #   nightly.sh      update pass for all researched tickers, then seed the queue
@@ -12,6 +13,22 @@ trap 'echo "interrupted — stopping"; exit 130' INT TERM
 export PATH="$HOME/.local/share/mise/shims:$HOME/.local/share/mise/installs/node/23.0.0/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
+
+# Fortnightly cadence. launchd has no "every 14 days" schedule (StartInterval
+# restarts its count on every reboot), so the agent still fires at 02:00 daily
+# and the scheduled pass exits here unless the last COMPLETED one began at least
+# 13.5 days ago -- the half-day of slack keeps a 02:00 start from missing its
+# own fortnight by a few seconds. The stamp is written only after a pass
+# finishes, so a crashed night retries on the next one. Continuous mode
+# (nightly.sh N) is always manual and never gated; FORCE=1 overrides the gate.
+STAMP="$HERE/logs/last_full_pass"
+START_EPOCH="$(date +%s)"
+if [ -z "${1:-}" ] && [ -z "${FORCE:-}" ] && [ -f "$STAMP" ]; then
+  last="$(cat "$STAMP" 2>/dev/null || echo 0)"
+  if [ $(( START_EPOCH - ${last:-0} )) -lt $(( 13 * 86400 + 43200 )) ]; then
+    exit 0
+  fi
+fi
 
 LOCK="$HERE/.nightly.lock"
 # A bare mkdir lock cannot tell a live run from a corpse. The 2026-08-26 pass
@@ -85,6 +102,7 @@ for t in sys.stdin.read().split():
     seed_batch 3 || { echo "queue exhausted"; break; }
   done
   echo "=== done $(date '+%F %T') ==="
+  echo "$START_EPOCH" > "$STAMP"
 else
   # Continuous mode: batches of N until stopped (Ctrl-C / pkill -f nightly.sh)
   # or the queue runs dry.
