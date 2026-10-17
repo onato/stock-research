@@ -549,7 +549,8 @@ def _slider_range(dcf: dict[str, Any]) -> dict[str, tuple[float, float, float]]:
     for sc in ("base", "bull", "bear"):
         s = a.get(sc, {})
         g = s.get("growth_rates")
-        growths.append(float(g[0]) if isinstance(g, list) and g else
+        g0 = g[0] if isinstance(g, list) and g else None
+        growths.append(float(g0) if g0 is not None else
                        float(F.num(dcf_get(dcf, "historical_growth.selected_growth_rate")) or 0))
         waccs.append(float(s.get("wacc") or base.get("wacc") or 10))
         terms.append(float(s.get("terminal_growth") or base.get("terminal_growth") or 3))

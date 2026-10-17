@@ -57,6 +57,31 @@ class TestNetRevenuePromotion:
         assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
 
 
+class TestHoldingCompanyDeveloperPromotion:
+    """A HK developer/holdco's related-party debt and JV/associate income.
+
+    Henderson Land Development (0012.HK) borrows from its own controlling
+    family's private finance company (Henderson Finance Co) rather than only
+    from banks -- AmountDueToFellowSubsidiary reached ~HK$77bn at H1 FY2026,
+    roughly the size of reported TotalDebt, so it is a material debt-like
+    disclosure, not a footnote curiosity. ShareOfAssociatesProfit and
+    ShareOfJointVenturesProfit are the group's share of profit from stakes
+    it does not consolidate (including ~41.53% of HK & China Gas / Towngas)
+    -- a meaningful slice of group economics with its own trend, distinct
+    from consolidated NetIncome. InvestmentPropertyFairValueChange is the
+    IAS 40 revaluation swing the financial-parser excluded from this
+    company's operating/net income definition; charting it separately shows
+    why net income and the revaluation line diverge. All three were absent
+    from PROMOTE_KPIS despite multi-year history in `kpis`.
+    """
+
+    def test_developer_kpis_are_promoted(self, patch_repo):
+        make_db(patch_repo, "SYN",
+                ["AmountDueToFellowSubsidiary", "ShareOfAssociatesProfit",
+                 "ShareOfJointVenturesProfit", "InvestmentPropertyFairValueChange"])
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+
+
 class TestRetirementOperatorPromotion:
     """An ORA/DMF retirement operator's own earnings measure must reach the CSV.
 
@@ -657,6 +682,259 @@ class TestDiversifiedMinerNCIAndOneOffPromotion:
     def test_bhp_profit_and_nci_kpis_are_promoted(self, patch_repo):
         names = ["ProfitAfterTaxTotal", "ProfitAttributableNCI",
                   "DiscontinuedOpsProfitPetroleum"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestInvestmentTrustFeeAndRevenueReturnPromotion:
+    """Scottish Mortgage Investment Trust plc (SMT.L): trust-specific KPIs.
+
+    InvestmentManagementFee is the fee drag on returns -- a standard
+    disclosure line for an investment trust that core_metrics has no column
+    for. RevenueReturn is the income-side half of UK investment-trust total
+    return reporting (distinct from capital return), used to size dividend
+    cover independent of portfolio revaluations. Both were absent from
+    PROMOTE_KPIS, so neither reached the CSV despite being populated for
+    every FY and H1 period back to FY2017.
+    """
+
+    def test_fee_and_revenue_return_kpis_are_promoted(self, patch_repo):
+        names = ["InvestmentManagementFee", "RevenueReturn"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestUtilityBeforeExceptionalsPromotion:
+    """SSE plc (SSE.L): before-exceptional earnings and capital-structure KPIs.
+
+    SSE's statutory operating income and net income are dominated by
+    derivative re-measurement swings unrelated to the underlying business
+    (FY2023 statutory operating income was -GBP146.3m on a year SSE itself
+    called a record), so the financial-parser and dcf-analyst both anchor
+    on the adjusted/"before exceptional items" lines SSE reports alongside
+    the statutory ones. OperatingProfitBeforeExceptionals and
+    ProfitBeforeExceptionalsAttributable were stranded in `kpis`, so the
+    dashboard's profit chart could only show the misleading statutory
+    series. SharesInIssuePeriodEnd (vs the weighted-average share count
+    already in core_metrics) and TotalEquityInclHybridNCI (vs the
+    ordinary-shareholders-only equity column) matter here because the
+    ~GBP2bn November 2025 placing and SSE's hybrid capital move the
+    period-end basis well away from the weighted-average/ordinary-only one
+    used elsewhere on the dashboard.
+    """
+
+    def test_sse_before_exceptional_and_capital_kpis_are_promoted(self, patch_repo):
+        names = ["OperatingProfitBeforeExceptionals",
+                  "ProfitBeforeExceptionalsAttributable",
+                  "SharesInIssuePeriodEnd", "TotalEquityInclHybridNCI"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestPackagingSegmentAdjustedEBITDAPromotion:
+    """Smurfit WestRock plc (SKG.L): segment-level Adjusted EBITDA only.
+
+    FY2024 and FY2025 did not disclose a full-group Adjusted EBITDA -- only
+    segment-level Adjusted EBITDA before head-office costs -- so the
+    financial-parser stored it under its own name, distinct from the
+    generic AdjustedEBITDA entry (which means whole-company). Reusing
+    AdjustedEBITDA for this figure would overstate group profitability by
+    the head-office cost each year. SegmentAdjustedEBITDA was absent from
+    PROMOTE_KPIS, so it was stranded in `kpis` and unchartable.
+    """
+
+    def test_segment_adjusted_ebitda_is_promoted(self, patch_repo):
+        names = ["SegmentAdjustedEBITDA"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestConvenienceRetailNetworkSizeAndJVEarningsPromotion:
+    """Alimentation Couche-Tard Inc. (ATD.TO): network scale and JV earnings.
+
+    TotalNetworkSites is the company's own disclosed count of
+    convenience/fuel sites across its global network (company-operated plus
+    franchised/affiliated), distinct from the core_metrics StoreCount which
+    only has sparse coverage -- it is the scale metric a retail rollup is
+    actually judged on. JVShareOfEarnings is Couche-Tard's share of the
+    earnings of its joint ventures, a component the financial-parser folds
+    into the company's EBITDA definition; without a home in PROMOTE_KPIS it
+    was stranded in `kpis` and invisible to readers checking that EBITDA
+    bridge. Both were absent from PROMOTE_KPIS, so neither reached the CSV.
+    """
+
+    def test_network_sites_and_jv_earnings_are_promoted(self, patch_repo):
+        names = ["TotalNetworkSites", "JVShareOfEarnings"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestCopperByproductRealizedPricePromotion:
+    """Barrick Mining Corporation (ABX.TO): realized copper price.
+
+    ABX already has CopperProduction (volume) promoted, but the
+    USD/lb realized price it achieves on that copper byproduct -- the
+    other half of the copper revenue story, and the natural companion
+    series to chart against production -- was stranded in `kpis` back
+    to FY2017 with no PROMOTE_KPIS entry.
+    """
+
+    def test_realized_copper_price_is_promoted(self, patch_repo):
+        names = ["RealizedCopperPrice"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestITServicesBookingsAndCollectionsPromotion:
+    """CGI Inc. (GIB-A.TO): IT-services unit economics.
+
+    Bookings and BookToBill signal forward revenue visibility (a book-to-bill
+    above 100% means new contract signings outpaced revenue recognized that
+    period), and DaysSalesOutstanding signals working-capital/collections
+    health -- all disclosed every quarter, none with a core_metrics column.
+    """
+
+    def test_bookings_metrics_are_promoted(self, patch_repo):
+        names = ["Bookings", "BookToBill", "DaysSalesOutstanding"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestPropertyServicesTwoSegmentPromotion:
+    """FirstService Corporation (FSV.TO): Residential vs Brands segments.
+
+    FirstService runs two distinct reporting segments -- FirstService
+    Residential (property management) and FirstService Brands (the
+    franchise portfolio: California Closets, Paul Davis, CertaPro, etc) --
+    with different growth and margin profiles (Brands grew Adjusted
+    EBITDA to a wider margin than Residential through FY2025). A single
+    blended Revenue/EBITDA column hides which segment drives the mix
+    shift. Both segments' revenue and Adjusted EBITDA were stranded in
+    `kpis` with history back to FY2015/Q1-2016, with no PROMOTE_KPIS entry.
+    """
+
+    def test_segment_revenue_and_ebitda_are_promoted(self, patch_repo):
+        names = ["SegmentRevenueResidential", "SegmentRevenueBrands",
+                  "SegmentAdjustedEBITDAResidential",
+                  "SegmentAdjustedEBITDABrands"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestEngineeringConsultancyBacklogPromotion:
+    """WSP Global (WSP.TO): contracted order backlog, the forward-revenue
+
+    visibility metric for a project-based engineering consultancy. WSP
+    frames it in months of revenue coverage. Populated in `kpis` back to
+    FY2015 (55 periods) but absent from PROMOTE_KPIS, so the dashboard
+    could not chart the trend.
+    """
+
+    def test_backlog_is_promoted(self, patch_repo):
+        make_db(patch_repo, "SYN", ["Backlog"])
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        assert schema.promote_header("Backlog") == "Backlog"
+
+
+class TestLikeForLikeRestatementPromotion:
+    """Geely Automobile Holdings (0175.HK): the FY2025 annual report
+
+    restated FY2021-FY2024 financials after consolidating ZEEKR, LYNK & CO
+    and other Geely Holding brands bought in from the parent group (e.g.
+    FY2024 revenue as-filed RMB240.2bn vs restated RMB275.9bn). core_metrics
+    keeps each filing's as-originally-filed numbers; the restated
+    like-for-like series -- the bridge a reader needs to see growth around
+    FY2024-2025 is partly inorganic -- were absent from PROMOTE_KPIS.
+    """
+
+    def test_restated_series_are_promoted(self, patch_repo):
+        names = ["RevenueRestated", "NetIncomeRestated", "OCFRestated",
+                  "EBITDARestated", "EBITDACompanyReportedInclDeemedDisposalGain"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestPartlyOwnedSubsidiaryAndWealthProductPromotion:
+    """Sany Heavy Equipment International Holdings (0631.HK): NetIncomeTotal
+
+    is total profit including minority interests, versus the owners'-only
+    NetIncome already in core_metrics -- informative because NCI is in a
+    deficit position (NCI took a share of FY2025 losses), so attributable
+    profit exceeds total profit, the reverse of the usual direction.
+    EPSBasic is basic EPS against the diluted EPS already charted.
+    ShortTermInvestments is current FVTPL bank wealth-management products
+    (note 13) -- near-cash but outside CashAndEquivalents, and netted off
+    against cash in the DCF's own net-debt bridge. All three have multi-year
+    history in `kpis` but were absent from PROMOTE_KPIS.
+    """
+
+    def test_subsidiary_kpis_are_promoted(self, patch_repo):
+        names = ["NetIncomeTotal", "EPSBasic", "ShortTermInvestments"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestTencentThreeSegmentRevenuePromotion:
+    """Tencent Holdings (0700.HK): VAS / Marketing Services / FinTech &
+
+    Business Services / Others is the segment split management reports
+    revenue under, each with a different growth profile. Populated in
+    `kpis` back to FY2018/FY2019 but absent from PROMOTE_KPIS, so the
+    dashboard could only chart the blended Revenue column.
+    """
+
+    def test_segment_revenue_lines_are_promoted(self, patch_repo):
+        names = ["SegmentRevenueVAS", "SegmentRevenueMarketingServices",
+                  "SegmentRevenueFinTechBusinessServices", "SegmentRevenueOthers"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+    def test_operating_income_new_basis_stays_unmapped(self, patch_repo):
+        """Restated post-FY2023 basis, not comparable to legacy OperatingIncome."""
+        make_db(patch_repo, "SYN", ["OperatingIncomeNewBasis"])
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == \
+            ["OperatingIncomeNewBasis"]
+
+
+class TestGoldMinerOutputAndPerpetualCapitalPromotion:
+    """Zhaojin Mining Industry (1818.HK): a gold miner's own-mine output is
+
+    the production-volume story (ounces/kg produced vs. smelted/traded gold
+    in total output) that revenue alone -- moved by the gold price too --
+    cannot show, populated FY2018-FY2025 in `kpis`. PerpetualCapitalInstruments
+    (RMB1.5-7.1bn) are perpetual bonds classified in equity but debt-like in
+    substance -- they sit outside TotalDebt and ShareholdersEquity-based book
+    value per ordinary share overstates what common shareholders actually
+    own. PerpetualDistributionsPaid is the cash cost of servicing them. All
+    five were absent from PROMOTE_KPIS despite multi-year history in `kpis`.
+    """
+
+    def test_gold_output_and_perpetual_capital_are_promoted(self, patch_repo):
+        names = ["GoldOutputMineProducedKg", "GoldOutputMineProducedOz",
+                  "GoldOutputTotalKg", "PerpetualCapitalInstruments",
+                  "PerpetualDistributionsPaid"]
         make_db(patch_repo, "SYN", names)
         assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
         for n in names:

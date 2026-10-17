@@ -37,7 +37,8 @@ _SECTOR_RULES: list[tuple[str, str]] = [
       r"\blic\b|venture capital fund|unit trust"), "lic_nav"),
     ((r"\bbank|lending|lender|deposit taker|insurer|\binsurance\b|thrift|credit union|"
       r"financial services|^financials?$"), "bank"),
-    (r"gold|mining|exploration|mineral|developer.*(mine|project)", "miner_prerevenue"),
+    ((r"gold|exploration|mineral|developer.*(mine|project)|"
+      r"mining(?!.*(machinery|equipment))"), "miner_prerevenue"),
     (r"marketplace|classifieds|online auction", "marketplace"),
     (r"e-?commerce|online retail|direct marketing retail|internet retail|meal kit", "ecommerce"),
     (r"payment|fintech|remittance|money transfer|card network", "payments"),

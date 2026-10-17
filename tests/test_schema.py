@@ -119,15 +119,179 @@ class TestPromotableKpiVocabulary:
         assert schema.promote_header("OrderBook") == "OrderBook"
         assert schema.promote_header("OrderBookWithOptions") == "OrderBookWithOptions"
 
+    def test_promotes_china_jinmao_real_estate_kpis(self):
+        """China Jinmao Holdings (0817.HK): LandAppreciationTaxPaid is a
+        real-estate-specific levy on development-property disposals, and
+        ProfitIncludingNCI vs attributable NetIncome is the gap driven by
+        ~55% of total equity sitting in non-controlling interests plus the
+        RMB15.2bn Sinochem HK perpetual instrument reclassified into equity
+        attributable to owners from H1 FY2024. Neither is derivable from
+        the existing CSV columns."""
+        assert (schema.promote_header("LandAppreciationTaxPaid")
+                == "LandAppreciationTaxPaid")
+        assert (schema.promote_header("ProfitIncludingNCI")
+                == "ProfitIncludingNCI")
+
+    def test_promotes_hisense_home_appliances_kpis(self):
+        """Hisense Home Appliances Group (0921.HK): the Hisense-Hitachi HVAC
+        JV is only ~49-51% owned, so NetProfitInclMinority (total group net
+        profit, ~RMB4.73bn FY2025) sits well above attributable NetIncome
+        (~RMB3.19bn), with MinorityInterests (~RMB4.05bn FY2025) and
+        MinorityDividendsPaid as the balance-sheet/cash-flow counterparts.
+        TradingFinancialAssets (~RMB19-21bn of wealth-management/treasury
+        products) is larger than operating cash and is the subject of the
+        DCF's 35% trapped-capital discount. None is derivable from the
+        existing CSV columns."""
+        assert (schema.promote_header("NetProfitInclMinority")
+                == "NetProfitInclMinority")
+        assert (schema.promote_header("MinorityInterests")
+                == "MinorityInterests")
+        assert (schema.promote_header("MinorityDividendsPaid")
+                == "MinorityDividendsPaid")
+        assert (schema.promote_header("TradingFinancialAssets")
+                == "TradingFinancialAssets")
+
+    def test_promotes_sino_biopharmaceutical_nci_dividend(self):
+        """Sino Biopharmaceutical (1177.HK): minority interests take roughly
+        half of consolidated net profit via the NCI-heavy CT Tianqing
+        subsidiary plus the LaNova Medicines/Hygieia acquisitions.
+        DividendsPaidToNCI is the cash-flow counterpart to the
+        already-promoted NonControllingInterests balance -- the actual cash
+        leaving the group to minority shareholders, not derivable from the
+        existing CSV columns."""
+        assert (schema.promote_header("DividendsPaidToNCI")
+                == "DividendsPaidToNCI")
+
     def test_promotes_revpar(self):
         """Hotel revenue per available room (Millennium & Copthorne Hotels
         New Zealand Limited, MCK.NZ) is a hotel-specific operating KPI, not
         derivable from the CSV's Revenue/Occupancy columns alone."""
         assert schema.promote_header("RevPAR") == "RevPAR"
 
+    def test_promotes_sales_volume(self):
+        """Beer sales volume in kilolitres (Tsingtao Brewery, 0168.HK) is the
+        unit-economics metric behind the premiumization thesis -- volume vs
+        price/mix -- and is not derivable from the CSV's Revenue column."""
+        assert schema.promote_header("SalesVolumeKL") == "SalesVolumeKL"
+
+    def test_promotes_container_shipping_yield(self):
+        """Revenue per TEU (OOCL/Orient Overseas, 0316.HK) is the freight-rate
+        yield behind a container carrier's revenue line -- volume
+        (ContainerVolumeTEU) times this yield is the revenue story, and
+        neither factor is derivable from the blended Revenue column alone."""
+        assert schema.promote_header("RevenuePerTEU") == "RevenuePerTEU"
+
+    def test_promotes_gold_reserves_and_resources(self):
+        """Gold reserves/resources tonnes (Zijin Gold International, 2259.HK)
+        are the resource-base metrics the investment thesis is built on --
+        mine life and future production capacity -- and are not derivable
+        from any income-statement or cash-flow column."""
+        assert schema.promote_header("GoldReservesTonnes") == "GoldReservesTonnes"
+        assert schema.promote_header("GoldResourcesTonnes") == "GoldResourcesTonnes"
+
     def test_unknown_kpi_name_is_not_promoted(self):
         """Opt-in, not opt-out: an unrecognised name stays out of the CSV."""
         assert schema.promote_header("WaferShipments") is None
+
+    def test_promotes_samsonite_brand_segment_channel_kpis(self):
+        """Samsonite Group S.A. (1910.HK): a multi-brand, multi-region
+        luggage maker where the brand mix (Samsonite/Tumi/American
+        Tourister), regional segment mix (Asia/North America/Europe/Latin
+        America) and wholesale-vs-DTC channel mix are each a distinct
+        investor question -- none derivable from the blended Revenue
+        column alone."""
+        for name in (
+            "BrandRevenueSamsonite", "BrandRevenueTumi",
+            "BrandRevenueAmericanTourister",
+            "SegmentRevenueAsia", "SegmentRevenueNorthAmerica",
+            "SegmentRevenueEurope", "SegmentRevenueLatinAmerica",
+            "WholesaleRevenue", "DTCRevenue",
+        ):
+            assert schema.promote_header(name) == name
+
+    def test_promotes_capital_structure_for_soe_contractor(self):
+        """China Railway Group (0390.HK) consolidates large PPP/infrastructure
+        subsidiaries: TotalEquity and ProfitTotal include minority interests
+        on top of the owners'-only ShareholdersEquity/NetIncome columns, and
+        PerpetualNotes (equity-classified but economically debt-like) sit
+        inside ShareholdersEquity. None is derivable from the existing CSV
+        columns alone."""
+        assert schema.promote_header("TotalEquity") == "TotalEquity"
+        assert schema.promote_header("ProfitTotal") == "ProfitTotal"
+        assert schema.promote_header("PerpetualNotes") == "PerpetualNotes"
+
+    def test_promotes_crcc_perpetual_bonds(self):
+        """China Railway Construction Corporation (1186.HK): total debt rose
+        from RMB333bn (FY2023) to RMB728bn (H1 FY2026), and
+        OtherEquityInstruments -- perpetual bonds classified in equity,
+        RMB59.5bn FY2023 to RMB72.3bn H1 FY2026 -- are a debt-like claim
+        sitting outside TotalDebt. Not derivable from existing columns."""
+        assert (schema.promote_header("OtherEquityInstruments")
+                == "OtherEquityInstruments")
+
+    def test_promotes_concession_and_investment_property_capex(self):
+        """Shanghai Industrial Holdings (0363.HK): toll-road concession
+        purchases and investment-property capex are the infrastructure and
+        property segments' reinvestment lines -- central to the bear/base/
+        bull split on the 2027-2030 concession renewals, and not derivable
+        from the blended CapEx column."""
+        assert (schema.promote_header("InvestmentPropertyCapex")
+                == "InvestmentPropertyCapex")
+        assert (schema.promote_header("PurchaseOfOperatingConcessions")
+                == "PurchaseOfOperatingConcessions")
+
+    def test_promotes_investment_property_additions(self):
+        """China Overseas Land & Investment (0688.HK): cash added to the
+        held-for-rent investment-property book at fair value, distinct from
+        InvestmentPropertyCapex (cost-basis capex spend) -- the lead
+        indicator for whether the REIT-recyclable portfolio the bull case
+        leans on is still growing or being run down."""
+        assert (schema.promote_header("InvestmentPropertyAdditions")
+                == "InvestmentPropertyAdditions")
+
+    def test_promotes_rail_operating_metrics(self):
+        """Railroad operating KPIs (Canadian National Railway, CNR.TO):
+        Operating Ratio is the headline efficiency metric the whole rail
+        industry is judged on, and Carloads/GrossTonMiles/RevenueTonMiles/
+        FreightRevenuePerRTM are the volume and yield metrics behind
+        revenue that a blended Revenue column cannot show."""
+        for name in ("OperatingRatio", "AdjustedOperatingRatio", "Carloads",
+                     "GrossTonMiles", "RevenueTonMiles",
+                     "FreightRevenuePerRTM", "EmployeesEndOfPeriod"):
+            assert schema.promote_header(name) == name
+
+    def test_promotes_midstream_operating_metrics(self):
+        """Pembina Pipeline (PPL.TO): TotalVolumes is pipeline/facility
+        throughput in mboe/d -- a midstream operator's core operational
+        driver, distinct from financial Revenue. AdjustedCashFlowFromOperations
+        is Pembina's own disclosed non-GAAP operating cash flow measure."""
+        assert schema.promote_header("TotalVolumes") == "TotalVolumes"
+        assert schema.promote_header("AdjustedCashFlowFromOperations") == "AdjustedCashFlowFromOperations"
+
+    def test_promotes_china_taiping_insurer_kpis(self):
+        """China Taiping Insurance Holdings (0966.HK): GrossPremiumsWritten
+        is the core insurer top-line KPI under the old IFRS 4 regime
+        (populated FY2017-FY2021 only, before the IFRS 17 switch).
+        NetInvestmentResult is the dcf-analyst's flagged single biggest swing
+        driver of reported earnings (-HK$7.5bn FY2022 to +HK$14.6bn FY2025).
+        RepoLiabilities (HK$106.7bn FY2025) is a material repo-funding line
+        distinct from TotalDebt. None is derivable from the existing CSV
+        columns."""
+        assert (schema.promote_header("GrossPremiumsWritten")
+                == "GrossPremiumsWritten")
+        assert (schema.promote_header("NetInvestmentResult")
+                == "NetInvestmentResult")
+        assert (schema.promote_header("RepoLiabilities")
+                == "RepoLiabilities")
+
+    def test_promotes_new_china_life_gross_written_premiums(self):
+        """New China Life Insurance (1336.HK): GrossWrittenPremiums is the
+        core life-insurer top-line KPI (populated FY2016-FY2022 only, before
+        the IFRS 17 transition replaced the summary-table disclosure). Same
+        pre-IFRS17 break as 0966.HK's GrossPremiumsWritten, but a distinct
+        name in this filer's own tables -- not derivable from Revenue."""
+        assert (schema.promote_header("GrossWrittenPremiums")
+                == "GrossWrittenPremiums")
 
     def test_normalize_kpi_collapses_depreciation_spellings(self):
         """One concept, six spellings observed across the corpus."""
@@ -265,6 +429,31 @@ class TestRedefinedKpiSeries:
         assert (schema.promote_header("FinancialServicesRevenue")
                 == "FinancialServicesRevenue")
 
+    def test_promotes_cathay_pacific_passenger_cargo_split(self):
+        """0293.HK: passenger vs cargo revenue is the core segment split for
+        an airline, not derivable from Revenue alone."""
+        assert schema.promote_header("PassengerRevenue") == "PassengerRevenue"
+        assert schema.promote_header("CargoRevenue") == "CargoRevenue"
+
+    def test_promotes_qunabox_revenue_segment_split(self):
+        """0917.HK: marketing services (~84% of FY2025 revenue) vs
+        merchandise sales (smart retail, ~12%) vs other/IT services (~4%) is
+        the core segment split for an AI interactive marketing terminal
+        network, not derivable from Revenue alone."""
+        assert (schema.promote_header("MarketingServicesRevenue")
+                == "MarketingServicesRevenue")
+        assert (schema.promote_header("MerchandiseSalesRevenue")
+                == "MerchandiseSalesRevenue")
+        assert (schema.promote_header("OtherServicesRevenue")
+                == "OtherServicesRevenue")
+
+    def test_promotes_mao_geping_selling_expense(self):
+        """Mao Geping Cosmetics (1318.HK): selling/advertising expense is
+        ~47% of revenue and the DCF's own margin-compression thesis turns on
+        its ratio to revenue rising (45.2% -> 47.4% H1 FY2025 -> H1 FY2026),
+        not derivable from the core OperatingIncome/EBITDA columns alone."""
+        assert schema.promote_header("SellingExpense") == "SellingExpense"
+
 
 class TestTotalAUMPromotion:
     """AMP.AX reports 'Total AUM' as its own named KPI, distinct from the
@@ -354,6 +543,176 @@ class TestPromotedMinerKpis:
         SMI.NZ's PFS figure was stored in kpis and never reached the CSV."""
         assert schema.promote_header("AISC") == "AISC"
 
+    def test_royalty_streamer_kpis_promote(self):
+        """Franco-Nevada (FNV.TO): gold equivalent ounces sold is the volume
+        driver for a royalty/streaming company the way units shipped is for a
+        manufacturer; realized gold price and cash cost per GEO are its
+        commodity-exposure and margin metrics, all disclosed quarterly but
+        absent from core_metrics and thus stuck in kpis."""
+        assert schema.promote_header("GEOsSold") == "GEOsSold"
+        assert schema.promote_header("AverageGoldPrice") == "AverageGoldPrice"
+        assert schema.promote_header("CashCostsPerGEO") == "CashCostsPerGEO"
+
+    def test_streaming_company_unit_economics_promote(self):
+        """Wheaton Precious Metals (WPM.TO): a pure streamer with no mine to
+        run, so GEO produced/sold is the volume driver, realized price per
+        ounce is what it actually sold metal for, and cash cost per ounce is
+        the near-fixed price its long-term purchase agreements lock in --
+        the spread between the two (CashOperatingMarginPerGEO) is the whole
+        economic engine. Metal-specific ounces/prices/costs break the blended
+        GEO figures into gold and silver. Spelling differs from Franco-
+        Nevada's (GEOSold not GEOsSold, CashCostPerGEO not CashCostsPerGEO) --
+        these are genuinely distinct disclosed names, not typos."""
+        for name in ("GEOProduced", "GEOSold", "GoldOuncesProduced",
+                     "GoldOuncesSold", "SilverOuncesProduced",
+                     "SilverOuncesSold", "RealizedGoldPrice",
+                     "RealizedSilverPrice", "RealizedPricePerGEO",
+                     "CashCostPerGEO", "GoldCashCostPerOz",
+                     "SilverCashCostPerOz", "CashOperatingMarginPerGEO"):
+            assert schema.promote_header(name) == name
+
+    def test_conglomerate_segment_recurring_profit_kpis_promote(self):
+        """Swire Pacific (0019.HK): a conglomerate whose reported net income
+        is dominated by investment-property revaluation noise, so management
+        and analysts track recurring/underlying profit by division instead --
+        Property (Swire Properties), Beverages (Swire Coca-Cola), the Cathay
+        Pacific equity-accounted group, wholly-owned HAECO plus other
+        aviation-services interests, Trading & Industrial, and Head
+        Office/Healthcare (typically negative: corporate costs net of the
+        healthcare bolt-on). A single blended NetIncome or UnderlyingProfit
+        column hides which division drives the mix shift."""
+        for name in ("RecurringProfitProperty", "RecurringProfitBeverages",
+                     "RecurringProfitCathayGroup",
+                     "RecurringProfitHAECOAndOthers",
+                     "RecurringProfitTradingIndustrial",
+                     "RecurringProfitHeadOfficeHealthcare",
+                     "RecurringUnderlyingProfit"):
+            assert schema.promote_header(name) == name
+
+    def test_hang_lung_revaluation_kpis_promote(self):
+        """Hang Lung Properties (0101.HK): a commercial landlord whose
+        statutory profit swings heavily with IAS 40 investment-property fair
+        value revaluations, distinct from the InvestmentPropertyFairValueChange
+        name used on Henderson Land (0012.HK). InvestmentPropertyRevaluation is
+        the revaluation gain/loss itself; OperatingProfitAfterRevaluation is
+        operating profit including it -- both are needed alongside the DCF's
+        revaluation-excluded OperatingIncome to show the swing."""
+        for name in ("InvestmentPropertyRevaluation",
+                     "OperatingProfitAfterRevaluation"):
+            assert schema.promote_header(name) == name
+
+    def test_telecom_segment_and_arpu_kpis_promote(self):
+        """Rogers Communications (RCI-B.TO): segment revenue across Wireless/
+        Cable/Media is hidden by a single blended Revenue column, and
+        BlendedARPU/BlendedABPU are non-comparable predecessor definitions of
+        the already-promoted MobileARPU -- three series, not one continuous
+        line. InternetNetAdds is the annual net change in broadband subs."""
+        for name in ("SegmentRevenueWireless", "SegmentRevenueCable",
+                     "SegmentRevenueMedia", "BlendedARPU", "BlendedABPU",
+                     "InternetNetAdds"):
+            assert schema.promote_header(name) == name
+
+    def test_gas_utility_operating_kpis_promote(self):
+        """Hong Kong and China Gas Company / Towngas (0003.HK): a gas
+        utility's operating scale is customer count and gas volume sold, not
+        the generic core_metrics columns. CustomersHK and
+        MainlandCityGasCustomers (thousands) are the HK and mainland city-gas
+        customer bases; TownGasSoldHK (million MJ) and MainlandGasSold
+        (million m3) are the physical volumes sold in each market --
+        different units because HK sells town gas (calorific-value basis)
+        and the mainland JVs sell natural gas (volumetric basis).
+        EmployeesHKCompany is headcount for the HK company only, a
+        labour-productivity input distinct from any group-wide figure.
+        DilutedEPS is the standard diluted per-share figure, disclosed
+        alongside the already-promoted (core_metrics) EPS but on a different
+        share-count basis. Only FY2023-FY2025 were extracted (earlier years
+        were chart-image only), so all land in kpis with no core_metrics
+        column."""
+        for name in ("CustomersHK", "MainlandCityGasCustomers",
+                     "MainlandGasSold", "TownGasSoldHK",
+                     "EmployeesHKCompany", "DilutedEPS"):
+            assert schema.promote_header(name) == name
+
+
+class TestChinaEastEducationCashAndLeaseKpis:
+    """China East Education Holdings (0667.HK): FVTPLFinancialAssets is
+    non-principal-protected structured deposits and level-3 fund
+    investments the dcf-analyst sums into net cash alongside
+    CashAndEquivalents and TimeDeposits (30 Jun 2026: RMB1,488.0m of the
+    RMB3,515.3m net-cash bridge) -- material enough that CashAndEquivalents
+    alone understates the liquid balance by roughly 40%. LeasePrincipalRepaid
+    is the IFRS-16 financing-cash-flow line the DCF's lease treatment (full
+    cash payment, principal + interest, charged inside EBIT rather than
+    treated as debt service) is built on, distinct from the already-charted
+    OperatingCashFlow/CapEx lines. Both had multi-year history in `kpis`
+    but no PROMOTE_KPIS entry."""
+
+    def test_fvtpl_and_lease_principal_promote(self) -> None:
+        assert (schema.promote_header("FVTPLFinancialAssets")
+                == "FVTPLFinancialAssets")
+        assert (schema.promote_header("LeasePrincipalRepaid")
+                == "LeasePrincipalRepaid")
+
+    def test_snake_case_variants_promote(self) -> None:
+        assert (schema.promote_header("fvtpl_financial_assets")
+                == "FVTPLFinancialAssets")
+        assert (schema.promote_header("lease_principal_repaid")
+                == "LeasePrincipalRepaid")
+
+
+class TestHaitianFvtplInvestmentsKpi:
+    """Haitian International Holdings (1882.HK): FVTPLInvestments is the
+    wealth-management-product treasury line (bank/trust/fund products at fair
+    value through P&L) alongside the already-promoted TermDeposits --
+    ~RMB10.2bn at H1 FY2026, roughly a quarter of the DCF's weighted
+    intrinsic value, valued separately in the equity_bridge at fair value
+    less a 10% haircut. Populated FY2018-FY2025 in `kpis` but absent from
+    PROMOTE_KPIS, so the dashboard could not chart it."""
+
+    def test_fvtpl_investments_promotes(self) -> None:
+        assert (schema.promote_header("FVTPLInvestments")
+                == "FVTPLInvestments")
+
+    def test_snake_case_variant_promotes(self) -> None:
+        assert (schema.promote_header("fvtpl_investments")
+                == "FVTPLInvestments")
+
+
+class TestDpcDashLeaseInterestKpi:
+    """DPC Dash (1405.HK): LeaseInterestPaid is the IFRS-16 financing-cash-
+    flow interest line alongside the already-promoted LeasePrincipalRepaid --
+    together they are the full lease cash burden the DCF deducts from
+    reported FCF to get Owner FCF (FY2025: 386.9 - 370.2 principal - 74.0
+    interest - 46.0 SBC - 17.3 interest income = -120.6m, negative every
+    year FY2022-25). Populated FY2022-25 plus four half-years in `kpis` but
+    absent from PROMOTE_KPIS, so the dashboard could not chart it."""
+
+    def test_lease_interest_promotes(self) -> None:
+        assert (schema.promote_header("LeaseInterestPaid")
+                == "LeaseInterestPaid")
+
+    def test_snake_case_variant_promotes(self) -> None:
+        assert (schema.promote_header("lease_interest_paid")
+                == "LeaseInterestPaid")
+
+
+class TestTechtronicCapitalisedDevelopmentKpi:
+    """Techtronic Industries (0669.HK): CapitalisedDevelopment is R&D spend
+    capitalised as an intangible asset rather than expensed -- $135.6m in
+    FY2018 growing to $300-400m/yr by FY2022-FY2025, folded by the
+    financial-parser agent into the CapEx figure used for FCF. 11 periods
+    populated in `kpis` (FY2018-FY2026 plus half-years) but absent from
+    PROMOTE_KPIS, so the dashboard could not chart it separately from
+    cash CapEx."""
+
+    def test_capitalised_development_promotes(self) -> None:
+        assert (schema.promote_header("CapitalisedDevelopment")
+                == "CapitalisedDevelopment")
+
+    def test_snake_case_variant_promotes(self) -> None:
+        assert (schema.promote_header("capitalised_development")
+                == "CapitalisedDevelopment")
+
 
 class TestPromotedBankBalanceSheetKpis:
     """ANZ Group Holdings (ANZ.AX) disclosures the NIM/CET1/ROE bank-quality
@@ -368,6 +727,67 @@ class TestPromotedBankBalanceSheetKpis:
         assert schema.promote_header("CustomerDeposits") == "CustomerDeposits"
         assert schema.promote_header("NetLoansAndAdvances") == "NetLoansAndAdvances"
         assert schema.promote_header("OperatingExpenses") == "OperatingExpenses"
+
+
+class TestHongqiaoEffectiveCashTaxRateKpi:
+    """China Hongqiao Group Limited (1378.HK): EffectiveCashTaxRate (cash
+    taxes paid / profit before tax) swings 10.6%-48.8% across FY2018-25 --
+    an aluminium smelter with provincial tax incentives and swing items
+    that ProfitBeforeTax and CashTaxesPaid alone do not explain. 12 periods
+    populated in `kpis` (FY2018-FY2025 plus four half-years) but absent
+    from PROMOTE_KPIS, so the dashboard could not chart it."""
+
+    def test_effective_cash_tax_rate_promotes(self) -> None:
+        assert (schema.promote_header("EffectiveCashTaxRate")
+                == "EffectiveCashTaxRate")
+
+    def test_snake_case_variant_promotes(self) -> None:
+        assert (schema.promote_header("effective_cash_tax_rate")
+                == "EffectiveCashTaxRate")
+
+
+class TestTencentMusicSegmentRevenueKpis:
+    """Tencent Music Entertainment Group (1698.HK): OnlineMusicRevenue grew
+    ~9.3bn -> ~26.7bn RMB FY2021-FY2025 while SocialEntertainmentRevenue
+    (live-streaming/virtual gifting) shrank ~19.8bn -> ~6.2bn under Chinese
+    regulatory pressure -- the two offsetting segment trends are why total
+    Revenue looked flat FY2022-FY2024 despite a fundamental business-mix
+    shift. Populated in `kpis` FY2020-FY2025 but absent from PROMOTE_KPIS,
+    so the dashboard could not chart the segment split separately from
+    Revenue."""
+
+    def test_online_music_revenue_promotes(self) -> None:
+        assert (schema.promote_header("OnlineMusicRevenue")
+                == "OnlineMusicRevenue")
+
+    def test_social_entertainment_revenue_promotes(self) -> None:
+        assert (schema.promote_header("SocialEntertainmentRevenue")
+                == "SocialEntertainmentRevenue")
+
+    def test_snake_case_variants_promote(self) -> None:
+        assert (schema.promote_header("online_music_revenue")
+                == "OnlineMusicRevenue")
+        assert (schema.promote_header("social_entertainment_revenue")
+                == "SocialEntertainmentRevenue")
+
+
+class TestCnoocRealizedPriceAndVolumeKpis:
+    """CNOOC Limited (0883.HK): disclosed realized oil/gas prices
+    (US$/barrel, US$/mcf) and oil-and-gas sales volume (mmboe) are the
+    standard E&P investor metrics -- realized price versus benchmark and
+    volume growth -- and are not derivable from Revenue, which also
+    includes trading. Full annual history (FY2019-FY2025) and both half
+    years sat in `kpis` unmapped to any CSV column."""
+
+    def test_realized_price_and_volume_kpis_promote(self) -> None:
+        assert schema.promote_header("RealizedOilPrice") == "RealizedOilPrice"
+        assert schema.promote_header("RealizedGasPrice") == "RealizedGasPrice"
+        assert schema.promote_header("SalesVolume") == "SalesVolume"
+
+    def test_snake_case_variants_promote(self) -> None:
+        assert schema.promote_header("realized_oil_price") == "RealizedOilPrice"
+        assert schema.promote_header("realized_gas_price") == "RealizedGasPrice"
+        assert schema.promote_header("sales_volume") == "SalesVolume"
 
     def test_snake_case_bank_balance_sheet_kpis_promote(self):
         assert schema.promote_header("credit_impairment_charge") == "CreditImpairmentCharge"
@@ -451,3 +871,262 @@ class TestPromotedMoneyTransferVolumeAndHoldingsKpis:
         for name in ("CrossBorderVolume", "CustomerHoldings",
                      "CustomerBalances", "AssetsUnderCustody"):
             assert schema.promote_header(name) == name
+
+
+class TestPromotedBiopharmaLicensingKpis:
+    """HUTCHMED (0013.HK): revenue mixes lumpy licensing/milestone income
+    (Takeda's FRUZAQLA upfront drove a one-off FY2023 spike) with steadily
+    compounding royalties from ex-China marketing partners (Takeda,
+    AstraZeneca, Eli Lilly) -- a blended Revenue column hides that mix
+    shift. R&D spend more than halved FY2022->FY2025 as the pipeline
+    matured past its most spend-intensive trials, which is the other half
+    of the investment case a generic operating template misses."""
+
+    def test_licensing_and_royalty_kpis_promote(self):
+        assert schema.promote_header("LicensingRevenue") == "LicensingRevenue"
+        assert schema.promote_header("RoyaltyRevenue") == "RoyaltyRevenue"
+
+    def test_rnd_kpi_promotes(self):
+        assert schema.promote_header("ResearchAndDevelopment") == "ResearchAndDevelopment"
+
+    def test_snake_case_variants_promote(self):
+        assert schema.promote_header("licensing_revenue") == "LicensingRevenue"
+        assert schema.promote_header("royalty_revenue") == "RoyaltyRevenue"
+        assert schema.promote_header("research_and_development") == "ResearchAndDevelopment"
+
+
+class TestChinaRuyiFairValueKpis:
+    """China Ruyi Holdings (0136.HK): reported operating profit is
+    dominated by 'Other gains/(losses) -- net', fair-value marks on a large
+    investment book (FY2024 loss RMB1,222.0m, FY2025 gain RMB1,281.7m,
+    swinging reported NetIncome from -190.5m to +1,796.6m) that the DCF
+    strips out entirely to reach the underlying film/TV/streaming/games
+    operating economics. AdjustedNetProfit is the company's own non-GAAP
+    measure excluding that swing; FilmRightsAmortisation is the content
+    amortisation cost the DCF explicitly does NOT add back. All three had
+    full history in `kpis` but no CSV column."""
+
+    def test_other_gains_and_adjusted_profit_kpis_promote(self):
+        assert schema.promote_header("OtherGainsNet") == "OtherGainsNet"
+        assert schema.promote_header("AdjustedNetProfit") == "AdjustedNetProfit"
+        assert schema.promote_header("FilmRightsAmortisation") == "FilmRightsAmortisation"
+
+    def test_snake_case_variants_promote(self):
+        assert schema.promote_header("other_gains_net") == "OtherGainsNet"
+        assert schema.promote_header("adjusted_net_profit") == "AdjustedNetProfit"
+        assert schema.promote_header("film_rights_amortisation") == "FilmRightsAmortisation"
+
+
+class TestSinofertTimeDepositsKpi:
+    """Sinofert Holdings (0297.HK): time deposits (FY2025 RMB3,269.0m) sit
+    alongside cash and equivalents on the balance sheet and are comparable
+    in size to that line -- the dcf-analyst's net-cash bridge explicitly
+    sums cash + time deposits (H1 FY2026: 2,722.4 + 2,972.7 = 5,695.1) to
+    reach the DCF's net_debt figure. CashAndEquivalents alone understates
+    the liquid balance by roughly half; this KPI had full history in
+    `kpis` but no CSV column."""
+
+    def test_time_deposits_kpi_promotes(self):
+        assert schema.promote_header("TimeDeposits") == "TimeDeposits"
+
+    def test_snake_case_variant_promotes(self):
+        assert schema.promote_header("time_deposits") == "TimeDeposits"
+
+
+class TestChinaMedicalSystemLicensingAndNCIKpis:
+    """China Medical System Holdings (0867.HK): IntangibleAssetPurchases is
+    cash paid to acquire in-licensed drug product rights -- the dcf-analyst
+    treats it as mandatory reinvestment, deducted from owner FCF every year,
+    because the growth model depends on continuously buying licences
+    (RMB423-473m/yr in FY2024-25, RMB468m in H1 FY2026 alone). It had full
+    history back to FY2017 in `kpis` but no CSV column, making that spend
+    invisible on the dashboard. NetIncomeIncludingNCI is profit including
+    non-controlling interests, alongside the already-charted NetIncome
+    (attributable to owners)."""
+
+    def test_licensing_and_nci_kpis_promote(self):
+        assert (schema.promote_header("IntangibleAssetPurchases")
+                == "IntangibleAssetPurchases")
+        assert (schema.promote_header("NetIncomeIncludingNCI")
+                == "NetIncomeIncludingNCI")
+
+    def test_snake_case_variants_promote(self):
+        assert (schema.promote_header("intangible_asset_purchases")
+                == "IntangibleAssetPurchases")
+        assert (schema.promote_header("net_income_including_nci")
+                == "NetIncomeIncludingNCI")
+
+
+class TestChinaMobileTelecomServicesRevenueKpi:
+    """China Mobile Limited (0941.HK): TelecomServicesRevenue is the
+    core mobile/broadband/IoT subscription line, stored separately from
+    total Revenue because Revenue also includes product/terminal sales
+    and the fast-growing computing/AIDC/AI services segments. The
+    investment thesis centers on this mix shift -- core telecom services
+    growth has decelerated and gone negative YoY in H1 FY2026 (452,663m
+    vs 466,989m) while total Revenue keeps growing on computing/AI -- so
+    a single blended Revenue column hides the story. Full annual and
+    half-year history back to FY2018 sat in `kpis` with no CSV column."""
+
+    def test_telecom_services_revenue_promotes(self):
+        assert (schema.promote_header("TelecomServicesRevenue")
+                == "TelecomServicesRevenue")
+
+    def test_snake_case_variant_promotes(self):
+        assert (schema.promote_header("telecom_services_revenue")
+                == "TelecomServicesRevenue")
+
+
+class TestBrillianceChinaJvKpis:
+    """Brilliance China Automotive Holdings (1114.HK): a holding company
+    whose consolidated Revenue is tiny -- the overwhelming majority of net
+    income is ShareOfAssociatesAndJVResults, the equity-accounted share of
+    results from the 25%-owned BMW Brilliance Automotive joint venture.
+    ProfitInclNCI is total profit including non-controlling interests, the
+    same attributable-vs-total gap as ProfitIncludingNCI/NetProfitInclMinority
+    above but this filing's own disclosed line, not an alias of either."""
+
+    def test_share_of_associates_and_jv_results_promotes(self):
+        assert (schema.promote_header("ShareOfAssociatesAndJVResults")
+                == "ShareOfAssociatesAndJVResults")
+
+    def test_profit_incl_nci_promotes(self):
+        assert schema.promote_header("ProfitInclNCI") == "ProfitInclNCI"
+
+
+class TestAiaGroupEmbeddedValueKpis:
+    def test_insurer_ev_and_investment_income_promote(self):
+        # AIA Group (1299.HK): EVEquity is disclosed Embedded Value, the
+        # insurer valuation anchor the dcf-analyst cross-checks against --
+        # distinct from statutory ShareholdersEquity. InterestRevenueOn-
+        # FinancialAssets is interest earned on the investment portfolio,
+        # kept separate from a stripped non-operating interest line.
+        assert schema.promote_header("EVEquity") == "EVEquity"
+        assert (schema.promote_header("InterestRevenueOnFinancialAssets")
+                == "InterestRevenueOnFinancialAssets")
+        assert schema.promote_header("ev_equity") == "EVEquity"
+        assert (schema.promote_header("interest_revenue_on_financial_assets")
+                == "InterestRevenueOnFinancialAssets")
+
+
+class TestSunevisionCashGeneratedFromOperationsKpi:
+    """SUNeVision Holdings (1686.HK): the debt-funded data-centre build-out
+    makes InterestPaid a growing drag between operating cash and the
+    post-interest OperatingCashFlow column (~HK$10m FY2017 to >HK$800m
+    FY2025). CashGeneratedFromOperations is the pre-interest, pre-tax cash
+    line that makes that coverage visible; 12 periods populated in `kpis`
+    but absent from PROMOTE_KPIS, so the dashboard could not chart it."""
+
+    def test_cash_generated_from_operations_promotes(self) -> None:
+        assert (schema.promote_header("CashGeneratedFromOperations")
+                == "CashGeneratedFromOperations")
+
+    def test_snake_case_variant_promotes(self) -> None:
+        assert (schema.promote_header("cash_generated_from_operations")
+                == "CashGeneratedFromOperations")
+
+
+class TestTimeInterconnectDebtAndPlacingKpis:
+    """Time Interconnect Technology (1729.HK): Luxshare Precision Industry is
+    both the controlling shareholder and, via LoansFromRelatedCompanies, a
+    lender -- that split of TotalDebt into bank vs related-party is the
+    leverage/dependency story, not derivable from TotalDebt alone. The H1
+    FY2026 placings (SharePlacingProceeds, SharesIssuedPeriodEnd) lifted the
+    share count ~21% in one half-year. All four populated in `kpis` but
+    absent from PROMOTE_KPIS, so the dashboard could not chart them."""
+
+    def test_bank_borrowings_promotes(self) -> None:
+        assert schema.promote_header("BankBorrowings") == "BankBorrowings"
+
+    def test_loans_from_related_companies_promotes(self) -> None:
+        assert (schema.promote_header("LoansFromRelatedCompanies")
+                == "LoansFromRelatedCompanies")
+
+    def test_share_placing_proceeds_promotes(self) -> None:
+        assert (schema.promote_header("SharePlacingProceeds")
+                == "SharePlacingProceeds")
+
+    def test_shares_issued_period_end_promotes(self) -> None:
+        assert (schema.promote_header("SharesIssuedPeriodEnd")
+                == "SharesIssuedPeriodEnd")
+
+
+class TestMedliveDebtInvestmentsKpis:
+    """Medlive Technology (2192.HK): the dcf-analyst's thesis is that the
+    market is pricing the core operating business near zero -- DebtInvestments
+    (bonds/wealth-management products funded by IPO proceeds) grew from
+    CNY 0 (FY2023) to CNY 2,535.8m (H1-2026) and alone is worth more per
+    share than the quoted price. OtherIncomeAndGains (mostly interest income
+    off that same balance, CNY 193.5m FY2025) is a material chunk of
+    reported profit. Both populated in `kpis` but absent from PROMOTE_KPIS,
+    so the dashboard could not chart either."""
+
+    def test_debt_investments_promotes(self) -> None:
+        assert schema.promote_header("DebtInvestments") == "DebtInvestments"
+
+    def test_other_income_and_gains_promotes(self) -> None:
+        assert (schema.promote_header("OtherIncomeAndGains")
+                == "OtherIncomeAndGains")
+
+
+class TestShandongGoldPerpetualBondAndCasKpis:
+    """Shandong Gold Mining (1787.HK): the CAS income statement folds
+    perpetual-bond-holder profit and minority interest into reported
+    NetIncome/ShareholdersEquity. PerpetualBonds (balance, CNY ~14bn FY2025)
+    is deducted in the DCF equity bridge because it is economically senior
+    to ordinary equity; PerpetualBondProfit and MinorityInterestProfit are
+    the two leakage lines that separate reported NetIncome from
+    NetIncomeOrdinary (the ex-perpetual-holder figure the DCF narrative
+    quotes). OperatingCashFlowCAS exists because the company switched from
+    IFRS to PRC GAAP (CAS) at FY2025 and OCF is not comparable like-for-like
+    across the switch (FY2024 OCF: RMB20.3bn IFRS vs RMB13.3bn CAS)."""
+
+    def test_perpetual_bonds_promotes(self) -> None:
+        assert schema.promote_header("PerpetualBonds") == "PerpetualBonds"
+
+    def test_perpetual_bond_profit_promotes(self) -> None:
+        assert (schema.promote_header("PerpetualBondProfit")
+                == "PerpetualBondProfit")
+
+    def test_minority_interest_profit_promotes(self) -> None:
+        assert (schema.promote_header("MinorityInterestProfit")
+                == "MinorityInterestProfit")
+
+    def test_net_income_ordinary_promotes(self) -> None:
+        assert (schema.promote_header("NetIncomeOrdinary")
+                == "NetIncomeOrdinary")
+
+    def test_operating_cash_flow_cas_promotes(self) -> None:
+        assert (schema.promote_header("OperatingCashFlowCAS")
+                == "OperatingCashFlowCAS")
+
+    def test_snake_case_variants_promote(self) -> None:
+        assert schema.promote_header("bank_borrowings") == "BankBorrowings"
+        assert (schema.promote_header("loans_from_related_companies")
+                == "LoansFromRelatedCompanies")
+        assert (schema.promote_header("share_placing_proceeds")
+                == "SharePlacingProceeds")
+        assert (schema.promote_header("shares_issued_period_end")
+                == "SharesIssuedPeriodEnd")
+
+
+class TestPradaLeaseKpis:
+    """Prada S.p.A. (1913.HK): LeaseRepayments and InterestExpenseLeases are
+    the IFRS-16 lease principal and lease interest lines, extracted under
+    different literal spellings than DPC Dash's LeasePrincipalRepaid/
+    LeaseInterestPaid (same concept -- the full lease cash cost the DCF
+    deducts from reported FCF to reach Owner FCF, ~9.6% of revenue here).
+    Both were populated FY2018/19-FY2024 in `kpis` but, as distinct
+    spellings, had no KPI_ALIASES entry, so they fell through to the generic
+    unmapped bucket instead of reusing the existing promoted headers."""
+
+    def test_lease_repayments_aliases_to_lease_principal_repaid(self) -> None:
+        assert schema.normalize_kpi("LeaseRepayments") == "LeasePrincipalRepaid"
+        assert (schema.promote_header("LeaseRepayments")
+                == "LeasePrincipalRepaid")
+
+    def test_interest_expense_leases_aliases_to_lease_interest_paid(self) -> None:
+        assert (schema.normalize_kpi("InterestExpenseLeases")
+                == "LeaseInterestPaid")
+        assert (schema.promote_header("InterestExpenseLeases")
+                == "LeaseInterestPaid")

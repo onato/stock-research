@@ -348,6 +348,17 @@ class TestDcfSection:
         assert r["wacc"][2] is not None
         assert r["terminal"][2] is not None
 
+    def test_growth_rates_first_entry_null_does_not_crash(self, dcf):
+        # A NAV/earnings-waterfall bear case can have year-1 NPAT of zero
+        # (recovering from a loss), making the year-1 growth rate undefined
+        # -- stored as `"growth_rates": [null, 100.0, ...]` rather than
+        # omitting the list. _slider_range must fall back past the null,
+        # not crash on float(None).
+        dcf = json.loads(json.dumps(dcf))
+        dcf["assumptions"]["bear"]["growth_rates"] = [None, 100.0, 25.0, 20.0]
+        r = bd._slider_range(dcf)
+        assert r["growth"][2] is not None
+
     def test_model_approach_banner_only_when_spec_asks_for_it(self, spec, analysis, csv_text, dcf):
         # Step 8c.6 of the research-stock skill requires a yellow "Model
         # approach" banner above the DCF section when the sanity check

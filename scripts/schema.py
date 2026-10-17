@@ -182,6 +182,51 @@ PROMOTE_KPIS: dict[str, str] = {
     "TotalOrders": "TotalOrders",
     "ProcessedVolume": "ProcessedVolume",
     "GrossBookings": "GrossBookings",
+    # Beer sales volume in kilolitres (Tsingtao Brewery, 0168.HK): volume vs
+    # price/mix is the premiumization thesis -- not derivable from Revenue.
+    "SalesVolumeKL": "SalesVolumeKL",
+    # CNOOC Limited (0883.HK): disclosed realized oil/gas prices and sales
+    # volume are the standard E&P investor metrics (realized price vs.
+    # benchmark, volume growth) -- not derivable from Revenue, which also
+    # includes trading.
+    "RealizedOilPrice": "RealizedOilPrice",
+    "RealizedGasPrice": "RealizedGasPrice",
+    "SalesVolume": "SalesVolume",
+    # Chow Tai Fook Jewellery (1929.HK): fair-value loss/gain on gold loans,
+    # reclassified out of COGS into "other gains and losses" from H1 FY2025.
+    # It is the dominant driver of the net-income-vs-operating-cash-flow gap
+    # (FY2026 profit +52.2% to HK$9,004m vs OCF of only HK$1,317m) and is not
+    # derivable from any CSV column.
+    "GoldLoanFairValueLoss": "GoldLoanFairValueLoss",
+    # China Taiping Insurance Holdings (0966.HK): GrossPremiumsWritten is
+    # the core insurer top-line KPI under the old IFRS 4 regime (populated
+    # FY2017-FY2021 only, before the IFRS 17 switch replaced it with the
+    # insurance service result presentation). NetInvestmentResult is the
+    # dcf-analyst's flagged single biggest swing driver of reported
+    # earnings (-HK$7.5bn FY2022 to +HK$14.6bn FY2025 per build notes).
+    # RepoLiabilities (HK$106.7bn FY2025) is a material repo-funding line,
+    # distinct from TotalDebt, that the DCF analysis flagged separately.
+    "GrossPremiumsWritten": "GrossPremiumsWritten",
+    "NetInvestmentResult": "NetInvestmentResult",
+    "RepoLiabilities": "RepoLiabilities",
+    # New China Life Insurance (1336.HK): GrossWrittenPremiums is the core
+    # life-insurer top-line KPI, populated FY2016-FY2022 only -- it stops
+    # appearing in the summary disclosure after the IFRS 17 transition, the
+    # same pre/post-IFRS17 break as 0966.HK's GrossPremiumsWritten above, but
+    # spelled differently in this filer's own tables.
+    "GrossWrittenPremiums": "GrossWrittenPremiums",
+    # China Railway Construction Corporation (1186.HK): total debt rose
+    # from RMB333bn (FY2023) to RMB728bn (H1 FY2026). OtherEquityInstruments
+    # (perpetual bonds, RMB59.5bn FY2023 to RMB72.3bn H1 FY2026) are a
+    # debt-like claim classified in equity -- sitting outside TotalDebt and
+    # not derivable from the existing balance-sheet columns.
+    "OtherEquityInstruments": "OtherEquityInstruments",
+    # Core telecom-services revenue (China Mobile Limited, 0941.HK): total
+    # Revenue also includes product/terminal sales and the fast-growing
+    # computing/AIDC/AI services segments, so the mix-shift thesis -- decade
+    # of core mobile/broadband/IoT growth decelerating, now negative YoY in
+    # H1 FY2026 -- needs this line split out from the blended Revenue column.
+    "TelecomServicesRevenue": "TelecomServicesRevenue",
     # Money transfer (Wise, WISE.L): the volume behind the take rate, and the
     # customer money that earns ~a third of net revenue as interest.
     "CrossBorderVolume": "CrossBorderVolume",
@@ -198,6 +243,15 @@ PROMOTE_KPIS: dict[str, str] = {
     # Marketing cost lines
     "MarketingExpense": "MarketingExpense",
     "MarketingPctRevenue": "MarketingPctRevenue",
+    # IT-services unit economics (CGI Inc., GIB-A.TO): Bookings is new
+    # contract signings in the period; BookToBill (Bookings/Revenue, %)
+    # signals forward revenue visibility -- above 100% means the backlog is
+    # growing faster than revenue is being recognized. DaysSalesOutstanding
+    # is the collections/working-capital health check. All three are
+    # disclosed every quarter with no core_metrics column.
+    "Bookings": "Bookings",
+    "BookToBill": "BookToBill",
+    "DaysSalesOutstanding": "DaysSalesOutstanding",
     # Oil & gas non-IFRS profitability measure (earnings before interest,
     # tax, depreciation, amortisation AND exploration expense) -- distinct
     # from the generic EBITDA column (Santos, STO.AX)
@@ -233,6 +287,11 @@ PROMOTE_KPIS: dict[str, str] = {
     # blended CashAndEquivalents figure hides that split.
     "CustomerReceivables": "CustomerReceivables",
     "RestrictedCash": "RestrictedCash",
+    # Pledged/restricted bank deposits securing borrowings (Fufeng Group,
+    # 0546.HK): management discloses these separately from free cash, and
+    # they are material to the leverage story -- RMB7.7bn pledged against
+    # RMB21.3bn borrowings alongside RMB13.9bn of unrestricted cash.
+    "RestrictedBankBalances": "RestrictedBankBalances",
     # Segment revenue (WasteCo Group, WCO.NZ): three operating lines --
     # waste collection, sweeping services, industrial cleaning -- reverse-
     # listed into a shell in FY2023, so a single blended Revenue column
@@ -262,8 +321,28 @@ PROMOTE_KPIS: dict[str, str] = {
     "HealthcareOrganicGrowth": "HealthcareOrganicGrowth",
     "IndustrialOrganicGrowth": "IndustrialOrganicGrowth",
     "OrganicRevenueGrowth": "OrganicRevenueGrowth",
+    # Three-segment revenue split (Qunabox Group, 0917.HK): marketing
+    # services (AI-enabled interactive marketing terminal network, ~84% of
+    # FY2025 revenue) vs merchandise sales (smart retail vending, ~12%) vs
+    # other/IT services (~4%) -- a single blended Revenue column hides which
+    # segment is driving the mix, and marketing services is growing faster
+    # than the other two.
+    "MarketingServicesRevenue": "MarketingServicesRevenue",
+    "MerchandiseSalesRevenue": "MerchandiseSalesRevenue",
+    "OtherServicesRevenue": "OtherServicesRevenue",
     "AdjustedEBITMargin": "AdjustedEBITMargin",
     "AdjustedEPS": "AdjustedEPS",
+    # FirstService Corporation (FSV.TO): Residential (property management)
+    # vs Brands (the franchise portfolio: California Closets, Paul Davis,
+    # CertaPro, etc) two-segment split. The segments have different growth
+    # and margin profiles -- Brands grew Adjusted EBITDA to a wider margin
+    # than Residential through FY2025 -- so a single blended Revenue/
+    # AdjustedEBITDA column hides which segment drives the mix shift. Both
+    # had history back to FY2015/Q1-2016 stranded in kpis.
+    "SegmentRevenueResidential": "SegmentRevenueResidential",
+    "SegmentRevenueBrands": "SegmentRevenueBrands",
+    "SegmentAdjustedEBITDAResidential": "SegmentAdjustedEBITDAResidential",
+    "SegmentAdjustedEBITDABrands": "SegmentAdjustedEBITDABrands",
     # Customer concentration (Appen Limited, APX.AX): top-5-customer share of
     # revenue is a named high-severity business risk -- historically
     # dependent on a handful of big-tech accounts, and the abrupt loss of
@@ -289,6 +368,82 @@ PROMOTE_KPIS: dict[str, str] = {
     # only show the noisy statutory OCF column.
     "OperatingCashFlowExSeed": "OperatingCashFlowExSeed",
     "NetSeedInvestmentFlow": "NetSeedInvestmentFlow",
+    # Contracted order backlog (WSP Global, WSP.TO): forward-revenue
+    # visibility for a project-based engineering consultancy -- WSP's own
+    # disclosure frames backlog in months of revenue coverage. 55 periods
+    # populated in `kpis` back to FY2015 but absent from PROMOTE_KPIS, so
+    # the dashboard could not chart the trend investors watch.
+    "Backlog": "Backlog",
+    # Licensing/milestone revenue vs royalty revenue (biopharma licensor
+    # HUTCHMED, 0013.HK): licensing/milestone income is lumpy -- Takeda's
+    # FRUZAQLA upfront drove a one-off FY2023 spike ($279m vs $15-71m in
+    # other years) -- while royalties from ex-China marketing partners
+    # (Takeda, AstraZeneca, Eli Lilly) compound steadily. A blended Revenue
+    # column hides that mix shift. ResearchAndDevelopment is the other half
+    # of the story: spend more than halved FY2022->FY2025 as the pipeline
+    # matured past its most capital-intensive trials.
+    "LicensingRevenue": "LicensingRevenue",
+    "RoyaltyRevenue": "RoyaltyRevenue",
+    "ResearchAndDevelopment": "ResearchAndDevelopment",
+    # Medlive Technology (2192.HK): DebtInvestments (bonds/wealth-management
+    # products funded by IPO proceeds) grew from CNY 0 (FY2023) to
+    # CNY 2,535.8m (H1-2026) -- the dcf-analyst's thesis is that this balance
+    # alone is worth more per share than the quoted price, i.e. the core
+    # operating business is priced near zero. OtherIncomeAndGains is mostly
+    # interest income off that same balance (CNY 193.5m FY2025) and a
+    # material chunk of reported profit.
+    "DebtInvestments": "DebtInvestments",
+    "OtherIncomeAndGains": "OtherIncomeAndGains",
+    # Capitalised development costs (Techtronic Industries, 0669.HK): R&D
+    # spend recognised as an intangible asset rather than expensed -- $135.6m
+    # in FY2018 growing to $300-400m/yr by FY2022-FY2025, folded by the
+    # financial-parser agent into the CapEx figure used for FCF. 11 periods
+    # populated in `kpis` (FY2018-FY2026 plus half-years) but absent from
+    # PROMOTE_KPIS, so the dashboard could not chart it separately from cash
+    # CapEx.
+    "CapitalisedDevelopment": "CapitalisedDevelopment",
+    # Partly-owned subsidiary with minority interests (Sany Heavy Equipment
+    # International Holdings, 0631.HK): NetIncomeTotal is total profit
+    # including minority interests, vs the owners'-only NetIncome column --
+    # informative here because NCI is in a deficit position (it took a share
+    # of FY2025 losses), so attributable profit exceeds total profit, the
+    # reverse of the usual direction. EPSBasic is basic EPS against the
+    # diluted EPS already charted. ShortTermInvestments is current FVTPL
+    # bank wealth-management products (note 13) -- near-cash but outside
+    # CashAndEquivalents, and netted off against cash in the DCF's own
+    # net-debt bridge.
+    "NetIncomeTotal": "NetIncomeTotal",
+    "EPSBasic": "EPSBasic",
+    "ShortTermInvestments": "ShortTermInvestments",
+    # Advertising/distribution spend (Mao Geping Cosmetics, 1318.HK):
+    # selling expense runs ~47% of revenue, and the DCF's own margin-
+    # compression thesis turns on its ratio to revenue rising (45.2% ->
+    # 47.4% H1 FY2025 -> H1 FY2026) as advertising intensity stays high
+    # against premium-beauty peers -- not derivable from OperatingIncome or
+    # EBITDA alone.
+    "SellingExpense": "SellingExpense",
+    # Like-for-like restatement bridge (Geely Automobile Holdings, 0175.HK):
+    # the FY2025 annual report restated FY2021-FY2024 financials after
+    # consolidating ZEEKR, LYNK & CO and other Geely Holding brands bought
+    # in from the parent group (FY2024 revenue as-filed RMB240.2bn vs
+    # restated RMB275.9bn). core_metrics keeps each filing's
+    # as-originally-filed numbers; these are the restated like-for-like
+    # series disclosed alongside them, without which a reader can't see
+    # that growth around FY2024-2025 is partly inorganic.
+    "RevenueRestated": "RevenueRestated",
+    "NetIncomeRestated": "NetIncomeRestated",
+    "OCFRestated": "OCFRestated",
+    "EBITDARestated": "EBITDARestated",
+    # Pre-IPO convertible redeemable preferred shares (Bloks Group, 0325.HK):
+    # classified as a liability (not equity) under IFRS until the January
+    # 2026 IPO converted them to ordinary equity -- why shareholders' equity
+    # flipped from negative to positive, and why the mark-to-market fair-
+    # value loss on this liability drove reported net income deeply negative
+    # pre-IPO despite an operationally improving business. Both series stop
+    # at FY2024/H1 FY2024 once the IPO converts the liability away.
+    "ConvertiblePreferredSharesLiability": "ConvertiblePreferredSharesLiability",
+    "PreferredSharesFairValueLoss": "PreferredSharesFairValueLoss",
+    "EBITDACompanyReportedInclDeemedDisposalGain": "EBITDACompanyReportedInclDeemedDisposalGain",
     # Property advertising vs financial services revenue split (REA Group,
     # REA.AX): the core listings business, financial services (Mortgage
     # Choice) is a bolt-on segment whose revenue steps up sharply -- from
@@ -297,6 +452,13 @@ PROMOTE_KPIS: dict[str, str] = {
     # broking business.
     "PropertyAdvertisingRevenue": "PropertyAdvertisingRevenue",
     "FinancialServicesRevenue": "FinancialServicesRevenue",
+    # Passenger vs cargo revenue split (Cathay Pacific Airways, 0293.HK): the
+    # two halves of an airline's top line move on different drivers (travel
+    # demand vs air-freight rates) and recovered on very different timelines
+    # post-2020, so a single Revenue column hides which engine is actually
+    # driving the recovery.
+    "PassengerRevenue": "PassengerRevenue",
+    "CargoRevenue": "CargoRevenue",
     # Five-segment revenue split (Breville Group, BRG.AX): the FY report
     # discloses revenue by APAC, Americas, EMEA, Global Product and
     # Distribution rather than a single blended Revenue line, and the mix is
@@ -336,13 +498,91 @@ PROMOTE_KPIS: dict[str, str] = {
     "TotalEquityInclNCI": "TotalEquityInclNCI",
     "CapexPPE": "CapexPPE",
     "CapexIntangibles": "CapexIntangibles",
+    # Same minority-interest story for ATCO Ltd. (ACO-X.TO, ~52.4% of CU.TO):
+    # core_metrics.net_income is ATCO-owners' share only. NetIncomeInclNCI is
+    # the consolidated figure before the CU minority's cut -- e.g. Q3 FY2025
+    # 145 consolidated vs 85 attributable, a ~41% minority slice of that
+    # quarter's income, materially above the ~47.6% CU minority stake read
+    # off equity alone because the split of consolidated income swings
+    # quarter to quarter.
+    "NetIncomeInclNCI": "NetIncomeInclNCI",
+    # Henderson Land Development (0012.HK): related-party debt and the JV/
+    # associate income it does not consolidate. AmountDueToFellowSubsidiary
+    # is an interest-bearing loan from the controlling family's own private
+    # finance company (Henderson Finance Co) -- ~HK$77bn at H1 FY2026,
+    # roughly the size of reported TotalDebt, so it is debt-like and
+    # material, not a footnote curiosity. ShareOfAssociatesProfit and
+    # ShareOfJointVenturesProfit are the group's share of profit from
+    # unconsolidated stakes (including ~41.53% of HK & China Gas / Towngas)
+    # with their own trend, distinct from consolidated NetIncome.
+    # InvestmentPropertyFairValueChange is the IAS 40 revaluation swing the
+    # financial-parser excluded from this company's operating/net income
+    # definition.
+    "AmountDueToFellowSubsidiary": "AmountDueToFellowSubsidiary",
+    "ShareOfAssociatesProfit": "ShareOfAssociatesProfit",
+    "ShareOfJointVenturesProfit": "ShareOfJointVenturesProfit",
+    "InvestmentPropertyFairValueChange": "InvestmentPropertyFairValueChange",
+    # Hang Lung Properties (0101.HK): same IAS 40 revaluation-noise pattern as
+    # Henderson Land above, but this company's worksheet carried the swing
+    # and the revaluation-inclusive operating line under its own disclosed
+    # names rather than Henderson's -- kept distinct so neither aliases over
+    # the other's sign convention or basis.
+    "InvestmentPropertyRevaluation": "InvestmentPropertyRevaluation",
+    "OperatingProfitAfterRevaluation": "OperatingProfitAfterRevaluation",
+    # China Merchants Port Holdings (0144.HK): a port operator whose
+    # consolidated subsidiaries are only half the earnings story -- roughly
+    # 40-50% of pre-tax profit comes from equity-accounted associates/JVs
+    # (SIPG Shanghai, Qingdao, Tianjin, Terminal Link, Djibouti's PDSA) that
+    # never touch consolidated revenue. It fell 23.7% YoY in FY2025 (6,513m
+    # -> 4,970m) and drove an 18.5% drop in attributable profit even as
+    # consolidated revenue grew 12.8% -- the combined associates+JV line the
+    # filing discloses as one figure, distinct from Henderson Land's split
+    # ShareOfAssociatesProfit/ShareOfJointVenturesProfit above.
+    "ShareOfAssocJVProfit": "ShareOfAssocJVProfit",
     # Property / financial sector staples
     "AFFO": "AFFO",
     "AISC": "AISC",                       # gold miners: all-in sustaining cost per oz
     "GoldProduction": "GoldProduction",
     "CopperProduction": "CopperProduction",
     "GoldPriceAchieved": "GoldPriceAchieved",
+    "RealizedCopperPrice": "RealizedCopperPrice",  # copper byproduct USD/lb price
     "GoldSoldManagedOz": "GoldSoldManagedOz",  # gold oz sold by managed ops
+    # Royalty/streaming companies (Franco-Nevada, FNV.TO): GEOsSold (gold
+    # equivalent ounces sold) is the volume driver the way units shipped is
+    # for a manufacturer -- it blends gold, silver, PGM and energy royalty
+    # streams onto one comparable axis. AverageGoldPrice is the realized
+    # price that drives the top line without a mine to run; CashCostsPerGEO
+    # is the margin metric specific to the royalty model (a cost per ounce
+    # with no mining opex behind it).
+    "GEOsSold": "GEOsSold",
+    "AverageGoldPrice": "AverageGoldPrice",
+    "CashCostsPerGEO": "CashCostsPerGEO",
+    # Wheaton Precious Metals (WPM.TO): same streaming/royalty model as
+    # Franco-Nevada above but a distinct disclosed vocabulary -- gold and
+    # silver broken out separately (volume, realized price, cash cost per
+    # ounce) as well as the blended GEO figures, plus the per-GEO cash
+    # operating margin (realized price less cash cost) that is the model's
+    # entire economic engine.
+    "GEOProduced": "GEOProduced",
+    "GEOSold": "GEOSold",
+    "GoldOuncesProduced": "GoldOuncesProduced",
+    "GoldOuncesSold": "GoldOuncesSold",
+    "SilverOuncesProduced": "SilverOuncesProduced",
+    "SilverOuncesSold": "SilverOuncesSold",
+    "RealizedGoldPrice": "RealizedGoldPrice",
+    # Zijin Gold International (2259.HK): proved+probable reserves and
+    # measured+indicated+inferred resources, in tonnes of contained gold --
+    # the resource-base size the investment thesis is built on (mine life,
+    # future production capacity), disclosed once a year and not derivable
+    # from any income-statement or cash-flow column.
+    "GoldReservesTonnes": "GoldReservesTonnes",
+    "GoldResourcesTonnes": "GoldResourcesTonnes",
+    "RealizedSilverPrice": "RealizedSilverPrice",
+    "RealizedPricePerGEO": "RealizedPricePerGEO",
+    "CashCostPerGEO": "CashCostPerGEO",
+    "GoldCashCostPerOz": "GoldCashCostPerOz",
+    "SilverCashCostPerOz": "SilverCashCostPerOz",
+    "CashOperatingMarginPerGEO": "CashOperatingMarginPerGEO",
     "GoldProduction_Cowal": "GoldProduction_Cowal",
     "GoldProduction_ErnestHenry": "GoldProduction_ErnestHenry",
     "GoldProduction_Mungari": "GoldProduction_Mungari",
@@ -365,6 +605,28 @@ PROMOTE_KPIS: dict[str, str] = {
     "OperatingCashFlowContinuing": "OperatingCashFlowContinuing",
     "NAVPerShare": "NAVPerShare",
     "NTAPerShare": "NTAPerShare",
+    # Investment-trust specific disclosures (Scottish Mortgage Investment
+    # Trust plc, SMT.L): InvestmentManagementFee is the fee drag on returns,
+    # and RevenueReturn is the income-side half of UK trust total-return
+    # reporting (distinct from capital return) used to size dividend cover
+    # independent of portfolio revaluations. Neither has a core_metrics
+    # column.
+    "InvestmentManagementFee": "InvestmentManagementFee",
+    "RevenueReturn": "RevenueReturn",
+    # SSE plc (SSE.L): statutory operating income/net income are dominated
+    # by derivative re-measurement swings unrelated to the underlying
+    # business (FY2023 statutory operating income was -GBP146.3m on a year
+    # SSE itself called a record), so the financial-parser and dcf-analyst
+    # anchor on SSE's own adjusted "before exceptional items" lines instead.
+    # SharesInIssuePeriodEnd (vs the weighted-average core_metrics column)
+    # and TotalEquityInclHybridNCI (vs the ordinary-shareholders-only
+    # equity column) matter because the ~GBP2bn Nov-2025 placing and SSE's
+    # hybrid capital move the period-end basis well away from the
+    # weighted-average/ordinary-only ones used elsewhere on the dashboard.
+    "OperatingProfitBeforeExceptionals": "OperatingProfitBeforeExceptionals",
+    "ProfitBeforeExceptionalsAttributable": "ProfitBeforeExceptionalsAttributable",
+    "SharesInIssuePeriodEnd": "SharesInIssuePeriodEnd",
+    "TotalEquityInclHybridNCI": "TotalEquityInclHybridNCI",
     # Ambev's own headline non-GAAP profitability measure (Ambev S.A.,
     # ABEV): disclosed every quarter in its press releases, distinct from
     # the audited EBITDA core_metrics column the financial-parser built
@@ -469,6 +731,15 @@ PROMOTE_KPIS: dict[str, str] = {
     "ManagementExpenseRatio": "ManagementExpenseRatio",
     "InsuranceServiceResult": "InsuranceServiceResult",
     "NetInsuranceFinancialResult": "NetInsuranceFinancialResult",
+    # P&C insurer core-earnings lines (Intact Financial, IFC.TO): underwriting
+    # income is the profit on the insurance book itself (premiums less claims
+    # and expenses), separate from the investment portfolio's return: net
+    # investment income. NOIPS (Net Operating Income Per Share) is the
+    # company's own non-GAAP per-share operating metric, reported quarterly
+    # alongside EPS.
+    "UnderwritingIncome": "UnderwritingIncome",
+    "NetInvestmentIncome": "NetInvestmentIncome",
+    "NOIPS": "NOIPS",
     # Pre-revenue JV lithium developer (Argosy Minerals, AGY.AX): Argosy
     # cannot fund the Rincon project alone and holds it through an
     # equal-board equity-accounted JV (Puna Mining S.A.), so the funding
@@ -514,6 +785,21 @@ PROMOTE_KPIS: dict[str, str] = {
     # the earnings measure the model runs off, and the ORA sales and portfolio
     # counts are the volume series behind it.
     "UnderlyingProfit": "UnderlyingProfit",
+    # Conglomerate segment recurring profit (Swire Pacific, 0019.HK): statutory
+    # net income is dominated by investment-property revaluation noise, so
+    # management and analysts track recurring/underlying profit by division
+    # instead -- Property (Swire Properties), Beverages (Swire Coca-Cola), the
+    # Cathay Pacific equity-accounted group, wholly-owned HAECO plus other
+    # aviation-services interests, Trading & Industrial, and Head Office/
+    # Healthcare (typically negative: corporate costs net of the healthcare
+    # bolt-on). RecurringUnderlyingProfit is the sum of the six divisions.
+    "RecurringProfitProperty": "RecurringProfitProperty",
+    "RecurringProfitBeverages": "RecurringProfitBeverages",
+    "RecurringProfitCathayGroup": "RecurringProfitCathayGroup",
+    "RecurringProfitHAECOAndOthers": "RecurringProfitHAECOAndOthers",
+    "RecurringProfitTradingIndustrial": "RecurringProfitTradingIndustrial",
+    "RecurringProfitHeadOfficeHealthcare": "RecurringProfitHeadOfficeHealthcare",
+    "RecurringUnderlyingProfit": "RecurringUnderlyingProfit",
     "NPAT": "NPAT",
     "NetAssets": "NetAssets",
     # Pallet/crate/container pooling group capital-efficiency measures
@@ -606,6 +892,11 @@ PROMOTE_KPIS: dict[str, str] = {
     "BulkCargoVolumeTonnes": "BulkCargoVolumeTonnes",
     "ContainerCargoTonnes": "ContainerCargoTonnes",
     "ContainerVolumeTEU": "ContainerVolumeTEU",
+    # Revenue per TEU (OOCL/Orient Overseas, 0316.HK): the freight-rate yield
+    # behind a container carrier's revenue line. Volume (ContainerVolumeTEU)
+    # times this yield is the revenue story, and neither factor is
+    # derivable from the blended Revenue column alone.
+    "RevenuePerTEU": "RevenuePerTEU",
     "NormalisedNPAT": "NormalisedNPAT",
     # Cinema software vendor's SaaS transition and two-segment split
     # (VGL.NZ). SaaS/Recurring/NonRecurring revenue is the company's own
@@ -654,6 +945,14 @@ PROMOTE_KPIS: dict[str, str] = {
     "NetIncomeExSignificant": "NetIncomeExSignificant",
     "RevenueExPassThrough": "RevenueExPassThrough",
     "TotalDrawnDebt": "TotalDrawnDebt",
+    # Canadian midstream pipeline operator (Pembina Pipeline Corporation,
+    # PPL.TO). TotalVolumes (mboe/d) is pipeline/facility throughput, the
+    # physical operating driver distinct from financial Revenue, which also
+    # moves with commodity marketing. AdjustedCashFlowFromOperations is
+    # Pembina's own disclosed non-GAAP operating cash flow measure,
+    # distinct from the GAAP OperatingCashFlow line.
+    "TotalVolumes": "TotalVolumes",
+    "AdjustedCashFlowFromOperations": "AdjustedCashFlowFromOperations",
     # Market-infrastructure operator (ASX Limited, ASX.AX). The four
     # reporting segments -- Listings, Markets, Securities & Payments, and
     # Technology & Data -- are what the revenue mix story is told through,
@@ -784,6 +1083,13 @@ PROMOTE_KPIS: dict[str, str] = {
     # FY2018 to ~$202m FY2026 as debt was paid down, which is invisible in
     # the generic TotalDebt/CashAndEquivalents pair alone.
     "InterestPaid": "InterestPaid",
+    # Cash generated from operations (SUNeVision Holdings, 1686.HK): the
+    # debt-funded data-centre build-out means interest paid (~HK$10m FY2017
+    # to >HK$800m FY2025) is a growing drag between operating cash and
+    # OperatingCashFlow -- CGFO is the pre-interest, pre-tax cash line that
+    # makes the coverage ratio visible, and is not derivable from the
+    # already-net OperatingCashFlow column.
+    "CashGeneratedFromOperations": "CashGeneratedFromOperations",
     # Amortisation and term deposits (ikeGPS Group, IKE.NZ): Amortisation is
     # Depreciation's smaller companion in D&A but is a distinct concept, not
     # an alias of it, and is not an owner-FCF component -- it belongs
@@ -793,6 +1099,20 @@ PROMOTE_KPIS: dict[str, str] = {
     # on the dashboard by roughly two-thirds.
     "Amortisation": "Amortisation",
     "TermDeposits": "TermDeposits",
+    # Cash-and-equivalents split (Keymed Biosciences, 2162.HK): the
+    # financial-parser combined CashOnly and TermDeposits into the single
+    # CashAndEquivalents column, so CashOnly on its own was stranded in
+    # `kpis` with no way to see the split (H1 FY2026: CNY2,339.4m cash-only
+    # vs CNY556.1m term deposits) -- promoted alongside TermDeposits above so
+    # the composition is chartable, not just the combined total.
+    "CashOnly": "CashOnly",
+    # Wealth-management products at fair value through P&L (Haitian
+    # International Holdings, 1882.HK): a second treasury line alongside
+    # TermDeposits, ~RMB10.2bn at H1 FY2026 (~25% of the DCF's weighted
+    # intrinsic value) and valued separately in the equity_bridge with a 10%
+    # haircut -- leaving it in `kpis` hid roughly a quarter of the bridge from
+    # the dashboard.
+    "FVTPLInvestments": "FVTPLInvestments",
     # Investment-holding company whose equity-accounted JV/associate
     # portfolio IS the business (Power Assets Holdings, 0006.HK): statutory
     # Revenue is ~85% understated (it is mostly shareholder-loan interest
@@ -874,6 +1194,444 @@ PROMOTE_KPIS: dict[str, str] = {
     # Charge KPI already promoted.
     "EfficiencyRatio": "EfficiencyRatio",
     "PrePCLProfit": "PrePCLProfit",
+    # Smurfit WestRock plc (SKG.L): FY2024 and FY2025 did not disclose a
+    # full-group Adjusted EBITDA, only segment-level Adjusted EBITDA before
+    # head-office costs. Distinct from the generic AdjustedEBITDA entry
+    # above (whole-company basis) -- reusing that name would overstate
+    # group profitability by the head-office cost excluded here.
+    "SegmentAdjustedEBITDA": "SegmentAdjustedEBITDA",
+    # Alimentation Couche-Tard Inc. (ATD.TO): network scale and JV earnings.
+    # TotalNetworkSites is the company's own disclosed count of
+    # convenience/fuel sites across its global network (company-operated
+    # plus franchised/affiliated) -- a retail rollup's real scale metric,
+    # distinct from the sparsely-populated core_metrics StoreCount.
+    # JVShareOfEarnings is the share of joint-venture earnings the
+    # financial-parser folds into the company's EBITDA definition.
+    "TotalNetworkSites": "TotalNetworkSites",
+    "JVShareOfEarnings": "JVShareOfEarnings",
+    # BCE Inc. (BCE.TO): core wireless unit economics, disclosed every
+    # quarter alongside the already-promoted BroadbandConnections/
+    # ChurnRate/Subscribers. MobileARPU is the per-subscriber monthly
+    # revenue that drives the wireless segment's top line independent of
+    # subscriber count; MobileNetAdds is the quarterly net change in mobile
+    # phone subscribers (growth momentum, distinct from the EOP Subscribers
+    # stock); IPTVSubscribers is the home-services bundle's third leg
+    # alongside broadband and mobile.
+    "MobileARPU": "MobileARPU",
+    "MobileNetAdds": "MobileNetAdds",
+    "IPTVSubscribers": "IPTVSubscribers",
+    # Railroad operating metrics (Canadian National Railway, CNR.TO):
+    # Operating Ratio (operating expense / revenue, lower is better) is the
+    # headline efficiency metric the whole rail industry is judged on, and
+    # the "Adjusted" variant strips out significant items management
+    # excludes. Carloads/GrossTonMiles/RevenueTonMiles are volume/traffic
+    # metrics distinct from dollar Revenue; FreightRevenuePerRTM is the
+    # yield (revenue efficiency per unit of traffic) behind that volume.
+    # EmployeesEndOfPeriod is headcount, a labour-productivity input.
+    "OperatingRatio": "OperatingRatio",
+    "AdjustedOperatingRatio": "AdjustedOperatingRatio",
+    "Carloads": "Carloads",
+    "GrossTonMiles": "GrossTonMiles",
+    "RevenueTonMiles": "RevenueTonMiles",
+    "FreightRevenuePerRTM": "FreightRevenuePerRTM",
+    "EmployeesEndOfPeriod": "EmployeesEndOfPeriod",
+    # Rogers Communications (RCI-B.TO): segment revenue across its three
+    # reporting segments (Wireless, Cable, Media) -- a single blended
+    # Revenue column hides which segment drives growth, and Media jumped
+    # ~32% FY2024->FY2025 on sports-rights timing while Wireless grew ~1%.
+    # BlendedARPU/BlendedABPU are predecessor definitions of the
+    # already-promoted MobileARPU: Rogers reported "Blended ARPU" through
+    # FY2017, redefined it as "Blended ABPU" (Average Billing Per User, adds
+    # device financing) for FY2018-2021, then switched to "Mobile ARPU" from
+    # FY2022 -- three non-comparable series, not one continuous line.
+    # InternetNetAdds is the annual net change in broadband subscribers,
+    # alongside the already-promoted BroadbandConnections stock.
+    "SegmentRevenueWireless": "SegmentRevenueWireless",
+    "SegmentRevenueCable": "SegmentRevenueCable",
+    "SegmentRevenueMedia": "SegmentRevenueMedia",
+    "BlendedARPU": "BlendedARPU",
+    "BlendedABPU": "BlendedABPU",
+    "InternetNetAdds": "InternetNetAdds",
+    # Gas utility operating scale (The Hong Kong and China Gas Company,
+    # 0003.HK / Towngas): CustomersHK and MainlandCityGasCustomers
+    # (thousands) are the HK and mainland city-gas customer bases;
+    # TownGasSoldHK (million MJ) and MainlandGasSold (million m3) are the
+    # physical volumes sold -- different units because HK town gas is
+    # measured on a calorific-value basis and the mainland JVs sell natural
+    # gas volumetrically. EmployeesHKCompany is HK-company-only headcount.
+    # DilutedEPS sits alongside the core_metrics EPS column on a different
+    # share-count basis. Only FY2023-FY2025 were extracted (earlier years
+    # were chart-image only in the filings).
+    "CustomersHK": "CustomersHK",
+    "MainlandCityGasCustomers": "MainlandCityGasCustomers",
+    "MainlandGasSold": "MainlandGasSold",
+    "TownGasSoldHK": "TownGasSoldHK",
+    "EmployeesHKCompany": "EmployeesHKCompany",
+    "DilutedEPS": "DilutedEPS",
+    # Rail-plus-Property segment split and recurrent-vs-property-development
+    # profit bridge (MTR Corporation, 0066.HK): the four revenue lines (HK
+    # Transport, Station Commercial, HK Property Rental, Mainland &
+    # International) sum close to total Revenue but move on different
+    # drivers (fare days vs retail rent vs offshore rail concessions).
+    # RecurrentBusinessProfit/RecurrentEBITDA exclude property development
+    # entirely, which is lumpy project-recognition income that now dominates
+    # net income (HK$12.2bn of HK$15.9bn H1 FY2026 net profit) -- the DCF's
+    # sum-of-parts split rests on this line, not on consolidated NetIncome.
+    # PropertyDevelopmentReceipts is cash received from sold units (can lead
+    # or lag the P&L recognition in HKPropertyDevelopmentProfitPreTax /
+    # PropertyDevelopmentProfitAttributable). VariableAndFixedAnnualPayments
+    # is the annual payment to KCRC under the Service Concession Agreement
+    # (~6% of revenue) -- a fixed claim on cash flow before it reaches
+    # shareholders. PerpetualCapitalSecurities is a hybrid instrument
+    # classified in equity (so it inflates TotalEquityInclHybridNCI versus
+    # ShareholdersEquity) but carries a coupon like debt.
+    "RevenueHKTransport": "RevenueHKTransport",
+    "RevenueStationCommercial": "RevenueStationCommercial",
+    "RevenueHKPropertyRental": "RevenueHKPropertyRental",
+    "RevenueMainlandInternational": "RevenueMainlandInternational",
+    "HKPropertyDevelopmentProfitPreTax": "HKPropertyDevelopmentProfitPreTax",
+    "PropertyDevelopmentProfitAttributable": "PropertyDevelopmentProfitAttributable",
+    "RecurrentBusinessProfit": "RecurrentBusinessProfit",
+    "RecurrentEBITDA": "RecurrentEBITDA",
+    "PropertyDevelopmentReceipts": "PropertyDevelopmentReceipts",
+    "VariableAndFixedAnnualPayments": "VariableAndFixedAnnualPayments",
+    "PerpetualCapitalSecurities": "PerpetualCapitalSecurities",
+    # Kunlun Energy Company Limited (0135.HK): minority shareholders in
+    # part-owned subsidiaries take a large and growing share of consolidated
+    # profit (~37% in FY2025) -- ProfitForPeriodInclNCI (group, before the
+    # minority cut) sits well above the attributable NetIncome column, the
+    # same minority-interest story as PCCW/ATCO above but under this
+    # company's own disclosed label. CashEquivalentsOnly and
+    # TimeDepositsOver3M split out how much of the CashAndEquivalents total
+    # is actually demand cash versus time deposits placed for 3+ months
+    # (FY2025: 13,329 of 44,609) -- the latter is not available on demand,
+    # so lumping them together overstates near-term liquidity.
+    "ProfitForPeriodInclNCI": "ProfitForPeriodInclNCI",
+    "CashEquivalentsOnly": "CashEquivalentsOnly",
+    "TimeDepositsOver3M": "TimeDepositsOver3M",
+    # China Ruyi Holdings (0136.HK): reported operating profit is dominated
+    # by "Other gains/(losses) -- net", fair-value marks on a large
+    # investment book (FY2024 loss RMB1,222.0m, FY2025 gain RMB1,281.7m)
+    # that swing reported NetIncome from -190.5m to +1,796.6m -- the DCF
+    # strips this out entirely to reach the underlying film/TV/streaming/
+    # games operating economics. AdjustedNetProfit is the company's own
+    # non-GAAP measure excluding that swing; FilmRightsAmortisation is the
+    # content amortisation cost the DCF explicitly does NOT add back.
+    "OtherGainsNet": "OtherGainsNet",
+    "AdjustedNetProfit": "AdjustedNetProfit",
+    "FilmRightsAmortisation": "FilmRightsAmortisation",
+    # Sinofert Holdings (0297.HK): time deposits sit alongside cash and
+    # equivalents on the balance sheet and are comparable in size to that
+    # line (FY2025: RMB3,269.0m deposits vs RMB2,928.3m cash) -- the
+    # dcf-analyst's net-cash bridge explicitly sums cash + time deposits to
+    # reach the DCF's net_debt figure, so CashAndEquivalents alone
+    # understates the liquid balance by roughly half.
+    "TimeDeposits": "TimeDeposits",
+    # China East Education Holdings (0667.HK): FVTPLFinancialAssets is
+    # non-principal-protected structured deposits and level-3 fund
+    # investments the dcf-analyst sums into net cash alongside
+    # CashAndEquivalents and TimeDeposits (30 Jun 2026: RMB1,488.0m of the
+    # RMB3,515.3m net-cash bridge) -- material enough that
+    # CashAndEquivalents alone understates the liquid balance by roughly
+    # 40%. LeasePrincipalRepaid is the IFRS-16 financing-cash-flow line
+    # behind the DCF's lease treatment (full lease cash payment, principal
+    # + interest, charged inside EBIT rather than treated as debt service).
+    "FVTPLFinancialAssets": "FVTPLFinancialAssets",
+    "LeasePrincipalRepaid": "LeasePrincipalRepaid",
+    # DPC Dash (1405.HK): LeaseInterestPaid is the interest half of the
+    # IFRS-16 financing-cash-flow lease payment, alongside the already-
+    # promoted LeasePrincipalRepaid -- together they are the full lease cash
+    # burden the DCF deducts from reported FCF to get Owner FCF (negative
+    # every year FY2022-25).
+    "LeaseInterestPaid": "LeaseInterestPaid",
+    # Shanghai Industrial Holdings (0363.HK): the infrastructure segment's
+    # toll-road concession purchases and the property segment's investment-
+    # property additions are the reinvestment lines the DCF's bear/base/bull
+    # split turns on -- the Hu-Yu, Jing-Hu and Hu-Kun expressway concessions
+    # expire 2027-2030, and PurchaseOfOperatingConcessions is the cash spent
+    # renewing or extending that concession book, not derivable from the
+    # blended CapEx column.
+    "InvestmentPropertyCapex": "InvestmentPropertyCapex",
+    "PurchaseOfOperatingConcessions": "PurchaseOfOperatingConcessions",
+    # China Overseas Land & Investment (0688.HK): cash added to the
+    # held-for-rent investment-property book at fair value (offices, malls,
+    # business parks) -- the lead indicator for whether the REIT-recyclable
+    # portfolio the bull case leans on to help close the 0.32x price-to-book
+    # gap is still growing or being run down. Distinct from
+    # InvestmentPropertyCapex, which is a cost-basis capex spend line.
+    "InvestmentPropertyAdditions": "InvestmentPropertyAdditions",
+    # China Railway Group (0390.HK): a Chinese SOE infrastructure contractor
+    # consolidates large PPP/infrastructure subsidiaries, so TotalEquity and
+    # ProfitTotal (both including minority interests) sit well above the
+    # owners'-only ShareholdersEquity and NetIncome columns -- FY2025
+    # TotalEquity RMB540,450m vs ShareholdersEquity RMB370,915m. Within
+    # ShareholdersEquity, PerpetualNotes (RMB52,794m at FY2025) are
+    # equity-classified under IFRS but economically debt-like (fixed coupon,
+    # callable), so owners' *ordinary* equity is smaller still. None of the
+    # three is derivable from the existing CSV columns.
+    "TotalEquity": "TotalEquity",
+    "ProfitTotal": "ProfitTotal",
+    "PerpetualNotes": "PerpetualNotes",
+    # China Jinmao Holdings (0817.HK): another SOE developer with the same
+    # NCI/perpetual-instrument gap as China Railway Group above --
+    # ProfitIncludingNCI sits well above NetIncome (attributable) because
+    # ~55% of total equity is non-controlling interests, and a RMB15.2bn
+    # Sinochem HK perpetual instrument has sat inside equity attributable to
+    # owners since H1 FY2024. LandAppreciationTaxPaid is the real-estate-
+    # specific levy on development-property disposals, not derivable from
+    # the generic CashTaxesPaid line.
+    "ProfitIncludingNCI": "ProfitIncludingNCI",
+    "LandAppreciationTaxPaid": "LandAppreciationTaxPaid",
+    # Hisense Home Appliances Group (0921.HK): the Hisense-Hitachi HVAC JV is
+    # only ~49-51% owned, so NetProfitInclMinority (total group net profit)
+    # sits well above attributable NetIncome, with MinorityInterests (the
+    # balance-sheet NCI equity) and MinorityDividendsPaid (cash-flow) as the
+    # counterparts -- the same attributable-vs-total gap as ProfitIncludingNCI
+    # above but a distinct disclosure line, not an alias of it.
+    # TradingFinancialAssets (wealth-management/treasury products, larger
+    # than operating cash) is the balance-sheet pile the DCF applies a
+    # trapped-capital discount to.
+    "NetProfitInclMinority": "NetProfitInclMinority",
+    "MinorityInterests": "MinorityInterests",
+    "MinorityDividendsPaid": "MinorityDividendsPaid",
+    "TradingFinancialAssets": "TradingFinancialAssets",
+    # Brilliance China Automotive Holdings (1114.HK): a holding company whose
+    # consolidated Revenue is tiny -- the real earnings engine is the 25%
+    # equity-accounted stake in the BMW Brilliance Automotive JV.
+    # ShareOfAssociatesAndJVResults is that JV/associate income line, the
+    # overwhelming majority of net income here; distinct from Henderson
+    # Land's split ShareOfAssociatesProfit/ShareOfJointVenturesProfit and
+    # China Merchants Port's combined ShareOfAssocJVProfit above because this
+    # filing discloses it under its own name. ProfitInclNCI is the same
+    # attributable-vs-total gap as ProfitIncludingNCI/NetProfitInclMinority
+    # above but this filing's own disclosed line.
+    "ShareOfAssociatesAndJVResults": "ShareOfAssociatesAndJVResults",
+    "ProfitInclNCI": "ProfitInclNCI",
+    # Tencent Holdings (0700.HK): the three-segment revenue split --
+    # Value-Added Services (gaming + social networks, ~49% of FY2025
+    # revenue), Marketing Services (advertising, ~19%), FinTech & Business
+    # Services (payments/wealth/lending/cloud, ~31%), and the small Others
+    # residual -- has very different growth and margin profiles per segment
+    # (FinTech & Business Services and Marketing Services both grew faster
+    # than VAS through FY2024-FY2025). A single blended Revenue column
+    # hides that mix shift. Populated in `kpis` back to FY2018/FY2019 but
+    # absent from PROMOTE_KPIS. OperatingIncomeNewBasis is deliberately not
+    # promoted here: the financial-parser noted it is a restated basis
+    # (post-FY2023 reclassification) not comparable to the legacy
+    # OperatingIncome column already charted.
+    "SegmentRevenueVAS": "SegmentRevenueVAS",
+    "SegmentRevenueMarketingServices": "SegmentRevenueMarketingServices",
+    "SegmentRevenueFinTechBusinessServices": "SegmentRevenueFinTechBusinessServices",
+    "SegmentRevenueOthers": "SegmentRevenueOthers",
+    # China Medical System Holdings (0867.HK): cash paid to acquire
+    # in-licensed drug product rights -- the dcf-analyst treats it as
+    # mandatory reinvestment, deducted from owner FCF every year, because
+    # the growth model depends on continuously buying licences (RMB423-473m
+    # /yr in FY2024-25, RMB468m in H1 FY2026 alone). Full history back to
+    # FY2017 in `kpis` but no CSV column, so the spend was invisible on the
+    # dashboard. NetIncomeIncludingNCI is profit including non-controlling
+    # interests, alongside the already-charted NetIncome (attributable).
+    "IntangibleAssetPurchases": "IntangibleAssetPurchases",
+    "NetIncomeIncludingNCI": "NetIncomeIncludingNCI",
+    # China Construction Bank Corporation (0939.HK): the non-performing-loan
+    # ratio and total capital adequacy ratio are the asset-quality and
+    # solvency metrics a bank investor checks first, alongside the already
+    # -promoted NIM/CET1Ratio/ROE. GrossInterestIncome is interest income
+    # before netting against interest expense -- a distinct disclosure line
+    # from the already-charted NetInterestIncome, not derivable from it
+    # without also knowing interest expense.
+    "NPLRatio": "NPLRatio",
+    "TotalCapitalRatio": "TotalCapitalRatio",
+    "GrossInterestIncome": "GrossInterestIncome",
+    # China CITIC Bank Corporation (0998.HK): AllowanceCoverageRatio
+    # (loan-loss reserves / NPLs) and CreditCost (impairment charge / average
+    # loans, annualized) are the asset-quality pair asset-quality investors
+    # read alongside NPLRatio -- a falling coverage ratio with a rising NPL
+    # ratio is a reserve-adequacy warning the already-charted ratios alone
+    # don't show. ROAA (net income / average assets) is the bank-standard
+    # profitability measure that is comparable across banks of different
+    # leverage, unlike ROE. NetFeeAndCommissionIncome is the non-interest
+    # revenue line (wealth management, cards, settlement) that the bank
+    # discloses separately from NetInterestIncome -- the diversification-away
+    # -from-NIM-compression thesis needs it split out from blended Revenue.
+    # OrdinaryShareholdersEquity excludes the RMB52.8bn+ of preference shares
+    # and perpetual bonds sitting inside the already-charted ShareholdersEquity
+    # column -- those carry fixed coupons and dilute the per-ordinary-share
+    # book value the DCF and BookValuePerShare column are built on.
+    "AllowanceCoverageRatio": "AllowanceCoverageRatio",
+    "CreditCost": "CreditCost",
+    "ROAA": "ROAA",
+    "NetFeeAndCommissionIncome": "NetFeeAndCommissionIncome",
+    "OrdinaryShareholdersEquity": "OrdinaryShareholdersEquity",
+    # Seazen Group (1030.HK): consolidates a listed A-share subsidiary
+    # (New Town Holdings, 601155.SS) it does not wholly own, so
+    # NonControllingInterests is ~42% of total equity -- not a rounding
+    # item -- yet had no CSV column separate from the already-charted
+    # ShareholdersEquity (attributable only). SubsidiaryShareBuyback is
+    # that subsidiary's own on-market repurchase, funded from its own
+    # cash; tracked separately because it does not retire parent shares
+    # or change the parent share count the DCF holds flat.
+    "NonControllingInterests": "NonControllingInterests",
+    "SubsidiaryShareBuyback": "SubsidiaryShareBuyback",
+    # Sino Biopharmaceutical (1177.HK): minority interests take roughly
+    # half of consolidated net profit via the NCI-heavy CT Tianqing
+    # subsidiary plus the LaNova Medicines/Hygieia acquisitions.
+    # DividendsPaidToNCI is the cash-flow counterpart to the
+    # already-promoted NonControllingInterests balance -- the actual cash
+    # leaving the group to minority shareholders.
+    "DividendsPaidToNCI": "DividendsPaidToNCI",
+    # TCL Electronics Holdings Limited (1070.HK): four-segment revenue split
+    # -- large-display (TV sets, the core business), internet (smart-TV
+    # advertising/content), innovative (other consumer electronics) and
+    # photovoltaic (solar, a newer diversification) -- plus the volume and
+    # share metrics management discloses alongside the blended Revenue
+    # column: TV unit shipments, the Mini LED mix within those shipments,
+    # and TV market share by both shipment volume and revenue (global
+    # ranking claims). AdjustedNetIncomeAttributable strips one-offs from
+    # the already-charted NetIncome; NetIncomeContinuingOps isolates
+    # continuing operations in the one year a disposal was disclosed.
+    "LargeDisplayRevenue": "LargeDisplayRevenue",
+    "LargeDisplayGrossMargin": "LargeDisplayGrossMargin",
+    "InternetRevenue": "InternetRevenue",
+    "InternetGrossMargin": "InternetGrossMargin",
+    "InnovativeBusinessRevenue": "InnovativeBusinessRevenue",
+    "InnovativeBusinessGrossProfit": "InnovativeBusinessGrossProfit",
+    "PhotovoltaicRevenue": "PhotovoltaicRevenue",
+    "TVShipments": "TVShipments",
+    "MiniLEDTVShipments": "MiniLEDTVShipments",
+    "TVMarketShareByShipment": "TVMarketShareByShipment",
+    "TVMarketShareByRevenue": "TVMarketShareByRevenue",
+    "AdjustedNetIncomeAttributable": "AdjustedNetIncomeAttributable",
+    "NetIncomeContinuingOps": "NetIncomeContinuingOps",
+    # AIA Group Limited (1299.HK): EVEquity is AIA's disclosed Embedded
+    # Value, the pan-Asian life insurer valuation anchor analysts and the
+    # dcf-analyst cross-check against -- distinct from statutory
+    # ShareholdersEquity, which does not capture the discounted value of
+    # the in-force policy book. InterestRevenueOnFinancialAssets is
+    # interest earned on the investment portfolio -- core operating
+    # income for an insurer, deliberately kept separate from a stripped
+    # non-operating interest line used elsewhere in the DCF.
+    "EVEquity": "EVEquity",
+    "InterestRevenueOnFinancialAssets": "InterestRevenueOnFinancialAssets",
+    # Guming Holdings (1364.HK), tea-drink franchisor: AdjustedProfit is
+    # management's own non-IFRS measure stripping the one-off non-cash fair
+    # value gain/loss on preferred shares -- material in FY2025, where
+    # reported NetIncome grew 108.6% YoY but AdjustedProfit grew only 66.9%
+    # because of the RMB556.9m preferred-share fair-value gain booked at
+    # listing. CupsSold is the operating unit-volume KPI (cups of tea sold)
+    # behind GMV/StoreCount. FairValueChangePreferredShares is the one-off
+    # gain itself, carried separately so it is visible as context rather
+    # than buried inside NetIncome.
+    "AdjustedProfit": "AdjustedProfit",
+    "CupsSold": "CupsSold",
+    "FairValueChangePreferredShares": "FairValueChangePreferredShares",
+    # China Hongqiao Group Limited (1378.HK): EffectiveCashTaxRate (cash
+    # taxes paid / profit before tax) swings 10.6%-48.8% across FY2018-25 --
+    # an aluminium smelter with provincial tax incentives and swing items
+    # that ProfitBeforeTax and CashTaxesPaid alone do not explain; not
+    # derivable from other CSV columns since both inputs are DCF-only.
+    "EffectiveCashTaxRate": "EffectiveCashTaxRate",
+    # Tencent Music Entertainment Group (1698.HK): OnlineMusicRevenue grew
+    # ~9.3bn -> ~26.7bn RMB FY2021-FY2025 while SocialEntertainmentRevenue
+    # (live-streaming/virtual gifting) shrank ~19.8bn -> ~6.2bn under
+    # Chinese regulatory pressure -- the two offsetting segment trends are
+    # why total Revenue looked flat FY2022-FY2024 despite a fundamental
+    # business-mix shift; not derivable from Revenue alone.
+    "OnlineMusicRevenue": "OnlineMusicRevenue",
+    "SocialEntertainmentRevenue": "SocialEntertainmentRevenue",
+    # Time Interconnect Technology Limited (1729.HK): Luxshare Precision
+    # Industry is both the controlling shareholder and, via
+    # LoansFromRelatedCompanies, a lender -- the bank/related-party split of
+    # TotalDebt is the leverage/dependency story (related-party loans grew
+    # from ~parity with bank borrowings to over 3x by H1 FY2026), not
+    # derivable from TotalDebt alone. SharePlacingProceeds and
+    # SharesIssuedPeriodEnd capture the H1 FY2026 placings that lifted the
+    # share count ~21% in one half-year.
+    "BankBorrowings": "BankBorrowings",
+    "LoansFromRelatedCompanies": "LoansFromRelatedCompanies",
+    "SharePlacingProceeds": "SharePlacingProceeds",
+    "SharesIssuedPeriodEnd": "SharesIssuedPeriodEnd",
+    # Shandong Gold Mining (1787.HK): the CAS income statement folds
+    # perpetual-bond-holder profit and minority interest into reported
+    # NetIncome. PerpetualBonds (balance, CNY ~14bn FY2025) is deducted in
+    # the DCF equity bridge as a debt-like claim senior to ordinary equity;
+    # PerpetualBondProfit and MinorityInterestProfit are the two leakage
+    # lines reconciling NetIncome to NetIncomeOrdinary (ex-perpetual-holder
+    # profit). OperatingCashFlowCAS exists because the company switched
+    # from IFRS to PRC GAAP (CAS) at FY2025 and OCF is not comparable
+    # like-for-like across the switch (FY2024: RMB20.3bn IFRS vs RMB13.3bn
+    # CAS for the same year).
+    "PerpetualBonds": "PerpetualBonds",
+    "PerpetualBondProfit": "PerpetualBondProfit",
+    "MinorityInterestProfit": "MinorityInterestProfit",
+    "NetIncomeOrdinary": "NetIncomeOrdinary",
+    "OperatingCashFlowCAS": "OperatingCashFlowCAS",
+    # Segment and product-line revenue split (Xiaomi Corporation, 1810.HK):
+    # Smart EV only started contributing in FY2024 and reached its first
+    # profitable quarter in FY2025 before swinging back to a segment loss in
+    # H1 FY2026 -- the growth/risk story the blended Revenue column hides.
+    # SmartphoneAIoTSegmentRevenue is the mature core business on the other
+    # side of that split; SmartphoneRevenue/IoTLifestyleRevenue break the
+    # legacy "Smartphone x AIoT" segment further into its two product lines.
+    "SmartEVSegmentRevenue": "SmartEVSegmentRevenue",
+    "SmartphoneAIoTSegmentRevenue": "SmartphoneAIoTSegmentRevenue",
+    "SmartphoneRevenue": "SmartphoneRevenue",
+    "IoTLifestyleRevenue": "IoTLifestyleRevenue",
+    # Unit volumes behind the revenue lines above: smartphone shipments (FY
+    # only, millions of units) and EV deliveries (FY2025+, vehicles) -- the
+    # EV delivery run-rate against management's FY2026 target is a live
+    # controversy per the qualitative analysis. ConnectedIoTDevices is the
+    # ecosystem-scale metric (million units) disclosed alongside them.
+    "SmartphoneShipments": "SmartphoneShipments",
+    "EVDeliveries": "EVDeliveries",
+    "ConnectedIoTDevices": "ConnectedIoTDevices",
+    # Gold production volumes (Zhaojin Mining Industry, 1818.HK): own-mine
+    # output (kg and the oz equivalent investors quote gold in) versus total
+    # output including smelted/traded third-party gold -- a volume story
+    # revenue alone cannot show since it also moves with the gold price.
+    # Populated FY2018-FY2025 in `kpis` but absent from PROMOTE_KPIS.
+    "GoldOutputMineProducedKg": "GoldOutputMineProducedKg",
+    "GoldOutputMineProducedOz": "GoldOutputMineProducedOz",
+    "GoldOutputTotalKg": "GoldOutputTotalKg",
+    # Perpetual capital instruments (Zhaojin Mining Industry, 1818.HK):
+    # RMB1.5-7.1bn of perpetual bonds classified in equity but debt-like in
+    # substance -- they sit outside TotalDebt, and ShareholdersEquity-based
+    # book value per ordinary share overstates what common shareholders
+    # actually own. PerpetualDistributionsPaid is the cash cost of servicing
+    # them, distinct from DividendsPaid to ordinary shareholders.
+    "PerpetualCapitalInstruments": "PerpetualCapitalInstruments",
+    "PerpetualDistributionsPaid": "PerpetualDistributionsPaid",
+    # Embedded-value life-insurer disclosures (FWD Group Holdings, 1828.HK):
+    # EmbeddedValue (ANW + VIF) is the standard EV-basis measure of what the
+    # in-force book plus net assets are worth, distinct from book
+    # ShareholdersEquity -- the DCF's cross-check section quotes EV/share
+    # against the DCF's own intrinsic value. ValueOfNewBusiness and
+    # NewBusinessCSM are the growth-engine metrics (new sales' contribution
+    # to future profit); NewBusinessMargin is VNB/APE. SolvencyRatioLCSM is
+    # the HK risk-based Local Capital Summation Method capital-adequacy
+    # ratio -- it fell from 265% (FY2025) to 203% (H1 FY2026) per the
+    # qualitative analysis, a material regulatory-buffer compression not
+    # visible in any balance-sheet column.
+    "EmbeddedValue": "EmbeddedValue",
+    "ValueOfNewBusiness": "ValueOfNewBusiness",
+    "NewBusinessCSM": "NewBusinessCSM",
+    "NewBusinessMargin": "NewBusinessMargin",
+    "SolvencyRatioLCSM": "SolvencyRatioLCSM",
+    "APE": "APE",
+    # Samsonite Group S.A. (1910.HK): a multi-brand, multi-region luggage
+    # maker. Brand mix (Samsonite/Tumi/American Tourister), regional segment
+    # mix (Asia/North America/Europe/Latin America) and wholesale-vs-DTC
+    # channel mix are each a distinct investor question -- none derivable
+    # from the blended Revenue column alone.
+    "BrandRevenueSamsonite": "BrandRevenueSamsonite",
+    "BrandRevenueTumi": "BrandRevenueTumi",
+    "BrandRevenueAmericanTourister": "BrandRevenueAmericanTourister",
+    "SegmentRevenueAsia": "SegmentRevenueAsia",
+    "SegmentRevenueNorthAmerica": "SegmentRevenueNorthAmerica",
+    "SegmentRevenueEurope": "SegmentRevenueEurope",
+    "SegmentRevenueLatinAmerica": "SegmentRevenueLatinAmerica",
+    "WholesaleRevenue": "WholesaleRevenue",
+    "DTCRevenue": "DTCRevenue",
 }
 
 # Owner-FCF components and core-column duplicates. Listed explicitly so a
@@ -912,6 +1670,9 @@ KPI_ALIASES: dict[str, str] = {
     "dividendspaidcash": "DividendsPaid",
     "leaseliabilities": "LeaseLiabilities",
     "stockbasedcomp": "StockBasedComp",
+    # IFRS-16 lease cash cost, observed under distinct literal spellings
+    "leaserepayments": "LeasePrincipalRepaid",
+    "interestexpenseleases": "LeaseInterestPaid",
     # Business KPIs
     "activecustomers": "ActiveCustomers",
     "customers": "Customers",
@@ -942,6 +1703,13 @@ KPI_ALIASES: dict[str, str] = {
     "arr": "ARR",
     "annualrecurringrevenue": "ARR",
     "digitalmediaarr": "DigitalMediaARR",
+    "licensingrevenue": "LicensingRevenue",
+    "royaltyrevenue": "RoyaltyRevenue",
+    "researchanddevelopment": "ResearchAndDevelopment",
+    "othergainsnet": "OtherGainsNet",
+    "adjustednetprofit": "AdjustedNetProfit",
+    "filmrightsamortisation": "FilmRightsAmortisation",
+    "filmrightsamortization": "FilmRightsAmortisation",
     "totaladobearr": "TotalAdobeARR",
     "subscriptionrevenue": "SubscriptionRevenue",
     "netrevenueretention": "NetRevenueRetention",
@@ -981,6 +1749,28 @@ KPI_ALIASES: dict[str, str] = {
     "grossloansandadvances": "GrossLoansAndAdvances",
     "totaldeposits": "TotalDeposits",
     "casheps": "CashEPS",
+    "timedeposits": "TimeDeposits",
+    "fvtplfinancialassets": "FVTPLFinancialAssets",
+    "fvtplinvestments": "FVTPLInvestments",
+    "leaseprincipalrepaid": "LeasePrincipalRepaid",
+    "cashgeneratedfromoperations": "CashGeneratedFromOperations",
+    "leaseinterestpaid": "LeaseInterestPaid",
+    "capitaliseddevelopment": "CapitalisedDevelopment",
+    "intangibleassetpurchases": "IntangibleAssetPurchases",
+    "netincomeincludingnci": "NetIncomeIncludingNCI",
+    "realizedoilprice": "RealizedOilPrice",
+    "realizedgasprice": "RealizedGasPrice",
+    "salesvolume": "SalesVolume",
+    "telecomservicesrevenue": "TelecomServicesRevenue",
+    "evequity": "EVEquity",
+    "interestrevenueonfinancialassets": "InterestRevenueOnFinancialAssets",
+    "effectivecashtaxrate": "EffectiveCashTaxRate",
+    "onlinemusicrevenue": "OnlineMusicRevenue",
+    "socialentertainmentrevenue": "SocialEntertainmentRevenue",
+    "bankborrowings": "BankBorrowings",
+    "loansfromrelatedcompanies": "LoansFromRelatedCompanies",
+    "shareplacingproceeds": "SharePlacingProceeds",
+    "sharesissuedperiodend": "SharesIssuedPeriodEnd",
 }
 
 

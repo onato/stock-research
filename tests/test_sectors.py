@@ -73,6 +73,14 @@ class TestSectorKeywords:
         assert sectors.bucket(None, None) == "operating"
         assert sectors.bucket("Unknown", "owner_fcf_dcf_10yr_component_build") == "operating"
 
+    def test_construction_and_mining_machinery_maker_is_not_a_prerevenue_miner(self):
+        # 1157.HK (Zoomlion) makes and sells cranes/excavators/concrete
+        # machinery -- "mining" here qualifies the equipment market
+        # (construction & mining machinery), not an extraction business.
+        # The bare "mining" keyword must not fire when the sector string
+        # also says "machinery" (the company sells to miners, it isn't one).
+        assert sectors.bucket("Industrials - Construction & Mining Machinery", "owner_fcf_dcf_component") == "operating"
+
 
 class TestModelLabel:
     def test_collects_every_spelling_the_corpus_uses(self):
