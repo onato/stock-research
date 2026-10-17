@@ -27,7 +27,7 @@ REQUIRE_NEW ?= 1
 LEADERBOARD ?= 15   # rows shown by `make screen`
 
 .DEFAULT_GOAL := help
-.PHONY: help run digest status screen integrity missing prune-stubs standardize-scale research facts evals evals-all dashboard-spec \
+.PHONY: help run digest status screen quality-growth integrity missing prune-stubs standardize-scale research facts evals evals-all dashboard-spec \
         fix cost gaps exchange-eval facts-xbrl adjudicate fetch-asx fetch-filings dcf-context build-dcf check-dcf warehouse dashboard kpi-coverage screen-metrics check-currency ledger ledger-backfill queue-prune sanity-check \
         screen-fundamentals backfill-units canonical-iv sync-portfolio update-prices commit-refreshed commit-scores screen-deferred screen-deferred-report \
         test test-country lint coverage typecheck
@@ -272,6 +272,9 @@ screen-metrics: ## Compare core metrics across tickers, normalized (PERIOD=FY202
 screen-fundamentals: warehouse ## Screen on TTM/growth/ROE/D-E/PEG (EXCHANGE=NZX ARGS="--min-roe 0.15")
 	$(PY) $(SCRIPTS)/screen_fundamentals.py $(if $(EXCHANGE),--exchange $(EXCHANGE),) \
 	  $(if $(SUFFIX),--suffix $(SUFFIX),) $(ARGS)
+
+quality-growth: warehouse ## Accelerating growth + ROIC + low debt + IV upside (APPLY=1 writes state/quality_growth.json)
+	$(PY) $(SCRIPTS)/quality_growth.py $(if $(APPLY),--write,)
 
 # A dual-listed DCF writes weighted_iv_hkd/_usd rather than the canonical
 # weighted_iv, so screen.py flags NO_IV and drops the row. Selection is by
