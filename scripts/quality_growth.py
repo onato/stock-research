@@ -7,7 +7,7 @@ running (consecutive years, latest >= 10%, below 150% -- a bigger jump is a
 merger or a units error). Each candidate is then graded on four tests:
 
   slowing    the latest interim's YoY growth is under 90% of the FY rate
-  returns    ROIC (ROE for financials) below 15%, or unknown
+  returns    ROIC (ROE for financials) below 15%
   leverage   debt/equity above 0.5; negative equity passes only with net cash;
              financials are exempt
   valuation  price at or above weighted IV, or no IV
@@ -17,6 +17,9 @@ and lands in one tier:
   qualified  passes all four
   expensive  fails only on valuation -- the business qualifies, the price does not
   near_miss  fails exactly one non-valuation test (and may also be expensive)
+  incomplete a test cannot be run because its inputs are not on file (no debt
+             or equity figure, no ROIC). Unknown is never read as a pass or
+             as zero: fill the gap with `make fix`, sourced from the filing.
 
 Two kinds of acceleration are excluded outright and listed with the reason, so
 the list never silently drops them: a recovery (growth was negative two years
@@ -25,10 +28,8 @@ growth is the metal or energy price). The quality-growth-analyst agent can
 exclude more -- acquisition-driven or one-off growth -- through
 `state/quality_growth_notes/{TICKER}.json`, the judgment files it owns.
 
-ROIC comes from `build_dashboard.returns_on_capital`, the function the
-dashboards and the index leaderboard use, so they cannot disagree -- except
-that a blank TotalDebt is read as nil here (flagged `assumed_no_debt`), since
-debt-free US filers (RDDT, ISRG, INCY) carry no borrowings tag at all.
+ROIC comes from `dashboard_spec.returns_for`, the function the dashboards and
+the index leaderboard use, so they cannot disagree.
 
 Everything else is read from the warehouse (`make warehouse`). Output is
 `state/quality_growth.json` (generated, committed); the portfolio tracker reads
@@ -48,7 +49,6 @@ from collections.abc import Callable
 from typing import Any
 
 import duckdb
-import periods
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 WAREHOUSE = REPO / "state" / "research.duckdb"
@@ -61,7 +61,7 @@ MIN_RETURN_PCT = 15.0
 MAX_DEBT_TO_EQUITY = 0.5
 INTERIM_TOLERANCE = 0.9
 REVIEW_MAX_AGE_DAYS = 30
-TIER_ORDER = ("qualified", "expensive", "near_miss")
+TIER_ORDER = ("qualified", "expensive", "near_miss", "incomplete")
 
 COMMODITY_WORDS = ("mining", "miner", "gold", "copper", "silver", "precious metals",
                    "metals", "steel", "iron ore", "lithium", "coal", "oil & gas",
@@ -90,16 +90,17 @@ def interim_trend(fy_growth: float, interim_yoy: float | None) -> str:
     return "confirming" if interim_yoy >= fy_growth * INTERIM_TOLERANCE else "slowing"
 
 
-def _leverage_ok(row: dict[str, Any]) -> bool:
+def _leverage_ok(row: dict[str, Any]) -> bool | None:
+    """True/False, or None when the inputs are not on file. A blank is never
+    read as zero: that would wave a heavily indebted company through on a
+    data gap."""
     if row.get("financial"):
         return True
-    equity = row.get("equity")
-    debt = row.get("debt") or 0.0
-    cash = row.get("cash") or 0.0
-    if equity is None:
-        return False
+    equity, debt, cash = row.get("equity"), row.get("debt"), row.get("cash")
+    if equity is None or debt is None:
+        return None
     if equity <= 0:
-        return debt - cash <= 0
+        return None if cash is None else bool(debt - cash <= 0)
     return bool(debt / equity <= MAX_DEBT_TO_EQUITY)
 
 
@@ -108,14 +109,22 @@ def classify(row: dict[str, Any]) -> tuple[str | None, list[str]]:
     if row.get("interim_trend") == "slowing":
         failures.append("slowing")
     ret = row.get("return_pct")
-    if ret is None or ret < MIN_RETURN_PCT:
+    if ret is None:
+        failures.append("returns_unknown")
+    elif ret < MIN_RETURN_PCT:
         failures.append("returns")
-    if not _leverage_ok(row):
+    lev = _leverage_ok(row)
+    if lev is None:
+        failures.append("leverage_unknown")
+    elif not lev:
         failures.append("leverage")
     up = row.get("upside_pct")
     if up is None or up <= 0:
         failures.append("valuation")
-    others = [f for f in failures if f != "valuation"]
+    unknown = [f for f in failures if f.endswith("_unknown")]
+    others = [f for f in failures if f != "valuation" and f not in unknown]
+    if unknown:
+        return ("incomplete" if len(others) <= 1 else None), failures
     if not failures:
         return "qualified", failures
     if not others:
@@ -226,7 +235,6 @@ def build(con: duckdb.DuckDBPyConnection, returns: ReturnsLookup,
             "interim_trend": interim_trend(g[2], interim["yoy"] if interim else None),
             "return_measure": ret.get("measure"), "return_pct": ret.get("latest"),
             "return_avg3_pct": ret.get("avg3"), "financial": ret.get("measure") == "ROE",
-            "assumed_no_debt": bool(ret.get("assumed_no_debt")),
             "debt": debt, "cash": cash, "equity": equity,
             "debt_to_equity": round(debt / equity, 2) if debt is not None and equity and equity > 0 else None,
             **_valuation(con, ticker),
@@ -272,20 +280,6 @@ def build(con: duckdb.DuckDBPyConnection, returns: ReturnsLookup,
     }
 
 
-def fill_missing_debt(rows: list[dict[str, str]]) -> tuple[list[dict[str, str]], bool]:
-    """Blank TotalDebt read as nil, so a debt-free filer (no borrowings tag at
-    all) still gets a ROIC. The flag -- set only when the latest fiscal year is
-    the blank one, since that is the headline ROIC -- travels to the output and
-    the tab shows it: the assumption is visible, never silent."""
-    def blank(r: dict[str, str]) -> bool:
-        return not str(r.get("TotalDebt") or "").strip()
-
-    annual = [r for r in rows if periods.is_annual(periods.parse(r.get("Period", "")))]
-    latest = max(annual, key=lambda r: periods.sort_key(r.get("Period")), default=None)
-    out = [{**r, "TotalDebt": "0"} if blank(r) else r for r in rows]
-    return out, latest is not None and blank(latest)
-
-
 def load_notes(folder: pathlib.Path) -> dict[str, dict[str, Any]]:
     """One judgment file per ticker, keyed by its filename stem."""
     if not folder.is_dir():
@@ -294,17 +288,8 @@ def load_notes(folder: pathlib.Path) -> dict[str, dict[str, Any]]:
 
 
 def _repo_returns(ticker: str) -> dict[str, Any] | None:
-    import build_dashboard as BD
     import dashboard_spec
-    path = REPO / "research" / ticker / "Reports" / f"{ticker}_Metrics.csv"
-    try:
-        _, rows = BD.read_csv(path.read_text())
-    except OSError:
-        return None
-    rows, assumed = fill_missing_debt(rows)
-    ret = BD.returns_on_capital(ticker, dashboard_spec.bucket_for(ticker), rows)
-    ret["assumed_no_debt"] = assumed and ret.get("measure") == "ROIC"
-    return ret
+    return dashboard_spec.returns_for(ticker)
 
 
 def main(argv: list[str] | None = None) -> int:

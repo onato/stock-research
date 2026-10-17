@@ -19,7 +19,7 @@ days). If it is empty, stop and say so.
 
 For each ticker read:
 - its entry in `candidates` (tier, failures, growth_pct, interim, ROIC/ROE,
-  D/E, IV, price, upside, entry_price, assumed_no_debt)
+  D/E, IV, price, upside, entry_price)
 - `research/{T}/Reports/{T}_Analysis.json` -- business model, growth drivers,
   risks, recent developments, guidance, bull and bear cases
 - `research/{T}/Reports/{T}_DCF.json` -- only the scenario narrative and drivers
@@ -67,8 +67,11 @@ Write `state/quality_growth_notes/{T}.json`:
 - `why`: name the specific engine of the acceleration. Not "strong growth".
 - `watch`: 2-4 items, each something a reader can check in the next filing or
   the share price. Include the base entry price when the tier is `expensive`
-  or the price is near IV. When `assumed_no_debt` is true, say the ROIC
-  assumes nil debt and should be checked.
+  or the price is near IV. When the tier is `incomplete`, name the missing
+  figure (a failure ending in `_unknown`) and say it must be filled from the
+  filing via `make fix` before the name is relied on. Never describe a
+  missing figure as zero or the company as debt-free on the strength of a
+  blank.
 - Set `exclude: true` with a one-line `exclude_reason` when the driver is
   `acquisition`, `one-off` or `cyclical`. Those accelerations end on their own,
   which is what this list exists to filter out. Brokers riding a retail-trading

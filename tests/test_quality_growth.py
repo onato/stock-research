@@ -87,8 +87,8 @@ def test_two_non_valuation_failures_drop_out() -> None:
     assert failures == ["slowing", "returns"]
 
 
-def test_missing_return_is_a_failure_not_a_pass() -> None:
-    assert qg.classify(_row(return_pct=None))[1] == ["returns"]
+def test_missing_return_is_unknown_not_a_pass() -> None:
+    assert qg.classify(_row(return_pct=None)) == ("incomplete", ["returns_unknown"])
 
 
 def test_missing_iv_is_a_valuation_failure() -> None:
@@ -111,8 +111,23 @@ def test_financials_skip_the_leverage_test() -> None:
     assert qg.classify(_row(financial=True, debt=900.0, cash=0.0))[1] == []
 
 
-def test_missing_debt_reads_as_no_debt_only_when_equity_known() -> None:
-    assert qg.classify(_row(debt=None, cash=None))[1] == []
+def test_missing_debt_is_unknown_never_zero() -> None:
+    # A blank is not evidence of no debt; reading it as zero would let a
+    # heavily indebted company through on a data gap.
+    assert qg.classify(_row(debt=None, cash=None)) == ("incomplete", ["leverage_unknown"])
+
+
+def test_missing_equity_is_unknown() -> None:
+    assert qg.classify(_row(equity=None))[1] == ["leverage_unknown"]
+
+
+def test_negative_equity_with_unknown_cash_is_unknown() -> None:
+    assert qg.classify(_row(equity=-50.0, debt=10.0, cash=None))[1] == ["leverage_unknown"]
+
+
+def test_unknowns_plus_two_known_failures_drop_out() -> None:
+    tier, _ = qg.classify(_row(return_pct=None, interim_trend="slowing", debt=900.0, cash=0.0))
+    assert tier is None
 
 
 def test_recovery_from_decline_is_excluded() -> None:
@@ -128,30 +143,6 @@ def test_commodity_sectors_are_excluded(sector: str) -> None:
 
 def test_ordinary_sector_is_not_excluded() -> None:
     assert qg.exclusion(_row(sector="Medical Devices / Robotic Surgery")) is None
-
-
-# --- missing debt -------------------------------------------------------
-
-def test_blank_debt_is_filled_with_zero_and_flagged() -> None:
-    rows = [{"Period": "FY2025", "TotalDebt": "", "CashAndEquivalents": "5"}]
-    filled, assumed = qg.fill_missing_debt(rows)
-    assert filled[0]["TotalDebt"] == "0"
-    assert assumed
-    assert rows[0]["TotalDebt"] == ""          # input untouched
-
-
-def test_only_a_blank_latest_year_flags_the_assumption() -> None:
-    # An old blank year is filled for the average but is not the headline ROIC.
-    rows = [{"Period": "FY2024", "TotalDebt": ""}, {"Period": "FY2025", "TotalDebt": "12"}]
-    _, assumed = qg.fill_missing_debt(rows)
-    assert not assumed
-
-
-def test_reported_debt_is_left_alone() -> None:
-    rows = [{"Period": "FY2025", "TotalDebt": "12", "CashAndEquivalents": "5"}]
-    filled, assumed = qg.fill_missing_debt(rows)
-    assert filled[0]["TotalDebt"] == "12"
-    assert not assumed
 
 
 # --- notes and review -----------------------------------------------------
