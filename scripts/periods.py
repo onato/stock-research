@@ -113,6 +113,8 @@ def sub_rank(ptype: PeriodType) -> int:
         return int(ptype[1]) * 2
     if ptype.startswith("Q"):
         return int(ptype[1])
+    if ptype == "9M":
+        return 3
     return 0
 
 

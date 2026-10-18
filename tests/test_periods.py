@@ -133,6 +133,14 @@ class TestSortKeyMatchesExportCsv:
         assert sorted(labels, key=periods.sort_key) == [
             "FY2024", "H1-2025", "Q3 2025", "FY2025"]
 
+    def test_nine_month_stub_sorts_after_half_year_before_full_year(self):
+        # 9M covers Jan-Sep, so it belongs after H1 (6mo) and before FY
+        # (12mo) -- previously sub_rank had no "9M" case and fell through
+        # to 0, the same bucket as OTHER, sorting it before even Q1.
+        labels = ["FY2024", "9M FY2024", "H1 FY2024", "Q1 FY2024"]
+        assert sorted(labels, key=periods.sort_key) == [
+            "Q1 FY2024", "H1 FY2024", "9M FY2024", "FY2024"]
+
 
 class TestGarbage:
     """A missing period is obvious; a plausible wrong one is not."""
