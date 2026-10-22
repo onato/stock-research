@@ -1182,3 +1182,48 @@ class TestSanityCheckWithNoRules:
         c = dcf_checks(make_ticker, doc)["dcf_sanity_check"]
         assert c["status"] == "warn"
         assert "units" in c["detail"]
+
+
+class TestBusinessKpis:
+    """A ticker routed to a business template with none of that template's
+    KPIs stored. 302 of 303 XBRL-only US runs since 2026-09-15 had no
+    business KPI at all and still scored 1.0 (RDDT: no DAU, no ARPU)."""
+
+    CSV_HEAD = "Period,Revenue,NetIncome,Units,Currency"
+
+    def write(self, repo, ticker, sector, extra_cols=(), extra_vals=()):
+        reports = repo / "research" / ticker / "Reports"
+        reports.mkdir(parents=True, exist_ok=True)
+        head = ",".join([*self.CSV_HEAD.split(","), *extra_cols])
+        rows = [f"FY{y},{100 + y - 2020},{5},millions,USD" + "".join(
+            f",{v}" for v in extra_vals) for y in (2022, 2023, 2024)]
+        (reports / f"{ticker}_Metrics.csv").write_text("\n".join([head, *rows]) + "\n")
+        (reports / f"{ticker}_Analysis.json").write_text(
+            json.dumps({"company_name": "X", "sector": sector}))
+
+    def check(self, ticker):
+        card = E.Card()
+        E.check_business_kpis(ticker, card)
+        assert len(card.checks) == 1
+        return card.checks[0]
+
+    def test_a_social_company_with_no_user_kpis_warns(self, patch_repo):
+        self.write(patch_repo, "SOC", "Social Media / Online Advertising")
+        c = self.check("SOC")
+        assert c["status"] == "warn"
+        assert "consumer_internet" in c["detail"]
+        assert "DAU" in c["detail"]
+
+    def test_one_stored_business_kpi_passes(self, patch_repo):
+        self.write(patch_repo, "SOC", "Social Media / Online Advertising",
+                   ("DAU",), (130.3,))
+        assert self.check("SOC")["status"] == "pass"
+
+    def test_an_operating_company_is_skipped(self, patch_repo):
+        self.write(patch_repo, "IND", "Industrial Manufacturing")
+        assert self.check("IND")["status"] == "skip"
+
+    def test_it_runs_as_part_of_evaluate(self, patch_repo):
+        self.write(patch_repo, "SOC", "Social Media / Online Advertising")
+        names = [c["id"] for c in E.evaluate("SOC")["checks"]]
+        assert "business_kpis" in names

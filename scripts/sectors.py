@@ -17,7 +17,8 @@ import re
 from typing import Any
 
 BUCKETS = ("reit", "lic_nav", "bank", "retirement_ora", "miner_prerevenue",
-           "saas", "payments", "ecommerce", "marketplace", "operating")
+           "saas", "payments", "ecommerce", "marketplace", "consumer_internet",
+           "operating")
 
 _MODEL_RULES: list[tuple[str, str]] = [
     (r"\baffo\b|reit", "reit"),
@@ -42,6 +43,12 @@ _SECTOR_RULES: list[tuple[str, str]] = [
     (r"marketplace|classifieds|online auction", "marketplace"),
     (r"e-?commerce|online retail|direct marketing retail|internet retail|meal kit", "ecommerce"),
     (r"payment|fintech|remittance|money transfer|card network", "payments"),
+    # Users x monetisation: social, ad-supported, streaming and consumer
+    # apps. Deliberately not "advertising" alone (OMC is an agency, TTD is
+    # ad-tech) nor "streaming" alone (FNV/WPM are metal-stream royalties).
+    ((r"social media|social entertainment|digital advertising|online advertising|"
+      r"technology / advertising|short-video|online video|online music|"
+      r"audio streaming|streaming media|online dating"), "consumer_internet"),
     (r"\bsaas\b|software|cloud|subscription|application", "saas"),
 ]
 

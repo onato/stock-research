@@ -127,6 +127,9 @@ def assemble(universal: dict[str, Any], business: dict[str, Any], columns: set[s
 
     sections: list[dict[str, Any]] = []
     seen: set[str] = set()
+    # A business chart left holding only universal columns (consumer_internet's
+    # users-vs-ARPU chart with just its Revenue YoY line) repeats a universal one.
+    universal_cols = template_columns(universal)
     for src in (universal, business):
         for sec in src.get("sections", []):
             charts = []
@@ -137,6 +140,11 @@ def assemble(universal: dict[str, Any], business: dict[str, Any], columns: set[s
                           if all(c in columns for c in _series_columns(s))
                           and _keep_series(s, has, dcf)]
                 if not series or not any("column" in s or "derive" in s for s in series):
+                    continue
+                declared = set().union(*(set(_series_columns(s)) for s in ch["series"]))
+                kept_cols = set().union(*(set(_series_columns(s)) for s in series))
+                if (src is business and declared - universal_cols
+                        and kept_cols <= universal_cols):
                     continue
                 kept = {**ch, "series": series}
                 if not any(s.get("axis") == "y1" for s in series):
@@ -217,6 +225,20 @@ def returns_for(ticker: str, repo: pathlib.Path | None = None) -> dict[str, Any]
     return BD.returns_on_capital(ticker, bucket_for(ticker, repo), rows)
 
 
+def missing_business_kpis(which: str, business: dict[str, Any],
+                          has: Callable[[str], bool]) -> list[str]:
+    """The business template's KPI columns, when not one of its columns has data.
+
+    RDDT routed to a business template with every KPI column empty, so the
+    spec quietly fell back to the universal charts and nothing told the run
+    the KPIs were never extracted. An empty list means nothing to flag.
+    """
+    own = template_columns(business) - template_columns(load_templates()["universal"])
+    if which == "operating" or any(has(c) for c in own):
+        return []
+    return [k["column"] for k in business.get("kpis", []) if "column" in k]
+
+
 def default_spec(ticker: str, repo: pathlib.Path | None = None) -> dict[str, Any]:
     repo = repo or REPO
     reports = repo / "research" / ticker / "Reports"
@@ -281,6 +303,7 @@ def default_spec(ticker: str, repo: pathlib.Path | None = None) -> dict[str, Any
             dcf_block["model_approach_note"] = str(sc["fix_applied"])
     spec["dcf"] = dcf_block
     spec["bucket"] = which
+    spec["missing_business_kpis"] = missing_business_kpis(which, business, has)
 
     BD.validate_spec(spec, columns)
     return spec
@@ -310,6 +333,10 @@ def main() -> int:
     n_charts = sum(len(s["charts"]) for s in spec["sections"])
     print(f"{ticker}: {spec['bucket']} template -> {out.name} "
           f"({len(spec['kpis'])} KPIs, {n_charts} charts, {len(text):,} bytes)")
+    if missing := spec.get("missing_business_kpis"):
+        print(f"  !! {spec['bucket']} template: none of {', '.join(missing)} is stored -- "
+              f"the business KPIs were never extracted. Have the financial-parser "
+              f"record them (US filers: make fetch-filings first), then rebuild.")
     return 0
 
 

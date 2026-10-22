@@ -76,8 +76,13 @@ Exit codes: **0** ran cleanly (even if nothing was new), **1** the adapter faile
 **3** the deadline was spent. Only spawn the ir-scraper afterwards for what it
 reports as missing (investor presentations, a report filed under an unusual title)
 or when it exits 1 — on TPW.AX the scraper burned 31 turns, and on SMI.NZ 3.5
-minutes, doing by hand what this does in one call. US filers have no adapter here:
-they take the SEC XBRL route (Step 4).
+minutes, doing by hand what this does in one call.
+
+**US filers run it too.** Their statements come from SEC XBRL (Step 5a), but XBRL
+carries no operating KPIs -- DAUq, ARPU, subscribers, nights booked are printed only
+in the 10-K/10-Q text. For a bare US symbol `make fetch-filings` pulls the last 3
+10-Ks and 8 10-Qs from EDGAR straight into `Extracted/*.txt`. Skipping it is how 302
+of 303 XBRL-only runs (2026-09 to 2026-10) ended with no business KPI at all.
 
 **Run `make fetch-filings` whether or not PDFs already exist.** It skips files that
 are present and only fills gaps, so it is free on a complete folder and is the only
@@ -461,10 +466,17 @@ python3 scripts/kpi_coverage.py $ARGUMENTS # which stored KPIs are stranded
 ```
 
 `dashboard_spec.py` routes the ticker to a business-model template (SaaS, payments,
-e-commerce, REIT, bank, LIC, retirement-village, pre-revenue miner, or plain
-operating) via `scripts/sectors.py`, keeps only the cards and charts whose columns
+e-commerce, marketplace, consumer-internet, REIT, bank, LIC, retirement-village,
+pre-revenue miner, or plain operating) via `scripts/sectors.py`, keeps only the cards and charts whose columns
 are populated, and writes company-substituted help text. If a Spec already exists
 (an agent edited it on an earlier run) it is kept; pass `FORCE=1` to regenerate.
+
+**If `make dashboard-spec` prints `!! <bucket> template: none of ... is stored`, stop
+and fix the data first**: the business KPIs were never extracted (the `business_kpis`
+eval warns on the same condition). Re-spawn the financial-parser to record them from
+`Extracted/` -- for a US filer, after `make fetch-filings` -- then re-run
+`make dashboard-spec FORCE=1`. A dashboard rendered past that line silently has no
+users/ARPU/ARR charts.
 
 Spawn the `dashboard-generator` agent **only** when `kpi_coverage.py` lists
 `unmapped` or `promoted` KPIs the default Spec did not chart, or the business has a

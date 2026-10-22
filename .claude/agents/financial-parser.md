@@ -60,6 +60,11 @@ You extract financial metrics from SEC filing text and earnings reports, then wr
 ### Company-Specific KPIs
 Look for metrics specific to the company's business model:
 - **Tech/SaaS**: DAU, MAU, ARR, subscribers, churn rate
+- **Social / ad-supported / consumer apps**: DAU (DAUq and "daily active
+  uniques" are DAU), MAU, WAU, ARPU, the US/international split (`DAUUS`,
+  `DAUIntl`, `ARPUUS`, `ARPUIntl`), `AdRevenue` vs `OtherRevenue`,
+  `ActiveAdvertisers`, `Subscribers`. Users stalling while ARPU carries
+  revenue is the early warning these dashboards exist to show.
 - **E-commerce**: GMV, take rate, orders, AOV, active customers, CAC
 - **Financial Services**: AUM, transaction volume, NIM
 - **Retail**: Same-store sales, store count
@@ -113,7 +118,16 @@ duckdb ./research/{TICKER}/Reports/{TICKER}.duckdb -c "
 - **`core` > 0, `candidates` = 0** — XBRL path. Do **not** re-derive these
   numbers from the filings; they are the filer's own tagged values. Your job
   is only to add company-specific KPIs to the `kpis` table (Step 6's business
-  metrics) and export the CSV. Skip to the Output section.
+  metrics) and export the CSV. XBRL has none of them, so read them from the
+  10-K/10-Q text in `Extracted/` (fetched by `make fetch-filings`; if the folder
+  is empty, run it -- do not skip the KPIs). They sit in MD&A under a "Key
+  Metrics" / "Key Operating Metrics" heading:
+  `grep -n -i -m5 "key metrics\|key operating metrics" Extracted/*.txt`, then
+  read ~60 lines from each hit. Each 10-Q gives the quarter and its prior-year
+  comparative; the 10-K gives the year. Record every period you can see, with
+  the geographic split when printed (`DAUUS`/`DAUIntl`, `ARPUUS`/`ARPUIntl`).
+  An empty `kpis` table here is a bug, not a result -- the `business_kpis`
+  eval warns on it. Then skip to the Output section.
 - **`candidates` > 0** — text path. Adjudicate, as below.
 - **both 0** — neither path worked; read the filings directly and log a gap
   (see Fallback).

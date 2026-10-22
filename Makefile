@@ -183,7 +183,7 @@ fetch-asx: ## Download ASX annual/half-year reports deterministically (TICKER=TP
 	@test -n "$(TICKER)" || { echo "usage: make fetch-asx TICKER=TPW.AX YEARS=2016-2026 [DRY=1]" >&2; exit 2; }
 	$(PY) $(SCRIPTS)/fetch_asx.py $(TICKER) --years $(or $(YEARS),2016-2026) $(if $(DRY),--dry-run,)
 
-fetch-filings: ## Download annual/half-year filings deterministically for .NZ/.HK/.AX/.L (TICKER= [YEARS=] [DRY=1])
+fetch-filings: ## Download filings deterministically: .NZ/.HK/.AX/.L PDFs, US 10-K/10-Q text from EDGAR (TICKER= [YEARS=] [DRY=1])
 	@test -n "$(TICKER)" || { echo "usage: make fetch-filings TICKER=SMI.NZ [YEARS=2016-2026] [DRY=1]" >&2; exit 2; }
 	$(PY) $(SCRIPTS)/fetch_filings.py $(TICKER) $(if $(YEARS),--years $(YEARS),) $(if $(DRY),--dry-run,)
 

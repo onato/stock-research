@@ -175,6 +175,18 @@ PROMOTE_KPIS: dict[str, str] = {
     "Subscribers": "Subscribers",
     "MAU": "MAU",
     "DAU": "DAU",
+    # Ad-supported / social: users x monetisation, and the US-vs-rest split
+    # that is the runway argument (RDDT: US ARPU $11.85 vs intl $2.26 a
+    # quarter). ARPU was missing entirely -- SPOT's stored ARPU never charted.
+    "WAU": "WAU",
+    "DAUUS": "DAUUS",
+    "DAUIntl": "DAUIntl",
+    "ARPU": "ARPU",
+    "ARPUUS": "ARPUUS",
+    "ARPUIntl": "ARPUIntl",
+    "ARPP": "ARPP",
+    "AdRevenue": "AdRevenue",
+    "ActiveAdvertisers": "ActiveAdvertisers",
     "BroadbandConnections": "BroadbandConnections",
     # XD Inc. (2400.HK): TapTap's PRC/international MAU split and the
     # games-vs-platform revenue mix are the two halves of the investment
@@ -1793,6 +1805,15 @@ KPI_ALIASES: dict[str, str] = {
     "subscribers": "Subscribers",
     "mau": "MAU",
     "dau": "DAU",
+    "dauq": "DAU",
+    "dailyactiveusers": "DAU",
+    "dailyactiveuniques": "DAU",
+    "monthlyactiveusers": "MAU",
+    "arpu": "ARPU",
+    "averagerevenueperuser": "ARPU",
+    "averagerevenueperunique": "ARPU",
+    "adrevenue": "AdRevenue",
+    "advertisingrevenue": "AdRevenue",
     "broadbandconnections": "BroadbandConnections",
     "gmv": "GMV",
     "grossmerchandisevolume": "GMV",

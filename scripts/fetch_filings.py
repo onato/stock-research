@@ -16,6 +16,9 @@ Dispatch is by suffix:
                            research/, already gated by its own checks)
     .NZ -> adapters.nzx   (nzx.com hydration + the per-year listing API)
     .HK -> adapters.hkex  (HKEXnews title search)
+    US  -> adapters.sec   (EDGAR 10-K/10-Q text straight to Extracted/ --
+                           the statements still come from XBRL; this is the
+                           text operating KPIs are read from)
 
 plus, for a .L/.AX/.NZ ticker holding fewer than SEED_THRESHOLD filings, the
 AnnualReports.com archive as a seed.
@@ -45,7 +48,7 @@ from pathlib import Path
 import fetch_asx
 import filing_gate
 import periods
-from adapters import DEFAULT_DEADLINE, annualreports, hkex, nzx
+from adapters import DEFAULT_DEADLINE, annualreports, hkex, nzx, sec
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -188,6 +191,39 @@ def run_adapters(ticker: str, years: str | None, deadline_s: float,
                                 deadline_s=deadline_s)
 
 
+def run_sec(ticker: str, deadline_s: float, dry_run: bool) -> int:
+    """US filers: 10-K/10-Q text from EDGAR, straight into Extracted/.
+
+    The statements still come from XBRL (build_facts_xbrl.py); this is the
+    text the financial-parser reads operating KPIs from. EDGAR is keyed by
+    CIK, so there is no staging/gate step -- see adapters/sec.py.
+    """
+    try:
+        subs = sec.submissions_for(ticker)
+    except Exception as e:
+        print(f"{ticker}: SEC submissions lookup failed -- {e}")
+        return 1
+    if subs is None:
+        print(f"{ticker}: not in SEC's ticker map -- use the ir-scraper agent")
+        return 1
+    held = sec.held_stems(ticker, REPO)
+    if dry_run:
+        for p in sec.plan(subs, ticker, held):
+            print(f"  {p.name:40s} <- {p.url}")
+        return 0
+    try:
+        written = sec.fetch(subs, ticker, REPO / "research" / ticker / "Extracted",
+                            held, deadline_s=deadline_s)
+    except TimeoutError as e:
+        print(f"{ticker}: {e}")
+        return 3
+    except Exception as e:
+        print(f"{ticker}: SEC adapter failed -- {e}")
+        return 1
+    print(f"{ticker}: extracted {len(written)} SEC filing(s), {len(held)} already held")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("ticker", help="e.g. SMI.NZ")
@@ -199,9 +235,11 @@ def main(argv: list[str] | None = None) -> int:
     ticker = a.ticker.upper()
     suffix = "." + ticker.rsplit(".", 1)[-1] if "." in ticker else ""
 
+    if not suffix:
+        return run_sec(ticker, a.deadline, a.dry_run)
     if suffix not in (".NZ", ".HK", ".AX"):
-        print(f"{ticker}: no deterministic adapter for {suffix or 'this ticker'} "
-              f"-- use the ir-scraper agent (US filers use the SEC XBRL route)")
+        print(f"{ticker}: no deterministic adapter for {suffix} "
+              f"-- use the ir-scraper agent")
         return 1
 
     print(f"{ticker}: {holdings_count(ticker)} filings on file, "

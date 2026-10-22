@@ -180,6 +180,51 @@ class TestBusinessTemplates:
         assert "affoChart" in chart_ids(spec)
         assert "ntaChart" in chart_ids(spec)
 
+    def test_consumer_internet_charts_users_against_monetisation(self, tmp_path):
+        """Revenue growth = user growth x ARPU growth. Charting the three
+        YoY lines together is the early warning: monetisation can carry a
+        quarter or two after users stall, not much longer."""
+        cols = ("DAU", "ARPU", "DAUUS", "DAUIntl", "ARPUUS", "ARPUIntl",
+                "AdRevenue", "OtherRevenue")
+        repo = make_ticker_files(tmp_path, csv=csv_text(extra_cols=cols),
+                                 analysis={"company_name": "Forum Co",
+                                           "sector": "Social Media / Online Advertising"})
+        spec = DS.default_spec("SYN", repo)
+        assert spec["bucket"] == "consumer_internet"
+        ids = chart_ids(spec)
+        for cid in ("usersChart", "userGeoChart", "arpuChart", "growthMixChart",
+                    "revenueMixChart"):
+            assert cid in ids, cid
+        mix = next(c for s in spec["sections"] for c in s["charts"]
+                   if c["id"] == "growthMixChart")
+        assert {se.get("derive") for se in mix["series"]} >= {
+            "yoy:Revenue", "yoy:DAU", "yoy:ARPU"}
+        kpi_cols = [k.get("column") for k in spec["kpis"]]
+        assert "DAU" in kpi_cols
+        assert "ARPU" in kpi_cols
+
+    def test_a_business_chart_of_only_universal_columns_is_kept(self, tmp_path):
+        # lic_nav's distributionsChart charts DividendPerShare alone; only a
+        # chart that lost every business-specific series is dropped.
+        repo = make_ticker_files(tmp_path, dcf={"model": "NAV discount", "inputs": {}})
+        spec = DS.default_spec("SYN", repo)
+        assert spec["bucket"] == "lic_nav"
+        assert "distributionsChart" in chart_ids(spec)
+
+    def test_a_template_with_none_of_its_kpis_stored_says_so(self, tmp_path):
+        """RDDT routed to a business template whose every KPI column was
+        empty, so the spec silently fell back to the universal charts and
+        nothing told the run to fetch the KPIs or spawn the generator."""
+        repo = make_ticker_files(tmp_path, analysis={
+            "company_name": "Forum Co", "sector": "Social Media / Online Advertising"})
+        spec = DS.default_spec("SYN", repo)
+        assert spec["missing_business_kpis"][:2] == ["DAU", "ARPU"]
+        assert "usersChart" not in chart_ids(spec)
+
+    def test_an_operating_company_has_no_missing_business_kpis(self, tmp_path):
+        spec = DS.default_spec("SYN", make_ticker_files(tmp_path))
+        assert spec.get("missing_business_kpis", []) == []
+
     def test_every_template_validates_against_a_full_csv(self, tmp_path):
         """Templates are data; a typo in a column name must fail here, not
         on a ticker at 2 a.m."""
@@ -215,6 +260,15 @@ class TestCli:
         assert run_main(monkeypatch, repo, "SYN", "--stdout") == 0
         assert '"descriptor"' in capsys.readouterr().out
         assert not (repo / "research/SYN/Reports/SYN_DashboardSpec.json").exists()
+
+    def test_missing_business_kpis_are_flagged_on_stdout(self, tmp_path, monkeypatch, capsys):
+        repo = make_ticker_files(tmp_path, analysis={
+            "company_name": "Forum Co", "sector": "Social Media / Online Advertising"})
+        assert run_main(monkeypatch, repo, "SYN") == 0
+        out = capsys.readouterr().out
+        assert "!! consumer_internet template" in out
+        assert "DAU" in out
+        assert "financial-parser" in out
 
     def test_missing_csv_is_an_error(self, tmp_path, monkeypatch, capsys):
         (tmp_path / "research" / "NOPE" / "Reports").mkdir(parents=True)

@@ -834,6 +834,40 @@ def check_units_consistent(ticker: str, card: Card) -> None:
              disagreement or "no comparable FY period")
 
 
+def check_business_kpis(ticker: str, card: Card) -> None:
+    """A business template (consumer_internet, saas, ...) with none of its own
+    KPI columns populated means the KPIs were never extracted.
+
+    302 of 303 XBRL-only US runs since 2026-09-15 stored no business KPI --
+    XBRL carries none and no filing text was fetched -- and still scored 1.0;
+    RDDT's dashboard had no DAU or ARPU chart. A warn, not a fail: some
+    companies genuinely disclose none.
+    """
+    import dashboard_spec as DS
+
+    csv_path = F.REPO / "research" / ticker / "Reports" / f"{ticker}_Metrics.csv"
+    if not csv_path.exists():
+        card.add("business_kpis", "skip", "no Metrics.csv")
+        return
+    which = DS.bucket_for(ticker, F.REPO)
+    templates = DS.load_templates()
+    if which == "operating" or which not in templates:
+        card.add("business_kpis", "skip", f"{which} template has no business KPIs")
+        return
+    own = DS.template_columns(templates[which]) - DS.template_columns(templates["universal"])
+    with open(csv_path, newline="", errors="replace") as fh:
+        rows = list(csv.DictReader(fh))
+    stored = sorted(c for c in own
+                    if any(F.num(r.get(c)) is not None for r in rows))
+    if stored:
+        card.add("business_kpis", "pass", f"{which}: {', '.join(stored)}")
+        return
+    wanted = [k["column"] for k in templates[which].get("kpis", []) if "column" in k]
+    card.add("business_kpis", "warn",
+             f"{which} template expects {', '.join(wanted)}; none stored "
+             f"(US filers: make fetch-filings, then the financial-parser)")
+
+
 def check_health(ticker: str, card: Card) -> None:
     reports = F.REPO / "research" / ticker / "Reports"
 
@@ -885,6 +919,7 @@ def evaluate(ticker: str) -> dict[str, Any]:
     if _dcf_for_entry is not None:
         check_entry_price_hurdle(_dcf_for_entry, card)
     check_units_consistent(ticker, card)
+    check_business_kpis(ticker, card)
     check_health(ticker, card)
     return {
         "ticker": ticker,

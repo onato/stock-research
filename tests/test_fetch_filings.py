@@ -81,8 +81,41 @@ class TestDispatch:
         assert "2019-2026" in argv["args"]
 
     def test_an_unsupported_suffix_exits_one(self, repo, capsys):
-        assert fetch_filings.main(["DUOL"]) == 1
+        assert fetch_filings.main(["SYN.TO"]) == 1
         assert "no deterministic adapter" in capsys.readouterr().out
+
+    def test_a_us_filer_goes_to_the_sec_adapter_and_lands_in_extracted(
+            self, repo, monkeypatch, no_extract):
+        # US filers used to exit 1 here ("US filers use the SEC XBRL route"),
+        # which left them with no filing text to read KPIs from.
+        seen = {}
+        monkeypatch.setattr(fetch_filings.sec, "submissions_for",
+                            lambda t: {"cik": "1", "filings": {"recent": {}}})
+
+        def fake(subs, ticker, dest, held, **kw):
+            seen.update(ticker=ticker, dest=dest)
+            return []
+
+        monkeypatch.setattr(fetch_filings.sec, "fetch", fake)
+        assert fetch_filings.main(["DUOL"]) == 0
+        assert seen["ticker"] == "DUOL"
+        assert seen["dest"] == repo / "research" / "DUOL" / "Extracted"
+
+    def test_a_us_symbol_missing_from_the_sec_map_exits_one(self, repo, monkeypatch,
+                                                           capsys):
+        monkeypatch.setattr(fetch_filings.sec, "submissions_for", lambda t: None)
+        assert fetch_filings.main(["NOPE"]) == 1
+        assert "SEC" in capsys.readouterr().out
+
+    def test_a_us_dry_run_prints_the_plan_and_fetches_nothing(self, repo, monkeypatch,
+                                                             capsys):
+        subs = json.loads((Path(__file__).parent / "fixtures" / "sec" /
+                           "submissions_rddt.json").read_text())
+        monkeypatch.setattr(fetch_filings.sec, "submissions_for", lambda t: subs)
+        monkeypatch.setattr(fetch_filings.sec, "download",
+                            lambda *a, **k: pytest.fail("dry run downloaded"))
+        assert fetch_filings.main(["RDDT", "--dry-run"]) == 0
+        assert "RDDT_Annual_FY2025.txt" in capsys.readouterr().out
 
     def test_a_thin_ticker_also_gets_the_annualreports_seed(self, repo, monkeypatch,
                                                             no_extract):

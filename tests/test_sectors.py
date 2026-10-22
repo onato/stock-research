@@ -93,3 +93,44 @@ class TestModelLabel:
         assert "nav_compounding" in sectors.dcf_model_label(dcf, include_prose=False)
         assert sectors.dcf_model_label(None) == ""
         assert sectors.dcf_model_label({"valuation_philosophy": "plain string"}) == "plain string"
+
+
+class TestConsumerInternet:
+    """Businesses read as users x monetisation (DAU/MAU, ARPU, subscribers).
+
+    These all fell through to `operating`, so RDDT, META and PINS got no
+    user or ARPU chart and the dashboard-generator was never spawned.
+    """
+
+    def test_social_and_ad_supported_platforms(self):
+        for s in ("Social Media / Online Advertising",          # RDDT
+                  "Social Media / Digital Advertising",          # PINS, WB
+                  "Social Media / Advertising",                  # META
+                  "Technology / Advertising",                    # GOOGL
+                  "Internet / Short-Video & Livestreaming",      # 1024.HK
+                  "Online Music / Social Entertainment"):        # 1698.HK
+            assert sectors.bucket(s, "owner_fcf_dcf") == "consumer_internet", s
+
+    def test_streaming_and_subscription_consumer_apps(self):
+        for s in ("Audio Streaming",                                     # SPOT
+                  "Communication Services - Entertainment / Streaming Media",  # NFLX
+                  "Online Music & Audio Entertainment",                  # TME
+                  "Online Video / Gaming / Livestreaming",               # BILI
+                  "Online Dating / Consumer Internet"):                  # MTCH
+            assert sectors.bucket(s, None) == "consumer_internet", s
+
+    def test_look_alikes_that_are_not_user_businesses(self):
+        # An ad agency and ad-tech sell to advertisers, not users; a
+        # precious-metals "stream" is a royalty; livestreaming e-commerce
+        # is retail; a property portal stays where it was.
+        assert sectors.bucket("Advertising & Marketing Services Holding Company",
+                              None) == "operating"                       # OMC
+        assert sectors.bucket("Advertising Technology / Demand-Side Platform",
+                              None) == "operating"                       # TTD
+        assert sectors.bucket("Precious Metals Streaming / Royalty", None) == "operating"
+        assert sectors.bucket("Consumer Discretionary / Livestreaming E-Commerce",
+                              None) == "ecommerce"
+        assert sectors.bucket("Real Estate Digital Advertising", None) == "reit"
+
+    def test_it_is_a_known_bucket(self):
+        assert "consumer_internet" in sectors.BUCKETS

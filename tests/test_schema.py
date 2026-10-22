@@ -1277,3 +1277,33 @@ class TestHealthyWayRedemptionLiabilityKpis:
     def test_net_income_attributable_promotes(self) -> None:
         assert (schema.promote_header("NetIncomeAttributable")
                 == "NetIncomeAttributable")
+
+
+class TestConsumerInternetKpiPromotion:
+    """Users x monetisation is how an ad-supported or social business is
+    read (RDDT: revenue +61% = DAUq +18% x ARPU +36%), and the user metric
+    is the early warning that growth is about to stop. ARPU was absent from
+    PROMOTE_KPIS (only MobileARPU/BlendedARPU, two telcos), so SPOT's stored
+    ARPU never reached a chart, and no geographic split existed at all --
+    for RDDT the US-vs-international gap is the whole runway argument.
+    """
+
+    @pytest.mark.parametrize("name", [
+        "ARPU", "ARPUUS", "ARPUIntl", "DAUUS", "DAUIntl", "WAU",
+        "AdRevenue", "ActiveAdvertisers", "ARPP",
+    ])
+    def test_promoted(self, name):
+        assert schema.promote_header(name) == name
+
+    @pytest.mark.parametrize(("spelling", "canon"), [
+        ("DAUq", "DAU"),
+        ("Daily Active Uniques", "DAU"),
+        ("daily_active_users", "DAU"),
+        ("Monthly Active Users", "MAU"),
+        ("Average Revenue Per User", "ARPU"),
+        ("average_revenue_per_unique", "ARPU"),
+        ("Advertising Revenue", "AdRevenue"),
+    ])
+    def test_common_spellings_resolve_to_one_name(self, spelling, canon):
+        assert schema.normalize_kpi(spelling) == canon
+        assert schema.promote_header(spelling) == canon

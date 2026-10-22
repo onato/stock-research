@@ -16,7 +16,9 @@ Example:
 ## Data Pipeline (DB-first)
 1. Download reports → `research/{TICKER}/PDFs/`
 2. `pdftotext -layout` → `research/{TICKER}/Extracted/*.txt`
-   (US filers skip PDFs: `scripts/build_facts_xbrl.py` pulls typed data from the SEC XBRL API)
+   (US filers skip PDFs: `scripts/build_facts_xbrl.py` pulls typed data from the SEC XBRL API,
+   and `make fetch-filings` pulls 10-K/10-Q text from EDGAR into `Extracted/` -- XBRL has no
+   operating KPIs, so without it a US ticker gets no DAU/ARPU/subscribers)
 3. `scripts/build_facts.py` scans the .txt files and writes every candidate value to the
    `facts` table in `research/{TICKER}/Reports/{TICKER}.duckdb`
 4. `scripts/adjudicate.py` (run by `extract.py`; `make adjudicate TICKER=X`) resolves
