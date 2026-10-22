@@ -211,6 +211,18 @@ class TestBusinessTemplates:
         assert spec["bucket"] == "lic_nav"
         assert "distributionsChart" in chart_ids(spec)
 
+    def test_a_quarter_only_kpi_still_gets_its_card(self, tmp_path):
+        lines = csv_text().splitlines()
+        head = [*lines[0].split(","), "DAU"]
+        fy = [line + "," for line in lines[1:]]            # DAU blank on every FY row
+        quarters = [",".join({"Period": p, "DAU": v}.get(c, "") for c in head)
+                    for p, v in (("Q1 2024", "110"), ("Q1 2025", "121"))]
+        repo = make_ticker_files(tmp_path, csv="\n".join([",".join(head), *fy, *quarters]) + "\n",
+                                 analysis={"company_name": "Forum Co",
+                                           "sector": "Social Media / Online Advertising"})
+        spec = DS.default_spec("SYN", repo)
+        assert any(k.get("column") == "DAU" for k in spec["kpis"])
+
     def test_a_template_with_none_of_its_kpis_stored_says_so(self, tmp_path):
         """RDDT routed to a business template whose every KPI column was
         empty, so the spec silently fell back to the universal charts and
@@ -224,6 +236,17 @@ class TestBusinessTemplates:
     def test_an_operating_company_has_no_missing_business_kpis(self, tmp_path):
         spec = DS.default_spec("SYN", make_ticker_files(tmp_path))
         assert spec.get("missing_business_kpis", []) == []
+
+    def test_no_template_chart_draws_two_series_in_one_colour(self):
+        """consumer_internet's ARPU chart drew US and international ARPU both
+        in amber (one explicit, one from the palette), so they were unreadable."""
+        palette = ["primary", "warning", "tertiary", "quaternary", "danger", "secondary"]
+        for name, tpl in DS.load_templates().items():
+            for sec in tpl.get("sections", []):
+                for ch in sec["charts"]:
+                    used = [s.get("color") or palette[i % len(palette)]
+                            for i, s in enumerate(ch["series"])]
+                    assert len(used) == len(set(used)), (name, ch["id"], used)
 
     def test_every_template_validates_against_a_full_csv(self, tmp_path):
         """Templates are data; a typo in a column name must fail here, not

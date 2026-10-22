@@ -1099,7 +1099,10 @@ function buildChart(spec) {
     const cd = chartData[spec.id];
     const el = document.getElementById(spec.id);
     if (!cd || !el) return;
+    // A chart whose series exist only per quarter opens on the quarters.
+    const startInterim = cd.default === 'interim' && !!cd.interim;
     const annual = cd.annual;
+    const first = startInterim ? cd.interim : annual;
     const hasY1 = spec.series.some(s => s.axis === 'y1');
     const kindOf = s => s.kind || spec.type || 'bar';
     const hasBars = spec.series.some(s => kindOf(s) === 'bar');
@@ -1108,7 +1111,7 @@ function buildChart(spec) {
         const kind = kindOf(s);
         // Chart.js paints ascending `order`, so lines need a LOWER order than
         // bars to land on top of them -- otherwise a YoY line hides behind its bars.
-        const ds = { type: kind, label: s.label, data: annual.data[i], yAxisID: s.axis || 'y',
+        const ds = { type: kind, label: s.label, data: first.data[i], yAxisID: s.axis || 'y',
                      spanGaps: true, order: (kind === 'bar' ? 100 : 0) + i };
         if (kind === 'bar') { ds.backgroundColor = color; ds.borderRadius = 4; }
         else {
@@ -1128,7 +1131,7 @@ function buildChart(spec) {
         return ds;
     });
     const scales = freshScales();
-    scales.x = scaleXFor(annual.labels, 'annual');
+    scales.x = scaleXFor(first.labels, startInterim ? cd.interim.kind : 'annual');
     if (spec.y_title) scales.y.title = { display: true, text: spec.y_title, color: '#888' };
     if (hasY1) {
         scales.y.position = 'left';
@@ -1136,11 +1139,12 @@ function buildChart(spec) {
         if (spec.y1_title) scales.y1.title = { display: true, text: spec.y1_title, color: '#888' };
     }
     const chart = new Chart(el.getContext('2d'), {
-        data: { labels: annual.labels, datasets: datasets },
+        data: { labels: first.labels, datasets: datasets },
         options: { ...chartDefaults, scales: scales }
     });
     chartRegistry[spec.id] = chart;
-    chartSeries[spec.id] = { annual: { labels: annual.labels, data: annual.data, scaleX: scales.x } };
+    chartSeries[spec.id] = { annual: { labels: annual.labels, data: annual.data,
+                                       scaleX: scaleXFor(annual.labels, 'annual') } };
     if (cd.interim) {
         chartSeries[spec.id].interim = {
             labels: cd.interim.labels, data: cd.interim.data, scaleX: scaleXFor(cd.interim.labels, cd.interim.kind)

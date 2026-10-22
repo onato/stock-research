@@ -429,21 +429,50 @@ def render_returns(ret: dict[str, Any]) -> str:
             f'<div class="returns-note">{note}</div></div>')
 
 
-def render_kpis(spec: dict[str, Any], rows: list[dict[str, str]],
-                dcf: dict[str, Any] | None) -> str:
+def latest_point(rows: list[dict[str, str]],
+                 column: str) -> tuple[float | None, float | None, str | None]:
+    """(value, same period a year earlier, interim label or None) for a card.
+
+    The latest FY row first. A KPI reported per quarter only (RDDT's DAUq
+    and ARPU) is blank there, so fall back to the newest interim row after
+    that FY -- never an older one, which would show a stale quarter -- and
+    compare it with the same quarter a year before, not the one before it.
+    """
     fy = annual_rows(rows)
     latest = fy[-1] if fy else (rows[-1] if rows else {})
-    prior = fy[-2] if len(fy) > 1 else None
+    v = num(latest.get(column))
+    if v is not None or not fy:
+        prior = fy[-2] if len(fy) > 1 else None
+        return v, (num(prior.get(column)) if prior else None), None
+    floor = periods.parse(fy[-1]["Period"]).sort_key
+    for i in range(len(rows) - 1, -1, -1):
+        p = periods.parse(rows[i]["Period"])
+        if p.ptype == "FY" or p.sort_key <= floor:
+            continue
+        iv = num(rows[i].get(column))
+        if iv is not None:
+            j = _prior_index(rows, i)
+            return iv, (num(rows[j].get(column)) if j is not None else None), rows[i]["Period"]
+    return None, None, None
+
+
+def render_kpis(spec: dict[str, Any], rows: list[dict[str, str]],
+                dcf: dict[str, Any] | None) -> str:
     currency, units = spec.get("currency", "$"), spec.get("units", "m")
     cards = []
     for k in spec["kpis"]:
         fmt = k.get("format", "money")
         value_text: str
         v: float | None = None
+        pv: float | None = None
+        period: str | None = None
         if "value" in k:
             value_text = html.escape(str(k["value"]))
         else:
-            v = num(latest.get(k["column"])) if "column" in k else F.num(dcf_get(dcf, k["dcf_path"]))
+            if "column" in k:
+                v, pv, period = latest_point(rows, k["column"])
+            else:
+                v = F.num(dcf_get(dcf, k["dcf_path"]))
             value_text = fmt_value(v, fmt, currency, units)
         # Rendered length, so the CSS can shrink a long number to fit its card.
         chars = max(1, len(html.unescape(value_text)))
@@ -451,7 +480,6 @@ def render_kpis(spec: dict[str, Any], rows: list[dict[str, str]],
         positive = bool(k.get("positive", True))
         change_text = ""
         if change == "yoy":
-            pv = num(prior.get(k["column"])) if (prior and "column" in k) else None
             if v is not None and pv:
                 yoy = (v - pv) / abs(pv) * 100
                 positive = yoy >= 0
@@ -461,7 +489,8 @@ def render_kpis(spec: dict[str, Any], rows: list[dict[str, str]],
         cards.append(
             '    <div class="kpi-card">\n'
             f'        <div class="kpi-value" style="--chars:{chars}">{value_text}</div>\n'
-            f'        <div class="kpi-label">{html.escape(str(k["label"]))}</div>\n'
+            f'        <div class="kpi-label">{html.escape(str(k["label"]))}'
+            + (f" &middot; {html.escape(period)}" if period else "") + '</div>\n'
             + (f'        <div class="kpi-change {"positive" if positive else "negative"}">'
                f'{change_text}</div>\n' if change_text else "")
             + (f'        <div class="kpi-note">{html.escape(str(k["note"]))}</div>\n'
@@ -489,6 +518,12 @@ def chart_data(spec: dict[str, Any], rows: list[dict[str, str]],
                     entry["interim"] = {"kind": kind,
                                         "labels": [short_label(r["Period"]) for r in inter],
                                         "data": idata}
+                    # A series reported per quarter only (RDDT's DAUq, ARPU) is
+                    # an empty canvas on the FY view: open on the interims.
+                    annual_data = entry["annual"]["data"]
+                    if any(all(v is None for v in a) and any(v is not None for v in i)
+                           for a, i in zip(annual_data, idata, strict=True)):
+                        entry["default"] = "interim"
             out[ch["id"]] = entry
     return out
 
@@ -513,9 +548,11 @@ def render_sections(spec: dict[str, Any], data: dict[str, Any]) -> str:
             actions = []
             if "interim" in d:
                 short = "Q" if d["interim"]["kind"] == "quarterly" else "H1/H2"
-                actions.append(f'<button class="view-toggle active" onclick="setPeriodView(\'{cid}\', '
+                fy_on, q_on = ((" active", "") if d.get("default") != "interim"
+                               else ("", " active"))
+                actions.append(f'<button class="view-toggle{fy_on}" onclick="setPeriodView(\'{cid}\', '
                                f'\'annual\', this)">FY</button>')
-                actions.append(f'<button class="view-toggle" onclick="setPeriodView(\'{cid}\', '
+                actions.append(f'<button class="view-toggle{q_on}" onclick="setPeriodView(\'{cid}\', '
                                f'\'interim\', this)">{short}</button>')
             if log_allowed(ch, d):
                 actions.append(f'<button class="log-toggle" onclick="toggleLogScale(\'{cid}\', this)" '

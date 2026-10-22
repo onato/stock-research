@@ -244,6 +244,23 @@ class TestKpis:
         assert '<div class="kpi-change negative">-10.0% YoY</div>' in page
 
 
+    def test_a_quarter_only_kpi_shows_the_latest_quarter_against_a_year_earlier(
+            self, spec, analysis, dcf):
+        """RDDT's DAUq and ARPU are reported per quarter only, so a card read
+        off the latest FY row showed nothing; it names the quarter it shows."""
+        csv = ("Period,Revenue,DAU\nFY2025,120,\nQ2 2025,35,110.4\n"
+               "Q1 2026,40,121.4\nQ2 2026,45,130.3\n")
+        spec["kpis"] = [{"label": "DAU (m)", "column": "DAU", "format": "number", "change": "yoy"},
+                        {"label": "Revenue", "column": "Revenue", "format": "money", "change": "yoy"}]
+        spec["sections"] = []
+        spec["metric_descriptions"] = {}
+        page = bd.render("TEST", spec, csv, analysis, dcf)
+        assert ">130.3</div>" in page
+        assert "DAU (m) &middot; Q2 2026" in page
+        assert "+18.0% YoY" in page                  # vs Q2 2025, not Q1 2026
+        assert "Revenue &middot;" not in page         # a FY value keeps its plain label
+
+
 class TestCharts:
     def test_sections_and_cards_rendered(self, html):
         assert "Growth &amp; Profitability" in html
@@ -291,6 +308,30 @@ class TestCharts:
         assert "setPeriodView('cashChart'" not in page
         cd = bd.chart_data(spec, *bd.read_csv(csv)[1:], dcf)
         assert "interim" not in cd["cashChart"]
+
+    def test_a_chart_with_quarter_only_series_opens_on_the_quarters(self, analysis, dcf):
+        """RDDT reports DAUq and ARPU per quarter only: opened on FY, the
+        users and ARPU charts were empty canvases until Q was clicked."""
+        spec = {"descriptor": "", "currency": "$", "units": "m", "kpis": [],
+                "metric_descriptions": {"users": {"title": "Users", "content": "x"},
+                                        "revenue": {"title": "Revenue", "content": "x"}},
+                "dcf": {},
+                "sections": [{"title": "Users", "charts": [
+                    {"id": "usersChart", "title": "Users", "help": "users",
+                     "series": [{"label": "DAU", "column": "DAU"}]},
+                    {"id": "revenueChart", "title": "Revenue", "help": "revenue",
+                     "series": [{"label": "Revenue", "column": "Revenue"}]}]}]}
+        csv = ("Period,Revenue,DAU\nFY2024,100,\nFY2025,120,\n"
+               "Q1 2025,30,110\nQ2 2025,35,115\nQ1 2026,40,120\n")
+        cd = bd.chart_data(spec, *bd.read_csv(csv)[1:], None)
+        assert cd["usersChart"]["default"] == "interim"
+        assert "default" not in cd["revenueChart"]
+        page = bd.render("TEST", spec, csv, analysis, None)
+        assert ("<button class=\"view-toggle active\" onclick=\"setPeriodView('usersChart', "
+                "'interim', this)\">Q</button>") in page
+        assert ("<button class=\"view-toggle active\" onclick=\"setPeriodView('revenueChart', "
+                "'annual', this)\">FY</button>") in page
+        assert "cd.default === 'interim'" in inline_script(page)
 
     def test_chart_data_series(self, spec, csv_text, dcf):
         _, rows = bd.read_csv(csv_text)

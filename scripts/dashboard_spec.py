@@ -263,7 +263,7 @@ def default_spec(ticker: str, repo: pathlib.Path | None = None) -> dict[str, Any
         return col in columns and sum(1 for r in rows if BD.num(r.get(col)) is not None) >= MIN_POINTS
 
     def has_latest(col: str) -> bool:
-        return col in columns and BD.num(latest.get(col)) is not None
+        return col in columns and BD.latest_point(rows, col)[0] is not None
 
     spec = assemble(templates["universal"], business, columns, has=has, company=company,
                     dcf=dcf, has_latest=has_latest)
