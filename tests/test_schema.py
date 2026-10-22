@@ -119,6 +119,27 @@ class TestPromotableKpiVocabulary:
         assert schema.promote_header("OrderBook") == "OrderBook"
         assert schema.promote_header("OrderBookWithOptions") == "OrderBookWithOptions"
 
+    def test_promotes_li_ning_kpis(self):
+        """Li Ning Company Limited (2331.HK): EPSDiluted sits alongside basic
+        EPS; LeasePayments is the full lease cash payment (principal+
+        interest), distinct from the blocked LeasePrincipalRepayment because
+        the DCF treats lease cost as an operating expense, not debt service
+        (no bank debt outstanding); SBCForfeitureReversal (large from
+        FY2025: 167.9m FY2025, 210.4m H1 FY2026) is stored separately from
+        StockBasedComp specifically so it is never netted into gross SBC."""
+        assert schema.promote_header("EPSDiluted") == "EPSDiluted"
+        assert schema.promote_header("LeasePayments") == "LeasePayments"
+        assert (schema.promote_header("SBCForfeitureReversal")
+                == "SBCForfeitureReversal")
+
+    def test_promotes_tce_earnings(self):
+        """Pacific Basin Shipping (2343.HK): Time-Charter Equivalent earnings
+        is the standard dry-bulk shipping KPI -- net voyage revenue after
+        voyage costs, reported per vessel-day against the BHSI/BSI indices --
+        and is not derivable from Revenue, which also includes the separate
+        'Operating Activity' chartered-in segment."""
+        assert schema.promote_header("TCEEarnings") == "TCEEarnings"
+
     def test_promotes_china_jinmao_real_estate_kpis(self):
         """China Jinmao Holdings (0817.HK): LandAppreciationTaxPaid is a
         real-estate-specific levy on development-property disposals, and
@@ -193,6 +214,38 @@ class TestPromotableKpiVocabulary:
         """Opt-in, not opt-out: an unrecognised name stays out of the CSV."""
         assert schema.promote_header("WaferShipments") is None
 
+    def test_promotes_share_award_scheme_purchases(self):
+        """Chervon Holdings (2285.HK) discloses no SBC expense line, so the
+        dcf-analyst uses on-market share purchases funding the employee
+        share award scheme as the SBC-cost proxy. It is a real valuation
+        driver, not derivable from the CSV's StockBasedComp column (which is
+        blank for this ticker)."""
+        assert (schema.promote_header("ShareAwardSchemePurchases")
+                == "ShareAwardSchemePurchases")
+
+    def test_promotes_franchisees(self):
+        """Auntea Jenny (2589.HK): a franchise/wholesale tea-shop operator
+        where franchisee count alongside StoreCount is a core growth KPI
+        (5,455 FY2024 -> 6,974 FY2025 -> 8,014 H1 FY2026) -- not derivable
+        from StoreCount, since the two can diverge (closures vs. onboarding)."""
+        assert schema.promote_header("Franchisees") == "Franchisees"
+
+    def test_promotes_insurance_revenue(self):
+        """China Pacific Insurance Group (2601.HK): InsuranceRevenue is the
+        IFRS 17-era top line (populated FY2022 onward, plus interim rows),
+        reported alongside the pre-IFRS17 GrossWrittenPremiums -- the two
+        never coexist for the same period, but each is the real top-line KPI
+        for its own era and neither is derivable from the other."""
+        assert schema.promote_header("InsuranceRevenue") == "InsuranceRevenue"
+
+    def test_promotes_rnd_expense(self):
+        """R&D expense (Lepu ScienTech Medical Technology, 2291.HK) is the
+        spend behind the biodegradable-occluder and TAVR pipeline the
+        qualitative thesis is built on, and is not derivable from any
+        existing income-statement column (it sits inside OperatingIncome's
+        deduction, not broken out on its own)."""
+        assert schema.promote_header("RnDExpense") == "RnDExpense"
+
     def test_promotes_samsonite_brand_segment_channel_kpis(self):
         """Samsonite Group S.A. (1910.HK): a multi-brand, multi-region
         luggage maker where the brand mix (Samsonite/Tumi/American
@@ -206,6 +259,31 @@ class TestPromotableKpiVocabulary:
             "SegmentRevenueAsia", "SegmentRevenueNorthAmerica",
             "SegmentRevenueEurope", "SegmentRevenueLatinAmerica",
             "WholesaleRevenue", "DTCRevenue",
+        ):
+            assert schema.promote_header(name) == name
+
+    def test_promotes_picc_pc_underwriting_ratios(self):
+        """PICC Property and Casualty (2328.HK): LossRatio and ExpenseRatio
+        are the two components of CombinedOperatingRatio (already a
+        promoted column) -- standard P&C underwriting-quality metrics, not
+        derivable from CombinedOperatingRatio alone since a given COR can
+        come from very different loss/expense splits. SolvencyRatio is the
+        C-ROSS regulatory capital-adequacy ratio (~237% at H1 FY2026 per the
+        qualitative analysis), a key risk indicator distinct from any
+        balance-sheet column."""
+        for name in ("LossRatio", "ExpenseRatio", "SolvencyRatio"):
+            assert schema.promote_header(name) == name
+
+    def test_promotes_sunny_optical_segment_revenue_kpis(self):
+        """Sunny Optical Technology (2382.HK) restated its segment categories
+        from FY2025 onward (Handset/VehicleRelated/ARVR -> Handset/Vehicle/
+        XR/OtherProducts); HandsetRevenue, VehicleRevenue, XRRevenue and
+        OtherProductsRevenue are the new-era names and carry the revenue-mix
+        thesis (mature handset base vs. the vehicle/XR growth drivers), not
+        derivable from total Revenue alone."""
+        for name in (
+            "HandsetRevenue", "VehicleRevenue", "XRRevenue",
+            "OtherProductsRevenue",
         ):
             assert schema.promote_header(name) == name
 
@@ -1069,6 +1147,26 @@ class TestMedliveDebtInvestmentsKpis:
                 == "OtherIncomeAndGains")
 
 
+class TestBocHongKongLoanBookKpis:
+    """BOC Hong Kong Holdings (2388.HK): AdvancesAndOtherAccounts (the loan
+    book, HK$1.28tn FY2018 to HK$1.81tn H1 FY2026) is the standard bank
+    growth KPI -- not derivable from TotalAssets, which also carries the
+    much larger investment-securities book. LoanToDepositRatio (69.3%
+    FY2022 down to 58.4% FY2025) is the funding/liquidity metric management
+    discloses directly; deriving it from AdvancesAndOtherAccounts /
+    CustomerDeposits would silently diverge from the disclosed ratio
+    whenever the denominator basis differs. Both populated in `kpis` but
+    absent from PROMOTE_KPIS, so the dashboard could not chart either."""
+
+    def test_advances_and_other_accounts_promotes(self) -> None:
+        assert (schema.promote_header("AdvancesAndOtherAccounts")
+                == "AdvancesAndOtherAccounts")
+
+    def test_loan_to_deposit_ratio_promotes(self) -> None:
+        assert (schema.promote_header("LoanToDepositRatio")
+                == "LoanToDepositRatio")
+
+
 class TestShandongGoldPerpetualBondAndCasKpis:
     """Shandong Gold Mining (1787.HK): the CAS income statement folds
     perpetual-bond-holder profit and minority interest into reported
@@ -1130,3 +1228,52 @@ class TestPradaLeaseKpis:
                 == "LeaseInterestPaid")
         assert (schema.promote_header("InterestExpenseLeases")
                 == "LeaseInterestPaid")
+
+
+class TestKeHoldingsSegmentRevenueKpis:
+    """KE Holdings Inc. / Beike (2423.HK): existing-home, new-home, home
+    renovation & furnishing, home rental and emerging & other services are
+    the five reported revenue-segment lines -- the mix shift (new-home down,
+    home rental up) is the core of the qualitative thesis and is not
+    derivable by splitting the single Revenue column. Populated in `kpis`
+    for FY2024/FY2025 only but absent from PROMOTE_KPIS, so the dashboard
+    could not chart the segment mix."""
+
+    def test_revenue_existing_home_promotes(self) -> None:
+        assert schema.promote_header("RevenueExistingHome") == "RevenueExistingHome"
+
+    def test_revenue_new_home_promotes(self) -> None:
+        assert schema.promote_header("RevenueNewHome") == "RevenueNewHome"
+
+    def test_revenue_home_renovation_promotes(self) -> None:
+        assert (schema.promote_header("RevenueHomeRenovation")
+                == "RevenueHomeRenovation")
+
+    def test_revenue_home_rental_promotes(self) -> None:
+        assert schema.promote_header("RevenueHomeRental") == "RevenueHomeRental"
+
+    def test_revenue_emerging_other_promotes(self) -> None:
+        assert (schema.promote_header("RevenueEmergingOther")
+                == "RevenueEmergingOther")
+
+
+class TestHealthyWayRedemptionLiabilityKpis:
+    """HealthyWay Inc. (2587.HK): a pre-IPO redemption liability on
+    convertible-redeemable preferred shares drove the FY2023/FY2024
+    reported net losses (-RMB313.9m/-269.2m) almost entirely through
+    non-cash fair-value remeasurement -- pre-redemption PBT was actually
+    +RMB4m/+9m those years, and the liability was extinguished at the
+    Dec-2024 IPO (nil from FY2025). RedemptionLiabilityChange isolates that
+    non-operating charge against NetIncome/OperatingIncome.
+    NetIncomeAttributable is net income after minority interests, which
+    diverges from the total NetIncome column by several million per period.
+    Both populated in `kpis` but absent from PROMOTE_KPIS, so the dashboard
+    could not chart either."""
+
+    def test_redemption_liability_change_promotes(self) -> None:
+        assert (schema.promote_header("RedemptionLiabilityChange")
+                == "RedemptionLiabilityChange")
+
+    def test_net_income_attributable_promotes(self) -> None:
+        assert (schema.promote_header("NetIncomeAttributable")
+                == "NetIncomeAttributable")

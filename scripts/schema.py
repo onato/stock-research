@@ -176,6 +176,15 @@ PROMOTE_KPIS: dict[str, str] = {
     "MAU": "MAU",
     "DAU": "DAU",
     "BroadbandConnections": "BroadbandConnections",
+    # XD Inc. (2400.HK): TapTap's PRC/international MAU split and the
+    # games-vs-platform revenue mix are the two halves of the investment
+    # thesis -- only disclosed in half-year filings, so these are sparse
+    # (H1 FY2024-FY2026) by nature, not a parsing gap.
+    "MPU": "MPU",
+    "TapTapPRCMAU": "TapTapPRCMAU",
+    "TapTapIntlMAU": "TapTapIntlMAU",
+    "SegmentRevenueGames": "SegmentRevenueGames",
+    "SegmentRevenueTapTap": "SegmentRevenueTapTap",
     # Volume
     "GMV": "GMV",
     "TPV": "TPV",
@@ -192,6 +201,23 @@ PROMOTE_KPIS: dict[str, str] = {
     "RealizedOilPrice": "RealizedOilPrice",
     "RealizedGasPrice": "RealizedGasPrice",
     "SalesVolume": "SalesVolume",
+    # KE Holdings Inc. / Beike (2423.HK): the five reported revenue-segment
+    # lines -- existing-home sales, new-home sales, home renovation &
+    # furnishing, home rental, and emerging & other services. The mix shift
+    # (new-home down, home rental sharply up) is the qualitative thesis and
+    # is not derivable by splitting the single Revenue column. Populated in
+    # `kpis` for FY2024/FY2025 only.
+    "RevenueExistingHome": "RevenueExistingHome",
+    "RevenueNewHome": "RevenueNewHome",
+    "RevenueHomeRenovation": "RevenueHomeRenovation",
+    "RevenueHomeRental": "RevenueHomeRental",
+    "RevenueEmergingOther": "RevenueEmergingOther",
+    # Pacific Basin Shipping (2343.HK): Time-Charter Equivalent earnings is
+    # the standard dry-bulk shipping KPI (net voyage revenue after voyage
+    # costs, benchmarked per vessel-day against the BHSI/BSI indices) -- not
+    # derivable from Revenue, which also includes the separate chartered-in
+    # 'Operating Activity' segment.
+    "TCEEarnings": "TCEEarnings",
     # Chow Tai Fook Jewellery (1929.HK): fair-value loss/gain on gold loans,
     # reclassified out of COGS into "other gains and losses" from H1 FY2025.
     # It is the dominant driver of the net-income-vs-operating-cash-flow gap
@@ -215,12 +241,25 @@ PROMOTE_KPIS: dict[str, str] = {
     # same pre/post-IFRS17 break as 0966.HK's GrossPremiumsWritten above, but
     # spelled differently in this filer's own tables.
     "GrossWrittenPremiums": "GrossWrittenPremiums",
+    # China Pacific Insurance Group (2601.HK): InsuranceRevenue is the
+    # IFRS 17-era top-line KPI (populated FY2022 onward, plus interim rows),
+    # reported alongside the pre-IFRS17 GrossWrittenPremiums above -- the
+    # two never coexist for the same period, but each is the real top line
+    # for its own era and neither is derivable from the other.
+    "InsuranceRevenue": "InsuranceRevenue",
     # China Railway Construction Corporation (1186.HK): total debt rose
     # from RMB333bn (FY2023) to RMB728bn (H1 FY2026). OtherEquityInstruments
     # (perpetual bonds, RMB59.5bn FY2023 to RMB72.3bn H1 FY2026) are a
     # debt-like claim classified in equity -- sitting outside TotalDebt and
     # not derivable from the existing balance-sheet columns.
     "OtherEquityInstruments": "OtherEquityInstruments",
+    # Shanghai Conant Optical (2276.HK): short-term wealth-management
+    # products held at fair value through P&L (RMB788.5m FY2025, RMB1,024.2m
+    # H1 FY2026) are a material, fast-growing balance-sheet item the
+    # dcf-analyst's net-cash bridge explicitly adds back against borrowings
+    # (net cash RMB1,717.7m vs. reported cash-only RMB1,438.3m at H1 FY2026)
+    # -- not derivable from CashAndEquivalents alone.
+    "ShortTermInvestmentsFVTPL": "ShortTermInvestmentsFVTPL",
     # Core telecom-services revenue (China Mobile Limited, 0941.HK): total
     # Revenue also includes product/terminal sales and the fast-growing
     # computing/AIDC/AI services segments, so the mix-shift thesis -- decade
@@ -243,6 +282,12 @@ PROMOTE_KPIS: dict[str, str] = {
     # Marketing cost lines
     "MarketingExpense": "MarketingExpense",
     "MarketingPctRevenue": "MarketingPctRevenue",
+    # R&D expense (Lepu ScienTech Medical Technology, 2291.HK): a medical
+    # device maker's spend on its biodegradable-occluder and TAVR pipeline
+    # -- the qualitative thesis's main forward driver -- sits inside
+    # OperatingIncome's deduction and is not broken out on any existing
+    # column.
+    "RnDExpense": "RnDExpense",
     # IT-services unit economics (CGI Inc., GIB-A.TO): Bookings is new
     # contract signings in the period; BookToBill (Bookings/Revenue, %)
     # signals forward revenue visibility -- above 100% means the backlog is
@@ -740,6 +785,16 @@ PROMOTE_KPIS: dict[str, str] = {
     "UnderwritingIncome": "UnderwritingIncome",
     "NetInvestmentIncome": "NetInvestmentIncome",
     "NOIPS": "NOIPS",
+    # PICC Property and Casualty (2328.HK): LossRatio and ExpenseRatio are
+    # the two components of CombinedOperatingRatio (already promoted above)
+    # -- a given COR can come from very different loss/expense splits, so
+    # the mix is its own underwriting-quality signal, not derivable from COR
+    # alone. SolvencyRatio is the C-ROSS regulatory capital-adequacy ratio
+    # (~237% at H1 FY2026 per the qualitative analysis), a key risk
+    # indicator distinct from any balance-sheet column.
+    "LossRatio": "LossRatio",
+    "ExpenseRatio": "ExpenseRatio",
+    "SolvencyRatio": "SolvencyRatio",
     # Pre-revenue JV lithium developer (Argosy Minerals, AGY.AX): Argosy
     # cannot fund the Rincon project alone and holds it through an
     # equal-board equity-accounted JV (Puna Mining S.A.), so the funding
@@ -880,6 +935,12 @@ PROMOTE_KPIS: dict[str, str] = {
     "ComparableSalesGrowthEurope": "ComparableSalesGrowthEurope",
     "StoreCount": "StoreCount",
     "EmployeesFTE": "EmployeesFTE",
+    # Auntea Jenny (Shanghai) Industrial (2589.HK): franchise/wholesale
+    # tea-shop operator where franchisee count alongside StoreCount is a
+    # core growth KPI (5,455 FY2024 -> 6,974 FY2025 -> 8,014 H1 FY2026,
+    # +39% store count YoY) -- not derivable from StoreCount, since
+    # closures (~12%/yr) and onboarding move the two counts independently.
+    "Franchisees": "Franchisees",
     # Port/terminal operators (SPN.NZ). Cargo tonnage is the operating
     # driver of a port -- the real KPI, not a proxy off revenue -- and
     # customer concentration (Tiwai smelter is ~24% of SPN.NZ FY2026
@@ -1632,6 +1693,59 @@ PROMOTE_KPIS: dict[str, str] = {
     "SegmentRevenueLatinAmerica": "SegmentRevenueLatinAmerica",
     "WholesaleRevenue": "WholesaleRevenue",
     "DTCRevenue": "DTCRevenue",
+    # Chervon Holdings Limited (2285.HK): discloses no stock-based-
+    # compensation expense line, so the dcf-analyst uses on-market share
+    # purchases funding the employee share award scheme as the SBC-cost
+    # proxy (0.3-0.4% of revenue in the model). Real valuation driver, not
+    # derivable from StockBasedComp, which this ticker leaves blank.
+    "ShareAwardSchemePurchases": "ShareAwardSchemePurchases",
+    # Li Ning Company Limited (2331.HK): EPSDiluted is stored alongside
+    # basic EPS. LeasePayments is the full lease cash payment
+    # (principal+interest) -- distinct from the blocked LeasePrincipalRepayment
+    # because this ticker has no bank debt (TotalDebt is lease liabilities
+    # only) and the DCF treats lease cost as an operating expense rather than
+    # debt service. SBCForfeitureReversal (reversals of stock-based comp for
+    # forfeited awards) became large from FY2025 onward (167.9m FY2025,
+    # 210.4m H1 FY2026) and is stored separately from gross StockBasedComp
+    # specifically so it is never netted into it.
+    "EPSDiluted": "EPSDiluted",
+    "LeasePayments": "LeasePayments",
+    "SBCForfeitureReversal": "SBCForfeitureReversal",
+    # Sunny Optical Technology (2382.HK): the company restated its segment
+    # categories from FY2025 onward (Handset/VehicleRelated/ARVR -> Handset/
+    # Vehicle/XR/OtherProducts), so the two eras are stored under different
+    # KPI names and never spliced together. HandsetRevenue (~63% of FY2025
+    # revenue, mature/declining smartphone unit market), VehicleRevenue
+    # (ADAS/smart-cabin growth driver) and XRRevenue (AR/VR optics, the
+    # emerging driver) are the revenue-mix thesis the qualitative analysis
+    # is built on and are not derivable from total Revenue alone.
+    "HandsetRevenue": "HandsetRevenue",
+    "VehicleRevenue": "VehicleRevenue",
+    "XRRevenue": "XRRevenue",
+    "OtherProductsRevenue": "OtherProductsRevenue",
+    # BOC Hong Kong Holdings (2388.HK): AdvancesAndOtherAccounts is the loan
+    # book (HK$1.28tn FY2018 to HK$1.81tn H1 FY2026) -- the standard bank
+    # growth KPI, not derivable from TotalAssets, which also carries the
+    # much larger investment-securities book. LoanToDepositRatio (69.3%
+    # FY2022 down to 58.4% FY2025) is management's own disclosed
+    # funding/liquidity ratio; deriving it from AdvancesAndOtherAccounts /
+    # CustomerDeposits would silently diverge whenever the denominator
+    # basis differs from the disclosed one.
+    "AdvancesAndOtherAccounts": "AdvancesAndOtherAccounts",
+    "LoanToDepositRatio": "LoanToDepositRatio",
+    # HealthyWay Inc. (2587.HK): a pre-IPO redemption liability on
+    # convertible-redeemable preferred shares drove the FY2023/FY2024
+    # reported net losses (-RMB313.9m/-269.2m) almost entirely through
+    # non-cash fair-value remeasurement -- pre-redemption PBT was actually
+    # +RMB4m/+9m those years, and the liability was extinguished at the
+    # Dec-2024 IPO (nil from FY2025). RedemptionLiabilityChange isolates
+    # that non-operating charge against NetIncome/OperatingIncome.
+    # NetIncomeAttributable is net income after minority interests, which
+    # diverges from the total NetIncome column by several million per
+    # period. Both populated in `kpis` but absent from PROMOTE_KPIS, so the
+    # dashboard could not chart either.
+    "RedemptionLiabilityChange": "RedemptionLiabilityChange",
+    "NetIncomeAttributable": "NetIncomeAttributable",
 }
 
 # Owner-FCF components and core-column duplicates. Listed explicitly so a

@@ -939,3 +939,21 @@ class TestGoldMinerOutputAndPerpetualCapitalPromotion:
         assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
         for n in names:
             assert schema.promote_header(n) == n
+
+
+class TestShortTermInvestmentsFVTPLPromotion:
+    """Shanghai Conant Optical (2276.HK): short-term wealth-management
+
+    products held at fair value through P&L (RMB788.5m FY2025, RMB1,024.2m
+    H1 FY2026) are a material, fast-growing balance-sheet item that the
+    dcf-analyst's net-cash bridge explicitly adds back against borrowings
+    (net cash RMB1,717.7m vs. reported cash-only RMB1,438.3m at H1 FY2026).
+    It was absent from PROMOTE_KPIS, so the true liquid-asset position could
+    not be charted beside CashAndEquivalents and TotalDebt.
+    """
+
+    def test_short_term_investments_fvtpl_is_promoted(self, patch_repo):
+        make_db(patch_repo, "SYN", ["ShortTermInvestmentsFVTPL"])
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        assert schema.promote_header("ShortTermInvestmentsFVTPL") == \
+            "ShortTermInvestmentsFVTPL"
