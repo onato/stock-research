@@ -1387,3 +1387,102 @@ class TestReturnsPanel:
         assert "Return on Invested Capital" in panel
         assert "21% US statutory" in panel
         assert "const csvGrowth =" in page
+
+
+def _header(page):
+    start = page.index('<div class="header">')
+    return page[start:page.index('<div class="overview-section">', start)]
+
+
+class TestAnalysisDate:
+    """The page says when the valuation was made -- from the DCF's own
+    valuation_date, never a build-time or invented date."""
+
+    def test_formats_the_dcf_valuation_date(self):
+        assert bd.analysis_date({"valuation_date": "2026-10-22"}) == ("2026-10-22", "22 Oct 2026")
+        assert bd.analysis_date({"valuation_date": "2026-08-05"}) == ("2026-08-05", "5 Aug 2026")
+
+    def test_missing_or_unparseable_date_is_none(self):
+        assert bd.analysis_date(None) is None
+        assert bd.analysis_date({}) is None
+        assert bd.analysis_date({"valuation_date": None}) is None
+        assert bd.analysis_date({"valuation_date": "soon"}) is None
+        assert bd.analysis_date({"valuation_date": "2026-13-40"}) is None
+
+    def test_trailing_note_after_an_iso_date_is_tolerated(self):
+        assert bd.analysis_date({"valuation_date": "2026-09-22 (morning build)"}) == ("2026-09-22", "22 Sep 2026")
+
+    def test_header_shows_the_analysis_date(self, html):
+        header = _header(html)
+        assert '<time datetime="2026-08-26">26 Aug 2026</time>' in header
+        assert "Analysis date:" in header
+
+    def test_no_dcf_no_date(self, spec, analysis, csv_text):
+        page = bd.render("TEST", spec, csv_text, analysis, None)
+        assert "Analysis date" not in page
+        assert "@@" not in page
+
+    def test_dcf_without_a_date_hides_the_line(self, spec, analysis, csv_text, dcf):
+        page = bd.render("TEST", spec, csv_text, analysis, {k: v for k, v in dcf.items() if k != "valuation_date"})
+        assert "Analysis date" not in page
+        assert "@@" not in page
+
+
+def _style(page):
+    css = page[page.index("<style>") + len("<style>"):page.index("</style>")]
+    return re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
+
+
+def _declarations(page, selector):
+    """Every declaration from rules whose selector list names `selector`."""
+    out = {}
+    for sel, body in re.findall(r"([^{}]+)\{([^{}]*)\}", _style(page)):
+        if selector in [s.strip() for s in sel.split(",")]:
+            for decl in body.split(";"):
+                if ":" in decl:
+                    k, v = decl.split(":", 1)
+                    out[k.strip()] = v.strip()
+    return out
+
+
+class TestOverflowGuards:
+    """9988.HK (2026-10-22): 'RMB1,023,670.0m' spilled out of 200px KPI
+    cards at desktop width, and at phone width the 11-column FCF grid, the
+    sensitivity table and the 350px overview / 500px chart grid minimums ran
+    off the right edge of the page."""
+
+    @pytest.mark.parametrize("cls", [".kpi-card", ".dcf-card", ".dcf-input-card", ".growth-item",
+                                     ".guidance-card", ".overview-card", ".chart-card"])
+    def test_cards_can_shrink_and_break_long_tokens(self, html, cls):
+        d = _declarations(html, cls)
+        assert d.get("min-width") == "0", cls
+        assert d.get("overflow-wrap") == "anywhere", cls
+
+    def test_kpi_value_scales_with_its_card(self, html):
+        assert _declarations(html, ".kpi-card").get("container-type") == "inline-size"
+        size = _declarations(html, ".kpi-value").get("font-size", "")
+        assert "cqi" in size
+        assert "var(--chars" in size
+
+    def test_kpi_value_carries_its_length_so_long_numbers_shrink_to_fit(self):
+        spec = {"kpis": [{"label": "Revenue", "column": "Revenue"}, {"label": "Tag", "value": "A&B"}],
+                "currency": "RMB", "units": "m"}
+        _, rows = bd.read_csv("Period,Revenue\nFY2025,1023670\n")
+        out = bd.render_kpis(spec, rows, None)
+        assert '<div class="kpi-value" style="--chars:15">RMB1,023,670.0m</div>' in out
+        # the escaped entity counts as the one character it renders
+        assert '<div class="kpi-value" style="--chars:3">A&amp;B</div>' in out
+
+    def test_no_auto_fit_grid_has_a_minimum_wider_than_its_container(self, html):
+        bare = re.findall(r"minmax\(\s*\d+px", _style(html))
+        assert bare == [], "use minmax(min(Npx, 100%), 1fr) so the track can fit a phone"
+
+    def test_sensitivity_table_scrolls_inside_its_section(self, html):
+        assert re.search(r'<div class="table-scroll">\s*<table class="sensitivity-table"', html)
+        assert _declarations(html, ".table-scroll").get("overflow-x") == "auto"
+
+    def test_fcf_projection_grid_keeps_readable_columns_and_scrolls(self, html):
+        script = inline_script(html)
+        assert "repeat(${cols.length}, 1fr)" not in script
+        assert re.search(r"repeat\(\$\{cols\.length\}, minmax\((?:\d+px|max-content), 1fr\)\)", script)
+        assert _declarations(html, ".fcf-projection-table").get("overflow-x") == "auto"

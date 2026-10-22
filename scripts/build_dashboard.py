@@ -46,6 +46,7 @@ Spec contract (validated by `validate_spec`):
 from __future__ import annotations
 
 import csv
+import datetime
 import html
 import io
 import json
@@ -444,6 +445,8 @@ def render_kpis(spec: dict[str, Any], rows: list[dict[str, str]],
         else:
             v = num(latest.get(k["column"])) if "column" in k else F.num(dcf_get(dcf, k["dcf_path"]))
             value_text = fmt_value(v, fmt, currency, units)
+        # Rendered length, so the CSS can shrink a long number to fit its card.
+        chars = max(1, len(html.unescape(value_text)))
         change = k.get("change")
         positive = bool(k.get("positive", True))
         change_text = ""
@@ -457,7 +460,7 @@ def render_kpis(spec: dict[str, Any], rows: list[dict[str, str]],
             change_text = html.escape(str(change))
         cards.append(
             '    <div class="kpi-card">\n'
-            f'        <div class="kpi-value">{value_text}</div>\n'
+            f'        <div class="kpi-value" style="--chars:{chars}">{value_text}</div>\n'
             f'        <div class="kpi-label">{html.escape(str(k["label"]))}</div>\n'
             + (f'        <div class="kpi-change {"positive" if positive else "negative"}">'
                f'{change_text}</div>\n' if change_text else "")
@@ -689,7 +692,9 @@ def render_dcf_section(ticker: str, spec: dict[str, Any], dcf: dict[str, Any],
 
   <div class="sensitivity-section">
     <h4>Sensitivity Analysis: Intrinsic Value by WACC &amp; Terminal Growth (Base Case)</h4>
-    <table class="sensitivity-table" id="sensitivityMatrix"></table>
+    <div class="table-scroll">
+      <table class="sensitivity-table" id="sensitivityMatrix"></table>
+    </div>
   </div>
 
   <div class="historical-growth">
@@ -775,6 +780,31 @@ def plain_text(spec: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def analysis_date(dcf: dict[str, Any] | None) -> tuple[str, str] | None:
+    """(ISO date, display date) from the DCF's own valuation_date, or None.
+
+    Only a leading YYYY-MM-DD that is a real calendar date counts; anything
+    else hides the line rather than showing a guessed or build-time date.
+    """
+    raw = (dcf or {}).get("valuation_date")
+    m = re.match(r"\d{4}-\d{2}-\d{2}", str(raw)) if raw else None
+    if not m:
+        return None
+    try:
+        d = datetime.date.fromisoformat(m.group(0))
+    except ValueError:
+        return None
+    return d.isoformat(), f"{d.day} {d:%b %Y}"
+
+
+def render_analysis_date(dcf: dict[str, Any] | None) -> str:
+    found = analysis_date(dcf)
+    if not found:
+        return ""
+    iso, text = found
+    return f'<p class="analysis-date">Analysis date: <time datetime="{iso}">{text}</time></p>'
+
+
 def render(ticker: str, spec: dict[str, Any], csv_text: str,
            analysis: dict[str, Any], dcf: dict[str, Any] | None) -> str:
     spec = plain_text(spec)
@@ -796,6 +826,7 @@ def render(ticker: str, spec: dict[str, Any], csv_text: str,
         "@@COMPANY_HTML@@": html.escape(company, quote=False),
         "@@TICKER@@": html.escape(ticker),
         "@@DESCRIPTOR@@": str(spec["descriptor"]),
+        "@@ANALYSIS_DATE@@": render_analysis_date(dcf),
         "@@KPI_CARDS@@": render_kpis(spec, rows, dcf),
         "@@SECTIONS@@": render_sections(spec, data),
         "@@DCF_SECTION@@": render_dcf_section(
