@@ -72,6 +72,12 @@ endif
 	@# The scoring/digest/screen steps above all write files that no
 	@# commit_ticker owns; without this they accumulate in the working tree.
 	@$(MAKE) --no-print-directory commit-scores || true
+	@# The parser's PROMOTE_KPIS edits are shared across tickers, so no
+	@# commit_ticker owns them either; committed once, gated on the code tests.
+	@$(MAKE) --no-print-directory commit-kpis || true
+
+commit-kpis: ## Commit the batch's schema.py KPI promotions + tests, if the code tests, lint and typecheck pass
+	@bash -c 'REPO_ROOT="$(CURDIR)"; LOG_DIR=state/logs; PUSH=0; . $(SCRIPTS)/lib.sh; commit_kpi_promotions'
 
 sync-portfolio: ## Regenerate queue/priority.txt from ../portfolio-tracker (no-op without it)
 	@$(PY) $(SCRIPTS)/sync_portfolio_queue.py

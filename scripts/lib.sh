@@ -233,6 +233,41 @@ Automated local run via scripts/"
 }
 
 # ---------------------------------------------------------------------------
+# commit_kpi_promotions
+#
+# Commits the batch's shared KPI edits: the financial-parser adds each
+# ticker's new KPIs to schema.py's PROMOTE_KPIS (with tests), and neither
+# commit_ticker nor commit-scores stages those files, so they piled up in the
+# working tree after every batch. Several tickers edit them concurrently, so
+# this runs once at the end of `make run`, and only when KPI_GATE (the code tests,
+# lint and typecheck gates) passes; otherwise the edits stay for a human.
+# The commit names its paths so nothing else staged rides along.
+# ---------------------------------------------------------------------------
+KPI_FILES=(scripts/schema.py tests/test_schema.py tests/test_kpi_coverage.py)
+
+commit_kpi_promotions() {
+  local changed
+  changed="$(git status --porcelain -- "${KPI_FILES[@]}")"
+  if [ -z "$changed" ]; then
+    echo "no KPI promotions to commit"
+    return 0
+  fi
+
+  # `slow` tests are data gates over the live corpus (test_corpus_units),
+  # not code tests; a known data gap there must not block a schema commit.
+  if ! bash -c "${KPI_GATE:-uv run pytest -q -m 'not slow' && make lint typecheck}"; then
+    echo "KPI promotions not committed: the test gates failed --" \
+         "fix them and commit ${KPI_FILES[*]} by hand" >&2
+    return 0
+  fi
+
+  git commit -q -m "feat: promote batch KPIs to the Metrics CSV" \
+    -m "Automated via make run: PROMOTE_KPIS entries and tests the
+financial-parser added during the batch." -- "${KPI_FILES[@]}" \
+    && echo "committed KPI promotions"
+}
+
+# ---------------------------------------------------------------------------
 # with_git_lock <ticker> <command...>
 #
 # Serializes git access across concurrent runners. Uses an mkdir spinlock
