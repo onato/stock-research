@@ -1,0 +1,5095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obayashi Corporation (1802.T) Financial Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 20px;
+}
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+}
+.header h1 {
+    font-size: 2.5rem;
+    background: linear-gradient(90deg, #00d4aa, #00b894);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+}
+.header p {
+    color: #888;
+    font-size: 1.1rem;
+}
+/* Headline valuation chip — fills the wide, otherwise-empty header strip so the
+   number the reader should act on is visible without scrolling to the DCF. */
+.header-valuation {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 14px 32px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.hv-item {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+.hv-label {
+    font-size: 0.75rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.hv-value {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #e0e0e0;
+}
+.hv-value.positive { color: #00d4aa; }
+.hv-value.negative { color: #ff6b6b; }
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.kpi-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.kpi-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 212, 170, 0.2);
+}
+.kpi-value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #00d4aa;
+    margin-bottom: 5px;
+}
+.kpi-label {
+    font-size: 0.85rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.kpi-change {
+    font-size: 0.9rem;
+    margin-top: 5px;
+}
+.kpi-change.positive { color: #00d4aa; }
+.kpi-change.negative { color: #ff6b6b; }
+/* Guidance Section */
+.guidance-section {
+    max-width: 1400px;
+    margin: 0 auto 30px;
+}
+.guidance-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+.guidance-header h3 {
+    color: #fff;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.guidance-header h3::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894);
+    border-radius: 2px;
+}
+.guidance-meta {
+    font-size: 0.85rem;
+    color: #888;
+}
+.guidance-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+.guidance-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.2s ease;
+}
+.guidance-card:hover {
+    transform: translateY(-2px);
+}
+.guidance-metric {
+    font-size: 0.8rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+.guidance-target {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: #00d4aa;
+    margin-bottom: 6px;
+}
+.guidance-period {
+    font-size: 0.85rem;
+    color: #e0e0e0;
+    margin-bottom: 8px;
+}
+.guidance-vs-prior {
+    display: inline-block;
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+.guidance-vs-prior.raised {
+    background: rgba(0, 212, 170, 0.15);
+    color: #00d4aa;
+}
+.guidance-vs-prior.lowered {
+    background: rgba(255, 107, 107, 0.15);
+    color: #ff6b6b;
+}
+.guidance-vs-prior.maintained {
+    background: rgba(255, 255, 255, 0.1);
+    color: #888;
+}
+.guidance-vs-prior.new {
+    background: rgba(99, 102, 241, 0.15);
+    color: #818cf8;
+}
+.guidance-notes {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 8px;
+    line-height: 1.4;
+}
+.guidance-commentary {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    padding: 16px 20px;
+    border-left: 3px solid #00d4aa;
+    font-style: italic;
+    color: #b0b0b0;
+    line-height: 1.6;
+}
+.guidance-commentary::before {
+    content: '"';
+    font-size: 1.5rem;
+    color: #00d4aa;
+    margin-right: 4px;
+}
+.section-title {
+    font-size: 1.5rem;
+    color: #fff;
+    margin: 40px auto 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid rgba(0, 212, 170, 0.3);
+    max-width: 1400px;
+}
+.charts-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(500px, 100%), 1fr));
+    gap: 25px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+.chart-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    padding: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+.chart-header h3 {
+    color: #fff;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.chart-header h3::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 20px;
+    background: linear-gradient(180deg, #00d4aa, #00b894);
+    border-radius: 2px;
+}
+.help-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(0, 212, 170, 0.2);
+    border: 1px solid #00d4aa;
+    color: #00d4aa;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+.help-btn:hover {
+    background: #00d4aa;
+    color: #1a1a2e;
+}
+.chart-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.view-toggle {
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #888;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.view-toggle:hover {
+    border-color: #0984e3;
+    color: #0984e3;
+}
+.view-toggle.active {
+    background: rgba(9, 132, 227, 0.2);
+    border-color: #0984e3;
+    color: #0984e3;
+}
+.log-toggle {
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #888;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.log-toggle:hover {
+    border-color: #00d4aa;
+    color: #00d4aa;
+}
+.log-toggle.active {
+    background: rgba(0, 212, 170, 0.2);
+    border-color: #00d4aa;
+    color: #00d4aa;
+}
+.chart-wrapper {
+    position: relative;
+    height: 300px;
+}
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+    background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%);
+    border-radius: 16px;
+    max-width: 600px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    border: 1px solid rgba(0, 212, 170, 0.3);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.modal-header {
+    padding: 20px 25px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.modal-header h3 {
+    color: #00d4aa;
+    font-size: 1.4rem;
+    margin: 0;
+}
+.modal-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 107, 107, 0.2);
+    border: 1px solid #ff6b6b;
+    color: #ff6b6b;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.modal-close:hover {
+    background: #ff6b6b;
+    color: #fff;
+}
+.modal-body {
+    padding: 25px;
+    line-height: 1.7;
+}
+.modal-body p { margin-bottom: 15px; }
+.modal-body strong { color: #00d4aa; }
+.modal-body ul { margin: 15px 0; padding-left: 20px; }
+.modal-body li { margin-bottom: 8px; }
+.metric-highlight {
+    background: rgba(0, 212, 170, 0.1);
+    border-left: 3px solid #00d4aa;
+    padding: 12px 15px;
+    margin: 15px 0;
+    border-radius: 0 8px 8px 0;
+}
+/* Investment Overview Section */
+.overview-section {
+    max-width: 1400px;
+    margin: 0 auto 30px;
+}
+.overview-toggle {
+    width: 100%;
+    background: rgba(0, 212, 170, 0.1);
+    border: 1px solid rgba(0, 212, 170, 0.3);
+    border-radius: 12px;
+    padding: 16px 24px;
+    color: #00d4aa;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s ease;
+}
+.overview-toggle:hover {
+    background: rgba(0, 212, 170, 0.2);
+}
+.overview-toggle .arrow {
+    transition: transform 0.3s ease;
+}
+.overview-toggle.active .arrow {
+    transform: rotate(180deg);
+}
+.overview-content {
+    display: none;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    padding: 30px;
+    margin-top: -12px;
+}
+.overview-content.active {
+    display: block;
+}
+.overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(350px, 100%), 1fr));
+    gap: 25px;
+}
+.overview-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.overview-card h3 {
+    color: #00d4aa;
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.overview-card p {
+    margin-bottom: 12px;
+    line-height: 1.6;
+}
+.overview-card ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.overview-card li {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    line-height: 1.5;
+}
+.overview-card li:last-child {
+    border-bottom: none;
+}
+.overview-card.bull h3 { color: #00d4aa; }
+.overview-card.bear h3 { color: #ff6b6b; }
+.overview-card.risks h3 { color: #fdcb6e; }
+.risk-high { color: #ff6b6b; }
+.risk-moderate { color: #fdcb6e; }
+.risk-low { color: #00d4aa; }
+.revenue-stream {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.revenue-stream .percent {
+    color: #00d4aa;
+    font-weight: 600;
+}
+.trend-growing { color: #00d4aa; }
+.trend-stable { color: #888; }
+.trend-declining { color: #ff6b6b; }
+
+@media (max-width: 768px) {
+    .charts-container { grid-template-columns: 1fr; }
+    .overview-grid { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.8rem; }
+}
+/* DCF Valuation Section */
+.dcf-section {
+    max-width: 1400px;
+    margin: 0 auto 40px;
+}
+.dcf-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+.dcf-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease;
+}
+.dcf-card:hover {
+    transform: translateY(-3px);
+}
+.dcf-card.highlight {
+    background: rgba(0, 212, 170, 0.1);
+    border-color: rgba(0, 212, 170, 0.3);
+}
+.dcf-label {
+    font-size: 0.85rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+}
+.dcf-value {
+    font-size: 2.2rem;
+    font-weight: bold;
+    color: #00d4aa;
+}
+.dcf-card:not(.highlight) .dcf-value {
+    color: #fff;
+}
+.dcf-change {
+    font-size: 1rem;
+    margin-top: 8px;
+    font-weight: 600;
+}
+.dcf-change.positive { color: #00d4aa; }
+.dcf-change.negative { color: #ff6b6b; }
+.dcf-sublabel {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 8px;
+}
+.dcf-warning {
+    background: rgba(253, 203, 110, 0.15);
+    border: 1px solid rgba(253, 203, 110, 0.4);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 25px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #fdcb6e;
+}
+.warning-icon {
+    font-size: 1.2rem;
+}
+/* DCF Inputs Display */
+.dcf-inputs {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.dcf-inputs h4 {
+    color: #e0e0e0;
+    margin-bottom: 15px;
+    font-size: 1rem;
+}
+.dcf-inputs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+.dcf-input-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.dcf-input-label {
+    font-size: 0.75rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+.dcf-input-value {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #00d4aa;
+}
+.dcf-input-note {
+    font-size: 0.7rem;
+    color: #666;
+    margin-top: 4px;
+}
+.fcf-projections h5 {
+    color: #b0b0b0;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+}
+.fcf-projection-table {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 12px;
+}
+.fcf-projection-item {
+    text-align: center;
+}
+.fcf-projection-item.header {
+    font-size: 0.75rem;
+    color: #888;
+    font-weight: 600;
+}
+.fcf-projection-item .year {
+    font-size: 0.75rem;
+    color: #888;
+    margin-bottom: 2px;
+}
+.fcf-projection-item .fcf-value {
+    font-size: 1rem;
+    color: #e0e0e0;
+    font-weight: 500;
+}
+.fcf-projection-item .growth-rate {
+    font-size: 0.75rem;
+    color: #00d4aa;
+    margin-top: 2px;
+}
+.dcf-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+    gap: 25px;
+    margin-bottom: 30px;
+    padding: 25px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.slider-group label {
+    font-size: 0.95rem;
+    color: #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+}
+.slider-group label span {
+    color: #00d4aa;
+    font-weight: 600;
+}
+.slider-group input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #00d4aa;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+.slider-group input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+.slider-hint {
+    font-size: 0.8rem;
+    color: #666;
+}
+.scenario-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+.scenario-tab {
+    padding: 10px 24px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: transparent;
+    color: #888;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+}
+.scenario-tab:hover {
+    border-color: rgba(0, 212, 170, 0.5);
+    color: #e0e0e0;
+}
+.scenario-tab.active {
+    background: rgba(0, 212, 170, 0.15);
+    border-color: #00d4aa;
+    color: #00d4aa;
+}
+.scenario-details {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.scenario-details h4 {
+    color: #00d4aa;
+    margin-bottom: 15px;
+}
+.assumption-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+    gap: 15px;
+}
+.assumption-item {
+    text-align: center;
+}
+.assumption-item .label {
+    font-size: 0.8rem;
+    color: #888;
+    margin-bottom: 4px;
+}
+.assumption-item .value {
+    font-size: 1.1rem;
+    color: #e0e0e0;
+    font-weight: 500;
+}
+.sensitivity-section {
+    margin-bottom: 30px;
+}
+.sensitivity-section h4 {
+    color: #e0e0e0;
+    margin-bottom: 15px;
+}
+.sensitivity-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.sensitivity-table th,
+.sensitivity-table td {
+    padding: 12px 16px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.sensitivity-table th {
+    background: rgba(0, 212, 170, 0.1);
+    color: #00d4aa;
+    font-weight: 600;
+}
+.sensitivity-table td {
+    color: #e0e0e0;
+}
+.sensitivity-table td.highlight {
+    background: rgba(0, 212, 170, 0.15);
+    color: #00d4aa;
+    font-weight: 600;
+}
+.sensitivity-table td.below-current {
+    color: #ff6b6b;
+}
+.sensitivity-table td.above-current {
+    color: #00d4aa;
+}
+.historical-growth {
+    margin-bottom: 30px;
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    gap: 24px;
+    align-items: start;
+}
+.historical-growth > :only-child { grid-column: 1 / -1; }
+@media (max-width: 900px) {
+    .historical-growth { grid-template-columns: minmax(0, 1fr); }
+}
+.returns-note, .growth-item .reason {
+    font-size: 0.75rem;
+    color: #888;
+    margin-top: 8px;
+    line-height: 1.4;
+}
+.historical-growth h4 {
+    color: #e0e0e0;
+    margin-bottom: 15px;
+}
+.growth-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
+    gap: 15px;
+}
+.growth-item {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.growth-item .metric {
+    font-size: 0.8rem;
+    color: #888;
+    margin-bottom: 6px;
+}
+.growth-item .rate {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+.growth-item .rate.positive { color: #00d4aa; }
+.growth-item .rate.negative { color: #ff6b6b; }
+.growth-item.selected {
+    border-color: #00d4aa;
+    background: rgba(0, 212, 170, 0.1);
+}
+.dcf-download {
+    text-align: center;
+    margin-top: 30px;
+}
+.download-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 28px;
+    background: rgba(0, 212, 170, 0.15);
+    border: 1px solid #00d4aa;
+    border-radius: 8px;
+    color: #00d4aa;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+.download-btn:hover {
+    background: #00d4aa;
+    color: #1a1a2e;
+}
+.download-icon {
+    font-size: 1.2rem;
+}
+/* Additions beyond the original agent template */
+.section-subtitle { font-size: 0.9rem; color: #888; max-width: 1400px; margin: -12px auto 20px; }
+.kpi-note { font-size: 0.75rem; color: #666; margin-top: 6px; line-height: 1.3; }
+.chart-annotation {
+    font-size: 0.75rem; color: #fdcb6e; background: rgba(253, 203, 110, 0.08);
+    border-left: 2px solid #fdcb6e; padding: 6px 10px; margin-top: 10px; border-radius: 0 6px 6px 0;
+}
+.dcf-philosophy {
+    background: rgba(255, 255, 255, 0.03); border-left: 3px solid #00d4aa; border-radius: 0 10px 10px 0;
+    padding: 16px 20px; margin-bottom: 25px; font-size: 0.92rem; line-height: 1.7; color: #b0b0b0;
+}
+.dcf-philosophy strong { color: #00d4aa; }
+.scenario-narrative { font-size: 0.9rem; color: #b0b0b0; line-height: 1.6; margin-bottom: 18px; }
+.dcf-banner {
+    max-width: 1400px; margin: 0 auto 25px; background: rgba(255, 107, 107, 0.12);
+    border: 1px solid rgba(255, 107, 107, 0.4); border-radius: 8px; padding: 12px 16px; color: #ff6b6b;
+}
+/* Overflow guards (9988.HK, 2026-10-22). Grid/flex children default to
+   min-width:auto, so one unbreakable token -- "RMB1,023,670.0m", a long
+   ticker, a URL in a note -- widened its card past the track and spilled.
+   min-width:0 lets the track win; overflow-wrap:anywhere breaks the token
+   only when it cannot fit whole. */
+.kpi-card, .dcf-card, .dcf-input-card, .growth-item, .guidance-card,
+.overview-card, .chart-card, .hv-item, .scenario-details, .dcf-philosophy {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+/* KPI numbers shrink to fit their card before they wrap: --chars is the
+   value's rendered length (build_dashboard.render_kpis). Measured on
+   9988.HK, a currency+digits+unit token runs ~0.62em per character, so
+   140cqi / chars leaves a ~13% margin inside the card. */
+.kpi-card { container-type: inline-size; }
+.kpi-value { font-size: clamp(1rem, calc(140cqi / var(--chars, 8)), 1.8rem); }
+.chart-header { gap: 10px; }
+.chart-header h3 { min-width: 0; overflow-wrap: anywhere; }
+.guidance-header { flex-wrap: wrap; gap: 6px 16px; }
+.header .analysis-date {
+    font-size: 0.85rem; color: #9aa4b2; margin-top: 6px; letter-spacing: 0.3px;
+}
+.header .analysis-date time { color: #e0e0e0; font-weight: 600; }
+/* Wide numeric grids scroll inside their box rather than off the page. */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-scroll .sensitivity-table th, .table-scroll .sensitivity-table td { white-space: nowrap; }
+.fcf-projection-table { overflow-x: auto; }
+.fcf-projection-item .fcf-value { white-space: nowrap; }
+@media (max-width: 600px) {
+    body { padding: 12px; }
+    .sensitivity-table th, .sensitivity-table td { padding: 8px 10px; }
+}
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Obayashi Corporation (1802.T)</h1>
+    <p>Operating company &middot; reported in JPY</p>
+    <p class="analysis-date">Analysis date: <time datetime="2026-10-26">26 Oct 2026</time></p>
+    <div class="header-valuation" id="headerValuation" style="display:none"></div>
+</div>
+
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid" id="overviewGrid"></div>
+    </div>
+</div>
+
+<div class="kpi-grid" id="kpiGrid">
+    <div class="kpi-card">
+        <div class="kpi-value" style="--chars:13">¥2,586,258.0m</div>
+        <div class="kpi-label">Revenue (latest FY)</div>
+        <div class="kpi-change negative">-1.3% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value" style="--chars:11">¥173,759.0m</div>
+        <div class="kpi-label">Net Income</div>
+        <div class="kpi-change positive">+19.0% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value" style="--chars:11">¥127,290.0m</div>
+        <div class="kpi-label">Free Cash Flow (reported)</div>
+        <div class="kpi-change positive">+259.1% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value" style="--chars:11">¥122,056.0m</div>
+        <div class="kpi-label">Owner FCF (DCF base)</div>
+        <div class="kpi-change positive">after SBC, interest income &amp; leases</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value" style="--chars:11">¥416,028.0m</div>
+        <div class="kpi-label">Cash &amp; Equivalents</div>
+        <div class="kpi-change positive">+9.4% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value" style="--chars:11">¥344,064.0m</div>
+        <div class="kpi-label">Total Debt</div>
+        <div class="kpi-change negative">-5.2% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value" style="--chars:5">687.4</div>
+        <div class="kpi-label">Shares Outstanding (m)</div>
+        <div class="kpi-change negative">-3.3% YoY</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value" style="--chars:5">249.4</div>
+        <div class="kpi-label">EPS</div>
+        <div class="kpi-change positive">+22.3% YoY</div>
+    </div>
+</div>
+
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf">-</span> | <span id="guidanceFY">-</span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<h2 class="section-title">Growth &amp; Profitability</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Revenue &amp; YoY Growth</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('revenueChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('revenueChart', 'interim', this)">Q</button>
+                <button class="help-btn" onclick="openModal('revenue')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="revenueChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Margins</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('marginsChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('marginsChart', 'interim', this)">Q</button>
+                <button class="help-btn" onclick="openModal('margins')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="marginsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Gross Profit, Operating Income &amp; Net Income</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('profitChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('profitChart', 'interim', this)">Q</button>
+                <button class="log-toggle" onclick="toggleLogScale('profitChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('profit')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="profitChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>EBITDA &amp; EBITDA Margin</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('ebitdaChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('ebitda')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="ebitdaChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>EPS &amp; Dividend per Share</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('epsDps')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="epsDpsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Revenue by Segment</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('segmentMix')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="segmentMixChart"></canvas></div>
+        <div class="chart-annotation">Segment data is not reported for FY2013, FY2018 or quarterly Q1/Q3 periods; those periods show as gaps, not zero revenue.</div>
+    </div>
+</div>
+<h2 class="section-title">Cash Flow &amp; Balance Sheet</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Income vs Free Cash Flow vs Owner FCF</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('fcfChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('fcfChart', 'interim', this)">Q</button>
+                <button class="help-btn" onclick="openModal('fcf')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="fcfChart"></canvas></div>
+        <div class="chart-annotation">Owner FCF, where shown, is the DCF's series after SBC, interest income and lease principal.</div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Operating Cash Flow &amp; CapEx</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('ocfCapex')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="ocfCapexChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Cash vs Total Debt</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('cashDebtChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('cashDebtChart', 'interim', this)">Q</button>
+                <button class="help-btn" onclick="openModal('cashDebt')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="cashDebtChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shareholders&#x27; Equity vs Total Liabilities</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('balanceChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('balanceChart', 'interim', this)">Q</button>
+                <button class="log-toggle" onclick="toggleLogScale('balanceChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('balanceSheet')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="balanceChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Stock-Based Comp &amp; Shares Outstanding</h3>
+            <div class="chart-header-actions">
+                <button class="view-toggle active" onclick="setPeriodView('sbcChart', 'annual', this)">FY</button>
+                <button class="view-toggle" onclick="setPeriodView('sbcChart', 'interim', this)">Q</button>
+                <button class="help-btn" onclick="openModal('sbc')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="sbcChart"></canvas></div>
+    </div>
+</div>
+
+<h2 class="section-title">DCF Valuation</h2>
+
+<div class="dcf-section">
+  <div class="dcf-philosophy" id="dcfPhilosophy"></div>
+
+  <div class="dcf-summary">
+    <div class="dcf-card highlight">
+      <div class="dcf-label">Prob-Weighted IV</div>
+      <div class="dcf-value" id="dcfWeighted">-</div>
+      <div class="dcf-change" id="dcfWeightedUpside"></div>
+      <div class="dcf-sublabel" id="dcfWeightedSublabel">-</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Intrinsic Value (Base)</div>
+      <div class="dcf-value" id="dcfIV">-</div>
+      <div class="dcf-change positive" id="dcfUpside"></div>
+      <div class="dcf-sublabel">Owner FCF &mdash; after SBC, interest income &amp; leases</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Entry Price (15% CAGR)</div>
+      <div class="dcf-value" id="dcfEntry">-</div>
+      <div class="dcf-sublabel">Buy below for a 15% annual return (incl. interim FCF)</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Current Price</div>
+      <div class="dcf-value" id="dcfCurrent">-</div>
+      <div class="dcf-sublabel">as of 2026-10-26</div>
+    </div>
+  </div>
+
+  <div class="dcf-warning" id="growthWarning" style="display: none;">
+    <span class="warning-icon">&#9888;</span>
+    <span id="warningText"></span>
+  </div>
+
+  <div class="dcf-inputs">
+    <h4>DCF Model Inputs</h4>
+    <div class="dcf-inputs-grid">
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Base Owner FCF (FY2026)</div>
+        <div class="dcf-input-value" id="baseFCF">-</div>
+        <div class="dcf-input-note" id="sbcBreakdown">Starting point for projections</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Shares Outstanding</div>
+        <div class="dcf-input-value" id="sharesOut">-</div>
+        <div class="dcf-input-note" id="dilutionNote"></div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Net Debt</div>
+        <div class="dcf-input-value" id="netDebt">-</div>
+        <div class="dcf-input-note">Negative = net cash</div>
+      </div>
+    </div>
+    <div class="fcf-projections">
+      <h5>Projected FCF</h5>
+      <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+    </div>
+  </div>
+
+  <!-- step is fine enough to hold every scenario default exactly; a range
+       input snaps to its step and 7.5 became 8 on NPH.NZ with step="1". -->
+  <div class="slider-hint" id="dcfEngineNote" style="max-width:1400px;margin:0 auto 8px"></div>
+  <div class="dcf-controls">
+    <div class="slider-group">
+      <label>Growth Rate (Yr 1): <span id="growthValue">-</span></label>
+      <input type="range" id="growthSlider" min="-5" max="30" value="13.9" step="0.1" oninput="updateDCFDisplay()">
+      <div class="slider-hint" id="growthHint">Base-case Year-1 revenue growth</div>
+    </div>
+    <div class="slider-group">
+      <label>WACC: <span id="waccValue">-</span></label>
+      <input type="range" id="waccSlider" min="6" max="18" value="7.5" step="0.05" oninput="updateDCFDisplay()">
+    </div>
+    <div class="slider-group">
+      <label>Terminal Growth: <span id="terminalValue">-</span></label>
+      <input type="range" id="terminalSlider" min="0" max="5" value="1" step="0.1" oninput="updateDCFDisplay()">
+    </div>
+  </div>
+
+  <div class="scenario-tabs">
+    <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+    <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+    <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+  </div>
+
+  <div class="scenario-details" id="scenarioDetails">
+    <h4>Assumptions</h4>
+    <div class="scenario-narrative" id="scenarioNarrative"></div>
+    <div class="assumption-grid" id="assumptionGrid"></div>
+  </div>
+
+  <div class="sensitivity-section">
+    <h4>Sensitivity Analysis: Intrinsic Value by WACC &amp; Terminal Growth (Base Case)</h4>
+    <div class="table-scroll">
+      <table class="sensitivity-table" id="sensitivityMatrix"></table>
+    </div>
+  </div>
+
+  <div class="historical-growth">
+    <div class="growth-block">
+      <h4>Historical Growth Rates (CAGR)</h4>
+      <div class="growth-grid" id="growthGrid"></div>
+    </div>
+    <div class="returns-block"><h4>Return on Invested Capital</h4><div class="growth-grid"><div class="growth-item"><div class="metric">ROIC FY2026</div><div class="rate positive">11.6%</div></div><div class="growth-item"><div class="metric">ROIC 3Y avg</div><div class="rate positive">8.5%</div></div><div class="growth-item"><div class="metric">ROIC 5Y avg</div><div class="rate positive">7.1%</div></div></div><div class="returns-note">Operating income &times; (1 &minus; 30.6% JP statutory rate) &divide; average (equity + debt &minus; cash). Rate is by listing country, not domicile.</div></div>
+  </div>
+
+  <div class="dcf-download">
+    <a href="1802.T_DCF_Model.xlsx" class="download-btn" download>
+      <span class="download-icon">&#8681;</span> Download Excel Model
+    </a>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// EMBEDDED DATA (generated by scripts/build_dashboard.py -- do not hand-edit;
+// edit the Spec JSON / CSV / Analysis / DCF and rebuild)
+// ============================================================
+const csvData = `Period,Revenue,CostOfRevenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,EBITDA,NetIncome,NetMargin,EPS,OperatingCashFlow,CapEx,FreeCashFlow,ShareholdersEquity,TotalAssets,TotalLiabilities,TotalDebt,CashAndEquivalents,SharesOutstanding,StockBasedComp,DividendPerShare,EBITDABeforeSignificant,RevenueContinuing,EBITDAContinuingBeforeSignificant,EBITContinuingBeforeSignificant,Units,Currency,Backlog,OrderIntake,OrdinaryIncome,SegmentRevenueConstruction,SegmentRevenueDomesticBuilding,SegmentRevenueDomesticCivil,SegmentRevenueOther,SegmentRevenueOverseasBuilding,SegmentRevenueOverseasCivil,SegmentRevenueRealEstate
+Q1 FY2014,330559.0,308446.0,22113.0,6.7,1969.0,0.6,,3177.0,1.0,4.42,,,,396803.0,1725754.0,1297219.0,462015.0,,718.778,,,,,,,millions,JPY,,,5536.0,,,,,,,
+H1 FY2014,723602.0,675791.0,47811.0,6.6,8411.0,1.2,13894.0,6310.0,0.9,8.79,-25900.0,38165.0,-64065.0,409537.0,1719440.0,1276977.0,447935.0,96930.0,717.861,,,,,,,millions,JPY,,,12007.0,672968.0,391915.0,146355.0,22099.0,107568.0,27128.0,28534.0
+9M FY2014,1125021.0,1049588.0,75433.0,6.7,16316.0,1.5,,13850.0,1.2,19.29,,,,429105.0,1866076.0,1402827.0,519804.0,,717.989,,,,,,,millions,JPY,,,23764.0,,,,,,,
+FY2014,1612756.0,1500697.0,112059.0,6.9,31991.0,2.0,44094.0,21627.0,1.3,30.11,37962.0,68191.0,-30229.0,412456.0,1818886.0,1370778.0,428441.0,121177.0,718.266,,,,,,,millions,JPY,,,40135.0,,,,,,,
+Q1 FY2015,377423.0,351191.0,26232.0,7.0,6113.0,1.6,,6793.0,1.8,9.46,,,,423764.0,1871733.0,1412214.0,481815.0,,718.076,,,,,,,millions,JPY,,,8004.0,,,,,,,
+H1 FY2015,810786.0,755029.0,55756.0,6.9,16831.0,2.1,23492.0,14179.0,1.7,19.74,16780.0,17007.0,-227.0,437534.0,1855909.0,1382411.0,450205.0,141546.0,718.288,,,,,,,millions,JPY,,,22257.0,778969.0,461519.0,145350.0,15949.0,142034.0,30066.0,15867.0
+9M FY2015,1261440.0,1173479.0,87960.0,7.0,27645.0,2.2,,24295.0,1.9,33.83,,,,463243.0,1979170.0,1476040.0,483744.0,,718.15,,,,,,,millions,JPY,,,37753.0,,,,,,,
+FY2015,1773981.0,1642273.0,131707.0,7.4,48388.0,2.7,62780.0,28695.0,1.6,39.96,74646.0,41090.0,33556.0,507670.0,1996193.0,1446710.0,410819.0,162607.0,718.093,,,,,,,millions,JPY,,,59913.0,1673040.0,953097.0,326353.0,37082.0,330702.0,62886.0,63858.0
+H1 FY2016,834626.0,749974.0,84651.0,10.1,42538.0,5.1,49545.0,27886.0,3.3,38.84,27184.0,13818.0,13366.0,499469.0,1887360.0,1344144.0,390329.0,155618.0,717.971,,,,,,,millions,JPY,,,45537.0,798336.0,435396.0,163395.0,17698.0,163652.0,35892.0,18591.0
+9M FY2016,1296951.0,1159417.0,137533.0,10.6,74050.0,5.7,,50667.0,3.9,70.57,,,,532164.0,2034277.0,1457844.0,448159.0,,717.968,,,,,,,millions,JPY,,,79226.0,,,,,,,
+FY2016,1777834.0,1584782.0,193052.0,10.9,106380.0,6.0,120856.0,63437.0,3.6,88.36,124980.0,59148.0,65832.0,516098.0,1951907.0,1390249.0,346338.0,164802.0,717.938,,,,,,,millions,JPY,,,111208.0,1695752.0,932997.0,353909.0,35061.0,337956.0,70889.0,47020.0
+Q1 FY2017,402052.0,357003.0,45048.0,11.2,22986.0,5.7,,15949.0,4.0,22.22,,,,496502.0,1840131.0,1298689.0,346456.0,,717.777,,,,,,,millions,JPY,,,23375.0,,,,,,,
+H1 FY2017,858996.0,757015.0,101980.0,11.9,59148.0,6.9,66348.0,41572.0,4.8,57.92,38511.0,18465.0,20046.0,520796.0,1840391.0,1274972.0,328392.0,150841.0,717.749,,,,,,,millions,JPY,,,60030.0,826307.0,481380.0,153505.0,14436.0,157707.0,33713.0,18252.0
+9M FY2017,1333197.0,1170401.0,162796.0,12.2,97132.0,7.3,,70562.0,5.3,98.31,,,,574078.0,2017218.0,1396771.0,362773.0,,717.75,,,,,,,millions,JPY,,,102433.0,,,,,,,
+FY2017,1872721.0,1647787.0,224933.0,12.0,133742.0,7.1,148723.0,94501.0,5.0,131.66,158892.0,39755.0,119137.0,594160.0,2015996.0,1371919.0,273358.0,194195.0,717.765,,,,,,,millions,JPY,,,140106.0,1802525.0,1020378.0,332374.0,31400.0,367980.0,81792.0,38795.0
+Q1 FY2018,439044.0,390481.0,48563.0,11.1,24897.0,5.7,,18976.0,4.3,26.44,,,,618096.0,1990351.0,1343797.0,288519.0,,717.7,,,,,,,millions,JPY,,,27121.0,,,,,,,
+H1 FY2018,917463.0,808060.0,109403.0,11.9,62366.0,6.8,69261.0,48386.0,5.3,67.41,23261.0,29210.0,-5949.0,651938.0,2033005.0,1357063.0,291019.0,164389.0,717.787,,,,,,,millions,JPY,,,66046.0,883430.0,504695.0,161712.0,15871.0,180226.0,36796.0,18160.0
+9M FY2018,1370802.0,1201182.0,169620.0,12.4,98883.0,7.2,,75763.0,5.5,105.55,,,,686779.0,2184690.0,1472684.0,393305.0,,717.793,,,,,,,millions,JPY,,,104862.0,,,,,,,
+FY2018,1900655.0,1666351.0,234303.0,12.3,137800.0,7.3,152459.0,92662.0,4.9,129.09,114034.0,71965.0,42069.0,684836.0,2148861.0,1437336.0,276727.0,184783.0,717.809,,,,,,,millions,JPY,,,143951.0,1820947.0,1014371.0,346119.0,35141.0,383995.0,76461.0,44566.0
+Q1 FY2019,437307.0,390272.0,47034.0,10.8,23075.0,5.3,,17924.0,4.1,24.97,,,,695972.0,2049452.0,1327340.0,243459.0,,717.821,,,,,,,millions,JPY,,,25941.0,,,,,,,
+H1 FY2019,937138.0,825155.0,111982.0,11.9,65028.0,6.9,72965.0,48827.0,5.2,68.02,22970.0,24838.0,-1868.0,731815.0,2141694.0,1382405.0,271903.0,149751.0,717.833,,,,,,,millions,JPY,1654937.0,539714.0,69742.0,,,,,,,
+9M FY2019,1482513.0,1303845.0,178668.0,12.1,106550.0,7.2,,79175.0,5.3,110.3,,,,718458.0,2217788.0,1469674.0,315571.0,,717.815,,,,,,,millions,JPY,1528176.0,795171.0,113076.0,,,,,,,
+FY2019,2039685.0,1785661.0,254023.0,12.5,155480.0,7.6,173152.0,113155.0,5.5,157.65,44203.0,36552.0,7651.0,768944.0,2214512.0,1416362.0,272215.0,157699.0,717.761,,,,,,,millions,JPY,1670093.0,1327594.0,163054.0,,,,,,,
+Q1 FY2020,446720.0,396807.0,49912.0,11.2,25399.0,5.7,,22733.0,5.1,31.68,,,,766727.0,2163199.0,1366446.0,263366.0,,717.582,,,,,,,millions,JPY,1627669.0,258101.0,28112.0,,,,,,,
+H1 FY2020,965290.0,843926.0,121364.0,12.6,72764.0,7.5,82023.0,56813.0,5.9,79.17,66051.0,15981.0,50070.0,805982.0,2190336.0,1353845.0,250819.0,172093.0,717.608,,,,,,,millions,JPY,,611840.0,76751.0,917962.0,538055.0,164532.0,25149.0,185141.0,30233.0,22178.0
+9M FY2020,1498420.0,1305515.0,192905.0,12.9,118424.0,7.9,,91763.0,6.1,127.87,,,,840267.0,2264840.0,1392581.0,252838.0,,717.627,,,,,,,millions,JPY,,961039.0,125663.0,,,,,,,
+FY2020,2073043.0,1817495.0,255547.0,12.3,152871.0,7.4,172751.0,113093.0,5.5,157.59,237628.0,47471.0,190157.0,817892.0,2230297.0,1379798.0,248551.0,298945.0,717.641,,,,,,,millions,JPY,1809658.0,1555926.0,159005.0,1952419.0,1138934.0,342704.0,65580.0,398564.0,72215.0,55043.0
+Q1 FY2021,415109.0,370632.0,44477.0,10.7,19733.0,4.8,,22758.0,5.5,31.71,,,,834069.0,2218662.0,1353997.0,286438.0,,717.692,,,,,,,millions,JPY,1690375.0,154399.0,22418.0,,,,,,,
+H1 FY2021,852681.0,748985.0,103695.0,12.2,54871.0,6.4,64443.0,47155.0,5.5,65.71,-31293.0,29294.0,-60587.0,853045.0,2157669.0,1273629.0,272413.0,219209.0,717.623,,,,,,,millions,JPY,,439666.0,57127.0,808785.0,455771.0,155816.0,21902.0,164848.0,32349.0,21992.0
+9M FY2021,1276904.0,1115350.0,161554.0,12.7,86850.0,6.8,,71161.0,5.6,99.16,,,,876988.0,2224276.0,1316896.0,326899.0,,717.638,,,,,,,millions,JPY,,669119.0,91082.0,,,,,,,
+FY2021,1766893.0,1541108.0,225784.0,12.8,123161.0,7.0,143199.0,98780.0,5.6,137.64,24803.0,57431.0,-32628.0,931008.0,2272628.0,1310648.0,265952.0,236474.0,717.669,,,,,,,millions,JPY,2109230.0,1529989.0,128784.0,1683280.0,964683.0,342203.0,41186.0,304388.0,72004.0,42426.0
+Q1 FY2022,436414.0,395034.0,41379.0,9.5,14478.0,3.3,,12293.0,2.8,17.13,,,,939903.0,2296667.0,1324721.0,271944.0,,717.63,,,,,,,millions,JPY,2110180.0,315734.0,17648.0,,,,,,,
+H1 FY2022,899160.0,825975.0,73185.0,8.1,19298.0,2.1,28930.0,18889.0,2.1,26.32,21777.0,29270.0,-7493.0,950208.0,2302302.0,1320132.0,280612.0,221910.0,717.667,,,,,,,millions,JPY,,658723.0,23146.0,850262.0,509570.0,155778.0,30784.0,144946.0,39965.0,18113.0
+9M FY2022,1376141.0,1247991.0,128149.0,9.3,46105.0,3.4,,38372.0,2.8,53.49,,,,942234.0,2398770.0,1424932.0,362012.0,,717.368,,,,,,,millions,JPY,,900939.0,52746.0,,,,,,,
+FY2022,1922884.0,1768544.0,154339.0,8.0,41051.0,2.1,61742.0,39127.0,2.0,54.55,69697.0,58030.0,11667.0,955691.0,2422085.0,1433171.0,280434.0,249317.0,717.269,,,,,,,millions,JPY,2269378.0,1534281.0,49844.0,1795208.0,1059945.0,346808.0,66551.0,298818.0,89635.0,61124.0
+Q1 FY2023,410331.0,372852.0,37478.0,9.1,8434.0,2.1,,11279.0,2.7,15.73,,,,965074.0,2470878.0,1470827.0,360405.0,,717.038,,,,,,,millions,JPY,2229678.0,255389.0,12992.0,,,,,,,
+H1 FY2023,924391.0,824143.0,100248.0,10.8,41785.0,4.5,53317.0,38494.0,4.2,53.69,62732.0,46458.0,16274.0,992390.0,2502407.0,1473303.0,350142.0,321455.0,716.968,,,,,,,millions,JPY,2183012.0,563256.0,48659.0,862713.0,492020.0,151922.0,23677.0,170023.0,48746.0,38001.0
+9M FY2023,1441095.0,1285337.0,155757.0,10.8,65713.0,4.6,,56550.0,3.9,78.88,,,,982195.0,2547990.0,1528278.0,350795.0,,716.912,,,,,,,millions,JPY,2326887.0,1054038.0,73032.0,,,,,,,
+FY2023,1983888.0,1767318.0,216569.0,10.9,93800.0,4.7,117741.0,77671.0,3.9,108.34,228456.0,96589.0,131867.0,997109.0,2609929.0,1574048.0,337919.0,405633.0,716.919,,,,,,,millions,JPY,2376248.0,1493898.0,100802.0,1847688.0,1056407.0,343464.0,52324.0,343894.0,103921.0,83875.0
+Q1 FY2024,487444.0,450414.0,37030.0,7.6,4167.0,0.9,,6591.0,1.4,9.19,,,,1026515.0,2700819.0,1634529.0,363811.0,,717.193,,,,,,,millions,JPY,2339429.0,304482.0,9315.0,,,,,,,
+H1 FY2024,1081360.0,985240.0,96119.0,8.9,30843.0,2.9,43658.0,29741.0,2.8,41.48,-96710.0,33317.0,-130027.0,1071654.0,2752133.0,1638339.0,354251.0,253846.0,716.996,,,,,,,millions,JPY,2171693.0,539641.0,38009.0,1036690.0,594560.0,174665.0,25036.0,217335.0,50129.0,19634.0
+9M FY2024,1701549.0,1544966.0,156583.0,9.2,51208.0,3.0,,47492.0,2.8,66.24,,,,1069717.0,2949054.0,1836631.0,404340.0,,716.969,,,,,,,millions,JPY,2170605.0,953380.0,61098.0,,,,,,,
+FY2024,2325162.0,2105560.0,219602.0,9.4,79381.0,3.4,106498.0,75059.0,3.2,104.69,50399.0,78391.0,-27992.0,1151630.0,3017047.0,1822236.0,323883.0,326688.0,716.964,,,,,,,millions,JPY,2395601.0,1601552.0,91515.0,2206764.0,1264181.0,369367.0,51509.0,457818.0,115396.0,66888.0
+Q1 FY2025,574706.0,522929.0,51776.0,9.0,15372.0,2.7,,25847.0,4.5,36.05,,,,1115606.0,2948893.0,1789215.0,394400.0,,716.976,,,,,,,millions,JPY,2363926.0,341815.0,20300.0,,,,,,,
+H1 FY2025,1240596.0,1121789.0,118807.0,9.6,45497.0,3.7,61439.0,55100.0,4.4,76.85,-56300.0,34097.0,-90397.0,1129663.0,2961053.0,1784322.0,368344.0,259892.0,716.981,,,,,,,millions,JPY,2513424.0,905255.0,49719.0,1195125.0,635172.0,184633.0,22939.0,263790.0,111528.0,22531.0
+9M FY2025,1881161.0,1676305.0,204856.0,10.9,97172.0,5.2,,95551.0,5.1,133.27,,,,1141734.0,3064322.0,1874422.0,439649.0,,716.973,,,,,,,millions,JPY,2382450.0,1220447.0,105684.0,,,,,,,
+FY2025,2620101.0,2322267.0,297833.0,11.4,143442.0,5.5,175899.0,146052.0,5.6,203.88,85625.0,50178.0,35447.0,1158245.0,3042778.0,1832577.0,362764.0,380169.0,711.07,,,,,,,millions,JPY,,2044406.0,153383.0,2496880.0,1337171.0,402252.0,50289.0,498777.0,258678.0,72932.0
+Q1 FY2026,523763.0,469449.0,54313.0,10.4,15798.0,3.0,,18070.0,3.5,25.59,,,,1117581.0,2880973.0,1714657.0,357341.0,,702.399,,,,,,,millions,JPY,,232497.0,18396.0,,,,,,,
+H1 FY2026,1161287.0,1002456.0,158830.0,13.7,80077.0,6.9,97525.0,77967.0,6.7,110.84,20478.0,36983.0,-16505.0,1174797.0,2883408.0,1657814.0,352235.0,328101.0,696.613,,,,,,,millions,JPY,,675743.0,84547.0,1083308.0,513375.0,194287.0,32291.0,234422.0,141222.0,45687.0
+9M FY2026,1832429.0,1568885.0,263543.0,14.4,142725.0,7.8,,131761.0,7.2,188.39,,,,1194148.0,3145710.0,1897407.0,501483.0,,687.422,,,,,,,millions,JPY,,1063730.0,151645.0,,,,,,,
+FY2026,2586258.0,2221567.0,364691.0,14.1,194678.0,7.5,231031.0,173759.0,6.7,249.42,252920.0,125630.0,127290.0,1258424.0,3143449.0,1826983.0,344064.0,416028.0,687.422,,,,,,,millions,JPY,,1641646.0,204195.0,2409378.0,1138762.0,426623.0,70082.0,507992.0,336000.0,106798.0
+Q1 FY2027,623429.0,545891.0,77538.0,12.4,32700.0,5.2,,39091.0,6.3,56.87,,,,1244437.0,3063036.0,1763294.0,342856.0,,687.421,,,,,,,millions,JPY,,358545.0,36468.0,,,,,,,`;
+
+const analysis = {
+ "ticker": "1802.T",
+ "company_name": "Obayashi Corporation",
+ "analysis_date": "2026-10-26",
+ "overview": "Obayashi Corporation (株式会社大林組), founded in 1892 and headquartered in Tokyo, is one of Japan's \"Big 4\"/\"Big 5\" sogo kensetsu (super general contractors) alongside Taisei, Shimizu and Kajima (and, unlisted, Takenaka). The group builds and engineers large-scale buildings and civil infrastructure in Japan and overseas (North America, Asia, Australia/UK via the 2026 Multiplex acquisition), and also develops and holds real estate, with a fiscal year ending March 31. Domestic construction is the core of the business (roughly 60% of consolidated net sales), supplemented by overseas construction (~33%), real estate development (~4%) and smaller green-energy/new-business initiatives.",
+ "business_model": {
+  "summary": "Obayashi earns the bulk of its revenue from fixed-price and cost-reimbursable construction contracts for buildings (offices, factories, data centers, hospitals, residential) and civil engineering works (roads, tunnels, dams, rail, disaster-resilience projects), recognized over the life of often multi-year projects. A smaller real estate development/leasing segment generates revenue from selling developed properties and rental income, and is a source of lumpy gains (e.g., FY ended March 2026 real estate operating profit nearly doubled on property sales). Revenue is overwhelmingly project-based and non-recurring rather than subscription-like; margins depend heavily on the vintage of backlog pricing versus current labor/material costs, so profitability lags and then overshoots the cost cycle as old low-margin contracts roll off and new, better-priced work is recognized.",
+  "revenue_streams": [
+   {
+    "name": "Domestic Building Construction",
+    "percent": 44,
+    "trend": "growing"
+   },
+   {
+    "name": "Domestic Civil Engineering",
+    "percent": 17,
+    "trend": "stable"
+   },
+   {
+    "name": "Overseas Construction (Building + Civil)",
+    "percent": 33,
+    "trend": "growing"
+   },
+   {
+    "name": "Real Estate Development",
+    "percent": 4,
+    "trend": "volatile/lumpy"
+   },
+   {
+    "name": "Other (green energy, new business initiatives)",
+    "percent": 3,
+    "trend": "growing"
+   }
+  ],
+  "customer_type": "B2B/B2G — private developers, corporates and manufacturers (semiconductor fabs, data centers, logistics) for building construction; national/local government and utilities for civil engineering and disaster-resilience work; real estate development adds a smaller owned-asset/leasing and for-sale income stream",
+  "geographic_mix": "Domestic Japan roughly two-thirds of consolidated net sales; overseas construction (North America, Asia, and now Australia/UK/Canada via Multiplex) around one-third and growing, aided by the GCON (US data center/semiconductor contractor, acquired FY2025) and Multiplex (announced June 2026) acquisitions"
+ },
+ "competitive_position": {
+  "main_competitors": [
+   "Taisei Corporation (1801.T)",
+   "Shimizu Corporation (unlisted)",
+   "Kajima Corporation (1812.T)",
+   "Takenaka Corporation (unlisted)",
+   "Toda Corporation",
+   "Maeda Corporation"
+  ],
+  "market_position": "One of Japan's top-tier general contractors by revenue and technical capability, part of an oligopolistic group that dominates the largest, most technically demanding domestic projects (skyscrapers, long tunnels, dams, data centers, disaster-recovery work), while the broader Japanese construction market remains highly fragmented among thousands of smaller contractors",
+  "moat_factors": [
+   {
+    "factor": "Technical/engineering track record",
+    "strength": "moderate",
+    "description": "Over 130 years of experience on complex infrastructure and high-rise projects builds a qualification and trust advantage with large developers and government agencies that smaller contractors cannot easily replicate"
+   },
+   {
+    "factor": "Scale and balance sheet",
+    "strength": "moderate",
+    "description": "Size and bonding capacity allow bidding on multi-year, multi-billion-yen projects beyond the reach of smaller rivals"
+   },
+   {
+    "factor": "Government/public-sector relationships",
+    "strength": "moderate",
+    "description": "Long-standing prequalified status on public infrastructure, resilience and disaster-recovery tenders provides recurring access to large public works"
+   },
+   {
+    "factor": "Oligopoly structure among the Big 4/5",
+    "strength": "moderate",
+    "description": "Limits the number of credible bidders for mega-projects, though competition among the five peers for major tenders remains real (and, historically, has tipped into illegal bid-rigging — see risks)"
+   }
+  ],
+  "weaknesses": [
+   "General contracting is fundamentally a thin-moat, highly competitive, labor-intensive business; Obayashi's own operating margin was only ~2% as recently as FY2022 (year ended March 2022)",
+   "Limited pricing power on legacy fixed-price contracts signed before recent cost inflation, which depressed margins for years until the backlog rolled over",
+   "No real product differentiation versus Taisei/Shimizu/Kajima/Takenaka on most tenders; price and schedule are often the deciding factors",
+   "History of regulatory/compliance risk — Obayashi was one of four Big-4 contractors found guilty of bid-rigging on the Linear Chuo Shinkansen maglev project in 2018",
+   "Heavy reliance on a shrinking, aging domestic skilled labor force, which increasingly constrains how much work the company can actually take on regardless of order demand"
+  ]
+ },
+ "growth_drivers": [
+  "Post-inflation backlog repricing: operating margin recovered from roughly 2% (FY2022) to 7.5% (fiscal year ended March 2026) as pre-2022 fixed-price contracts rolled off and newer, cost-reflective contracts were recognized",
+  "Japan's semiconductor/data center construction boom — TSMC/JASM-type fab ecosystem buildout plus hyperscale and urban data center demand; Obayashi's FY2025-acquired US subsidiary GCON specializes in semiconductor/data center construction, and the company launched its own urban data center venture, MiTASUN, targeting roughly ¥100 billion of investment with a first Tokyo facility slated for FY2028",
+  "June 2026 agreement to acquire Multiplex Global Limited from Brookfield (~$650 million including an earn-out) to accelerate expansion into Australia and the UK and strengthen its existing Canadian business — a rare large overseas M&A move for a Japanese contractor",
+  "Large-scale urban redevelopment in Tokyo/Osaka and infrastructure-renewal/disaster-resilience spending as Japan's postwar infrastructure ages",
+  "Growing overseas construction mix (North America, Asia) diversifying away from a demographically shrinking domestic new-build market",
+  "Continued share buybacks (¥58.1 billion in the fiscal year ended March 2026) and rising dividends (full-year dividend raised to ¥88, guided to ¥94 for the following year) as a capital-return lever alongside earnings growth"
+ ],
+ "risks": {
+  "business": [
+   {
+    "risk": "Order backlog volatility and declining new orders",
+    "severity": "moderate",
+    "description": "Consolidated orders received for the construction business fell 9.9% YoY (and non-consolidated orders fell 20.6% YoY) in the fiscal year ended March 2026 versus a prior year that benefited from large-project wins, illustrating the lumpiness of order intake and backlog"
+   },
+   {
+    "risk": "Legacy low-margin contract overhang",
+    "severity": "moderate",
+    "description": "A portion of backlog can still reflect pre-inflation pricing; margin recovery depends on continued disciplined, profitability-focused bidding rather than chasing volume"
+   },
+   {
+    "risk": "Multiplex and GCON integration risk",
+    "severity": "moderate",
+    "description": "Cross-border M&A (Australia/UK/Canada via Multiplex, US data centers via GCON) carries execution, cultural and regulatory-approval risk, and increases the company's overseas revenue and FX exposure"
+   },
+   {
+    "risk": "Bid-rigging/compliance history",
+    "severity": "low-to-moderate",
+    "description": "Obayashi, along with Taisei, Shimizu and Kajima, was found guilty by a Tokyo court in 2018 of rigging bids on sections of the Linear Chuo Shinkansen maglev project (2014-2015); recurrence or scrutiny of bidding practices on future mega-projects remains a tail risk given this history"
+   }
+  ],
+  "financial": [
+   {
+    "risk": "Capital intensity of real estate and new ventures",
+    "severity": "low-to-moderate",
+    "description": "Real estate development, green energy, and data center investments (e.g., MiTASUN's ~¥100bn plan) require capital deployment with multi-year payback and some demand/price risk"
+   },
+   {
+    "risk": "Cross-shareholding unwind execution",
+    "severity": "low",
+    "description": "Company is reducing cross-shareholdings toward a 20%-of-net-assets target by March 2027; pace and realized value depend on market conditions"
+   }
+  ],
+  "regulatory": [
+   {
+    "risk": "Public infrastructure bidding rules and antitrust scrutiny",
+    "severity": "moderate",
+    "description": "Heavy reliance on government tenders exposes the company to procurement rule changes and renewed antitrust scrutiny, given the sector's history (maglev bid-rigging case) of coordinated bidding among the Big 4/5"
+   },
+   {
+    "risk": "Multiplex acquisition regulatory approvals",
+    "severity": "low",
+    "description": "Completion of the Brookfield/Multiplex deal (expected to close around Q4 2026) remains subject to customary closing conditions and regulatory approvals in Australia, the UK and Canada"
+   }
+  ],
+  "macro": [
+   {
+    "risk": "Skilled labor shortage and wage inflation",
+    "severity": "high",
+    "description": "Japan's construction workforce has shrunk from 6.85 million (1997) to 4.78 million (2025), with 36.6% of workers aged 55+ versus only 11.9% under 30; the April 2024 overtime cap (\"2024 problem\") constrains capacity further and construction-industry bankruptcies hit a 10-year high in 2025, with over 100 explicitly labor-shortage-driven failures"
+   },
+   {
+    "risk": "Raw material and construction cost inflation",
+    "severity": "moderate",
+    "description": "Steel, concrete, and equipment cost volatility remains a key swing factor on multi-year, partly fixed-price contracts"
+   },
+   {
+    "risk": "Japanese interest rate normalization",
+    "severity": "moderate",
+    "description": "Rising BOJ rates raise financing costs for the company's balance sheet and could cool private building-construction/real estate demand"
+   },
+   {
+    "risk": "Cyclicality tied to capex and real estate cycles",
+    "severity": "moderate",
+    "description": "Order intake and margins are sensitive to corporate capital spending cycles (e.g., semiconductor/data center investment waves) and Japanese/global real estate investment sentiment"
+   },
+   {
+    "risk": "Currency exposure",
+    "severity": "low-to-moderate",
+    "description": "Overseas construction (~33% of sales) and recent acquisitions (GCON in the US, Multiplex in Australia/UK/Canada) increase translation and project-level FX exposure"
+   }
+  ]
+ },
+ "macro_factors": {
+  "industry_outlook": "Japanese construction demand is shifting from new-build volume growth toward high-value, technically specialized work — semiconductor fabs, data centers, disaster-resilience/infrastructure renewal, and large urban redevelopment — a smaller but higher-margin pool than the historical new-build boom; near-term order environments for domestic building and civil engineering are described by management as firm, supported partly by reshoring of production and government-designated critical-product investment, even as some project cancellations/postponements occur",
+  "cyclicality": "Moderate-to-high — multi-year order backlogs smooth revenue recognition but order intake, pricing and margins remain sensitive to corporate capex cycles, real estate investment sentiment and public infrastructure budgets",
+  "interest_rate_sensitivity": "Moderate — rising Japanese policy rates raise financing costs for the company and its real estate development arm, and could cool private construction demand; overseas (notably North American) rate moves also affect the overseas building/civil order environment",
+  "key_input_costs": [
+   "Steel and rebar",
+   "Concrete and cement",
+   "Construction labor/wages",
+   "Heavy equipment and fuel",
+   "Land/property acquisition costs for real estate development"
+  ]
+ },
+ "recent_developments": [
+  {
+   "date": "2026-08",
+   "event": "Q1 FY2027 (April-June 2026) results: consolidated net sales ¥623.4bn (+19.0% YoY), consolidated operating profit ¥32.7bn (+107.0% YoY), profit attributable to owners of parent ¥39.0bn (+116.3% YoY), driven by property sales in real estate, completion of loss-provisioned projects, and highly profitable domestic building projects; consolidated orders received fell 7.2% YoY to ¥577.5bn against a strong prior-year comparison; full-year forecasts left unchanged from the May 13, 2026 guidance"
+  },
+  {
+   "date": "2026-06",
+   "event": "Announced agreement (disclosed June 18, 2026) to acquire Multiplex Global Limited (the Wembley Stadium-building Australian/UK/Canadian contractor) from Brookfield for approximately $650 million (including an earn-out tied to future performance), aiming to accelerate expansion into Australia and the UK and strengthen its Canadian foundation; deal expected to close around Q4 2026 subject to regulatory approvals, with Multiplex's operations, projects, brand, and leadership (CEO John Flecker) expected to continue unchanged"
+  },
+  {
+   "date": "2026-05",
+   "event": "Full fiscal year results for year ended March 31, 2026: consolidated net sales ¥2,586.3bn (-0.2% YoY), operating profit ¥194.7bn (+36.6% YoY, margin 7.5%), ordinary profit ¥204.2bn (+34.1%), profit attributable to owners of parent ¥173.8bn (+19.5%), ROE 14.4% (up from 12.6%); annual dividend raised to ¥88 (from ¥81), DOE ~5.1%; FY2027 (year ending March 2027) guidance set at net sales ¥2,945.0bn (+13.9%), operating profit ¥180.0bn (-7.5%), net income ¥157.0bn (-9.6%), citing a lower proportion of projects in final, most-profitable construction stages"
+  },
+  {
+   "date": "2025-08",
+   "event": "Executed an up-to-¥40 billion share buyback program (completed, repurchasing ~15.14 million shares, 2.17% of shares outstanding) between August and December 2025, with shares subsequently cancelled; FY ended March 2026 total buybacks were ¥58.1bn versus ¥12.2bn the prior year"
+  },
+  {
+   "date": "2025 (FY2025)",
+   "event": "Acquired GCON, LLC and affiliated companies, a US contractor specializing in semiconductor/data-center construction, to build out overseas (North American) exposure to the AI/cloud-driven data center capex cycle"
+  }
+ ],
+ "guidance": {
+  "as_of": "FY ended March 2026 results and FY2026 Q1 presentation (2026-05-13 / 2026-08-07)",
+  "fiscal_year": "Fiscal year ending March 31, 2027",
+  "items": [
+   {
+    "metric": "Consolidated net sales",
+    "target": "¥2,945.0 billion",
+    "period": "FY ending March 2027",
+    "vs_prior": "raised (implies +13.9% YoY)",
+    "notes": "Growth driven by progress on a substantial volume of projects in hand in overseas building/civil engineering and continued domestic building strength; forecast reaffirmed unchanged as of the Q1 (Aug 2026) update"
+   },
+   {
+    "metric": "Consolidated operating profit",
+    "target": "¥180.0 billion",
+    "period": "FY ending March 2027",
+    "vs_prior": "lowered vs. prior-year actual (down ~7.5% YoY)",
+    "notes": "Expected decline reflects a lower proportion of projects in the final, most-profitable stage of construction in domestic building, limiting the benefit from additional claim approvals, change orders and cost reductions"
+   },
+   {
+    "metric": "Profit attributable to owners of parent",
+    "target": "¥157.0 billion",
+    "period": "FY ending March 2027",
+    "vs_prior": "lowered vs. prior-year actual (down ~9.6% YoY)",
+    "notes": "EPS guidance ¥228.39"
+   },
+   {
+    "metric": "Consolidated new orders received",
+    "target": "¥3,100.0 billion",
+    "period": "FY ending March 2027",
+    "vs_prior": "raised modestly (+3.0% YoY)",
+    "notes": "Expected to remain roughly flat as increases in domestic building and overseas civil engineering offset a decrease in overseas building orders versus the large-project-driven prior year"
+   },
+   {
+    "metric": "Consolidated equity / ROE / ROIC",
+    "target": "Equity ¥1,290.0bn (+2.5% YoY); ROE 12.3%; ROIC 7.4%",
+    "period": "FY ending March 2027",
+    "vs_prior": "lowered (ROE down ~210bps, ROIC down ~100bps YoY)",
+    "notes": "Both remain above the Medium-Term Business Plan 2022 targets of ROE ≥10% and ROIC ≥5%, and above WACC, despite the YoY decline"
+   },
+   {
+    "metric": "Consolidated interest-bearing debt and nonrecourse loans",
+    "target": "¥330.0 billion",
+    "period": "FY ending March 2027",
+    "vs_prior": "lowered (-4.1% YoY)",
+    "notes": "Expected to decrease on continued collection of outstanding construction receivables following completion of large projects"
+   },
+   {
+    "metric": "Dividend per share",
+    "target": "¥94 full year (¥47 interim / ¥47 year-end)",
+    "period": "FY ending March 2027",
+    "vs_prior": "raised from ¥88 the prior fiscal year",
+    "notes": "Based on DOE policy of ~5%; FY ended March 2026 actual DOE was 5.1%, payout ratio 35.3%"
+   }
+  ],
+  "management_commentary": "Management attributes the FY ended March 2026 margin surge to a greater contribution from highly profitable construction projects, additional claim approvals and change orders in domestic building, steady progress in overseas civil engineering, and gains from real estate property sales. For FY ending March 2027, management explicitly flagged profit will decline even as sales grow, because fewer projects will be in the final, most-profitable stage of construction and the prior year benefited from one-off items (large claim approvals, property sales) that are not expected to repeat at the same scale."
+ },
+ "bull_case": [
+  "Multi-year margin recovery story: operating margin rose from roughly 2% (FY2022) to 7.5% (fiscal year ended March 2026) as the order backlog rolled over from pre-inflation to cost-reflective pricing, with ROE climbing from single digits to over 14%",
+  "Secular tailwinds from Japan's and North America's semiconductor/data center construction boom, reinforced by the GCON acquisition and the company's own MiTASUN urban data center venture, provide a technically demanding, less commoditized growth pool beyond traditional building/civil work",
+  "June 2026 Multiplex acquisition (Australia/UK/Canada) is a rare, meaningful overseas expansion for a Japanese contractor, diversifying revenue away from a shrinking domestic market and adding scale in markets with different demand drivers",
+  "Shareholder-friendly capital returns: dividend has been raised in successive years (¥81 to ¥88 to a guided ¥94) alongside an active buyback program (¥58.1bn in the fiscal year ended March 2026), supported by cross-shareholding unwind proceeds",
+  "Oligopolistic Big 4/5 market structure limits the number of credible competitors on Japan's largest, most complex redevelopment and infrastructure projects, and public infrastructure/resilience spending provides a steady floor of demand"
+ ],
+ "bear_case": [
+  "FY ending March 2027 guidance already signals declining operating profit and net income even as sales rise, reflecting the fading of one-off gains (claim approvals, property sales) and fewer projects in their most profitable completion stage — a reminder that the FY2026 margin surge may partly reflect a cyclical peak rather than a durable step-change",
+  "Japan's skilled-labor shortage is structural and worsening — the workforce has shrunk by roughly 30% since the 1990s, is heavily skewed toward workers 55+, and the 2024 overtime cap is constraining how much work contractors can physically execute, which can offset pricing gains with capacity limits and wage inflation",
+  "General contracting remains a fundamentally thin-moat, highly competitive, labor-intensive business; Obayashi has no meaningful product differentiation versus Taisei/Shimizu/Kajima/Takenaka and its historical margins (as low as ~2% in FY2022) show how quickly profitability can compress in a cost-inflation cycle",
+  "Order intake has already shown real volatility — consolidated construction orders fell 9.9% YoY and non-consolidated orders fell 20.6% YoY in the fiscal year ended March 2026 — illustrating how dependent recent results are on the timing of a handful of large projects",
+  "Regulatory/compliance tail risk is not purely historical: Obayashi was found guilty in 2018, alongside its three biggest domestic peers, of rigging bids on Japan's largest infrastructure project (the Linear Chuo Shinkansen maglev), underscoring the competitive intensity and governance risk inherent in bidding for Japan's largest public works",
+  "Cross-border acquisitions (GCON, Multiplex) add integration, FX and execution risk in markets (US data centers, Australia/UK/Canada construction) outside the company's traditional domestic competency, at a time when North American interest-rate direction for private real estate/data center capex is itself uncertain"
+ ]
+};
+
+const dcfData = {
+ "ticker": "1802.T",
+ "company_name": "Obayashi Corporation",
+ "valuation_date": "2026-10-26",
+ "current_price": 2976.0,
+ "model": "owner_fcf_dcf_component",
+ "equity_bridge": [
+  {
+   "item": "Investment securities (cross-shareholdings) at fair value, net of deferred tax on unrealised gains",
+   "value": 247000.0,
+   "note": "2026-06-30 investment securities JPY301,692m (Q1 FY2027 tanshin BS). AFS valuation difference JPY123,936m is net of tax; grossed up at 30.6% the unrealised gain is ~178.6bn and the deferred tax ~54.6bn, so realisable value ~247bn. Dividend income and sale gains are outside the modelled flows (matching-asset rule). Company is selling down to <20% of net assets by March 2027."
+  },
+  {
+   "item": "Non-controlling interests",
+   "value": -55305.0,
+   "note": "2026-06-30 balance sheet; flows are consolidated so NCI is charged once, here."
+  },
+  {
+   "item": "Net unfunded retirement benefit obligation, after tax",
+   "value": -25600.0,
+   "note": "Retirement benefit liability 50,564 less retirement benefit asset 13,688 (March 2026 figure) = 36,876 x (1-0.306)."
+  }
+ ],
+ "historical_growth": {
+  "revenue_3yr_cagr": 9.2,
+  "revenue_5yr_cagr": 7.9,
+  "eps_3yr_cagr": 32.0,
+  "eps_5yr_cagr": 12.6,
+  "equity_3yr_cagr": 8.1,
+  "equity_5yr_cagr": 6.2,
+  "fcf_3yr_cagr": -2.3,
+  "fcf_5yr_cagr": null,
+  "selected_growth_rate": 4.0,
+  "growth_rate_source": "equity_5yr_cagr (6.2%) tempered to the base-path 10-year revenue CAGR (~3.5%): FY2027 guided +13.9% is backlog conversion, after which domestic volume is capacity-constrained by labour and growth is price-led",
+  "growth_divergence_warning": "Equity 5yr CAGR 6.2% vs EPS 5yr CAGR 12.6% diverge by >30%: the EPS series runs from the FY2021 margin peak through the FY2022 trough (EPS 54.55) back to a new peak, so point-to-point EPS CAGRs are cycle artefacts. Owner-FCF CAGRs: 3yr -2.3% (FY2023 130.7bn -> FY2026 122.1bn); 5yr undefined because FY2021 owner FCF was negative (-33.5bn). Reported FCF over FY2017-26 averaged ~60bn/yr with four negative or near-zero years -- FCF is lumpy with advances/receivables timing and should not be trended.",
+  "notes": "Owner FCF series = reported FCF less interest income (SBC zero): FY2021 -33,493; FY2022 10,862; FY2023 130,742; FY2024 -31,128; FY2025 30,599; FY2026 122,056. Revenue: FY2021 1,766,893 -> FY2023 1,983,888 -> FY2026 2,586,258. Equity: 931,008 -> 997,109 -> 1,258,424. EPS: 137.64 -> 108.34 -> 249.42."
+ },
+ "scenario_narratives": {
+  "base": "FY2027 follows management's guide: sales +13.9% to 2,945bn on backlog conversion, op profit down 7.5% to 180bn (6.1%) as fewer projects sit in their final, most-profitable stage and FY2026's claim approvals and property-sale gains do not repeat. From FY2028 the business is a mature, labour-constrained Big-4 contractor growing 1.5-4% with a mid-cycle 5.75% EBIT margin -- below FY2026's 7.5% peak but above the FY2017-26 mean -- reinvesting ~1.5% of sales net into real estate and data centres. Value is roughly half operating flows, a quarter terminal and a quarter balance sheet (net cash plus cross-shareholdings).",
+  "bull": "The margin step-up is structural, not cyclical: inflation-indexed contracts, oligopoly discipline on mega-projects and data-centre/semiconductor specialisation (GCON, MiTASUN) hold the group op margin near 7%, overseas margins rise, and growth stays 3-6% through the decade. Capex eases as the MTBP investment wave passes.",
+  "bear": "The 2022-24 playbook repeats: cost inflation and the labour shortage squeeze fixed-price backlog, op margin falls to ~4%, orders roll over after the large-project cohort and revenue contracts for two years; Multiplex/GCON integration disappoints and working capital absorbs cash on overseas projects. Margins recover only to ~4.5%, and the market caps the business at 12x FCF."
+ },
+ "valuation_philosophy": {
+  "summary": "A general contractor is valued on mid-cycle owner FCF, not on peak-year earnings. FY2026's 7.5% operating margin and 14.4% ROE are the top of a cycle that management has already guided down; the base case normalises the EBIT margin to 5.75% and converts earnings to cash at the historical ~2.5% of sales after the real-estate and data-centre reinvestment the company has committed to. The balance sheet (net cash plus a JPY300bn cross-shareholding book being sold down) is worth ~JPY500/share and is counted once, in the bridge, with the income it produces excluded from the flows. Multiplex is treated as NPV-neutral until its first consolidated results.",
+  "key_risks_to_valuation": [
+   "Margin normalisation judgment: if 7%+ op margins prove structural (bull), base IV is understated by roughly a third; if the FY2022-24 cost squeeze recurs (bear), it is overstated by a similar amount",
+   "FCF conversion: the model assumes ~1.5% of sales of net reinvestment forever; if the real-estate/data-centre programme ends and capex falls to D&A, FCF margin rises by ~1.5pp of sales (~+JPY700/share)",
+   "Cross-shareholding value (JPY247bn after tax, ~JPY360/share) depends on equity-market levels; the company is a forced seller down to 20% of net assets by March 2027",
+   "Multiplex (~JPY95-100bn) and GCON integration: a loss-making overseas project book is the classic way a Japanese contractor destroys a decade of domestic profit",
+   "Working-capital timing: advances received rose JPY106bn in FY2026 and can reverse; a single year's FCF says little",
+   "Compliance tail risk: 2018 maglev bid-rigging conviction; renewed antitrust action on mega-project tenders",
+   "WACC: at 7.5% in JPY the valuation is terminal-light (cap binds) but still sensitive -- each 1pp of WACC moves base IV by roughly JPY250-300/share"
+  ]
+ },
+ "data_sources": {
+  "price": "Yahoo Finance chart API at inputs.price_as_of; 52-week range 2,580-4,439",
+  "financials": "1802.T_Metrics.csv (core_metrics, JPY millions) FY2014-FY2026 plus Q1 FY2027; FY2026 tanshin (1802.T_Annual_FY2025.txt: BS lines 1052-1144, P&L 1186-1227, CF 1491-1545, share counts 107-115, 1742-1765); Q1 FY2027 tanshin (1802.T_Quarterly_Q1-FY2026.txt: BS lines 575-665, share counts 88-97); FY2027 guidance and segment table from the FY2026 tanshin lines 665-760; MTBP investment plan from 1802.T_Presentation_FY2025.txt lines 1271-1345",
+  "qualitative": "1802.T_Analysis.json (2026-10-26): business model, competitive position, guidance, bull/bear cases"
+ },
+ "inputs": {
+  "base_revenue": 2586258.0,
+  "shares_outstanding": 687.42,
+  "annual_share_growth_pct": 0.0,
+  "share_count_basis": "691,811,346 issued less 4,390,787 treasury (incl. ~0.8m BIP Trust shares) at 2026-06-30 = 687.42m; no convertibles or options outstanding, so basic = fully diluted. Held FLAT: buybacks (JPY58.1bn FY2026, JPY12.2bn FY2025) are value-neutral in this model and are not credited as a shrinking count.",
+  "net_debt": -114687.0,
+  "total_debt": 342856.0,
+  "cash": 457543.0,
+  "last_fcf": 122056.0,
+  "reported_fcf": 127290.0,
+  "sbc": 0.0,
+  "sbc_incl_equity_taxes": 0.0,
+  "sbc_pct_of_revenue": 0.0,
+  "interest_income": 5234.0,
+  "sbc_source": "J-GAAP filer with no share-based-compensation add-back in the cash flow statement. The only equity-settled pay is the directors' BIP Trust (provision for share awards JPY703m balance, ~0.8m trust shares); immaterial and already inside SG&A. Treated as an SBC-zero market: SBC rows kept explicit at 0%.",
+  "buyback_cash": 58061.0,
+  "currency": "JPY",
+  "quote_currency": "JPY",
+  "fx_rate": 1.0,
+  "units": "millions",
+  "fy0": "FY2026",
+  "fiscal_year_end": "31 March",
+  "price_as_of": "2026-10-26T01:27:40Z (Tokyo regular session; Yahoo Finance chart API)",
+  "balance_sheet_date": "2026-06-30",
+  "share_count_date": "2026-06-30",
+  "net_debt_note": "Q1 FY2027 tanshin (balance sheet at 2026-06-30): cash and deposits 457,543 vs interest-bearing debt 342,856 (short-term borrowings 78,405 + current nonrecourse 9,321 + current bonds 20,066 + bonds 40,009 + long-term borrowings 140,693 + nonrecourse loans 54,362). Nonrecourse real-estate loans are included in debt. Current 'Securities' of 9,687 are left out of cash (conservative). Lease liabilities (3,058 + 9,748 = 12,806) are excluded -- see lease_treatment. Net cash of JPY114.7bn is ~0.9x the owner-FCF base, so FY2026 interest income (5,234) is stripped from the flows and the cash sits in the bridge instead.",
+  "wacc_rationale": "Built in JPY, the currency of the flows. Cost of equity 7.7% = 10y JGB ~1.7% (Oct 2026) + beta 1.0 x Japan ERP 6.0%. Debt ~14% of market-value capital at ~1.0% after tax. Mechanical WACC ~6.8%; rounded up to 7.5% because a thin-moat, fixed-price-contract general contractor carries project and claim risk that a market beta understates. Cyclicality and margin mean-reversion are charged in the FLOWS (base-case margin normalised below FY2026, bear-case trough) -- the same 7.5% is used in all three scenarios so risk is not charged twice.",
+  "lease_treatment": "(B) leases as operating cost. J-GAAP: operating leases are expensed inside cost of sales / SG&A, so no lease add-back inflates EBITDA; finance-lease liabilities (JPY12.8bn) are excluded from net debt and the small lease principal repayment (JPY2.9bn FY2026) is covered by the capex line. No separate lease_cost_pct_path is needed.",
+  "nci_treatment": "Flows are consolidated (EBITDA-based). Non-controlling interests (JPY55,305m at 2026-06-30; NCI took JPY4.0bn of JPY177.8bn FY2026 profit, ~2.3%) are deducted ONCE in the equity bridge. FY0 check: FY2026 operating profit 194,678 x (1-0.31) = 134.3bn NOPAT vs attributable net income 173.8bn -- the gap is the JPY49.0bn extraordinary gain on cross-shareholding sales plus 12.1bn interest/dividend income, both of which are excluded from the flows and represented by the securities/cash lines in the bridge.",
+  "notes": "MODEL: owner-FCF component DCF (dcf-methods routing: non-US cyclical operating company; owner-fcf.md + owner-fcf-adaptations.md read in full). Obayashi is a Big-4 Japanese general contractor; a going-concern FCF model is the right frame. KEY JUDGMENT -- MARGIN NORMALISATION: FY2026 operating margin of 7.5% (op profit 194.7bn) is treated as a cyclical high, not a run-rate. Management's own FY2027 guidance is op profit 180.0bn on sales 2,945bn (6.1%), citing fewer projects in the final, most-profitable completion stage and non-repeat of claim approvals and property-sale gains. Ten-year operating margin history: FY2017-21 7.0-7.6%, FY2022-24 trough 2.1-4.7% (cost inflation on pre-inflation fixed-price backlog), FY2025 5.5%, FY2026 7.5%; 10-yr mean 5.95%. Base case follows guidance to 6.1% in FY2027 then settles at ~5.75% EBIT (7.25% EBITDA less 1.5% D&A) -- a mid-cycle margin, with the rising overseas mix (2-4% segment margins, now ~35% of sales) offsetting better domestic pricing. FY0 OWNER FCF: reported FCF 127,290 (OCF 252,920 less capex 125,630) less interest income 5,234 = 122,056. This FY0 figure is NOT carried forward: FY2026 OCF was flattered by a JPY106.5bn rise in advances received, and FY2026 capex (4.9% of sales) was a peak year of the Medium-Term Plan's JPY845bn investment programme (real estate development, GCON, machinery, DX). The component build gives year-1 owner FCF of ~JPY63bn (2.2% of sales), in line with the FY2017-26 average reported FCF of ~JPY60bn/yr -- Japanese contractors convert earnings to FCF poorly because they recycle profit into leasing real estate. CAPEX: 3.5% of sales in FY2027-28 (MiTASUN data-centre venture ~JPY100bn through FY2028, real estate pipeline), easing to 3.0%; D&A 1.45-1.5%. CASH TAX: 31% (Japan statutory ~30.6%; FY2026 cash tax paid 82.2bn was inflated by tax on securities gains). WORKING CAPITAL: net contract working capital is roughly neutral (receivables + WIP ~1.19tn vs payables + advances + deposits ~1.13tn at June 2026), so base capture 0%; bear -5% of revenue change as overseas receivables stretch. EQUITY BRIDGE (matching-asset rule): dividend income (6.8bn) and the recurring extraordinary gains on cross-shareholding sales (49.0bn FY2026, 68.7bn FY2025) are OUTSIDE operating profit, so the investment-securities portfolio enters the bridge at fair value net of deferred tax instead; NCI and the unfunded pension are deducted. MULTIPLEX: the ~US$650m (~JPY95-100bn incl. earn-out) acquisition of Multiplex Global from Brookfield, announced 2026-06-18 and expected to close ~Q4 CY2026, is NOT in the 2026-06-30 balance sheet and its flows are NOT in the projections (FY2027 guidance predates it). It is treated as NPV-neutral -- cash paid equals business value received -- which is the honest default for a ~1-2% margin contractor bought at a market price; integration risk is in the bear case. HOUSE = STREET: with SBC at zero the two bases coincide and band_position is null. HURDLE: house 15% kept for comparability; for JPY flows at a 1.7% risk-free rate it is a demanding bar and the required-return table is the better guide. The 10-year horizon is used although the margin matures by year 4, so the entry price and required-return table are on the house N=10 convention.",
+  "projected_shares": [
+   687.42,
+   687.42,
+   687.42,
+   687.42,
+   687.42,
+   687.42,
+   687.42,
+   687.42,
+   687.42,
+   687.42
+  ]
+ },
+ "assumptions": {
+  "bear": {
+   "growth_rates": [
+    12.0,
+    0.0,
+    -3.0,
+    -2.0,
+    0.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "ebitda_margin_path": [
+    6.8,
+    6.0,
+    5.5,
+    5.5,
+    5.7,
+    5.8,
+    6.0,
+    6.0,
+    6.0,
+    6.0
+   ],
+   "sbc_pct_path": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "da_pct_path": [
+    1.45,
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    1.5
+   ],
+   "capex_pct_path": [
+    3.5,
+    3.5,
+    3.2,
+    3.0,
+    3.0,
+    3.0,
+    3.0,
+    3.0,
+    3.0,
+    3.0
+   ],
+   "cash_tax_rate_path": [
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0
+   ],
+   "wc_capture_pct": -5.0,
+   "wacc": 7.5,
+   "terminal_growth": 0.5,
+   "terminal_cap_multiple": 12,
+   "narrative": "FY2027 backlog still converts (+12%) but at a 5.35% op margin as claim approvals dry up; then a renewed cost-inflation squeeze on fixed-price backlog (the FY2022-24 pattern) takes the op margin to ~4% while orders fall after the large-project cohort (FY2026 orders already -9.9%) and labour caps capacity, so revenue shrinks for two years. GCON/Multiplex integration absorbs management and cash; overseas receivables stretch (WC -5% of revenue change). Op margin recovers only to ~4.5% (6.0% EBITDA). Terminal cap 12x.",
+   "horizon_years": 10
+  },
+  "base": {
+   "growth_rates": [
+    13.9,
+    4.0,
+    3.0,
+    2.5,
+    2.0,
+    2.0,
+    2.0,
+    1.5,
+    1.5,
+    1.5
+   ],
+   "ebitda_margin_path": [
+    7.55,
+    7.4,
+    7.3,
+    7.25,
+    7.25,
+    7.25,
+    7.25,
+    7.25,
+    7.25,
+    7.25
+   ],
+   "sbc_pct_path": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "da_pct_path": [
+    1.45,
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    1.5
+   ],
+   "capex_pct_path": [
+    3.5,
+    3.5,
+    3.2,
+    3.0,
+    3.0,
+    3.0,
+    3.0,
+    3.0,
+    3.0,
+    3.0
+   ],
+   "cash_tax_rate_path": [
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0
+   ],
+   "wc_capture_pct": 0.0,
+   "wacc": 7.5,
+   "terminal_growth": 1.0,
+   "terminal_cap_multiple": 14,
+   "growth_rationale": "Y1 = FY2027 guidance (sales 2,945bn, +13.9%, reaffirmed Aug 2026; Q1 +19%). FY2027 orders guided 3,100bn (book-to-bill 1.05) supports FY2028 +4%. Thereafter domestic volume is capped by the shrinking skilled workforce, so growth is largely price/mix: 2-3% fading to 1.5%.",
+   "margin_rationale": "Y1 EBITDA 7.55% = guided op margin 6.1% + D&A 1.45% (op profit ties to the 180bn guide). Then settles at 7.25% EBITDA / 5.75% EBIT -- the FY2017-26 mean op margin is 5.95% and overseas mix (2-4% margins) is rising. FY2026's 7.5% (domestic building 9.1%) is treated as peak-of-cycle.",
+   "capex_rationale": "3.5% of sales FY2027-28 (data-centre venture, real estate pipeline, machinery; MTBP investing outflow ~JPY84bn/yr avg) easing to 3.0%; D&A 1.5%. Net investment ~1.5% of sales sustains the real-estate book that earns the ~20bn real-estate segment profit inside EBITDA.",
+   "terminal_rationale": "g = 1.0% nominal JPY for a mature, labour-constrained domestic market. Cap 14x terminal FCF (cyclical, thin moat); the cap binds in base at WACC 7.5% / g 1.0% (Gordon 15.5x).",
+   "horizon_years": 10
+  },
+  "bull": {
+   "growth_rates": [
+    15.0,
+    6.0,
+    5.0,
+    4.0,
+    3.0,
+    3.0,
+    2.5,
+    2.5,
+    2.0,
+    2.0
+   ],
+   "ebitda_margin_path": [
+    8.0,
+    8.3,
+    8.5,
+    8.5,
+    8.5,
+    8.5,
+    8.5,
+    8.5,
+    8.5,
+    8.5
+   ],
+   "sbc_pct_path": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "da_pct_path": [
+    1.45,
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    1.5
+   ],
+   "capex_pct_path": [
+    3.5,
+    3.3,
+    3.0,
+    2.8,
+    2.8,
+    2.8,
+    2.8,
+    2.8,
+    2.8,
+    2.8
+   ],
+   "cash_tax_rate_path": [
+    30.6,
+    30.6,
+    30.6,
+    30.6,
+    30.6,
+    30.6,
+    30.6,
+    30.6,
+    30.6,
+    30.6
+   ],
+   "wc_capture_pct": 0.0,
+   "wacc": 7.5,
+   "terminal_growth": 1.5,
+   "terminal_cap_multiple": 14,
+   "narrative": "Management's FY2027 guide proves conservative (as Q1's +107% op profit hints), domestic building holds 8-9% margins on disciplined bidding, overseas margins lift to 4-5% as GCON data-centre/semiconductor work scales, and the 7% op margin becomes the new normal (8.5% EBITDA). Growth stays mid-single-digit on the data-centre and urban-redevelopment cycle; capex normalises to 2.8% once MiTASUN is built.",
+   "horizon_years": 10
+  }
+ },
+ "projections": {
+  "bear": {
+   "years": [
+    "FY2027",
+    "FY2028",
+    "FY2029",
+    "FY2030",
+    "FY2031",
+    "FY2032",
+    "FY2033",
+    "FY2034",
+    "FY2035",
+    "FY2036"
+   ],
+   "growth_rates": [
+    12.0,
+    0.0,
+    -3.0,
+    -2.0,
+    0.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "revenue": [
+    2896609.0,
+    2896609.0,
+    2809710.7,
+    2753516.5,
+    2753516.5,
+    2781051.6,
+    2808862.2,
+    2836950.8,
+    2865320.3,
+    2893973.5
+   ],
+   "adj_ebitda": [
+    196969.4,
+    173796.5,
+    154534.1,
+    151443.4,
+    156950.4,
+    161301.0,
+    168531.7,
+    170217.0,
+    171919.2,
+    173638.4
+   ],
+   "sbc": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "lease_cost": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "d_and_a": [
+    42000.8,
+    43449.1,
+    42145.7,
+    41302.7,
+    41302.7,
+    41715.8,
+    42132.9,
+    42554.3,
+    42979.8,
+    43409.6
+   ],
+   "ebit": [
+    154968.6,
+    130347.4,
+    112388.4,
+    110140.7,
+    115647.7,
+    119585.2,
+    126398.8,
+    127662.8,
+    128939.4,
+    130228.8
+   ],
+   "cash_tax_rate": [
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0
+   ],
+   "cash_tax": [
+    48040.3,
+    40407.7,
+    34840.4,
+    34143.6,
+    35850.8,
+    37071.4,
+    39183.6,
+    39575.5,
+    39971.2,
+    40370.9
+   ],
+   "nopat": [
+    106928.3,
+    89939.7,
+    77548.0,
+    75997.1,
+    79796.9,
+    82513.8,
+    87215.2,
+    88087.3,
+    88968.2,
+    89857.9
+   ],
+   "capex": [
+    101381.3,
+    101381.3,
+    89910.7,
+    82605.5,
+    82605.5,
+    83431.5,
+    84265.9,
+    85108.5,
+    85959.6,
+    86819.2
+   ],
+   "working_capital": [
+    -15517.5,
+    -0.0,
+    4344.9,
+    2809.7,
+    -0.0,
+    -1376.8,
+    -1390.5,
+    -1404.4,
+    -1418.5,
+    -1432.7
+   ],
+   "fcf": [
+    32030.3,
+    32007.5,
+    34127.8,
+    37504.0,
+    38494.2,
+    39421.3,
+    43691.7,
+    44128.6,
+    44569.9,
+    45015.6
+   ],
+   "owner_fcf_margin": [
+    1.1,
+    1.1,
+    1.2,
+    1.4,
+    1.4,
+    1.4,
+    1.6,
+    1.6,
+    1.6,
+    1.6
+   ],
+   "discount_factors": [
+    0.9302,
+    0.8653,
+    0.805,
+    0.7488,
+    0.6966,
+    0.648,
+    0.6028,
+    0.5607,
+    0.5216,
+    0.4852
+   ],
+   "pv_fcf": [
+    29795.6,
+    27697.2,
+    27471.6,
+    28083.0,
+    26813.4,
+    25543.5,
+    26335.4,
+    24743.0,
+    23246.9,
+    21841.3
+   ]
+  },
+  "base": {
+   "years": [
+    "FY2027",
+    "FY2028",
+    "FY2029",
+    "FY2030",
+    "FY2031",
+    "FY2032",
+    "FY2033",
+    "FY2034",
+    "FY2035",
+    "FY2036"
+   ],
+   "growth_rates": [
+    13.9,
+    4.0,
+    3.0,
+    2.5,
+    2.0,
+    2.0,
+    2.0,
+    1.5,
+    1.5,
+    1.5
+   ],
+   "revenue": [
+    2945747.9,
+    3063577.8,
+    3155485.1,
+    3234372.2,
+    3299059.7,
+    3365040.9,
+    3432341.7,
+    3483826.8,
+    3536084.2,
+    3589125.5
+   ],
+   "adj_ebitda": [
+    222404.0,
+    226704.8,
+    230350.4,
+    234492.0,
+    239181.8,
+    243965.5,
+    248844.8,
+    252577.4,
+    256366.1,
+    260211.6
+   ],
+   "sbc": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "lease_cost": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "d_and_a": [
+    42713.3,
+    45953.7,
+    47332.3,
+    48515.6,
+    49485.9,
+    50475.6,
+    51485.1,
+    52257.4,
+    53041.3,
+    53836.9
+   ],
+   "ebit": [
+    179690.6,
+    180751.1,
+    183018.1,
+    185976.4,
+    189695.9,
+    193489.9,
+    197359.6,
+    200320.0,
+    203324.8,
+    206374.7
+   ],
+   "cash_tax_rate": [
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0,
+    31.0
+   ],
+   "cash_tax": [
+    55704.1,
+    56032.8,
+    56735.6,
+    57652.7,
+    58805.7,
+    59981.9,
+    61181.5,
+    62099.2,
+    63030.7,
+    63976.2
+   ],
+   "nopat": [
+    123986.5,
+    124718.3,
+    126282.5,
+    128323.7,
+    130890.2,
+    133508.0,
+    136178.2,
+    138220.8,
+    140294.1,
+    142398.6
+   ],
+   "capex": [
+    103101.2,
+    107225.2,
+    100975.5,
+    97031.2,
+    98971.8,
+    100951.2,
+    102970.3,
+    104514.8,
+    106082.5,
+    107673.8
+   ],
+   "working_capital": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "fcf": [
+    63598.7,
+    63446.7,
+    72639.3,
+    79808.1,
+    81404.3,
+    83032.4,
+    84693.0,
+    85963.4,
+    87252.9,
+    88561.7
+   ],
+   "owner_fcf_margin": [
+    2.2,
+    2.1,
+    2.3,
+    2.5,
+    2.5,
+    2.5,
+    2.5,
+    2.5,
+    2.5,
+    2.5
+   ],
+   "discount_factors": [
+    0.9302,
+    0.8653,
+    0.805,
+    0.7488,
+    0.6966,
+    0.648,
+    0.6028,
+    0.5607,
+    0.5216,
+    0.4852
+   ],
+   "pv_fcf": [
+    59161.6,
+    54902.5,
+    58471.7,
+    59760.4,
+    56702.9,
+    53801.8,
+    51049.1,
+    48199.9,
+    45509.7,
+    42969.6
+   ]
+  },
+  "bull": {
+   "years": [
+    "FY2027",
+    "FY2028",
+    "FY2029",
+    "FY2030",
+    "FY2031",
+    "FY2032",
+    "FY2033",
+    "FY2034",
+    "FY2035",
+    "FY2036"
+   ],
+   "growth_rates": [
+    15.0,
+    6.0,
+    5.0,
+    4.0,
+    3.0,
+    3.0,
+    2.5,
+    2.5,
+    2.0,
+    2.0
+   ],
+   "revenue": [
+    2974196.7,
+    3152648.5,
+    3310280.9,
+    3442692.2,
+    3545972.9,
+    3652352.1,
+    3743660.9,
+    3837252.4,
+    3913997.5,
+    3992277.4
+   ],
+   "adj_ebitda": [
+    237935.7,
+    261669.8,
+    281373.9,
+    292628.8,
+    301407.7,
+    310449.9,
+    318211.2,
+    326166.5,
+    332689.8,
+    339343.6
+   ],
+   "sbc": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "lease_cost": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "d_and_a": [
+    43125.9,
+    47289.7,
+    49654.2,
+    51640.4,
+    53189.6,
+    54785.3,
+    56154.9,
+    57558.8,
+    58710.0,
+    59884.2
+   ],
+   "ebit": [
+    194809.9,
+    214380.1,
+    231719.7,
+    240988.5,
+    248218.1,
+    255664.6,
+    262056.3,
+    268607.7,
+    273979.8,
+    279459.4
+   ],
+   "cash_tax_rate": [
+    30.6,
+    30.6,
+    30.6,
+    30.6,
+    30.6,
+    30.6,
+    30.6,
+    30.6,
+    30.6,
+    30.6
+   ],
+   "cash_tax": [
+    59611.8,
+    65600.3,
+    70906.2,
+    73742.5,
+    75954.7,
+    78233.4,
+    80189.2,
+    82193.9,
+    83837.8,
+    85514.6
+   ],
+   "nopat": [
+    135198.1,
+    148779.8,
+    160813.4,
+    167246.0,
+    172263.4,
+    177431.3,
+    181867.0,
+    186413.7,
+    190142.0,
+    193944.8
+   ],
+   "capex": [
+    104096.9,
+    104037.4,
+    99308.4,
+    96395.4,
+    99287.2,
+    102265.9,
+    104822.5,
+    107443.1,
+    109591.9,
+    111783.8
+   ],
+   "working_capital": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "fcf": [
+    74227.0,
+    92032.1,
+    111159.2,
+    122491.0,
+    126165.7,
+    129950.7,
+    133199.5,
+    136529.4,
+    139260.0,
+    142045.2
+   ],
+   "owner_fcf_margin": [
+    2.5,
+    2.9,
+    3.4,
+    3.6,
+    3.6,
+    3.6,
+    3.6,
+    3.6,
+    3.6,
+    3.6
+   ],
+   "discount_factors": [
+    0.9302,
+    0.8653,
+    0.805,
+    0.7488,
+    0.6966,
+    0.648,
+    0.6028,
+    0.5607,
+    0.5216,
+    0.4852
+   ],
+   "pv_fcf": [
+    69048.4,
+    79638.4,
+    89478.8,
+    91721.3,
+    87881.8,
+    84203.0,
+    80286.6,
+    76552.4,
+    72635.7,
+    68919.5
+   ]
+  }
+ },
+ "valuation": {
+  "bear": {
+   "sum_pv_fcf": 261570.9,
+   "tv_gordon": 646295.6,
+   "tv_cap": 540187.4,
+   "terminal_value": 540187.4,
+   "terminal_value_bound": "cap",
+   "pv_terminal": 262095.6,
+   "enterprise_value": 523666.6,
+   "equity_bridge_total": 166095.0,
+   "side_stream_value": 166095.0,
+   "net_debt": -114687.0,
+   "equity_value": 804448.6,
+   "intrinsic_value": 1170.24,
+   "street_intrinsic_value": 1170.24,
+   "upside": -60.7,
+   "terminal_pct_of_value": 50.1,
+   "implied_exit_multiple": 12.0,
+   "implied_terminal_ev_to_ebitda": 3.1
+  },
+  "base": {
+   "sum_pv_fcf": 530529.1,
+   "tv_gordon": 1376112.1,
+   "tv_cap": 1239863.4,
+   "terminal_value": 1239863.4,
+   "terminal_value_bound": "cap",
+   "pv_terminal": 601574.2,
+   "enterprise_value": 1132103.3,
+   "equity_bridge_total": 166095.0,
+   "side_stream_value": 166095.0,
+   "net_debt": -114687.0,
+   "equity_value": 1412885.3,
+   "intrinsic_value": 2055.35,
+   "street_intrinsic_value": 2055.35,
+   "upside": -30.9,
+   "terminal_pct_of_value": 53.1,
+   "implied_exit_multiple": 14.0,
+   "implied_terminal_ev_to_ebitda": 4.8
+  },
+  "bull": {
+   "sum_pv_fcf": 800366.0,
+   "tv_gordon": 2402931.8,
+   "tv_cap": 1988633.2,
+   "terminal_value": 1988633.2,
+   "terminal_value_bound": "cap",
+   "pv_terminal": 964872.8,
+   "enterprise_value": 1765238.7,
+   "equity_bridge_total": 166095.0,
+   "side_stream_value": 166095.0,
+   "net_debt": -114687.0,
+   "equity_value": 2046020.7,
+   "intrinsic_value": 2976.38,
+   "street_intrinsic_value": 2976.38,
+   "upside": 0.0,
+   "terminal_pct_of_value": 54.7,
+   "implied_exit_multiple": 14.0,
+   "implied_terminal_ev_to_ebitda": 5.9
+  }
+ },
+ "entry_price": {
+  "hurdle_rate": 0.15,
+  "bear": {
+   "years_to_terminal": 10,
+   "pv_interim_fcf_at_hurdle": 186766.5,
+   "terminal_value_at_hurdle": 312004.8,
+   "terminal_value_bound": "gordon",
+   "pv_terminal_at_hurdle": 77122.8,
+   "net_debt": -114687.0,
+   "entry_price": 792.34,
+   "entry_discount_from_current": -73.4
+  },
+  "base": {
+   "years_to_terminal": 10,
+   "pv_interim_fcf_at_hurdle": 379674.3,
+   "terminal_value_at_hurdle": 638909.2,
+   "terminal_value_bound": "gordon",
+   "pv_terminal_at_hurdle": 157928.6,
+   "net_debt": -114687.0,
+   "entry_price": 1190.52,
+   "entry_discount_from_current": -60.0
+  },
+  "bull": {
+   "years_to_terminal": 10,
+   "pv_interim_fcf_at_hurdle": 565570.4,
+   "terminal_value_at_hurdle": 1067969.7,
+   "terminal_value_bound": "gordon",
+   "pv_terminal_at_hurdle": 263985.8,
+   "net_debt": -114687.0,
+   "entry_price": 1615.23,
+   "entry_discount_from_current": -45.7
+  },
+  "weighted_entry_price": 1156.01
+ },
+ "required_return_table": {
+  "scenario": "base",
+  "returns": [
+   7.5,
+   9,
+   10,
+   11,
+   12,
+   15
+  ],
+  "value_per_share": [
+   2055.35,
+   1813.92,
+   1651.71,
+   1522.18,
+   1416.38,
+   1190.52
+  ],
+  "note": "Each row rebuilds the terminal value at that row's rate (max(0, min(Gordon@r, 14x FCF_N))); the WACC row is valuation.base.intrinsic_value and the hurdle row is entry_price.base.entry_price."
+ },
+ "sensitivity": {
+  "scenario": "base",
+  "wacc_range": [
+   5.5,
+   6.5,
+   7.5,
+   8.5,
+   9.5
+  ],
+  "terminal_growth_range": [
+   0.0,
+   0.5,
+   1.0,
+   1.5,
+   2.0
+  ],
+  "matrix": [
+   [
+    2316.9,
+    2316.9,
+    2316.9,
+    2316.9,
+    2316.9
+   ],
+   [
+    2179.98,
+    2179.98,
+    2179.98,
+    2179.98,
+    2179.98
+   ],
+   [
+    2013.67,
+    2055.35,
+    2055.35,
+    2055.35,
+    2055.35
+   ],
+   [
+    1814.39,
+    1859.84,
+    1911.36,
+    1941.75,
+    1941.75
+   ],
+   [
+    1657.52,
+    1690.81,
+    1728.01,
+    1769.87,
+    1817.31
+   ]
+  ],
+  "terminal_cap_multiple": 14.0,
+  "note": "Rows are WACC, columns terminal growth; each cell rebuilds its own terminal value."
+ },
+ "probability_weighted": {
+  "weights": {
+   "bear": 0.3,
+   "base": 0.5,
+   "bull": 0.2
+  },
+  "weighted_iv": 1974.02,
+  "street_weighted_iv": 1974.02,
+  "weighted_upside_pct": -33.6,
+  "band_position": null,
+  "weights_rationale": "Bear raised from the 15% default to 30%: this is a thin-moat cyclical valued off a margin management itself says is coming down, the labour constraint is structural, and the FY2022-24 trough shows how fast a 7% margin becomes 2%. Bull cut to 20%: it needs three independent things -- domestic margins holding at peak, overseas margins doubling, and growth staying mid-single-digit despite capacity limits -- plus a clean integration of two cross-border acquisitions. Base 50%.",
+  "band_note": "House and street coincide (SBC immaterial): the band collapsed, so band_position is null rather than a degenerate 0."
+ },
+ "engine": {
+  "name": "dcf_engine",
+  "version": 1,
+  "built_at": "2026-10-26T01:47:31Z",
+  "drivers": "1802.T_Drivers.json"
+ },
+ "price_refresh": {
+  "refreshed_at": "2026-10-26T01:48:17Z",
+  "price_source": "yahoo:regularMarketPrice",
+  "previous_price": 2974.5,
+  "current_price": 2976.0,
+  "drift_pct": 0.1,
+  "valuation_date": "2026-10-26",
+  "fields_updated": [
+   "current_price",
+   "valuation.bull.upside"
+  ],
+  "prose_is_stale": false,
+  "prose_paths_quoting_previous_price": [],
+  "dashboard_stale": false
+ },
+ "sanity_check": {
+  "ran": true,
+  "passed": true,
+  "model": "owner_fcf",
+  "basis": "SBC-adjusted on both sides (EPS less SBC/share; EBITDA less SBC), so these deliberately do not match GAAP screener multiples.",
+  "rules_evaluated": [
+   "pb",
+   "p_sales"
+  ],
+  "rules_not_evaluated": [
+   "pe",
+   "ev_ebitda"
+  ],
+  "fy_end_month": 3,
+  "fy_end_month_source": "learned from the annual filings",
+  "implied_multiples": {
+   "pe": null,
+   "pb": 1.1227,
+   "ev_ebitda": null,
+   "p_sales": 0.5463
+  },
+  "historical_averages_ex_outliers": {
+   "pe_avg": null,
+   "pe_max": null,
+   "pe_min": null,
+   "pb_avg": 1.1192,
+   "pb_max": 1.9988,
+   "pb_min": 0.6725,
+   "ev_ebitda_avg": null,
+   "ev_ebitda_max": null,
+   "ev_ebitda_min": null,
+   "p_sales_avg": 0.4869,
+   "p_sales_max": 0.9726,
+   "p_sales_min": 0.3296
+  },
+  "price_position_in_10yr_range": 0.5978,
+  "trip_reasons": [],
+  "diagnosis": [],
+  "historical_table": [
+   {
+    "period": "FY2014",
+    "price": null,
+    "pe": null,
+    "pb": null,
+    "ev_ebitda": null,
+    "p_sales": null
+   },
+   {
+    "period": "FY2015",
+    "price": null,
+    "pe": null,
+    "pb": null,
+    "ev_ebitda": null,
+    "p_sales": null
+   },
+   {
+    "period": "FY2016",
+    "price": null,
+    "pe": null,
+    "pb": null,
+    "ev_ebitda": null,
+    "p_sales": null
+   },
+   {
+    "period": "FY2017",
+    "price": 1081.0,
+    "pe": null,
+    "pb": 1.3059,
+    "ev_ebitda": null,
+    "p_sales": 0.4143
+   },
+   {
+    "period": "FY2018",
+    "price": 1262.0,
+    "pe": null,
+    "pb": 1.3228,
+    "ev_ebitda": null,
+    "p_sales": 0.4766
+   },
+   {
+    "period": "FY2019",
+    "price": 1089.0,
+    "pe": null,
+    "pb": 1.0165,
+    "ev_ebitda": null,
+    "p_sales": 0.3832
+   },
+   {
+    "period": "FY2020",
+    "price": 952.0,
+    "pe": null,
+    "pb": 0.8353,
+    "ev_ebitda": null,
+    "p_sales": 0.3296
+   },
+   {
+    "period": "FY2021",
+    "price": 997.0,
+    "pe": null,
+    "pb": 0.7685,
+    "ev_ebitda": null,
+    "p_sales": 0.405
+   },
+   {
+    "period": "FY2022",
+    "price": 896.0,
+    "pe": null,
+    "pb": 0.6725,
+    "ev_ebitda": null,
+    "p_sales": 0.3342
+   },
+   {
+    "period": "FY2023",
+    "price": 1132.0,
+    "pe": null,
+    "pb": 0.8139,
+    "ev_ebitda": null,
+    "p_sales": 0.4091
+   },
+   {
+    "period": "FY2024",
+    "price": 1762.0,
+    "pe": null,
+    "pb": 1.097,
+    "ev_ebitda": null,
+    "p_sales": 0.5433
+   },
+   {
+    "period": "FY2025",
+    "price": 2216.5,
+    "pe": null,
+    "pb": 1.3608,
+    "ev_ebitda": null,
+    "p_sales": 0.6015
+   },
+   {
+    "period": "FY2026",
+    "price": 3659.0,
+    "pe": null,
+    "pb": 1.9988,
+    "ev_ebitda": null,
+    "p_sales": 0.9726
+   }
+  ],
+  "computed_by": "scripts/sanity_check.py",
+  "computed_at": "2026-10-26T01:48:24.094078Z"
+ }
+};
+// Reported-FCF CAGRs for horizons the DCF leaves empty (rate null = not computable).
+const csvGrowth = [
+ {
+  "label": "FCF 5Y (reported)",
+  "rate": null,
+  "reason": "FCF negative in FY2021"
+ }
+];
+
+// Numbers the DCF cards must show at each scenario's own defaults. The
+// interactive model below is a generic 5-year Gordon toy; it scales these
+// anchors by the ratio it implies, it never replaces them.
+const dcfAnchors = {
+ "bear": {
+  "iv": 1170.24,
+  "entry": 792.34
+ },
+ "base": {
+  "iv": 2055.35,
+  "entry": 1190.52
+ },
+ "bull": {
+  "iv": 2976.38,
+  "entry": 1615.23
+ }
+};
+
+// Chart configuration from the Spec, and the series pre-computed from the CSV.
+const chartSpecs = [
+ {
+  "id": "revenueChart",
+  "series": [
+   {
+    "label": "Revenue",
+    "column": "Revenue",
+    "kind": "bar"
+   },
+   {
+    "label": "YoY %",
+    "derive": "yoy:Revenue",
+    "kind": "line",
+    "axis": "y1",
+    "color": "warning"
+   }
+  ],
+  "y1_title": "YoY %"
+ },
+ {
+  "id": "marginsChart",
+  "series": [
+   {
+    "label": "Gross margin",
+    "column": "GrossMargin",
+    "kind": "line"
+   },
+   {
+    "label": "Operating margin",
+    "column": "OperatingMargin",
+    "kind": "line"
+   },
+   {
+    "label": "Net margin",
+    "column": "NetMargin",
+    "kind": "line"
+   }
+  ],
+  "percent": true
+ },
+ {
+  "id": "profitChart",
+  "series": [
+   {
+    "label": "Gross profit",
+    "column": "GrossProfit",
+    "kind": "bar"
+   },
+   {
+    "label": "Operating income",
+    "column": "OperatingIncome",
+    "kind": "bar"
+   },
+   {
+    "label": "Net income",
+    "column": "NetIncome",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "ebitdaChart",
+  "series": [
+   {
+    "label": "EBITDA",
+    "column": "EBITDA",
+    "kind": "bar"
+   },
+   {
+    "label": "EBITDA %",
+    "derive": "ratio:EBITDA/Revenue",
+    "kind": "line",
+    "axis": "y1",
+    "color": "warning"
+   }
+  ],
+  "y1_title": "EBITDA %"
+ },
+ {
+  "id": "epsDpsChart",
+  "series": [
+   {
+    "label": "EPS",
+    "column": "EPS",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "segmentMixChart",
+  "series": [
+   {
+    "label": "Domestic Building",
+    "column": "SegmentRevenueDomesticBuilding",
+    "kind": "bar"
+   },
+   {
+    "label": "Domestic Civil Engineering",
+    "column": "SegmentRevenueDomesticCivil",
+    "kind": "bar"
+   },
+   {
+    "label": "Overseas Building",
+    "column": "SegmentRevenueOverseasBuilding",
+    "kind": "bar"
+   },
+   {
+    "label": "Overseas Civil Engineering",
+    "column": "SegmentRevenueOverseasCivil",
+    "kind": "bar"
+   },
+   {
+    "label": "Real Estate",
+    "column": "SegmentRevenueRealEstate",
+    "kind": "bar"
+   },
+   {
+    "label": "Other",
+    "column": "SegmentRevenueOther",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "fcfChart",
+  "series": [
+   {
+    "label": "Net income",
+    "column": "NetIncome",
+    "kind": "bar"
+   },
+   {
+    "label": "Reported FCF",
+    "column": "FreeCashFlow",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "ocfCapexChart",
+  "series": [
+   {
+    "label": "Operating cash flow",
+    "column": "OperatingCashFlow",
+    "kind": "bar"
+   },
+   {
+    "label": "CapEx",
+    "column": "CapEx",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "cashDebtChart",
+  "series": [
+   {
+    "label": "Cash & equivalents",
+    "column": "CashAndEquivalents",
+    "kind": "bar"
+   },
+   {
+    "label": "Total debt",
+    "column": "TotalDebt",
+    "kind": "bar"
+   }
+  ]
+ },
+ {
+  "id": "balanceChart",
+  "series": [
+   {
+    "label": "Total assets",
+    "column": "TotalAssets",
+    "kind": "line"
+   },
+   {
+    "label": "Shareholders' equity",
+    "column": "ShareholdersEquity",
+    "kind": "line"
+   },
+   {
+    "label": "Total liabilities",
+    "column": "TotalLiabilities",
+    "kind": "line"
+   }
+  ]
+ },
+ {
+  "id": "sbcChart",
+  "series": [
+   {
+    "label": "Shares outstanding (m)",
+    "column": "SharesOutstanding",
+    "kind": "line",
+    "axis": "y1"
+   }
+  ],
+  "y1_title": "shares (m)"
+ }
+];
+const chartData = {
+ "revenueChart": {
+  "annual": {
+   "labels": [
+    "FY14",
+    "FY15",
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     1612756.0,
+     1773981.0,
+     1777834.0,
+     1872721.0,
+     1900655.0,
+     2039685.0,
+     2073043.0,
+     1766893.0,
+     1922884.0,
+     1983888.0,
+     2325162.0,
+     2620101.0,
+     2586258.0
+    ],
+    [
+     null,
+     9.996862513610242,
+     0.21719511088337473,
+     5.337224960260632,
+     1.491626355447501,
+     7.314846723892552,
+     1.6354486109374733,
+     -14.768145185603965,
+     8.8285481916562,
+     3.172526267835189,
+     17.202281580411796,
+     12.684664552405382,
+     -1.291667763952611
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "quarterly",
+   "labels": [
+    "Q1'14",
+    "Q1'15",
+    "Q1'17",
+    "Q1'18",
+    "Q1'19",
+    "Q1'20",
+    "Q1'21",
+    "Q1'22",
+    "Q1'23",
+    "Q1'24",
+    "Q1'25",
+    "Q1'26",
+    "Q1'27"
+   ],
+   "data": [
+    [
+     330559.0,
+     377423.0,
+     402052.0,
+     439044.0,
+     437307.0,
+     446720.0,
+     415109.0,
+     436414.0,
+     410331.0,
+     487444.0,
+     574706.0,
+     523763.0,
+     623429.0
+    ],
+    [
+     null,
+     14.177196809041654,
+     null,
+     9.200799896530796,
+     -0.3956323284226638,
+     2.1524924137962578,
+     -7.0762446275071635,
+     5.132386915243948,
+     -5.976664359988451,
+     18.792876970055882,
+     17.901953865469675,
+     -8.864184469972473,
+     19.028835561122108
+    ]
+   ]
+  }
+ },
+ "marginsChart": {
+  "annual": {
+   "labels": [
+    "FY14",
+    "FY15",
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     6.9,
+     7.4,
+     10.9,
+     12.0,
+     12.3,
+     12.5,
+     12.3,
+     12.8,
+     8.0,
+     10.9,
+     9.4,
+     11.4,
+     14.1
+    ],
+    [
+     2.0,
+     2.7,
+     6.0,
+     7.1,
+     7.3,
+     7.6,
+     7.4,
+     7.0,
+     2.1,
+     4.7,
+     3.4,
+     5.5,
+     7.5
+    ],
+    [
+     1.3,
+     1.6,
+     3.6,
+     5.0,
+     4.9,
+     5.5,
+     5.5,
+     5.6,
+     2.0,
+     3.9,
+     3.2,
+     5.6,
+     6.7
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "quarterly",
+   "labels": [
+    "Q1'14",
+    "Q1'15",
+    "Q1'17",
+    "Q1'18",
+    "Q1'19",
+    "Q1'20",
+    "Q1'21",
+    "Q1'22",
+    "Q1'23",
+    "Q1'24",
+    "Q1'25",
+    "Q1'26",
+    "Q1'27"
+   ],
+   "data": [
+    [
+     6.7,
+     7.0,
+     11.2,
+     11.1,
+     10.8,
+     11.2,
+     10.7,
+     9.5,
+     9.1,
+     7.6,
+     9.0,
+     10.4,
+     12.4
+    ],
+    [
+     0.6,
+     1.6,
+     5.7,
+     5.7,
+     5.3,
+     5.7,
+     4.8,
+     3.3,
+     2.1,
+     0.9,
+     2.7,
+     3.0,
+     5.2
+    ],
+    [
+     1.0,
+     1.8,
+     4.0,
+     4.3,
+     4.1,
+     5.1,
+     5.5,
+     2.8,
+     2.7,
+     1.4,
+     4.5,
+     3.5,
+     6.3
+    ]
+   ]
+  }
+ },
+ "profitChart": {
+  "annual": {
+   "labels": [
+    "FY14",
+    "FY15",
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     112059.0,
+     131707.0,
+     193052.0,
+     224933.0,
+     234303.0,
+     254023.0,
+     255547.0,
+     225784.0,
+     154339.0,
+     216569.0,
+     219602.0,
+     297833.0,
+     364691.0
+    ],
+    [
+     31991.0,
+     48388.0,
+     106380.0,
+     133742.0,
+     137800.0,
+     155480.0,
+     152871.0,
+     123161.0,
+     41051.0,
+     93800.0,
+     79381.0,
+     143442.0,
+     194678.0
+    ],
+    [
+     21627.0,
+     28695.0,
+     63437.0,
+     94501.0,
+     92662.0,
+     113155.0,
+     113093.0,
+     98780.0,
+     39127.0,
+     77671.0,
+     75059.0,
+     146052.0,
+     173759.0
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "quarterly",
+   "labels": [
+    "Q1'14",
+    "Q1'15",
+    "Q1'17",
+    "Q1'18",
+    "Q1'19",
+    "Q1'20",
+    "Q1'21",
+    "Q1'22",
+    "Q1'23",
+    "Q1'24",
+    "Q1'25",
+    "Q1'26",
+    "Q1'27"
+   ],
+   "data": [
+    [
+     22113.0,
+     26232.0,
+     45048.0,
+     48563.0,
+     47034.0,
+     49912.0,
+     44477.0,
+     41379.0,
+     37478.0,
+     37030.0,
+     51776.0,
+     54313.0,
+     77538.0
+    ],
+    [
+     1969.0,
+     6113.0,
+     22986.0,
+     24897.0,
+     23075.0,
+     25399.0,
+     19733.0,
+     14478.0,
+     8434.0,
+     4167.0,
+     15372.0,
+     15798.0,
+     32700.0
+    ],
+    [
+     3177.0,
+     6793.0,
+     15949.0,
+     18976.0,
+     17924.0,
+     22733.0,
+     22758.0,
+     12293.0,
+     11279.0,
+     6591.0,
+     25847.0,
+     18070.0,
+     39091.0
+    ]
+   ]
+  }
+ },
+ "ebitdaChart": {
+  "annual": {
+   "labels": [
+    "FY14",
+    "FY15",
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     44094.0,
+     62780.0,
+     120856.0,
+     148723.0,
+     152459.0,
+     173152.0,
+     172751.0,
+     143199.0,
+     61742.0,
+     117741.0,
+     106498.0,
+     175899.0,
+     231031.0
+    ],
+    [
+     2.7340775666002792,
+     3.5389330550890907,
+     6.797935015305141,
+     7.941546017799768,
+     8.021392625173954,
+     8.489153962499111,
+     8.333208717812415,
+     8.10456547170655,
+     3.210906118101768,
+     5.934861242166897,
+     4.580240000481687,
+     6.713443489392203,
+     8.933022150148979
+    ]
+   ]
+  }
+ },
+ "epsDpsChart": {
+  "annual": {
+   "labels": [
+    "FY14",
+    "FY15",
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     30.11,
+     39.96,
+     88.36,
+     131.66,
+     129.09,
+     157.65,
+     157.59,
+     137.64,
+     54.55,
+     108.34,
+     104.69,
+     203.88,
+     249.42
+    ]
+   ]
+  }
+ },
+ "segmentMixChart": {
+  "annual": {
+   "labels": [
+    "FY14",
+    "FY15",
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     null,
+     953097.0,
+     932997.0,
+     1020378.0,
+     1014371.0,
+     null,
+     1138934.0,
+     964683.0,
+     1059945.0,
+     1056407.0,
+     1264181.0,
+     1337171.0,
+     1138762.0
+    ],
+    [
+     null,
+     326353.0,
+     353909.0,
+     332374.0,
+     346119.0,
+     null,
+     342704.0,
+     342203.0,
+     346808.0,
+     343464.0,
+     369367.0,
+     402252.0,
+     426623.0
+    ],
+    [
+     null,
+     330702.0,
+     337956.0,
+     367980.0,
+     383995.0,
+     null,
+     398564.0,
+     304388.0,
+     298818.0,
+     343894.0,
+     457818.0,
+     498777.0,
+     507992.0
+    ],
+    [
+     null,
+     62886.0,
+     70889.0,
+     81792.0,
+     76461.0,
+     null,
+     72215.0,
+     72004.0,
+     89635.0,
+     103921.0,
+     115396.0,
+     258678.0,
+     336000.0
+    ],
+    [
+     null,
+     63858.0,
+     47020.0,
+     38795.0,
+     44566.0,
+     null,
+     55043.0,
+     42426.0,
+     61124.0,
+     83875.0,
+     66888.0,
+     72932.0,
+     106798.0
+    ],
+    [
+     null,
+     37082.0,
+     35061.0,
+     31400.0,
+     35141.0,
+     null,
+     65580.0,
+     41186.0,
+     66551.0,
+     52324.0,
+     51509.0,
+     50289.0,
+     70082.0
+    ]
+   ]
+  }
+ },
+ "fcfChart": {
+  "annual": {
+   "labels": [
+    "FY14",
+    "FY15",
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     21627.0,
+     28695.0,
+     63437.0,
+     94501.0,
+     92662.0,
+     113155.0,
+     113093.0,
+     98780.0,
+     39127.0,
+     77671.0,
+     75059.0,
+     146052.0,
+     173759.0
+    ],
+    [
+     -30229.0,
+     33556.0,
+     65832.0,
+     119137.0,
+     42069.0,
+     7651.0,
+     190157.0,
+     -32628.0,
+     11667.0,
+     131867.0,
+     -27992.0,
+     35447.0,
+     127290.0
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "quarterly",
+   "labels": [
+    "Q1'14",
+    "Q1'15",
+    "Q1'17",
+    "Q1'18",
+    "Q1'19",
+    "Q1'20",
+    "Q1'21",
+    "Q1'22",
+    "Q1'23",
+    "Q1'24",
+    "Q1'25",
+    "Q1'26",
+    "Q1'27"
+   ],
+   "data": [
+    [
+     3177.0,
+     6793.0,
+     15949.0,
+     18976.0,
+     17924.0,
+     22733.0,
+     22758.0,
+     12293.0,
+     11279.0,
+     6591.0,
+     25847.0,
+     18070.0,
+     39091.0
+    ],
+    [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   ]
+  }
+ },
+ "ocfCapexChart": {
+  "annual": {
+   "labels": [
+    "FY14",
+    "FY15",
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     37962.0,
+     74646.0,
+     124980.0,
+     158892.0,
+     114034.0,
+     44203.0,
+     237628.0,
+     24803.0,
+     69697.0,
+     228456.0,
+     50399.0,
+     85625.0,
+     252920.0
+    ],
+    [
+     68191.0,
+     41090.0,
+     59148.0,
+     39755.0,
+     71965.0,
+     36552.0,
+     47471.0,
+     57431.0,
+     58030.0,
+     96589.0,
+     78391.0,
+     50178.0,
+     125630.0
+    ]
+   ]
+  }
+ },
+ "cashDebtChart": {
+  "annual": {
+   "labels": [
+    "FY14",
+    "FY15",
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     121177.0,
+     162607.0,
+     164802.0,
+     194195.0,
+     184783.0,
+     157699.0,
+     298945.0,
+     236474.0,
+     249317.0,
+     405633.0,
+     326688.0,
+     380169.0,
+     416028.0
+    ],
+    [
+     428441.0,
+     410819.0,
+     346338.0,
+     273358.0,
+     276727.0,
+     272215.0,
+     248551.0,
+     265952.0,
+     280434.0,
+     337919.0,
+     323883.0,
+     362764.0,
+     344064.0
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "quarterly",
+   "labels": [
+    "Q1'14",
+    "Q1'15",
+    "Q1'17",
+    "Q1'18",
+    "Q1'19",
+    "Q1'20",
+    "Q1'21",
+    "Q1'22",
+    "Q1'23",
+    "Q1'24",
+    "Q1'25",
+    "Q1'26",
+    "Q1'27"
+   ],
+   "data": [
+    [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    [
+     462015.0,
+     481815.0,
+     346456.0,
+     288519.0,
+     243459.0,
+     263366.0,
+     286438.0,
+     271944.0,
+     360405.0,
+     363811.0,
+     394400.0,
+     357341.0,
+     342856.0
+    ]
+   ]
+  }
+ },
+ "balanceChart": {
+  "annual": {
+   "labels": [
+    "FY14",
+    "FY15",
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     1818886.0,
+     1996193.0,
+     1951907.0,
+     2015996.0,
+     2148861.0,
+     2214512.0,
+     2230297.0,
+     2272628.0,
+     2422085.0,
+     2609929.0,
+     3017047.0,
+     3042778.0,
+     3143449.0
+    ],
+    [
+     412456.0,
+     507670.0,
+     516098.0,
+     594160.0,
+     684836.0,
+     768944.0,
+     817892.0,
+     931008.0,
+     955691.0,
+     997109.0,
+     1151630.0,
+     1158245.0,
+     1258424.0
+    ],
+    [
+     1370778.0,
+     1446710.0,
+     1390249.0,
+     1371919.0,
+     1437336.0,
+     1416362.0,
+     1379798.0,
+     1310648.0,
+     1433171.0,
+     1574048.0,
+     1822236.0,
+     1832577.0,
+     1826983.0
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "quarterly",
+   "labels": [
+    "Q1'14",
+    "Q1'15",
+    "Q1'17",
+    "Q1'18",
+    "Q1'19",
+    "Q1'20",
+    "Q1'21",
+    "Q1'22",
+    "Q1'23",
+    "Q1'24",
+    "Q1'25",
+    "Q1'26",
+    "Q1'27"
+   ],
+   "data": [
+    [
+     1725754.0,
+     1871733.0,
+     1840131.0,
+     1990351.0,
+     2049452.0,
+     2163199.0,
+     2218662.0,
+     2296667.0,
+     2470878.0,
+     2700819.0,
+     2948893.0,
+     2880973.0,
+     3063036.0
+    ],
+    [
+     396803.0,
+     423764.0,
+     496502.0,
+     618096.0,
+     695972.0,
+     766727.0,
+     834069.0,
+     939903.0,
+     965074.0,
+     1026515.0,
+     1115606.0,
+     1117581.0,
+     1244437.0
+    ],
+    [
+     1297219.0,
+     1412214.0,
+     1298689.0,
+     1343797.0,
+     1327340.0,
+     1366446.0,
+     1353997.0,
+     1324721.0,
+     1470827.0,
+     1634529.0,
+     1789215.0,
+     1714657.0,
+     1763294.0
+    ]
+   ]
+  }
+ },
+ "sbcChart": {
+  "annual": {
+   "labels": [
+    "FY14",
+    "FY15",
+    "FY16",
+    "FY17",
+    "FY18",
+    "FY19",
+    "FY20",
+    "FY21",
+    "FY22",
+    "FY23",
+    "FY24",
+    "FY25",
+    "FY26"
+   ],
+   "data": [
+    [
+     718.266,
+     718.093,
+     717.938,
+     717.765,
+     717.809,
+     717.761,
+     717.641,
+     717.669,
+     717.269,
+     716.919,
+     716.964,
+     711.07,
+     687.422
+    ]
+   ]
+  },
+  "interim": {
+   "kind": "quarterly",
+   "labels": [
+    "Q1'14",
+    "Q1'15",
+    "Q1'17",
+    "Q1'18",
+    "Q1'19",
+    "Q1'20",
+    "Q1'21",
+    "Q1'22",
+    "Q1'23",
+    "Q1'24",
+    "Q1'25",
+    "Q1'26",
+    "Q1'27"
+   ],
+   "data": [
+    [
+     718.778,
+     718.076,
+     717.777,
+     717.7,
+     717.821,
+     717.582,
+     717.692,
+     717.63,
+     717.038,
+     717.193,
+     716.976,
+     702.399,
+     687.421
+    ]
+   ]
+  }
+ }
+};
+
+const metricDescriptions = {
+ "balanceSheet": {
+  "title": "Balance sheet",
+  "content": "<p><strong>Shareholders' equity<\/strong> is assets less liabilities; plotted against <strong>total liabilities<\/strong> to show leverage.<\/p><div class=\"metric-highlight\"><strong>For Obayashi Corporation:<\/strong> equity that grows only through revaluations or share issues is not the same as retained earnings.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Liabilities growing faster than equity<\/li><li>Goodwill share of equity after acquisitions<\/li><\/ul>"
+ },
+ "cashDebt": {
+  "title": "Cash and debt",
+  "content": "<p><strong>Cash &amp; equivalents<\/strong> against <strong>total borrowings<\/strong> (leases excluded unless noted).<\/p><div class=\"metric-highlight\"><strong>For Obayashi Corporation:<\/strong> the DCF's net-debt bridge uses these balances at the latest balance-sheet date.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Net debt trend versus EBITDA<\/li><li>Refinancing dates and covenants in the filings<\/li><\/ul>"
+ },
+ "ebitda": {
+  "title": "EBITDA",
+  "content": "<p><strong>EBITDA<\/strong> is earnings before interest, tax, depreciation and amortisation -- an operating-cash proxy that ignores capital intensity.<\/p><div class=\"metric-highlight\"><strong>For Obayashi Corporation:<\/strong> read it beside CapEx: a business that must reinvest most of its EBITDA is not as cash-generative as the margin suggests.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>EBITDA margin trend<\/li><li>Gap between EBITDA and operating cash flow (working capital)<\/li><\/ul>"
+ },
+ "epsDps": {
+  "title": "EPS and dividends",
+  "content": "<p><strong>EPS<\/strong> is net income per share; <strong>DPS<\/strong> is the cash dividend paid per share. Both are in major currency units.<\/p><div class=\"metric-highlight\"><strong>For Obayashi Corporation:<\/strong> the payout ratio (DPS / EPS) shows how much of earnings is returned versus reinvested.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>EPS growth versus net income growth (dilution)<\/li><li>Dividends funded from earnings, not debt<\/li><\/ul>"
+ },
+ "fcf": {
+  "title": "Free cash flow",
+  "content": "<p><strong>Reported FCF<\/strong> is operating cash flow less capital expenditure. <strong>Owner FCF<\/strong> (from the DCF) further deducts stock-based compensation, interest income and lease principal -- the cash an owner could actually take out.<\/p><div class=\"metric-highlight\"><strong>For Obayashi Corporation:<\/strong> the gap between net income and owner FCF is the earnings-quality question the valuation is built on.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>FCF persistently below net income<\/li><li>Working-capital swings inflating one year's FCF<\/li><\/ul>"
+ },
+ "margins": {
+  "title": "Margins",
+  "content": "<p><strong>Gross margin<\/strong> is revenue less cost of revenue; <strong>operating margin<\/strong> deducts operating expenses; <strong>net margin<\/strong> is after interest and tax.<\/p><div class=\"metric-highlight\"><strong>For Obayashi Corporation:<\/strong> the spread between gross and operating margin is the cost of running the business; a widening spread with flat gross margin means opex is growing faster than sales.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Direction of operating margin over several years, not one<\/li><li>One-offs (impairments, disposals) that distort net margin<\/li><\/ul>"
+ },
+ "ocfCapex": {
+  "title": "Operating cash flow and CapEx",
+  "content": "<p><strong>Operating cash flow<\/strong> is cash generated by operations; <strong>CapEx<\/strong> is cash invested in fixed and intangible assets.<\/p><div class=\"metric-highlight\"><strong>For Obayashi Corporation:<\/strong> CapEx here is shown as stored (sign convention varies by ticker); the DCF splits it into stay-in-business and growth where disclosed.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>CapEx rising faster than revenue<\/li><li>OCF that diverges from EBITDA<\/li><\/ul>"
+ },
+ "profit": {
+  "title": "Profit lines",
+  "content": "<p><strong>Gross profit<\/strong> is revenue less cost of revenue; <strong>operating income<\/strong> deducts operating expenses; <strong>net income<\/strong> is after interest, tax and one-offs.<\/p><div class=\"metric-highlight\"><strong>For Obayashi Corporation:<\/strong> the three lines together show where margin is made and lost between the top line and the bottom.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Operating income growing slower than gross profit (opex creep)<\/li><li>Net income far from operating income (interest, tax, one-offs)<\/li><\/ul>"
+ },
+ "revenue": {
+  "title": "Revenue",
+  "content": "<p><strong>Revenue<\/strong> is the top line: what customers paid for goods and services in the period, before any costs.<\/p><div class=\"metric-highlight\"><strong>For Obayashi Corporation:<\/strong> the growth rate matters more than the level; compare it with the DCF's base-case growth path below.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Acceleration or deceleration in YoY growth<\/li><li>Whether growth is organic or acquired<\/li><li>Interim rows show seasonality<\/li><\/ul>"
+ },
+ "sbc": {
+  "title": "Stock-based compensation and share count",
+  "content": "<p><strong>Stock-based comp<\/strong> is the expense of equity awards; <strong>shares outstanding<\/strong> shows the dilution it causes net of buybacks.<\/p><div class=\"metric-highlight\"><strong>For Obayashi Corporation:<\/strong> the DCF charges SBC as a cash cost and holds the share count flat, so this chart is the check on that assumption.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Share count rising while buybacks are advertised<\/li><li>SBC as a percentage of revenue<\/li><\/ul>"
+ },
+ "segmentMix": {
+  "title": "Revenue by segment",
+  "content": "<p>Obayashi reports revenue across five lines: <strong>Domestic Building<\/strong> and <strong>Domestic Civil Engineering<\/strong> (the core Japanese construction business), <strong>Overseas Building<\/strong> and <strong>Overseas Civil Engineering<\/strong> (international contracting), and <strong>Real Estate Development<\/strong> (recurring income from Obayashi's own property portfolio, structurally higher-margin than contract construction). <strong>Other<\/strong> is small ancillary business.<\/p><div class=\"metric-highlight\"><strong>For Obayashi Corporation:<\/strong> Domestic Building is consistently the largest line, but Overseas Civil Engineering has grown sharply in recent periods (roughly tripling from FY2023 to H1 FY2026), while Real Estate contributes a smaller but steadier, higher-margin slice. The mix shift matters because domestic contracting margins are thinner and more cyclical (steel, labour and subcontractor cost inflation) than overseas civil or real estate income.<\/div><p><strong>What to watch:<\/strong><\/p><ul><li>Overseas share of total revenue rising or falling -- it carries different FX and project-execution risk than the domestic book<\/li><li>Real Estate's share, since that income is closer to recurring rent than one-off contract revenue<\/li><li>Segment data is not disclosed for FY2013, FY2018 or quarterly Q1/Q3 filings, so those periods are gaps in this chart, not zero revenue<\/li><\/ul>"
+ }
+};
+
+// ============================================================
+// OVERVIEW & GUIDANCE
+// ============================================================
+function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function renderGuidance() {
+    const g = analysis.guidance;
+    const section = document.getElementById('guidanceSection');
+    if (!g || !g.items || g.items.length === 0) { section.style.display = 'none'; return; }
+    document.getElementById('guidanceAsOf').textContent = g.as_of || '';
+    document.getElementById('guidanceFY').textContent = g.fiscal_year || '';
+    document.getElementById('guidanceGrid').innerHTML = g.items.map(item => {
+        const vp = item.vs_prior ? String(item.vs_prior) : '';
+        const vsClass = vp ? (vp.toLowerCase().replace(/[^a-z]/g, '') || 'na') : 'new';
+        const vsLabel = vp ? (vp === 'n/a' ? 'N/A' : vp.charAt(0).toUpperCase() + vp.slice(1)) : 'New';
+        return `<div class="guidance-card">
+            <div class="guidance-metric">${esc(item.metric)}</div>
+            <div class="guidance-target">${esc(item.target)}</div>
+            <div class="guidance-period">${esc(item.period)}</div>
+            <span class="guidance-vs-prior ${vsClass}">${esc(vsLabel)}</span>
+            ${item.notes ? `<div class="guidance-notes">${esc(item.notes)}</div>` : ''}
+        </div>`;
+    }).join('');
+    const c = document.getElementById('guidanceCommentary');
+    if (g.management_commentary) { c.textContent = g.management_commentary; c.style.display = 'block'; }
+    else { c.style.display = 'none'; }
+}
+
+function renderOverview() {
+    const bm = analysis.business_model || {};
+    const cp = analysis.competitive_position || {};
+    const risks = analysis.risks || {};
+    const cats = { business: 'Business', financial: 'Financial', regulatory: 'Regulatory', macro: 'Macro', execution: 'Execution' };
+    const allRisks = [];
+    for (const k of Object.keys(risks)) {
+        (risks[k] || []).forEach(r => allRisks.push({ ...r, cat: cats[k] || k }));
+    }
+    const sevClass = s => s === 'high' ? 'risk-high' : s === 'moderate' || s === 'medium' ? 'risk-moderate' : 'risk-low';
+    const trendClass = t => /grow/i.test(t || '') ? 'trend-growing' : /declin/i.test(t || '') ? 'trend-declining' : 'trend-stable';
+    const list = xs => (xs || []).map(x => `<li>${esc(x)}</li>`).join('');
+    document.getElementById('overviewGrid').innerHTML = `
+        <div class="overview-card"><h3>Company Overview</h3><p>${esc(analysis.overview)}</p></div>
+        <div class="overview-card"><h3>Business Model</h3><p>${esc(bm.summary)}</p>
+            <ul>${(bm.revenue_streams || []).map(r => `<li class="revenue-stream"><span>${esc(r.name)} <span class="${trendClass(r.trend)}">(${esc(r.trend)})</span></span><span class="percent">${r.percent != null ? esc(r.percent) + '%' : ''}</span></li>`).join('')}</ul></div>
+        <div class="overview-card"><h3>Competitive Position</h3>
+            <p><strong>Competitors:</strong> ${esc((cp.main_competitors || []).join(', '))}</p>
+            ${cp.market_position ? `<p>${esc(cp.market_position)}</p>` : ''}
+            <p><strong>Moat factors:</strong></p>
+            <ul>${(cp.moat_factors || []).map(m => `<li><strong>${esc(m.factor)}</strong> (${esc(m.strength)}) &mdash; ${esc(m.description)}</li>`).join('')}</ul></div>
+        <div class="overview-card"><h3>Growth Drivers</h3><ul>${list(analysis.growth_drivers)}</ul></div>
+        <div class="overview-card risks"><h3>Key Risks</h3>
+            <ul>${allRisks.map(r => `<li><span class="${sevClass(r.severity)}">&#9679; ${esc(String(r.severity || '').toUpperCase())}</span> [${esc(r.cat)}] <strong>${esc(r.risk)}</strong> &mdash; ${esc(r.description)}</li>`).join('')}</ul></div>
+        <div class="overview-card bull"><h3>Bull Case</h3><ul>${list(analysis.bull_case)}</ul></div>
+        <div class="overview-card bear"><h3>Bear Case</h3><ul>${list(analysis.bear_case)}</ul></div>
+        <div class="overview-card"><h3>Recent Developments</h3>
+            <ul>${(analysis.recent_developments || []).map(d => `<li><strong>${esc(d.date)}:</strong> ${esc(d.event)}</li>`).join('')}</ul></div>`;
+}
+
+function toggleOverview() {
+    document.querySelector('.overview-toggle').classList.toggle('active');
+    document.getElementById('overviewContent').classList.toggle('active');
+}
+
+// ============================================================
+// CHARTS
+// ============================================================
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } } },
+    scales: {
+        x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+// Every chart gets its OWN scales object so a log toggle changes only that chart.
+function freshScales() {
+    return { x: { ...chartDefaults.scales.x }, y: { ...chartDefaults.scales.y } };
+}
+const colors = {
+    primary: '#00d4aa', secondary: '#00b894', tertiary: '#0984e3',
+    quaternary: '#6c5ce7', warning: '#fdcb6e', danger: '#ff6b6b'
+};
+const palette = [colors.primary, colors.warning, colors.tertiary, colors.quaternary, colors.danger, colors.secondary];
+
+const chartRegistry = {};
+const chartSeries = {};
+
+// A brighter 2px grid line before each Q1 so a fiscal year reads as one group.
+function scaleXFor(labels, kind) {
+    const x = { ...chartDefaults.scales.x };
+    if (kind === 'quarterly') {
+        x.grid = {
+            color: ctx => (labels[ctx.index] || '').startsWith('Q1') ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.05)',
+            lineWidth: ctx => (labels[ctx.index] || '').startsWith('Q1') ? 2 : 1
+        };
+    }
+    return x;
+}
+
+function toggleLogScale(canvasId, btn) {
+    const chart = chartRegistry[canvasId];
+    if (!chart) return;
+    const toLog = chart.options.scales.y.type !== 'logarithmic';
+    chart.options.scales.y.type = toLog ? 'logarithmic' : 'linear';
+    btn.classList.toggle('active', toLog);
+    chart.update();
+}
+
+function setPeriodView(canvasId, view, btn) {
+    const chart = chartRegistry[canvasId], s = chartSeries[canvasId];
+    if (!chart || !s || !s[view]) return;
+    chart.data.labels = s[view].labels;
+    s[view].data.forEach((d, i) => { if (chart.data.datasets[i]) chart.data.datasets[i].data = d; });
+    if (chart.options.scales.x) chart.options.scales.x = s[view].scaleX;
+    btn.parentNode.querySelectorAll('.view-toggle').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    chart.update();
+}
+
+function buildChart(spec) {
+    const cd = chartData[spec.id];
+    const el = document.getElementById(spec.id);
+    if (!cd || !el) return;
+    // A chart whose series exist only per quarter opens on the quarters.
+    const startInterim = cd.default === 'interim' && !!cd.interim;
+    const annual = cd.annual;
+    const first = startInterim ? cd.interim : annual;
+    const hasY1 = spec.series.some(s => s.axis === 'y1');
+    const kindOf = s => s.kind || spec.type || 'bar';
+    const hasBars = spec.series.some(s => kindOf(s) === 'bar');
+    const datasets = spec.series.map((s, i) => {
+        const color = colors[s.color] || palette[i % palette.length];
+        const kind = kindOf(s);
+        // Chart.js paints ascending `order`, so lines need a LOWER order than
+        // bars to land on top of them -- otherwise a YoY line hides behind its bars.
+        const ds = { type: kind, label: s.label, data: first.data[i], yAxisID: s.axis || 'y',
+                     spanGaps: true, order: (kind === 'bar' ? 100 : 0) + i };
+        if (kind === 'bar') { ds.backgroundColor = color; ds.borderRadius = 4; }
+        else {
+            ds.borderColor = color; ds.backgroundColor = spec.fill ? color.replace(')', ',0.15)').replace('rgb', 'rgba') : color;
+            ds.tension = 0.3; ds.fill = !!spec.fill;
+            if (hasBars) {
+                // Over bars a hairline disappears: give it weight and dotted
+                // points haloed in the card background so it stays legible.
+                ds.borderWidth = 3;
+                ds.pointRadius = 3.5;
+                ds.pointBackgroundColor = color;
+                ds.pointBorderColor = 'rgba(22, 26, 46, 0.9)';
+                ds.pointBorderWidth = 1.5;
+                ds.pointHoverRadius = 5.5;
+            }
+        }
+        return ds;
+    });
+    const scales = freshScales();
+    scales.x = scaleXFor(first.labels, startInterim ? cd.interim.kind : 'annual');
+    if (spec.y_title) scales.y.title = { display: true, text: spec.y_title, color: '#888' };
+    if (hasY1) {
+        scales.y.position = 'left';
+        scales.y1 = { position: 'right', ticks: { color: '#888' }, grid: { display: false } };
+        if (spec.y1_title) scales.y1.title = { display: true, text: spec.y1_title, color: '#888' };
+    }
+    const chart = new Chart(el.getContext('2d'), {
+        data: { labels: first.labels, datasets: datasets },
+        options: { ...chartDefaults, scales: scales }
+    });
+    chartRegistry[spec.id] = chart;
+    chartSeries[spec.id] = { annual: { labels: annual.labels, data: annual.data,
+                                       scaleX: scaleXFor(annual.labels, 'annual') } };
+    if (cd.interim) {
+        chartSeries[spec.id].interim = {
+            labels: cd.interim.labels, data: cd.interim.data, scaleX: scaleXFor(cd.interim.labels, cd.interim.kind)
+        };
+    }
+}
+
+function initCharts() { chartSpecs.forEach(buildChart); }
+
+// ============================================================
+// MODALS
+// ============================================================
+function openModal(key) {
+    const m = metricDescriptions[key];
+    if (!m) return;
+    document.getElementById('modalTitle').textContent = m.title;
+    document.getElementById('modalBody').innerHTML = m.content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ============================================================
+// DCF VALUATION
+// ============================================================
+let currentScenario = 'base';
+
+// Display symbols for currencies whose ISO code is not what a reader
+// expects to see against a share price. Anything not listed renders as its
+// own code, which is the right answer for USD/EUR/AUD/NZD-style tickers.
+const CURRENCY_SYMBOLS = { hkd: 'HK$', rmb: 'RMB', cny: 'RMB', usd: 'US$', gbp: '\u00a3', jpy: '\u00a5' };
+// Minor-unit quote codes are case-sensitive: GBp (pence) is not GBP (pounds).
+// A per-share figure in pence takes a 'p' suffix; lowercasing GBp to gbp
+// rendered WISE.L's 920p as "\u00a3920", 100x the real price.
+const PENCE_CODES = { GBp: 'p', GBX: 'p', ZAc: 'c' };
+function penceSuffix(code) {
+    return code ? (PENCE_CODES[String(code)] || null) : null;
+}
+function currencySymbol(code) {
+    if (!code) return null;
+    if (penceSuffix(code)) return '';
+    return CURRENCY_SYMBOLS[String(code).toLowerCase()] || String(code);
+}
+// PER-SHARE quantities (intrinsic value, weighted IV, entry price, current
+// price, every sensitivity cell) are denominated in the QUOTE currency,
+// because runEngine multiplies its model-currency result by quoteFxRate and
+// the analyst stores intrinsic_value in the quote currency too. The FLOWS
+// (owner FCF, net cash, the equity bridge) stay in inputs.currency and are
+// formatted by formatMoney, which is deliberately left alone. Labelling a
+// HKD share price "RMB192" is wrong by the 1.08 rate and invites a reader to
+// compare it against the RMB financials elsewhere on the page.
+function perShareCurrency() {
+    const inputs = (dcfData && dcfData.inputs) || {};
+    const quote = currencySymbol(inputs.quote_currency);   // '' for a pence quote, null if unset
+    if (quote !== null) return quote;
+    return currencySymbol(inputs.currency) || '$';
+}
+
+function fmtIV(v) {
+    const c = perShareCurrency();
+    if (v == null || !isFinite(v)) return '-';
+    const a = Math.abs(v);
+    const dp = a >= 100 ? 0 : a >= 10 ? 1 : a >= 1 ? 2 : 4;
+    const inputs = (dcfData && dcfData.inputs) || {};
+    const suffix = penceSuffix(inputs.quote_currency) || '';
+    return c + v.toFixed(dp) + suffix;
+}
+
+function scenarioDefaults(sc) {
+    const a = dcfData.assumptions;
+    const cur = a[sc] || a.base;
+    const growth = (Array.isArray(cur.growth_rates) && cur.growth_rates.length)
+        ? cur.growth_rates[0] : dcfData.historical_growth.selected_growth_rate;
+    return {
+        growth: growth,
+        wacc: cur.wacc != null ? cur.wacc : a.base.wacc,
+        terminal: cur.terminal_growth != null ? cur.terminal_growth : a.base.terminal_growth
+    };
+}
+
+// ---- Valuation engine --------------------------------------------------
+// Reproduces the analyst's model from `assumptions[scenario]` so the sliders
+// recompute real numbers. Three families, detected from the fields present:
+//   component    : revenue path x (ebitda margin - sbc - lease - D&A) -> tax ->
+//                  + D&A - capex + wc capture on revenue change (owner-fcf.md s2)
+//   sum-of-parts : component OpCo leg (WACC) + a second embedded-lender leg
+//                  (assumptions[sc].monee: book_growth/roa_path/cost_of_equity,
+//                  discounted separately at its own cost of equity) + surplus
+//                  net cash, for models where one FCF stream cannot price a
+//                  credit book (dcf-methods sum-of-the-parts routing)
+//   fcf-margin   : revenue path x fcf margin path
+//   fcf-growth   : last_fcf compounded along the growth path
+// Each is validated at the scenario's own defaults against
+// valuation[scenario].intrinsic_value; a family that cannot reproduce the
+// JSON within ENGINE_TOL is not trusted and the page falls back to the
+// generic scaler below. Displayed numbers are always the JSON's own at
+// defaults; the engine supplies the ratio when the sliders move.
+const ENGINE_TOL = 0.015;
+const dcfEngineStatus = {};
+
+function asPath(v, n, fallback) {
+    if (Array.isArray(v) && v.length) {
+        const out = v.slice(0, n).map(Number);
+        while (out.length < n) out.push(out[out.length - 1]);
+        return out;
+    }
+    if (typeof v === 'number') return Array(n).fill(v);
+    return fallback == null ? null : Array(n).fill(fallback);
+}
+function firstOf(a, names) {
+    for (const k of names) if (a[k] != null) return a[k];
+    return null;
+}
+function growthPathOf(a) {
+    const g = firstOf(a, ['growth_rates', 'revenue_growth_pct_path', 'revenue_growth_rates', 'revenue_growth_pct', 'growth_rate']);
+    if (Array.isArray(g) && g.length) return g.map(Number);
+    if (typeof g === 'number') return Array(a.horizon_years || 5).fill(g);
+    return null;
+}
+function baseRevenueOf(sc, g0) {
+    const inputs = dcfData.inputs || {};
+    const proj = (dcfData.projections || {})[sc];
+    if (proj && Array.isArray(proj.revenue) && proj.revenue.length && isFinite(g0)) return proj.revenue[0] / (1 + g0 / 100);
+    for (const k of ['last_revenue', 'revenue', 'base_revenue']) if (inputs[k] != null) return Number(inputs[k]);
+    for (const k of Object.keys(inputs)) if (/^revenue_fy\d{4}$/.test(k)) return Number(inputs[k]);
+    return null;
+}
+// A separately-valued stream that the operating sliders deliberately do not
+// drive: a payment processor's merchant settlement float (ADYEN.AS) is valued
+// on its own interest spread, not on the operating growth path. It is a real
+// term in the equity bridge, so an engine that omits it undershoots and
+// silently falls back to the toy model. Read from valuation[sc] because that
+// is where the analyst records the already-discounted value.
+function sideStreamValue(sc) {
+    const v = (dcfData.valuation || {})[sc] || {};
+    const n = Number(firstOf(v, ['merchant_float_value', 'float_value', 'side_stream_value',
+                                'non_operating_assets']));
+    return isFinite(n) ? n : 0;
+}
+function engineFamily(sc) {
+    const a = (dcfData.assumptions || {})[sc];
+    if (!a) return null;
+    const g = growthPathOf(a);
+    if (!g) return null;
+    const hasMargin = firstOf(a, ['ebitda_margin_path', 'ebitda_margin_path_pct', 'ebitda_margin']) != null;
+    if (hasMargin && a.monee && baseRevenueOf(sc, g[0]) != null) return 'sum-of-parts';
+    if (hasMargin && baseRevenueOf(sc, g[0]) != null) return 'component';
+    if (firstOf(a, ['fcf_margin', 'fcf_margins', 'fcf_margin_path']) != null && baseRevenueOf(sc, g[0]) != null) return 'fcf-margin';
+    if ((dcfData.inputs || {}).last_fcf != null) return 'fcf-growth';
+    return null;
+}
+// Second, independently-discounted leg for sum-of-the-parts DCFs: an
+// embedded lender/insurer valued on distributable earnings (post-tax
+// earnings less a fixed share of loan/book growth retained as capital) at
+// its own cost of equity, not the OpCo WACC. Detected from assumptions[sc]
+// .monee = {book_growth[], roa_path[], capital_ratio_pct, cost_of_equity,
+// terminal_growth, exit_pe_cap}; book0 is backed out from
+// projections[sc].monee.loan_book_year_end[0] and the first book_growth
+// rate so the leg still works if the growth slider is not wired to it.
+function moneeLeg(sc) {
+    const a = (dcfData.assumptions || {})[sc] || {};
+    const m = a.monee;
+    const proj = ((dcfData.projections || {})[sc] || {}).monee;
+    if (!m || !proj || !Array.isArray(proj.loan_book_year_end) || !proj.loan_book_year_end.length) return null;
+    const bookGrowth = m.book_growth, roa = m.roa_path;
+    if (!Array.isArray(bookGrowth) || !Array.isArray(roa)) return null;
+    const n = bookGrowth.length;
+    const coe = Number(m.cost_of_equity);
+    const capRatio = Number(m.capital_ratio_pct || 0);
+    if (!isFinite(coe)) return null;
+    let book = proj.loan_book_year_end[0] / (1 + bookGrowth[0] / 100);
+    const distrib = [];
+    for (let i = 0; i < n; i++) {
+        const prev = book;
+        book *= (1 + bookGrowth[i] / 100);
+        const avgBook = (book + prev) / 2;
+        const earnings = avgBook * roa[i] / 100;
+        const retained = (book - prev) * capRatio / 100;
+        distrib.push(earnings - retained);
+    }
+    const tg = Number(m.terminal_growth), cap = Number(m.exit_pe_cap || 12);
+    const last = distrib[n - 1];
+    const gordon = (coe - tg) > 0 ? last * (1 + tg / 100) / ((coe - tg) / 100) : last * cap;
+    const tv = Math.max(0, Math.min(gordon, last * cap));
+    return { distrib: distrib, tv: tv, coe: coe, n: n };
+}
+// Shift the growth path by the slider delta at year 1, tapering to zero by
+// the final year so the long-run rate is untouched.
+function shiftedGrowth(path, startGrowth) {
+    if (startGrowth == null || !isFinite(startGrowth)) return path.slice();
+    const n = path.length, delta = startGrowth - path[0];
+    return path.map((g, i) => i === 0 ? startGrowth : g + delta * Math.max(0, 1 - i / Math.max(1, n - 1)));
+}
+// The engine builds value out of the PROJECTIONS, so its result is
+// denominated in the model currency (inputs.currency). The headline
+// `intrinsic_value` may be reported in the QUOTE currency instead -- for a
+// dual-listed filer the canonical-weighted-iv rule picks the currency the
+// primary listing trades in (9999.HK: RMB financials, HKD per-share values).
+// Comparing the two directly fails by exactly the FX rate and silently drops
+// every scenario to the toy model. The rate is derived from the JSON's OWN
+// paired intrinsic_value_<cur> keys rather than any hardcoded assumption, so
+// it stays correct when the analyst refreshes FX, and returns 1 whenever the
+// two currencies agree or the pair is absent.
+function quoteFxRate(sc) {
+    const v = ((dcfData.valuation || {})[sc] || {});
+    const inputs = dcfData.inputs || {};
+    // GBP (pounds) and GBp (pence) differ only by the case of the final
+    // letter, so the "are these different currencies" check must compare
+    // the raw codes -- case-folding both sides made BT-A.L's model and
+    // quote currency compare equal and this always returned 1.
+    const modelRaw = String(inputs.currency || '');
+    const quoteRaw = String(inputs.quote_currency || '');
+    if (!modelRaw || !quoteRaw || modelRaw === quoteRaw) return 1;
+    const model = modelRaw.toLowerCase();
+    const iv = Number(v.intrinsic_value);
+    const modelIv = Number(v['intrinsic_value_' + model]);
+    if (isFinite(iv) && isFinite(modelIv) && modelIv !== 0) return iv / modelIv;
+    return 1;
+}
+function runEngine(sc, ov) {
+    const family = engineFamily(sc);
+    if (!family) return null;
+    const a = dcfData.assumptions[sc], inputs = dcfData.inputs || {};
+    const wacc = (ov && ov.wacc != null) ? ov.wacc : a.wacc;
+    const tg = (ov && ov.terminal != null) ? ov.terminal : a.terminal_growth;
+    if (wacc == null || tg == null) return null;
+    const growth = shiftedGrowth(growthPathOf(a), ov && ov.growth);
+    const n = growth.length;
+    const fcfs = [];
+    if (family === 'fcf-growth') {
+        let f = Number(inputs.last_fcf);
+        for (let i = 0; i < n; i++) { f *= (1 + growth[i] / 100); fcfs.push(f); }
+    } else {
+        let rev = baseRevenueOf(sc, growth[0]);
+        if (family === 'fcf-margin') {
+            const m = asPath(firstOf(a, ['fcf_margins', 'fcf_margin_path', 'fcf_margin']), n);
+            for (let i = 0; i < n; i++) { rev *= (1 + growth[i] / 100); fcfs.push(rev * m[i] / 100); }
+        } else {
+            const m = asPath(firstOf(a, ['ebitda_margin_path', 'ebitda_margin_path_pct', 'ebitda_margin']), n);
+            const sbc = asPath(firstOf(a, ['sbc_pct_path', 'sbc_pct']), n, 0);
+            const lease = asPath(firstOf(a, ['lease_cost_pct', 'lease_cost_pct_path', 'lease_principal_pct_path', 'lease_principal_pct']), n, 0);
+            const da = asPath(firstOf(a, ['da_pct_path', 'da_pct']), n, 0);
+            const capex = asPath(firstOf(a, ['capex_pct_path', 'capex_pct']), n, 0);
+            const tax = asPath(firstOf(a, ['cash_tax_rate_path', 'cash_tax_rate_path_pct', 'cash_tax_rate', 'tax_rate']), n, 0);
+            const wc = Number(firstOf(a, ['wc_capture_pct']) || 0);
+            for (let i = 0; i < n; i++) {
+                const prev = rev;
+                rev *= (1 + growth[i] / 100);
+                const ebit = rev * (m[i] - sbc[i] - lease[i] - da[i]) / 100;
+                const nopat = ebit - Math.max(0, ebit) * tax[i] / 100;
+                fcfs.push(nopat + rev * da[i] / 100 - rev * capex[i] / 100 + (rev - prev) * wc / 100);
+            }
+        }
+    }
+    const cap = Number(firstOf(a, ['terminal_cap_multiple', 'terminal_fcf_multiple_cap', 'terminal_multiple_cap']) || 20);
+    const last = fcfs[n - 1];
+    // Terminal value depends on the discount rate through the Gordon spread
+    // (r - g), so it must be rebuilt at whichever rate is doing the
+    // discounting -- WACC for the intrinsic value, the entry-price hurdle
+    // rate for the entry price. Reusing the WACC-built `tv` for the hurdle
+    // leg overstated every slider-moved entry price (SPN.NZ: $4.38 vs the
+    // correct $3.51 at defaults for the same reason).
+    const tvAt = (rate) => {
+        const g = (rate - tg) > 0 ? last * (1 + tg / 100) / ((rate - tg) / 100) : last * cap;
+        return Math.max(0, Math.min(g, last * cap));
+    };
+    const tv = tvAt(wacc);
+    const netDebt = Number(inputs.net_debt || 0);
+    const shares = (inputs.projected_shares && inputs.projected_shares.length >= n)
+        ? Number(inputs.projected_shares[n - 1]) : Number(inputs.shares_outstanding);
+    if (!shares) return null;
+    const pv = (rate) => fcfs.reduce((s, f, i) => s + f / Math.pow(1 + rate / 100, i + 1), 0);
+    if (family === 'sum-of-parts') {
+        // The Monee (or equivalent embedded-lender) leg is not driven by the
+        // OpCo sliders: its own book-growth/ROA/cost-of-equity path is a
+        // separate, unlisted-elsewhere model the growth/WACC/terminal
+        // sliders intentionally do not touch (see the DCF section note).
+        const leg = moneeLeg(sc);
+        if (!leg) return null;
+        const pvLeg = (rate) => leg.distrib.reduce((s, f, i) => s + f / Math.pow(1 + rate / 100, i + 1), 0);
+        const moneeEquity = pvLeg(leg.coe) + leg.tv / Math.pow(1 + leg.coe / 100, leg.n);
+        const surplusCash = -netDebt;
+        const ev = pv(wacc) + tv / Math.pow(1 + wacc / 100, n);
+        const equityValue = ev + moneeEquity + surplusCash;
+        const hurdle = ((dcfData.entry_price || {}).hurdle_rate || 0.15) * 100;
+        const tvHurdle = tvAt(hurdle);
+        const entryEquity = pv(hurdle) + tvHurdle / Math.pow(1 + hurdle / 100, n)
+            + pvLeg(hurdle) + leg.tv / Math.pow(1 + hurdle / 100, leg.n) + surplusCash;
+        const fxSop = quoteFxRate(sc);
+        return { family: family, iv: equityValue / shares * fxSop,
+                 entryPrice: entryEquity / shares * fxSop,
+                 fcfList: fcfs, growthRates: growth };
+    }
+    const ev = pv(wacc) + tv / Math.pow(1 + wacc / 100, n);
+    const hurdle = ((dcfData.entry_price || {}).hurdle_rate || 0.15) * 100;
+    const side = sideStreamValue(sc);
+    const tvHurdle = tvAt(hurdle);
+    const entry = (pv(hurdle) + tvHurdle / Math.pow(1 + hurdle / 100, n) + side - netDebt) / shares;
+    const fx = quoteFxRate(sc);
+    return { family: family, iv: (ev + side - netDebt) / shares * fx, entryPrice: entry * fx, fcfList: fcfs, growthRates: growth };
+}
+function validateEngines() {
+    for (const sc of ['base', 'bull', 'bear']) {
+        const r = runEngine(sc);
+        const target = ((dcfData.valuation || {})[sc] || {}).intrinsic_value;
+        // Absolute floor alongside the relative tolerance: a distressed/
+        // going-concern scenario's stored intrinsic_value is rounded to 2dp
+        // at the source (dcf_engine.py's _r(iv, 2)), so for a near-zero
+        // target (ENS.NZ base -0.01, bear -0.26) that rounding alone can
+        // exceed a pure RELATIVE tolerance even when the JS engine agrees
+        // with the stored value to better than half a cent. Mirrors
+        // dcf_engine.py's check(): max(tol * abs(target), 0.005). Also,
+        // `target` must be checked with isFinite, not truthiness -- a
+        // stored intrinsic_value of exactly 0 is a legitimate target and
+        // was previously rejected by `target &&`.
+        const hasTarget = isFinite(target);
+        const tol = hasTarget ? Math.max(ENGINE_TOL * Math.abs(target), 0.005) : 0;
+        const ok = !!(r && hasTarget && isFinite(r.iv) && Math.abs(r.iv - target) <= tol);
+        dcfEngineStatus[sc] = { family: r ? r.family : null, ok: ok, iv: r ? r.iv : null, target: target };
+    }
+}
+
+// Generic 5-year Gordon model: the fallback when no engine family validates
+// (older JSONs without component fields). Only ever used as a ratio.
+function toyDCF(startGrowth, wacc, terminalGrowth) {
+    const years = 5;
+    const hurdle = 0.15;
+    const inputs = dcfData.inputs;
+    let pvFCF = 0, pvFCFHurdle = 0, projectedFCF = inputs.last_fcf;
+    const endGrowth = 10;
+    for (let i = 0; i < years; i++) {
+        const yearGrowth = startGrowth > endGrowth ? startGrowth - (startGrowth - endGrowth) * (i / 4) : startGrowth;
+        projectedFCF *= (1 + yearGrowth / 100);
+        pvFCF += projectedFCF / Math.pow(1 + wacc / 100, i + 1);
+        pvFCFHurdle += projectedFCF / Math.pow(1 + hurdle, i + 1);
+    }
+    const spread = Math.max(wacc / 100 - terminalGrowth / 100, 0.005);
+    const terminalValue = projectedFCF * (1 + terminalGrowth / 100) / spread;
+    const pvTerminal = terminalValue / Math.pow(1 + wacc / 100, years);
+    const enterpriseValue = pvFCF + pvTerminal;
+    const equityValue = enterpriseValue - (inputs.net_debt || 0);
+    const exitShares = (inputs.projected_shares && inputs.projected_shares.length >= years)
+        ? inputs.projected_shares[years - 1]
+        : inputs.shares_outstanding * Math.pow(1 + (inputs.annual_share_growth_pct || 0) / 100, years);
+    return { iv: equityValue / exitShares,
+             entryPrice: (pvFCFHurdle + terminalValue / Math.pow(1 + hurdle, years) - (inputs.net_debt || 0)) / exitShares };
+}
+
+// The model behind the sliders for one scenario: the validated engine, else the toy.
+function calculateDCF(sc, growth, wacc, terminal) {
+    const st = dcfEngineStatus[sc];
+    if (st && st.ok) {
+        const r = runEngine(sc, { growth: growth, wacc: wacc, terminal: terminal });
+        if (r && isFinite(r.iv)) return r;
+    }
+    return toyDCF(growth, wacc, terminal);
+}
+
+function canScale() {
+    const i = dcfData.inputs || {};
+    return i.last_fcf != null && (i.shares_outstanding != null || (i.projected_shares && i.projected_shares.length));
+}
+
+// Anchor the selected scenario's stored number (iv | entry) and scale it by
+// the model's ratio when the sliders leave that scenario's defaults.
+function anchored(field, growth, wacc, terminal) {
+    const stored = (dcfAnchors[currentScenario] || {})[field];
+    const d = scenarioDefaults(currentScenario);
+    const atDefaults = growth === d.growth && wacc === d.wacc && terminal === d.terminal;
+    if (stored != null && atDefaults) return stored;
+    const st = dcfEngineStatus[currentScenario];
+    if (!(st && st.ok) && !canScale()) return stored;
+    const key = field === 'iv' ? 'iv' : 'entryPrice';
+    const now = calculateDCF(currentScenario, growth, wacc, terminal)[key];
+    if (stored == null) return now;
+    // The entry price is returned STRAIGHT from the engine once a slider has
+    // moved, never scaled onto the stored number. Every DCF JSON written
+    // before the terminal-value-at-hurdle fix has a stored entry_price built
+    // with the WACC terminal value, so `stored * (now / ref)` re-injects the
+    // very bug the engine corrects -- on the TPW fixture a correct 2.943
+    // comes back out as 3.254.
+    //
+    // IV keeps its anchor: it is not what that fix changed, and anchoring
+    // stops a tab click nudging the headline number off the JSON.
+    if (key === 'entryPrice') return now;
+    const ref = calculateDCF(currentScenario, d.growth, d.wacc, d.terminal)[key];
+    if (!ref || !isFinite(ref) || !isFinite(now)) return stored;
+    return stored * (now / ref);
+}
+
+function isWeightedLive() {
+    const pw = dcfData.probability_weighted || {};
+    const w = pw.weights, a = dcfData.assumptions;
+    if (!w || !a || !a.base || !a.bull || !a.bear) return false;
+    // Two different things are needed before the weighted IV may be rescaled.
+    //
+    // `ok` is strict: the engine reproduced the stored IV within ENGINE_TOL. An
+    // engine can miss that and still be perfectly usable for a RATIO -- it only
+    // has to move the same way the model does -- so `ok` alone is too harsh and
+    // would freeze the sliders on dashboards that model fine.
+    //
+    // What must not happen is trusting an engine that modelled NOTHING. A
+    // finite-mine DCF (SMI.NZ) has no FCF projection to discount: family
+    // resolves null and the engine returns ~0.027 against a 1.011 target. The
+    // ratio stored * (now / ref) then divides two meaningless near-zero numbers,
+    // and once ref crosses zero the sign flips -- which published a +0.919
+    // weighted IV as NZD-5.59 (-1017%) while the header still read +51%.
+    //
+    // canScale() cannot stand in for this: it only says the inputs for a
+    // proportional rescale exist (last_fcf + shares), which a pre-revenue miner
+    // burning cash still satisfies.
+    const engineModels = ['base', 'bull', 'bear'].every(sc => {
+        const st = dcfEngineStatus[sc];
+        return st && st.family && isFinite(st.iv) && st.iv > 0;
+    });
+    if (!engineModels) return false;
+    const total = (w.bull || 0) + (w.base || 0) + (w.bear || 0);
+    return Math.abs(total - 1) <= 0.001;
+}
+
+// Probability-weighted IV: the stored weighted_iv at the selected scenario's
+// defaults (so a tab click never moves it), scaled by re-weighting all three
+// scenarios with the user's slider deltas applied to each.
+function weightedIV(growth, wacc, terminal) {
+    const pw = dcfData.probability_weighted || {};
+    const stored = pw.weighted_iv;
+    if (stored == null || !isWeightedLive()) return stored;
+    const d = scenarioDefaults(currentScenario);
+    if (growth === d.growth && wacc === d.wacc && terminal === d.terminal) return stored;
+    const w = pw.weights;
+    const at = (g, k, t) => {
+        let sum = 0;
+        for (const sc of ['bull', 'base', 'bear']) {
+            const sd = scenarioDefaults(sc);
+            const sg = sd.growth + (g - d.growth), sk = sd.wacc + (k - d.wacc), st = sd.terminal + (t - d.terminal);
+            sum += w[sc] * calculateDCF(sc, sg, Math.max(sk, st + 0.5), st).iv;
+        }
+        return sum;
+    };
+    const ref = at(d.growth, d.wacc, d.terminal);
+    if (!ref || !isFinite(ref)) return stored;
+    const now = at(growth, wacc, terminal);
+    if (!now || !isFinite(now)) return stored;
+    return stored * (now / ref);
+}
+
+function renderHeaderValuation() {
+    const el = document.getElementById('headerValuation');
+    if (!el) return;
+    const pw = dcfData.probability_weighted || {};
+    const wiv = pw.weighted_iv, price = dcfData.current_price;
+    if (wiv == null || price == null) return;
+    // A price must be denominated like the IV that divides it (WISE.L: GBp
+    // quote vs USD model). Suppress the chip rather than print -98%.
+    const ratio = wiv / price;
+    if (ratio > 20 || ratio < 0.05) return;
+    const up = (wiv - price) / price * 100;
+    const cls = up >= 0 ? 'positive' : 'negative', sign = up >= 0 ? '+' : '';
+    el.innerHTML = `<div class="hv-item"><span class="hv-label">Prob-Weighted IV</span><span class="hv-value">${fmtIV(wiv)}</span></div>
+        <div class="hv-item"><span class="hv-label">Current Price</span><span class="hv-value">${fmtIV(price)}</span></div>
+        <div class="hv-item"><span class="hv-label">Upside</span><span class="hv-value ${cls}">${sign}${up.toFixed(0)}%</span></div>`;
+    el.style.display = 'flex';
+}
+
+function formatMoney(n) {
+    const inputs = dcfData.inputs || {};
+    const currency = inputs.currency || '$';
+    const units = inputs.units === 'millions' ? 'M' : inputs.units === 'billions' ? 'B' : '';
+    if (n == null || !isFinite(n)) return '-';
+    if (Math.abs(n) >= 1000 && inputs.units === 'millions') return currency + (n / 1000).toFixed(1) + 'B';
+    return currency + n.toFixed(1) + units;
+}
+
+function renderDCFInputs() {
+    const inputs = dcfData.inputs || {};
+    document.getElementById('baseFCF').textContent = formatMoney(inputs.last_fcf);
+    const sbcEl = document.getElementById('sbcBreakdown');
+    if (inputs.sbc_source === 'unavailable') {
+        sbcEl.innerHTML = '<span style="color:#fdcb6e">&#9888; SBC not disclosed &mdash; FCF unadjusted, IV overstated</span>';
+    } else if (inputs.sbc != null && inputs.reported_fcf != null) {
+        const sbcAmt = inputs.sbc_incl_equity_taxes != null ? inputs.sbc_incl_equity_taxes : inputs.sbc;
+        let parts = `${formatMoney(inputs.reported_fcf)} reported − ${formatMoney(sbcAmt)} SBC`;
+        if (inputs.interest_income) parts += ` − ${formatMoney(inputs.interest_income)} interest`;
+        if (inputs.lease_principal_paid) parts += ` − ${formatMoney(inputs.lease_principal_paid)} leases`;
+        sbcEl.textContent = parts;
+    } else {
+        sbcEl.textContent = 'Starting point for projections';
+    }
+    const shares = inputs.shares_outstanding;
+    document.getElementById('sharesOut').textContent = shares == null ? '-'
+        : shares >= 1000 ? (shares / 1000).toFixed(2) + 'B' : shares.toFixed(1) + 'M';
+    const g = inputs.annual_share_growth_pct;
+    document.getElementById('dilutionNote').textContent = (g > 0)
+        ? `+${g.toFixed(1)}%/yr from non-SBC issuance` : 'Flat — SBC expensed in cash flows';
+    const netDebt = inputs.net_debt;
+    const ndEl = document.getElementById('netDebt');
+    ndEl.textContent = netDebt == null ? '-' : (netDebt < 0 ? '-' : '') + formatMoney(Math.abs(netDebt));
+    if (netDebt < 0) ndEl.style.color = '#00d4aa';
+    renderFCFProjections();
+}
+
+// The analyst's own projection when present; otherwise the toy model's path.
+function renderFCFProjections() {
+    const table = document.getElementById('fcfProjectionTable');
+    const proj = dcfData.projections && dcfData.projections[currentScenario];
+    let values = null, years = [];
+    const st = dcfEngineStatus[currentScenario];
+    if (st && st.ok) {
+        const s = sliderValues();
+        const r = runEngine(currentScenario, { growth: s.growth, wacc: s.wacc, terminal: s.terminal });
+        if (r) {
+            values = r.fcfList;
+            years = (proj && Array.isArray(proj.years) && proj.years.length === values.length)
+                ? proj.years : values.map((_, i) => 'Yr ' + (i + 1));
+        }
+    }
+    if (!values && proj && Array.isArray(proj.owner_fcf || proj.fcf)) {
+        values = proj.owner_fcf || proj.fcf;
+        years = Array.isArray(proj.years) ? proj.years : values.map((_, i) => 'Yr ' + (i + 1));
+    } else if (proj && Array.isArray(proj)) {
+        values = proj.map(p => p.owner_fcf != null ? p.owner_fcf : p.fcf);
+        years = proj.map((p, i) => p.year || p.fiscal_year || ('Yr ' + (i + 1)));
+    }
+    if (!values || !values.length) {
+        const startGrowth = parseFloat(document.getElementById('growthSlider').value);
+        let fcf = dcfData.inputs.last_fcf;
+        values = [];
+        for (let i = 0; i < 5; i++) {
+            const rate = startGrowth > 10 ? startGrowth - (startGrowth - 10) * (i / 4) : startGrowth;
+            fcf = fcf * (1 + rate / 100);
+            values.push(fcf);
+            years.push('Year ' + (i + 1));
+        }
+    }
+    const base = dcfData.inputs.last_fcf;
+    const cols = [['Base', base, null]].concat(values.map((v, i) => [years[i], v, i === 0 ? base : values[i - 1]]));
+    // max-content floor: 11 columns of 1fr squeezed to ~28px on a phone and
+    // spilled; with a floor the grid scrolls inside its box instead.
+    table.style.gridTemplateColumns = `repeat(${cols.length}, minmax(max-content, 1fr))`;
+    let html = cols.map(c => `<div class="fcf-projection-item header">${esc(c[0])}</div>`).join('');
+    html += cols.map(c => {
+        const g = (c[2] != null && c[2] !== 0 && c[1] != null) ? ((c[1] - c[2]) / Math.abs(c[2]) * 100) : null;
+        return `<div class="fcf-projection-item"><div class="fcf-value">${formatMoney(c[1])}</div>
+            <div class="growth-rate">${g == null ? '-' : (g >= 0 ? '+' : '') + g.toFixed(0) + '%'}</div></div>`;
+    }).join('');
+    table.innerHTML = html;
+}
+
+function sliderValues() {
+    return {
+        growth: parseFloat(document.getElementById('growthSlider').value),
+        wacc: parseFloat(document.getElementById('waccSlider').value),
+        terminal: parseFloat(document.getElementById('terminalSlider').value)
+    };
+}
+
+window.updateDCFDisplay = function() {
+    const s = sliderValues();
+    document.getElementById('growthValue').textContent = s.growth + '%';
+    document.getElementById('waccValue').textContent = s.wacc + '%';
+    document.getElementById('terminalValue').textContent = s.terminal + '%';
+    renderFCFProjections();
+
+    const iv = anchored('iv', s.growth, s.wacc, s.terminal);
+    const entry = anchored('entry', s.growth, s.wacc, s.terminal);
+    const price = dcfData.current_price;
+    document.getElementById('dcfIV').textContent = fmtIV(iv);
+    document.getElementById('dcfEntry').textContent = fmtIV(entry);
+    const upEl = document.getElementById('dcfUpside');
+    if (iv != null && price) {
+        const up = (iv - price) / price * 100;
+        upEl.textContent = (up >= 0 ? '+' : '') + up.toFixed(0) + '% ' + (up >= 0 ? 'upside' : 'downside');
+        upEl.className = 'dcf-change ' + (up >= 0 ? 'positive' : 'negative');
+    }
+    const wiv = weightedIV(s.growth, s.wacc, s.terminal);
+    document.getElementById('dcfWeighted').textContent = fmtIV(wiv);
+    const wUpEl = document.getElementById('dcfWeightedUpside');
+    if (wiv != null && price) {
+        const wUp = (wiv - price) / price * 100;
+        wUpEl.textContent = (wUp >= 0 ? '+' : '') + wUp.toFixed(0) + '% ' + (wUp >= 0 ? 'upside' : 'downside');
+        wUpEl.className = 'dcf-change ' + (wUp >= 0 ? 'positive' : 'negative');
+    }
+    renderAssumptions(s, iv, entry);
+};
+
+function renderAssumptions(s, iv, entry) {
+    const a = dcfData.assumptions[currentScenario] || {};
+    const items = [['Year 1 Growth', s.growth + '%']];
+    if (Array.isArray(a.growth_rates) && a.growth_rates.length > 1) {
+        items.push([`Year ${a.growth_rates.length} Growth`, a.growth_rates[a.growth_rates.length - 1] + '%']);
+    }
+    for (const k of Object.keys(a)) {
+        if (/margin/.test(k) && Array.isArray(a[k]) && a[k].length) {
+            items.push([k.replace(/_/g, ' ').replace(/ path$/, '') + ' (Y1 → end)', a[k][0] + '% → ' + a[k][a[k].length - 1] + '%']);
+            break;
+        }
+        if (/margin/.test(k) && typeof a[k] === 'number') { items.push([k.replace(/_/g, ' '), a[k] + '%']); break; }
+    }
+    items.push(['WACC', s.wacc + '%'], ['Terminal Growth', s.terminal + '%']);
+    if (a.terminal_cap_multiple) items.push(['Terminal cap', a.terminal_cap_multiple + 'x']);
+    items.push(['Intrinsic Value', fmtIV(iv)], ['Entry Price', fmtIV(entry)]);
+    document.getElementById('assumptionGrid').innerHTML = items.map(([l, v], i) =>
+        `<div class="assumption-item"><div class="label">${esc(l)}</div><div class="value"${i >= items.length - 2 ? ' style="color:#00d4aa"' : ''}>${esc(v)}</div></div>`).join('');
+}
+
+window.switchScenario = function(scenario) {
+    currentScenario = scenario;
+    document.querySelectorAll('.scenario-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.scenario === scenario);
+    });
+    const d = scenarioDefaults(scenario);
+    document.getElementById('growthSlider').value = d.growth;
+    document.getElementById('waccSlider').value = d.wacc;
+    document.getElementById('terminalSlider').value = d.terminal;
+    const nar = document.getElementById('scenarioNarrative');
+    const narratives = dcfData.scenario_narratives || {};
+    const text = narratives[scenario];
+    nar.textContent = typeof text === 'string' ? text : (text && text.summary) || '';
+    updateDCFDisplay();
+};
+
+function renderHistoricalGrowth() {
+    const growth = dcfData.historical_growth || {};
+    const selected = growth.growth_rate_source;
+    const keys = Object.keys(growth).filter(k => /cagr/.test(k) && typeof growth[k] === 'number');
+    document.getElementById('growthGrid').innerHTML = keys.map(k => {
+        const rate = growth[k];
+        const label = k.replace(/_cagr$/, '').replace(/_(\d+)yr/, ' $1Y').replace(/_/g, ' ');
+        return `<div class="growth-item ${k === selected ? 'selected' : ''}">
+            <div class="metric">${esc(label)}</div>
+            <div class="rate ${rate >= 0 ? 'positive' : 'negative'}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div></div>`;
+    }).join('') + csvGrowth.map(g => g.rate == null
+        ? `<div class="growth-item"><div class="metric">${esc(g.label)}</div>
+            <div class="rate">n/a</div><div class="reason">${esc(g.reason || '')}</div></div>`
+        : `<div class="growth-item"><div class="metric">${esc(g.label)}</div>
+            <div class="rate ${g.rate >= 0 ? 'positive' : 'negative'}">${g.rate >= 0 ? '+' : ''}${g.rate.toFixed(1)}%</div></div>`
+    ).join('');
+}
+
+// The grid is not always WACC x terminal growth: a multiple-exit model
+// (no Gordon terminal) ships e.g. coe_range x exit_multiple_range. Find the
+// two axes by shape -- rows match matrix.length, cols match the row width --
+// so any well-formed grid renders instead of being discarded.
+const SENS_AXES = {
+    wacc_range: { label: 'WACC', unit: '%', base: b => b.wacc },
+    coe_range: { label: 'Cost of equity', unit: '%', base: b => b.cost_of_equity ?? b.coe ?? b.wacc },
+    terminal_growth_range: { label: 'Term G', unit: '%', base: b => b.terminal_growth },
+    exit_multiple_range: { label: 'Exit multiple', unit: 'x', base: b => b.exit_multiple },
+    growth_range: { label: 'Growth', unit: '%', base: b => b.growth },
+};
+
+function pickSensAxis(sens, len, exclude) {
+    const keys = Object.keys(sens).filter(k =>
+        k !== exclude && Array.isArray(sens[k]) && sens[k].length === len && sens[k] !== sens.matrix);
+    // prefer a known axis name, else fall back to any range-shaped array
+    return keys.find(k => SENS_AXES[k]) || keys.find(k => /_range$/.test(k)) || null;
+}
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const table = document.getElementById('sensitivityMatrix');
+    const rows = sens && Array.isArray(sens.matrix) ? sens.matrix : null;
+    const rowKey = rows && rows.length ? pickSensAxis(sens, rows.length, null) : null;
+    const colKey = rowKey && Array.isArray(rows[0]) ? pickSensAxis(sens, rows[0].length, rowKey) : null;
+    if (!rowKey || !colKey) {
+        table.innerHTML = '<tr><td>No sensitivity grid in the DCF JSON</td></tr>';
+        return;
+    }
+    const price = dcfData.current_price;
+    const base = dcfData.assumptions.base || {};
+    const rowAx = SENS_AXES[rowKey] || { label: rowKey.replace(/_range$/, ''), unit: '', base: () => undefined };
+    const colAx = SENS_AXES[colKey] || { label: colKey.replace(/_range$/, ''), unit: '', base: () => undefined };
+    const rowBase = rowAx.base(base), colBase = colAx.base(base);
+    let html = `<tr><th>${rowAx.label} \\ ${colAx.label}</th>`
+        + sens[colKey].map(c => `<th>${c}${colAx.unit}</th>`).join('') + '</tr>';
+    sens[rowKey].forEach((rv, i) => {
+        html += `<tr><th>${rv}${rowAx.unit}</th>`;
+        (rows[i] || []).forEach((val, j) => {
+            const hl = rv === rowBase && sens[colKey][j] === colBase;
+            const cls = hl ? 'highlight' : (val >= price ? 'above-current' : 'below-current');
+            html += `<td class="${cls}">${fmtIV(val)}</td>`;
+        });
+        html += '</tr>';
+    });
+    table.innerHTML = html;
+}
+
+function philosophyLabel(key) {
+    const t = key.replace(/_/g, ' ').trim();
+    return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/* `valuation_philosophy` is a string on some DCF JSONs and a nested object on
+   others (52 of them). Interpolating the object rendered "[object Object]". */
+function philosophyParts(value, label) {
+    if (value === null || value === undefined || value === '') return [];
+    if (Array.isArray(value)) return value.flatMap(v => philosophyParts(v, label));
+    if (typeof value === 'object') {
+        return Object.keys(value).flatMap(k => philosophyParts(value[k], philosophyLabel(k)));
+    }
+    return [{ label: label, text: String(value) }];
+}
+
+function renderPhilosophy(value, el) {
+    if (!el) return;
+    const parts = philosophyParts(value, '');
+    if (!parts.length) { el.style.display = 'none'; return; }
+    const body = parts
+        .map(p => (p.label ? `<strong>${esc(p.label)}:</strong> ` : '') + esc(p.text))
+        .join('<br>');
+    el.innerHTML = `<strong>Valuation philosophy:</strong> ${body}`;
+}
+
+function initDCF() {
+    if (!dcfData || !dcfData.valuation || !dcfData.assumptions) return;
+    validateEngines();
+    const eng = document.getElementById('dcfEngineNote');
+    if (eng) {
+        const okAll = ['base', 'bull', 'bear'].every(sc => dcfEngineStatus[sc].ok);
+        eng.textContent = okAll
+            ? `Sliders re-run the ${dcfEngineStatus.base.family} model from the DCF's own assumptions.`
+            : 'Sliders scale the stored valuation with a generic model — the DCF JSON lacks the fields to rebuild it exactly.';
+    }
+    document.getElementById('dcfCurrent').textContent = fmtIV(dcfData.current_price);
+    renderPhilosophy(dcfData.valuation_philosophy, document.getElementById('dcfPhilosophy'));
+    const hg = dcfData.historical_growth || {};
+    if (hg.growth_divergence_warning) {
+        document.getElementById('growthWarning').style.display = 'flex';
+        document.getElementById('warningText').textContent = hg.growth_divergence_warning;
+    }
+    const wsub = document.getElementById('dcfWeightedSublabel');
+    const wts = (dcfData.probability_weighted || {}).weights;
+    if (wts) {
+        const pct = x => Math.round((x || 0) * 100);
+        let txt = `${pct(wts.bull)}% Bull / ${pct(wts.base)}% Base / ${pct(wts.bear)}% Bear`;
+        if (!isWeightedLive()) txt += ' — fixed from model';
+        wsub.textContent = txt;
+    }
+    renderHeaderValuation();
+    renderDCFInputs();
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    switchScenario('base');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+renderGuidance();
+renderOverview();
+initCharts();
+initDCF();
+</script>
+</body>
+</html>
