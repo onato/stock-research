@@ -346,7 +346,21 @@ def period_label(fact: dict[str, Any], fy_end_month: int | None = None,
         # into the fiscal year it is the first half of -- STZ's H1 FY2024
         # (ended 2023-08-31) collided with its real H1 FY2023 under the
         # identical "H1-2023" label. Mirrors the quarter branch below.
-        end_month = int(end[5:7])
+        #
+        # A 52/53-week filer's half end drifts a few days past the month
+        # boundary too, and the raw end month then names the wrong half:
+        # SFM's H1 2023 ended 2023-07-02, month 7 read as H2, and seven
+        # years of first halves were labelled H2. A half never genuinely
+        # ends in the first week of a month, so an end on day 1-7 belongs
+        # to the month before -- the same +/-7 day tolerance
+        # _near_fiscal_year_end uses. The year follows the corrected date
+        # as well: Western Digital's H1 FY2020 ended 2020-01-03, and fixing
+        # only the month rolled it into FY2021.
+        end_d = _d(end)
+        if end_d.day <= 7:
+            end_d -= datetime.timedelta(days=7)
+            year = str(end_d.year)
+        end_month = end_d.month
         fye = fy_end_month if fy_end_month is not None else 12
         half_num = (end_month - fye - 1) % 12 // 6 + 1
         half = f"H{half_num}"

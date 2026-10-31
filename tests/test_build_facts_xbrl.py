@@ -148,6 +148,35 @@ class TestPeriodLabel:
             {"start": "2024-01-01", "end": "2024-06-30"},
             fy_end_month=12) == "H1-2024"
 
+    def test_half_year_end_drifting_past_a_month_boundary(self):
+        # SFM closes on the Sunday nearest Dec 31, so its 26-week first half
+        # sometimes ends Jul 1-4. The raw end month (7) read as H2: in 2012,
+        # 2016-18 and 2021-23 every H1 was labelled H2, decumulate() found
+        # no H1 to subtract, and Q2/Q3 cash flow came out NULL -- while the
+        # exported CSV carried those years' quarters one period late.
+        assert bfx.period_label(
+            {"start": "2023-01-02", "end": "2023-07-02"},
+            fy_end_month=12) == "H1-2023"
+        assert bfx.period_label(
+            {"start": "2023-07-03", "end": "2023-12-31"},
+            fy_end_month=12) == "H2-2023"
+        # Same drift for a non-December 52/53-week filer: a Friday-nearest-
+        # Nov-30 close puts H1 FY2022 at 2021-12-04 .. 2022-06-03.
+        assert bfx.period_label(
+            {"start": "2021-12-04", "end": "2022-06-03"},
+            fy_end_month=11) == "H1-2022"
+        # A drifted H2 end must not roll the fiscal year forward either: a
+        # Feb filer's H2 closing Mar 2 is still the fiscal year ending Feb.
+        assert bfx.period_label(
+            {"start": "2023-09-02", "end": "2024-03-02"},
+            fy_end_month=2) == "H2-2024"
+        # A half that drifts across the NEW YEAR must take its year from the
+        # corrected date too. Western Digital (June FYE) closed H1 FY2020 on
+        # 2020-01-03: correcting only the month made it H1 of FY2021.
+        assert bfx.period_label(
+            {"start": "2019-06-29", "end": "2020-01-03"},
+            fy_end_month=6) == "H1-2020"
+
     def test_quarter_uses_space_separator(self):
         # "Q1 2024", not "Q1-2024" -- export_csv.sort_key splits on both, so
         # the space form sorts correctly, but the shape is pinned here.
