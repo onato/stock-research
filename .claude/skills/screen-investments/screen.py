@@ -15,6 +15,9 @@ It flags, but does not silently drop:
   * NO_PRICE -- no usable price (neither live nor stored)
   * PRICE_DRIFT -- live price differs from stored DCF price by > --drift-pct (default 15%)
                    i.e. the stored model is built off a materially different price
+  * SANITY_FAIL -- the DCF's own sanity check (scripts/sanity_check.py) tripped; the
+                   trip reasons ride along as `sanity_trips`
+  * CCY -- (HTML only) the intrinsic value's currency differs from the live quote's
 
 Usage:
   python3 screen.py [--root DIR] [--top N] [--live] [--stale-days 45]
@@ -183,6 +186,34 @@ def exclusion_reason(ticker, dcf, iv, never):
     return None
 
 
+SANITY_FAIL_STATUSES = ("FAILED", "FAIL", "TRIPPED")
+
+
+def sanity_failed(dcf):
+    """Did the DCF's own sanity_check block trip?
+
+    Shapes in the wild (same as scripts/run_evals.py): {ran, passed},
+    {passed: true, ...}, {status: "PASSED"}. `passed: null` is the script
+    saying its rules do not apply to this model (a REIT has no earnings
+    multiple to grade) -- not a failure. A missing or malformed block is
+    not judged here either: run_evals already warns on it.
+    """
+    sc = dcf.get("sanity_check")
+    if not isinstance(sc, dict):
+        return False
+    passed = sc.get("passed")
+    if passed is None and isinstance(sc.get("status"), str):
+        return sc["status"].strip().upper() in SANITY_FAIL_STATUSES
+    return passed is False
+
+
+def sanity_trips(dcf):
+    sc = dcf.get("sanity_check")
+    if not isinstance(sc, dict):
+        return []
+    return [str(x) for x in (sc.get("trip_reasons") or [])]
+
+
 def discover(root):
     """Yield (ticker, dcf_path, analysis_path) for every {T}/Reports/{T}_DCF.json."""
     for name in sorted(os.listdir(root)):
@@ -211,8 +242,14 @@ def screen(args):
         pw = d.get("probability_weighted") or {}
         iv = pw.get("weighted_iv")
         stored_price = d.get("current_price")
-        ccy = currency_code((d.get("inputs") or {}).get("currency"),
-                            d.get("currency"))
+        inputs = d.get("inputs") or {}
+        ccy = currency_code(inputs.get("currency"), d.get("currency"))
+        # The canonical weighted_iv is written in the QUOTE currency (the
+        # reporting-currency figure sits alongside as weighted_iv_<ccy>) and
+        # the stored price is the exchange quote, so this is the code both
+        # cells wear. A single-currency DCF carries none: its quote is `ccy`.
+        qccy = currency_code(inputs.get("quote_currency"),
+                             d.get("quote_currency")) or ccy
         vdate = d.get("valuation_date")
         adate = None
         if ana_path:
@@ -248,6 +285,11 @@ def screen(args):
         if iv is None:
             flags.append("NO_IV")
 
+        # A warning, never a demotion: the row keeps its rank and its reasons.
+        trips = sanity_trips(d) if sanity_failed(d) else []
+        if sanity_failed(d):
+            flags.append("SANITY_FAIL")
+
         upside = None
         if iv is not None and price:
             # `iv` of 0.0 is a real verdict (CBD.NZ: receivership waterfall
@@ -259,6 +301,7 @@ def screen(args):
             "ticker": ticker,
             "excluded_reason": exclusion_reason(ticker, d, iv, never),
             "currency": ccy,
+            "quote_currency": qccy,
             "live_currency": live_ccy,
             "price": price,
             "price_src": price_src,
@@ -270,6 +313,7 @@ def screen(args):
             "analysis_date": adate,
             "days_old": oldest,
             "flags": flags,
+            "sanity_trips": trips,
         })
 
     # Three buckets: excluded (never in question) is carved out first, so a
@@ -300,9 +344,18 @@ def load_scores(root):
     Lexicographic order on the ISO-dated filenames means the last file per
     ticker is the newest (same pattern as scripts/after_run.py). Missing dir
     (fresh clone, or run from elsewhere) just means no quality column.
+
+    `state/` sits BESIDE `research/` while --root defaults to `research`, so
+    the directory is looked for next to the root as well as inside it (the
+    same rule as load_companies). Joining only onto the root resolved to
+    research/state/scores, which does not exist, and blanked the Eval column
+    on all 1,177 rows while 11,848 scorecards sat in state/scores/.
     """
-    scores_dir = os.path.join(root, "state", "scores")
-    if not os.path.isdir(scores_dir):
+    candidates = (os.path.join(root, "state", "scores"),
+                  os.path.join(os.path.dirname(os.path.abspath(root)),
+                               "state", "scores"))
+    scores_dir = next((p for p in candidates if os.path.isdir(p)), None)
+    if scores_dir is None:
         return {}
     out = {}
     for name in sorted(os.listdir(scores_dir)):
@@ -358,7 +411,10 @@ FLAG_MEANINGS = (
     ("NO_PRICE", "no usable price, live or stored"),
     ("NO_IV", "DCF has no probability-weighted intrinsic value"),
     ("NO_DCF", "tracked company without a DCF model yet"),
-    ("CCY", "DCF currency differs from the quote currency — upside mixes currencies"),
+    ("SANITY_FAIL", ("the DCF's own sanity check tripped — its implied multiples sit outside "
+                     "the ticker's 10-year history; hover the badge for the reasons")),
+    ("CCY", ("the intrinsic value is denominated in a different currency from the live "
+             "quote — upside mixes currencies")),
 )
 
 
@@ -366,10 +422,11 @@ def esc(x):
     return html.escape(str(x))
 
 
-def badge_html(flag):
+def badge_html(flag, title=None):
     kind = flag.split("(")[0]
     cls = "bad" if kind in ("NO_PRICE", "NO_IV") else "warn"
-    return f'<span class="badge {cls}">{esc(flag)}</span>'
+    tip = f' title="{esc(title)}"' if title else ""
+    return f'<span class="badge {cls}"{tip}>{esc(flag)}</span>'
 
 
 def num_td(value, text, cls=""):
@@ -461,12 +518,23 @@ def roic_td(ret):
 def row_html(i, r, summary, co, ret=None):
     t = r.get("ticker", "?")
     cur = r.get("currency")
+    # The IV and the stored price are both in the quote currency. A row from
+    # an older last_screen.json carries no quote_currency; its model currency
+    # is what it was labelled with before, so that stays the fallback.
+    quote_cur = r.get("quote_currency") or cur
     live_cur = r.get("live_currency")
-    shown_cur = live_cur or cur or ""
+    shown_cur = live_cur or quote_cur or ""
 
     flags = list(r.get("flags") or [])
-    if cur and live_cur and cur != live_cur:
-        flags.append(f"CCY({cur}→{live_cur})")
+    # Mixed currencies means the IV's own currency against the live quote's:
+    # a CNY model with an HKD IV and an HKD quote mixes nothing. Flagging on
+    # the model currency marked every dual-currency ticker, hundreds of them.
+    if quote_cur and live_cur and quote_cur != live_cur:
+        flags.append(f"CCY({quote_cur}→{live_cur})")
+    trips = r.get("sanity_trips") or []
+    badges = "".join(
+        badge_html(f, " · ".join(trips) if f == "SANITY_FAIL" and trips else None)
+        for f in flags)
 
     price_txt = esc(fmt_price(r))
     if shown_cur:
@@ -476,8 +544,8 @@ def row_html(i, r, summary, co, ret=None):
 
     iv = r.get("weighted_iv")
     iv_txt = f"{iv:.2f}" if iv is not None else "—"
-    if iv is not None and cur:
-        iv_txt = f'{iv_txt} <span class="cur">{esc(cur)}</span>'
+    if iv is not None and quote_cur:
+        iv_txt = f'{iv_txt} <span class="cur">{esc(quote_cur)}</span>'
 
     up = r.get("upside_pct")
     up_txt = f"{up:+.1f}%" if up is not None else "—"
@@ -503,7 +571,7 @@ def row_html(i, r, summary, co, ret=None):
         num_td(up, esc(up_txt), "pos" if (up or 0) >= 0 else "neg"),
         roic_td(ret),
         num_td(age, f"{age}d" if age is not None else "—"),
-        "<td>" + ("".join(badge_html(f) for f in flags) or '<span class="ok">ok</span>') + "</td>",
+        "<td>" + (badges or '<span class="ok">ok</span>') + "</td>",
         score_cell,
     )) + "</tr>"
 
