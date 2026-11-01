@@ -1527,3 +1527,116 @@ class TestOverflowGuards:
         assert "repeat(${cols.length}, 1fr)" not in script
         assert re.search(r"repeat\(\$\{cols\.length\}, minmax\((?:\d+px|max-content), 1fr\)\)", script)
         assert _declarations(html, ".fcf-projection-table").get("overflow-x") == "auto"
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
+class TestHeaderEntryPrice:
+    """The header's headline number is the distance from the current price
+    to the probability-weighted entry price (15% CAGR hurdle), not the
+    prob-weighted upside and not the base-case entry.
+
+    Stephen reads the dashboard to answer one question -- is the price at or
+    below what he would pay? -- so the move the price needs to make to reach
+    the entry price is the hero figure, with the entry price itself and the
+    current price beside it. The weighted entry is the one he acts on: on
+    RDDT (2026-10-31) the base entry was 94.23 against a 91.73 price while
+    the weighted entry was 86.20, and a hero anchored on base read as a buy.
+    The base entry stays in the sub-line; a DCF without a weighted entry
+    (97 of 1,168 at the time) falls back to base. The IV and its upside stay
+    in the strip but smaller. Sign convention is the move from the CURRENT
+    price: negative means the price must fall that far to reach entry,
+    positive means the price already sits that far below it.
+    """
+
+    def probe(self, html, tmp_path):
+        js = tmp_path / "dash.js"
+        js.write_text(bd.node_harness(inline_script(html))
+                      + "\nconsole.log(JSON.stringify(__el('headerValuation').innerHTML));\n")
+        r = subprocess.run(["node", str(js)], capture_output=True, text=True, check=False)
+        assert r.returncode == 0, r.stderr
+        return json.loads(r.stdout.strip().splitlines()[-1])
+
+    def test_distance_to_weighted_entry_is_the_hero_number(self, spec, analysis, csv_text, tmp_path):
+        dcf = load("TPW_DCF.json")  # weighted entry 2.96 vs price 4.82 -> -39% (base 2.86 -> -41%)
+        header = self.probe(bd.render("TPW.AX", spec, csv_text, analysis, dcf), tmp_path)
+        m = re.search(r'class="hv-hero-value negative">(-39%)<', header)
+        assert m, header
+        assert "-41%" not in header
+        assert "Weighted Entry Price (15% CAGR)" in header
+        assert "AUD2.96" in header
+        assert "Base <strong>AUD2.86" in header
+        assert "AUD4.82" in header
+        # The IV and its upside remain, but as ordinary strip items.
+        assert "AUD3.51" in header
+        assert "-27%" in header
+        # The hero is the first thing in the strip.
+        assert header.index("hv-hero") < header.index("Prob-Weighted IV")
+
+    def test_price_below_entry_is_positive_and_green(self, spec, analysis, csv_text, tmp_path):
+        dcf = {**load("TPW_DCF.json"), "current_price": 2.0}  # (2.96 - 2.0) / 2.0 = +48%
+        header = self.probe(bd.render("TPW.AX", spec, csv_text, analysis, dcf), tmp_path)
+        assert re.search(r'class="hv-hero-value positive">\+48%<', header), header
+
+    def test_without_a_weighted_entry_the_hero_falls_back_to_base(self, spec, analysis, csv_text, tmp_path):
+        dcf = load("TPW_DCF.json")
+        dcf = {**dcf, "entry_price": {k: v for k, v in dcf["entry_price"].items()
+                                      if not k.startswith("weighted_entry")}}
+        header = self.probe(bd.render("TPW.AX", spec, csv_text, analysis, dcf), tmp_path)
+        assert re.search(r'class="hv-hero-value negative">-41%<', header), header
+        assert "Distance to Entry Price (15% CAGR)" in header
+        assert "Weighted Entry" not in header
+        assert "Weighted entry" not in header
+        assert "AUD2.86" in header
+
+    def test_hurdle_label_follows_the_json(self, spec, analysis, csv_text, tmp_path):
+        dcf = load("TPW_DCF.json")
+        dcf = {**dcf, "entry_price": {**dcf["entry_price"], "hurdle_rate": 0.12}}
+        header = self.probe(bd.render("TPW.AX", spec, csv_text, analysis, dcf), tmp_path)
+        assert "12% CAGR" in header
+        assert "15% CAGR" not in header
+
+    def test_without_an_entry_price_the_strip_still_renders(self, spec, analysis, csv_text, tmp_path):
+        dcf = {k: v for k, v in load("TPW_DCF.json").items() if k != "entry_price"}
+        header = self.probe(bd.render("TPW.AX", spec, csv_text, analysis, dcf), tmp_path)
+        assert "hv-hero" not in header
+        assert "Prob-Weighted IV" in header
+        assert "AUD3.51" in header
+
+    def test_hero_is_styled_larger_than_the_strip_values(self, html):
+        hero = re.search(r"\.hv-hero-value\s*\{[^}]*font-size:\s*([\d.]+)rem", html)
+        strip = re.search(r"\.hv-value\s*\{[^}]*font-size:\s*([\d.]+)rem", html)
+        assert hero, "hv-hero-value must set a rem font-size"
+        assert strip, "hv-value must set a rem font-size"
+        assert float(hero.group(1)) > float(strip.group(1))
+
+    def test_negative_entry_price_is_shown_as_no_entry(self, spec, analysis, csv_text, tmp_path):
+        """AKAM, BCE, APA.AX and ~25 others carry a NEGATIVE base entry price:
+        the model says no price earns the hurdle. That is the finding, so the
+        hero must say so rather than vanish (a -118% 'distance' is nonsense
+        and a missing hero reads as 'not computed')."""
+        dcf = load("TPW_DCF.json")
+        dcf = {**dcf, "entry_price": {**dcf["entry_price"], "weighted_entry_price": -2.09,
+                                      "base": {**dcf["entry_price"]["base"], "entry_price": -2.09}}}
+        header = self.probe(bd.render("TPW.AX", spec, csv_text, analysis, dcf), tmp_path)
+        assert re.search(r'class="hv-hero-value negative">none<', header), header
+        assert "no price earns a 15% CAGR" in header
+        assert "-118%" not in header
+
+    def test_tiny_entry_price_is_not_mistaken_for_a_currency_mismatch(self, spec, analysis, csv_text, tmp_path):
+        """BAYN.DE: entry 1.25 against a 43.98 price, IV 46.15. The IV proves
+        the price is in the model's denomination, so the entry is real and
+        the hero must print -97%, not hide behind the ratio guard."""
+        dcf = load("TPW_DCF.json")  # price 4.82, wiv 3.51
+        dcf = {**dcf, "entry_price": {**dcf["entry_price"], "weighted_entry_price": 0.14,
+                                      "base": {**dcf["entry_price"]["base"], "entry_price": 0.14}}}
+        header = self.probe(bd.render("TPW.AX", spec, csv_text, analysis, dcf), tmp_path)
+        assert re.search(r'class="hv-hero-value negative">-97%<', header), header
+
+    def test_entry_in_another_denomination_is_refused_when_no_iv_vouches(self, spec, analysis, csv_text, tmp_path):
+        """Without an IV in the price's denomination, an entry 100x off the
+        price (WISE.L-style pence vs pounds) is suppressed, not printed."""
+        dcf = {k: v for k, v in load("TPW_DCF.json").items() if k != "probability_weighted"}
+        dcf = {**dcf, "entry_price": {**dcf["entry_price"], "weighted_entry_price": 296.0,
+                                      "base": {**dcf["entry_price"]["base"], "entry_price": 286.0}}}
+        header = self.probe(bd.render("TPW.AX", spec, csv_text, analysis, dcf), tmp_path)
+        assert "hv-hero" not in header

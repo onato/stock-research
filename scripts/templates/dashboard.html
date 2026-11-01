@@ -67,6 +67,30 @@ body {
 }
 .hv-value.positive { color: #00d4aa; }
 .hv-value.negative { color: #ff6b6b; }
+/* The hero: distance from the current price to the entry price (hurdle
+   CAGR). It takes the full width of the strip and the other items sit under
+   it, so the one number the reader acts on is the biggest on the page. */
+.hv-hero {
+    flex-basis: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+.hv-hero-value {
+    font-size: 3rem;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -1px;
+}
+.hv-hero-value.positive { color: #00d4aa; }
+.hv-hero-value.negative { color: #ff6b6b; }
+.hv-hero-sub {
+    font-size: 0.95rem;
+    color: #aaa;
+}
+.hv-hero-sub strong { color: #e0e0e0; font-weight: 600; }
 .kpi-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
@@ -1596,21 +1620,68 @@ function weightedIV(growth, wacc, terminal) {
     return stored * (now / ref);
 }
 
+// A price must be denominated like the per-share figure that divides it
+// (WISE.L: GBp quote vs USD model). Refuse the ratio rather than print -98%.
+function sameDenomination(perShare, price) {
+    const ratio = perShare / price;
+    return ratio <= 20 && ratio >= 0.05;
+}
+
+function pctMove(from, to) {
+    const pct = (to - from) / from * 100;
+    return { pct: pct, cls: pct >= 0 ? 'positive' : 'negative', text: (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%' };
+}
+
+// Headline strip. The hero is the move the CURRENT price must make to reach
+// the probability-weighted entry price (negative: it has to fall that far;
+// positive: it already sits that far below). The base entry sits in the
+// sub-line; a DCF without a weighted entry falls back to base. The
+// prob-weighted IV and its upside follow as ordinary items -- the entry
+// price is what Stephen acts on, the IV is context.
 function renderHeaderValuation() {
     const el = document.getElementById('headerValuation');
     if (!el) return;
+    const price = dcfData.current_price;
+    if (price == null) return;
     const pw = dcfData.probability_weighted || {};
-    const wiv = pw.weighted_iv, price = dcfData.current_price;
-    if (wiv == null || price == null) return;
-    // A price must be denominated like the IV that divides it (WISE.L: GBp
-    // quote vs USD model). Suppress the chip rather than print -98%.
-    const ratio = wiv / price;
-    if (ratio > 20 || ratio < 0.05) return;
-    const up = (wiv - price) / price * 100;
-    const cls = up >= 0 ? 'positive' : 'negative', sign = up >= 0 ? '+' : '';
-    el.innerHTML = `<div class="hv-item"><span class="hv-label">Prob-Weighted IV</span><span class="hv-value">${fmtIV(wiv)}</span></div>
-        <div class="hv-item"><span class="hv-label">Current Price</span><span class="hv-value">${fmtIV(price)}</span></div>
-        <div class="hv-item"><span class="hv-label">Upside</span><span class="hv-value ${cls}">${sign}${up.toFixed(0)}%</span></div>`;
+    const wiv = (pw.weighted_iv != null && sameDenomination(pw.weighted_iv, price)) ? pw.weighted_iv : null;
+    const ep = dcfData.entry_price || {};
+    const baseEntry = (ep.base && typeof ep.base === 'object') ? ep.base.entry_price : ep.base;
+    const weightedEntry = (ep.weighted_entry_price != null && isFinite(ep.weighted_entry_price)) ? ep.weighted_entry_price : null;
+    const anchor = weightedEntry != null ? weightedEntry : baseEntry;
+    // A negative or tiny entry price is a finding (no price earns the hurdle;
+    // BAYN.DE's 1.25 against 43.98), not a denomination mismatch -- an IV that
+    // passes the ratio check vouches for the entry. Only without one is the
+    // entry itself held to the ratio check.
+    const entry = (anchor != null && isFinite(anchor)
+                   && (wiv != null || sameDenomination(anchor, price))) ? anchor : null;
+    if (wiv == null && entry == null) return;
+    const parts = [];
+    if (entry != null) {
+        const hurdle = Math.round((ep.hurdle_rate || 0.15) * 100);
+        const kind = weightedEntry != null ? 'Weighted ' : '';
+        const label = `<span class="hv-label">Distance to ${kind}Entry Price (${hurdle}% CAGR)</span>`;
+        const baseNote = (weightedEntry != null && baseEntry != null && isFinite(baseEntry))
+            ? ` &middot; Base <strong>${fmtIV(baseEntry)}</strong>` : '';
+        if (entry <= 0) {
+            parts.push(`<div class="hv-hero">${label}
+        <span class="hv-hero-value negative">none</span>
+        <span class="hv-hero-sub">${weightedEntry != null ? 'Weighted' : 'Base'} entry price is <strong>${fmtIV(entry)}</strong>: no price earns a ${hurdle}% CAGR${baseNote} &middot; Price <strong>${fmtIV(price)}</strong></span></div>`);
+        } else {
+            const m = pctMove(price, entry);
+            parts.push(`<div class="hv-hero">${label}
+        <span class="hv-hero-value ${m.cls}">${m.text}</span>
+        <span class="hv-hero-sub">${weightedEntry != null ? 'Weighted entry' : 'Entry'} <strong>${fmtIV(entry)}</strong>${baseNote} &middot; Price <strong>${fmtIV(price)}</strong></span></div>`);
+        }
+    } else {
+        parts.push(`<div class="hv-item"><span class="hv-label">Current Price</span><span class="hv-value">${fmtIV(price)}</span></div>`);
+    }
+    if (wiv != null) {
+        const m = pctMove(price, wiv);
+        parts.push(`<div class="hv-item"><span class="hv-label">Prob-Weighted IV</span><span class="hv-value">${fmtIV(wiv)}</span></div>
+        <div class="hv-item"><span class="hv-label">Upside</span><span class="hv-value ${m.cls}">${m.text}</span></div>`);
+    }
+    el.innerHTML = parts.join('\n        ');
     el.style.display = 'flex';
 }
 
