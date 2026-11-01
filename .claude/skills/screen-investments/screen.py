@@ -19,6 +19,11 @@ It flags, but does not silently drop:
                    trip reasons ride along as `sanity_trips`
   * CCY -- (HTML only) the intrinsic value's currency differs from the live quote's
 
+Alongside the scenario-weighted upside every row carries `upside_at_hurdle_pct`:
+the base case rebuilt at a 15% required return (each DCF's own required_return_table)
+against the same price. It is a discount-rate stress, not the verdict; the rank
+never uses it.
+
 Usage:
   python3 screen.py [--root DIR] [--top N] [--live] [--stale-days 45]
                     [--drift-pct 15] [--json OUT.json] [--only T1,T2,...]
@@ -186,6 +191,36 @@ def exclusion_reason(ticker, dcf, iv, never):
     return None
 
 
+HURDLE_RATE = 15.0   # % -- the required_return_table row shown as "Upside @15%"
+
+
+def _is_num(x):
+    return isinstance(x, (int, float)) and not isinstance(x, bool)
+
+
+def value_at_hurdle(dcf, rate=HURDLE_RATE):
+    """Base-case value per share at `rate` from the DCF's own
+    required_return_table, or None.
+
+    The table is the engine's: the base scenario rebuilt at each listed
+    rate, terminal value and all. Only an exact row counts -- BRW.NZ lists
+    10/12.5/14.5/16.5/20 and gets no number rather than an interpolation,
+    because the column is read as "what the model says at 15%", and that
+    model said nothing at 15%.
+    """
+    rr = dcf.get("required_return_table")
+    if not isinstance(rr, dict):
+        return None
+    rates, vals = rr.get("returns"), rr.get("value_per_share")
+    if (not isinstance(rates, list) or not isinstance(vals, list)
+            or len(rates) != len(vals)):
+        return None
+    for r, v in zip(rates, vals, strict=True):
+        if _is_num(r) and _is_num(v) and abs(float(r) - rate) < 1e-9:
+            return float(v)
+    return None
+
+
 SANITY_FAIL_STATUSES = ("FAILED", "FAIL", "TRIPPED")
 
 
@@ -297,6 +332,10 @@ def screen(args):
             # check demoted worthless-equity names to "no data".
             upside = round((iv / price - 1) * 100, 1)
 
+        hurdle_iv = value_at_hurdle(d)
+        hurdle_up = (round((hurdle_iv / price - 1) * 100, 1)
+                     if hurdle_iv is not None and price else None)
+
         rows.append({
             "ticker": ticker,
             "excluded_reason": exclusion_reason(ticker, d, iv, never),
@@ -309,6 +348,8 @@ def screen(args):
             "live_price": live_price,
             "weighted_iv": iv,
             "upside_pct": upside,
+            "iv_at_hurdle": hurdle_iv,
+            "upside_at_hurdle_pct": hurdle_up,
             "valuation_date": vdate,
             "analysis_date": adate,
             "days_old": oldest,
@@ -515,6 +556,24 @@ def roic_td(ret):
     return f'<td data-sort="{esc(latest)}"{cls_attr} title="{title}">{txt}</td>'
 
 
+def hurdle_td(r):
+    """Base-case upside at HURDLE_RATE from the DCF's required_return_table.
+
+    Sortable and informational: the rank is the scenario-weighted upside in
+    the column before it. An em dash means the table has no 15% row.
+    """
+    up = r.get("upside_at_hurdle_pct")
+    if up is None:
+        return num_td(None, "—")
+    iv = r.get("iv_at_hurdle")
+    tip = f"base case at {HURDLE_RATE:g}% required return"
+    if _is_num(iv):
+        tip += f": {iv:.2f}"
+    cls = "pos" if up >= 0 else "neg"
+    return (f'<td data-sort="{esc(up)}" class="{cls}" title="{esc(tip)}">'
+            f'{esc(f"{up:+.1f}%")}</td>')
+
+
 def row_html(i, r, summary, co, ret=None):
     t = r.get("ticker", "?")
     cur = r.get("currency")
@@ -569,6 +628,7 @@ def row_html(i, r, summary, co, ret=None):
         price_cell,
         num_td(iv, iv_txt),
         num_td(up, esc(up_txt), "pos" if (up or 0) >= 0 else "neg"),
+        hurdle_td(r),
         roic_td(ret),
         num_td(age, f"{age}d" if age is not None else "—"),
         "<td>" + (badges or '<span class="ok">ok</span>') + "</td>",
@@ -718,7 +778,7 @@ upside = weighted IV / price &minus; 1</p>
                      (returns or {}).get(r.get("ticker")))
             for i, r in enumerate(ranked, 1))
     else:
-        body_rows = '<tr><td colspan="10">No ranked tickers — see unranked below.</td></tr>'
+        body_rows = '<tr><td colspan="11">No ranked tickers — see unranked below.</td></tr>'
 
     ranked_table = f"""<div class="card">
 <table id="lb">
@@ -726,7 +786,8 @@ upside = weighted IV / price &minus; 1</p>
 <th data-type="num">#</th><th data-type="str">Ticker</th>
 <th data-type="str">Company</th>
 <th data-type="num">Price</th><th data-type="num">Weighted IV</th>
-<th data-type="num">Upside</th><th data-type="num">ROIC</th>
+<th data-type="num">Upside</th><th data-type="num">Upside @15%</th>
+<th data-type="num">ROIC</th>
 <th data-type="num">Age</th>
 <th data-type="str">Flags</th><th data-type="num">Eval</th>
 </tr></thead>
@@ -787,7 +848,11 @@ never enter the ranking.</p>
     footnote = "<p class=\"footnote\">" + " &middot; ".join(
         f"<b>{esc(k)}</b>: {esc(v)}" for k, v in FLAG_MEANINGS
     ) + (" &middot; <b>Eval</b>: tier-1 scorecard pass rate (F fails / W warns), "
-         "from state/scores/.</p>")
+         "from state/scores/."
+         " &middot; <b>Upside @15%</b>: the base case rebuilt at a 15% required "
+         "return (each DCF's own required-return table) against the same price "
+         "&mdash; a discount-rate stress, not the verdict; the rank never uses it."
+         "</p>")
 
     sort_js = """<script>
 // Row click-through (anchors inside still work for open-in-new-tab).
@@ -938,16 +1003,20 @@ def main():
             "live": args.live}
 
     print(f"\nInvestment screen — {today()}  ({'LIVE prices' if args.live else 'STORED prices'})")
-    print("Upside = probability-weighted intrinsic value / price - 1\n")
-    hdr = f"{'#':>2} {'TICKER':<9}{'PRICE':>9} {'src':<7}{'IV':>9}{'UPSIDE%':>9}  {'AGE':>5}  FLAGS"
+    print("Upside = probability-weighted intrinsic value / price - 1;"
+          f" @{HURDLE_RATE:g}% = base case at a {HURDLE_RATE:g}% required return\n")
+    hdr = (f"{'#':>2} {'TICKER':<9}{'PRICE':>9} {'src':<7}{'IV':>9}{'UPSIDE%':>9}"
+           f"{'@' + format(HURDLE_RATE, 'g') + '%':>8}  {'AGE':>5}  FLAGS")
     print(hdr)
     print("-" * len(hdr))
     for i, r in enumerate(ranked[: args.top], 1):
         age = f"{r['days_old']}d" if r.get("days_old") is not None else "?"
         iv = (f"{r['weighted_iv']:.2f}"
               if r.get("weighted_iv") is not None else "—")
+        hurdle = (f"{r['upside_at_hurdle_pct']:>7.0f}%"
+                  if r.get("upside_at_hurdle_pct") is not None else f"{'—':>8}")
         print(f"{i:>2} {r['ticker']:<9}{fmt_price(r):>9} {r['price_src']:<7}{iv:>9}"
-              f"{r['upside_pct']:>8.1f}%  {age:>5}  {','.join(r['flags']) or 'ok'}")
+              f"{r['upside_pct']:>8.1f}%{hurdle}  {age:>5}  {','.join(r['flags']) or 'ok'}")
 
     if unranked:
         print("\nNot ranked (need attention before they can be compared):")

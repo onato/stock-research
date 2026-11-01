@@ -28,7 +28,8 @@ ROW = {"ticker": "SYN.NZ", "currency": "NZD", "price": 1.0, "weighted_iv": 2.0,
 
 def roic_cell(ret):
     html = screen.row_html(1, ROW, None, {}, ret)
-    return html.split("</td>")[6]   # after #, ticker, company, price, IV, upside
+    # after #, ticker, company, price, IV, upside, upside @15%
+    return html.split("</td>")[7]
 
 
 def test_header_has_roic_column(tmp_path):
