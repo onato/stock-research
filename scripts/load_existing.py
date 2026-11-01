@@ -40,25 +40,50 @@ def parse_number(raw: Any) -> float | None:
         return None
 
 
+def demoted_headers(headers: Sequence[str]) -> list[str]:
+    """Headers that alias a core column whose canonical CSV header is also
+    present. They become KPI rows under their own name instead of silently
+    replacing the column: ADYEN.AS carries diluted EPS as `EPS` beside basic
+    EPS as `EPS_Basic`, both normalize to `eps`, and the 2026-09-23 rebuild
+    let whichever header came later overwrite the other."""
+    canonical = dict(zip(schema.CORE_NAMES, schema.CSV_HEADERS, strict=True))
+    claims: dict[str, list[str]] = {}
+    for h in headers:
+        col = schema.normalize(h) if h else None
+        if col:
+            claims.setdefault(col, []).append(h)
+    losers: list[str] = []
+    for h in headers:
+        col = schema.normalize(h) if h else None
+        if not col or len(claims[col]) < 2:
+            continue
+        canon = canonical.get(col)
+        if canon in claims[col] and h != canon:
+            losers.append(h)
+    return losers
+
+
 def read_csv(path: pathlib.Path) -> tuple[list[dict[str, Any]], Sequence[str], list[str]]:
     """Return (rows, headers, unmapped_headers)."""
     with open(path, newline="", errors="replace") as fh:
         rdr = csv.DictReader(fh)
         headers = rdr.fieldnames or []
         rows = list(rdr)
-    unmapped = [h for h in headers if h and schema.normalize(h) is None]
+    demoted = set(demoted_headers(headers))
+    unmapped = [h for h in headers if h and (schema.normalize(h) is None or h in demoted)]
     return rows, headers, unmapped
 
 
 def to_core(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[tuple[str, str, float, None]]]:
     """Map CSV rows onto core columns; everything else becomes a KPI row."""
     core, kpis = [], []
+    demoted = set(demoted_headers(list(rows[0].keys()))) if rows else set()
     for row in rows:
         rec: dict[str, Any] = dict.fromkeys(schema.CORE_NAMES)
         for header, raw in row.items():
             if not header:
                 continue
-            col = schema.normalize(header)
+            col = None if header in demoted else schema.normalize(header)
             if col == "period":
                 rec["period"] = (raw or "").strip()
             elif col in ("units", "currency"):

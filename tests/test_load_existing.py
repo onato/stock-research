@@ -301,3 +301,41 @@ class TestCliGuard:
         (tmp_path / "research").mkdir()
         monkeypatch.setattr(sys, "argv", ["load_existing.py", "--report"])
         assert L.main() == 0
+
+
+class TestAliasCollision:
+    """Two headers in one CSV can normalize to the same core column. ADYEN.AS
+    carries diluted EPS under the canonical `EPS` header and basic EPS beside
+    it as `EPS_Basic`; both alias to `eps`, and on the 2026-09-23 rebuild the
+    later header silently replaced the earlier one in core_metrics while its
+    own value never reached kpis."""
+
+    def test_canonical_header_keeps_the_column_and_sibling_becomes_kpi(self):
+        core, kpis = L.to_core([
+            {"Period": "H1 2018", "EPS": "1.58", "EPS_Basic": "1.64"},
+        ])
+        assert core[0]["eps"] == 1.58
+        assert kpis == [("H1 2018", "EPS_Basic", 1.64, None)]
+
+    def test_demotion_does_not_depend_on_header_order(self):
+        core, kpis = L.to_core([
+            {"Period": "H1 2018", "EPS_Basic": "1.64", "EPS": "1.58"},
+        ])
+        assert core[0]["eps"] == 1.58
+        assert kpis == [("H1 2018", "EPS_Basic", 1.64, None)]
+
+    def test_alias_alone_still_maps_to_core(self):
+        # A legacy CSV with only a basic-EPS column keeps the fallback.
+        core, kpis = L.to_core([{"Period": "FY2024", "EPS_Basic": "1.64"}])
+        assert core[0]["eps"] == 1.64
+        assert kpis == []
+
+    def test_demoted_headers_lists_only_the_losing_sibling(self):
+        assert L.demoted_headers(["Period", "EPS", "EPS_Basic", "FTE"]) == ["EPS_Basic"]
+        assert L.demoted_headers(["Period", "EPS_Basic", "FTE"]) == []
+
+    def test_read_csv_reports_demoted_header_as_kpi(self, tmp_path):
+        p = tmp_path / "X_Metrics.csv"
+        p.write_text("Period,EPS,EPS_Basic,FTE\nH1 2018,1.58,1.64,768\n")
+        _rows, _headers, unmapped = L.read_csv(p)
+        assert unmapped == ["EPS_Basic", "FTE"]
