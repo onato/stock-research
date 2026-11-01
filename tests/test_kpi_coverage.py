@@ -286,6 +286,28 @@ class TestRetailerOnlineAndSameStoreSalesPromotion:
             assert schema.promote_header(n) == n
 
 
+class TestKiwifruitOperatingKpisArePromoted:
+    """Seeka Limited (SEK.NZ): post-harvest kiwifruit volume, per-hectare
+    yield and segment results, plus the lease/IFRS-16 reconciliation and net
+    bank debt the qualitative analysis tracks as the active deleveraging
+    story. All twelve names were absent from PROMOTE_KPIS, so none reached
+    the Metrics CSV despite being populated in `kpis`.
+    """
+
+    def test_kiwifruit_and_debt_kpis_are_promoted(self, patch_repo):
+        names = [
+            "EBITDAPreIFRS16", "HaywardYieldPerHa", "KiwifruitTraysGrown",
+            "KiwifruitTraysPackedClass1", "LeaseDepreciation",
+            "LeaseInterestExpense", "NetBankDebt", "PostHarvestEBIT",
+            "PostHarvestRevenue", "SunGoldTraysPacked", "SunGoldYieldPerHa",
+            "TotalTraysPacked",
+        ]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
 class TestGentailerPromotion:
     """A gentailer's generation output and retail customer accounts.
 
@@ -1215,3 +1237,53 @@ class TestOrdinaryProfitPromotion:
         assert kpi_coverage.survey(patch_repo)["SYN"]["promoted"] == [
             "OrdinaryProfit"]
         assert schema.promote_header("OrdinaryProfit") == "OrdinaryProfit"
+
+
+class TestHallensteinGlassonSegmentPromotion:
+    """Hallenstein Glasson Holdings (HLG.NZ) discloses three brand segments
+    -- Glassons Australia, Glassons New Zealand and Hallensteins -- and
+    Glassons Australia has grown to become the dominant segment (~58% of
+    group sales in FY2026), the main growth story per the qualitative
+    analysis. Populated FY2025-FY2026 in `kpis` but absent from
+    PROMOTE_KPIS, so the segment mix could not reach the Metrics CSV or be
+    charted.
+    """
+
+    def test_segment_revenue_is_promoted(self, patch_repo):
+        names = [
+            "SegmentRevenue_GlassonsAU",
+            "SegmentRevenue_GlassonsNZ",
+            "SegmentRevenue_Hallensteins",
+        ]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestFlowTradersMarketMakingPromotion:
+    """Flow Traders (FLOW.AS) is a market maker whose revenue (net trading
+    income, NTI) splits into Traditional (ETP market making) vs Digital
+    Assets, and whose profitability is best read via trading capital
+    deployed and the resulting return on trading capital (RoTC) -- a
+    headline Horizon 2030 target (>50% RoTC). AverageVIX is the volatility
+    proxy management ties earnings to. All eight names were populated in
+    `kpis` but absent from PROMOTE_KPIS, so none reached the Metrics CSV
+    or could be charted.
+    """
+
+    def test_market_making_kpis_are_promoted(self, patch_repo):
+        names = [
+            "AverageVIX",
+            "FlowETPValueTraded",
+            "FlowTotalValueTraded",
+            "MarketETPValueTraded",
+            "NTIDigitalAssets",
+            "NTITraditional",
+            "ReturnOnTradingCapital",
+            "TradingCapital",
+        ]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n

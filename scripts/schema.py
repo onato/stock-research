@@ -2120,6 +2120,58 @@ PROMOTE_KPIS: dict[str, str] = {
     "OperatingIncomeEnvironmentEnergy": "OperatingIncomeEnvironmentEnergy",
     "OperatingIncomeIndustrialMaterials":
         "OperatingIncomeIndustrialMaterials",
+    # Hallenstein Glasson Holdings Limited (HLG.NZ): the three disclosed
+    # brand segments -- Glassons Australia, Glassons New Zealand and
+    # Hallensteins. Glassons Australia has grown to become the dominant
+    # segment (~58% of group sales in FY2026) and is the main growth story
+    # per the qualitative analysis; the other two are the mature NZ-based
+    # businesses it has outgrown. Populated FY2025-FY2026 in `kpis` but
+    # absent from PROMOTE_KPIS, so the segment mix could not reach the
+    # Metrics CSV.
+    "SegmentRevenue_GlassonsAU": "SegmentRevenue_GlassonsAU",
+    "SegmentRevenue_GlassonsNZ": "SegmentRevenue_GlassonsNZ",
+    "SegmentRevenue_Hallensteins": "SegmentRevenue_Hallensteins",
+    # Flow Traders N.V. (FLOW.AS): a market maker whose revenue (net trading
+    # income, NTI) splits into Traditional (ETP market making) vs Digital
+    # Assets, and whose profitability is best read via trading capital
+    # deployed and the resulting return on trading capital (RoTC) -- a
+    # headline Horizon 2030 target (>50% RoTC). AverageVIX is the
+    # volatility proxy management ties earnings to, and the ETP
+    # value-traded trio (Flow's ETP volume, Flow's total volume including
+    # non-ETP, and total market ETP volume) is the market-share argument.
+    # All eight were populated in `kpis` but absent from PROMOTE_KPIS, so
+    # none reached the Metrics CSV.
+    "AverageVIX": "AverageVIX",
+    "FlowETPValueTraded": "FlowETPValueTraded",
+    "FlowTotalValueTraded": "FlowTotalValueTraded",
+    "MarketETPValueTraded": "MarketETPValueTraded",
+    "NTIDigitalAssets": "NTIDigitalAssets",
+    "NTITraditional": "NTITraditional",
+    "ReturnOnTradingCapital": "ReturnOnTradingCapital",
+    "TradingCapital": "TradingCapital",
+    # Seeka Limited (SEK.NZ): kiwifruit post-harvest volume (trays grown vs
+    # packed to Class 1, SunGold vs total) and per-hectare yield (SunGold vs
+    # Hayward) are the standard horticulture operator KPIs -- volume and
+    # yield mix, not derivable from Revenue. PostHarvestRevenue/EBIT isolate
+    # the packing segment from Orcharding/SeekaFresh/Australia. NetBankDebt
+    # is the deleveraging metric the qualitative analysis tracks ($172m 2023
+    # peak to $119.8m June 2026). LeaseDepreciation/LeaseInterestExpense
+    # split the IFRS-16 lease charge out of EBITDAPreIFRS16, the covenant
+    # basis management reports alongside statutory EBITDA. All twelve were
+    # populated in `kpis` but absent from PROMOTE_KPIS, so none reached the
+    # Metrics CSV.
+    "EBITDAPreIFRS16": "EBITDAPreIFRS16",
+    "HaywardYieldPerHa": "HaywardYieldPerHa",
+    "KiwifruitTraysGrown": "KiwifruitTraysGrown",
+    "KiwifruitTraysPackedClass1": "KiwifruitTraysPackedClass1",
+    "LeaseDepreciation": "LeaseDepreciation",
+    "LeaseInterestExpense": "LeaseInterestExpense",
+    "NetBankDebt": "NetBankDebt",
+    "PostHarvestEBIT": "PostHarvestEBIT",
+    "PostHarvestRevenue": "PostHarvestRevenue",
+    "SunGoldTraysPacked": "SunGoldTraysPacked",
+    "SunGoldYieldPerHa": "SunGoldYieldPerHa",
+    "TotalTraysPacked": "TotalTraysPacked",
 }
 
 # Owner-FCF components and core-column duplicates. Listed explicitly so a
