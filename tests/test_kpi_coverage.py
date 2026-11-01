@@ -957,3 +957,261 @@ class TestShortTermInvestmentsFVTPLPromotion:
         assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
         assert schema.promote_header("ShortTermInvestmentsFVTPL") == \
             "ShortTermInvestmentsFVTPL"
+
+
+class TestMedicalDeviceSegmentPromotion:
+    """Terumo Corporation (4543.T): the three core reporting segments
+
+    (Cardiac & Vascular, Medical Care Solutions, Blood & Cell Technologies)
+    plus Organ Technologies, added FY2026 after the OrganOx acquisition. The
+    segment mix is the thesis -- Cardiac & Vascular's TAVI/structural-heart
+    growth outpacing the mature Medical Care Solutions segment -- and is not
+    derivable by splitting the single Revenue/OperatingIncome columns.
+    AdjustedOperatingProfit is management's own non-GAAP operating profit,
+    distinct from the reported OperatingIncome column. All nine names were
+    absent from PROMOTE_KPIS despite multi-year history in `kpis`.
+    """
+
+    def test_segment_and_adjusted_profit_kpis_are_promoted(self, patch_repo):
+        names = [
+            "SegmentRevenueCardiacVascular",
+            "SegmentRevenueMedicalCare",
+            "SegmentRevenueBloodCell",
+            "SegmentRevenueOrganTech",
+            "SegmentProfitCardiacVascular",
+            "SegmentProfitMedicalCare",
+            "SegmentProfitBloodCell",
+            "SegmentProfitOrganTech",
+            "AdjustedOperatingProfit",
+        ]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestNamedDrugAndSegmentRevenuePromotion:
+    """Daiichi Sankyo (4568.T): ENHERTU and DATROWAY (the oncology ADC
+
+    franchise) and LIXIANA (the legacy anticoagulant) are the company's
+    three most-watched named-drug revenue lines, plus the five-way business
+    segment split (Oncology, Japan, American Regent, EU Specialty, ASCA)
+    disclosed only for FY2025-FY2026. All eight names were absent from
+    PROMOTE_KPIS despite being stored in `kpis`, so no dashboard could chart
+    the ADC-overtaking-legacy-primary-care growth narrative.
+    """
+
+    def test_named_drug_and_segment_kpis_are_promoted(self, patch_repo):
+        names = [
+            "EnhertuRevenue",
+            "DatrowayRevenue",
+            "LixianaRevenue",
+            "OncologyBusinessRevenue",
+            "JapanBusinessRevenue",
+            "AmericanRegentRevenue",
+            "EUSpecialtyRevenue",
+            "ASCABusinessRevenue",
+            "SGAExpense",
+        ]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestBusinessProfitPromotion:
+    """Otsuka Holdings (4578.T): Business profit is management's own
+
+    non-IFRS core operating metric (Revenue - COGS - SG&A - R&D + equity
+    -method share of profit), which guidance and all of the company's own
+    disclosure are framed around (FY2026 target ¥500.0bn) in preference
+    to IFRS Operating profit. Populated FY2019-FY2026 in `kpis` but absent
+    from PROMOTE_KPIS, so the dashboard could not chart it beside the IFRS
+    operating income line.
+    """
+
+    def test_business_profit_kpi_is_promoted(self, patch_repo):
+        make_db(patch_repo, "SYN", ["BusinessProfit"])
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        assert schema.promote_header("BusinessProfit") == "BusinessProfit"
+
+
+class TestThemeParkOperatorAttendancePromotion:
+    """Theme-park attendance and per-guest spend (Oriental Land, 4661.T).
+
+    ThemeParkAttendance (thousands of guests) and NetSalesPerGuest (yen per
+    guest) are the two operating KPIs Oriental Land's own disclosure and
+    analyst coverage track most closely for Tokyo Disneyland/DisneySea --
+    the theme-park equivalent of same-store sales, decomposing revenue into
+    volume and spend-per-visitor. Both were populated across most of the
+    FY2007-FY2026 history in `kpis` but absent from PROMOTE_KPIS, so the
+    dashboard could only show consolidated Revenue and neither driver was
+    visible separately.
+    """
+
+    def test_attendance_and_spend_per_guest_are_promoted(self, patch_repo):
+        names = ["ThemeParkAttendance", "NetSalesPerGuest"]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestERPVendorSegmentMixPromotion:
+    """OBIC's three business segments and order intake (4684.T).
+
+    SegmentRevenueSI/SS/OA and the matching SegmentOperatingIncome* names
+    split OBIC's revenue into System Integration (project-based
+    implementation), System Support (the recurring maintenance/cloud
+    business already surfaced via RecurringRevenue) and Office Automation
+    (hardware resale) -- the segment mix IS the investment thesis, not
+    derivable from the consolidated Revenue/OperatingIncome columns.
+    OrdersReceived is the forward-looking order-intake KPI management
+    discloses alongside segment revenue. All seven names were populated
+    FY2022-FY2026 in `kpis` but absent from PROMOTE_KPIS, so the dashboard
+    could not chart the segment mix or order intake.
+    """
+
+    def test_segment_mix_and_orders_are_promoted(self, patch_repo):
+        names = [
+            "SegmentRevenueSI", "SegmentRevenueSS", "SegmentRevenueOA",
+            "SegmentOperatingIncomeSI", "SegmentOperatingIncomeSS",
+            "SegmentOperatingIncomeOA", "OrdersReceived",
+        ]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestFujifilmSegmentMixPromotion:
+    """FUJIFILM Holdings' four reported business segments (4901.T).
+
+    SegmentRevenue{Healthcare,Electronics,BusinessInnovation,Imaging} and the
+    matching SegmentOperatingIncome* names split the consolidated
+    Revenue/OperatingIncome columns into Healthcare (medical imaging,
+    diagnostics, bio CDMO), Electronics (semiconductor/display materials),
+    Business Innovation (office/production printing, formerly Fuji Xerox)
+    and Imaging (consumer photography, Instax) -- the segment mix is the
+    investment thesis (Electronics/Healthcare growth funding the mature
+    Imaging and Business Innovation lines), not derivable by splitting the
+    consolidated totals. Populated FY2025-FY2026 only in `kpis` (the
+    financial-parser agent noted earlier segment structures are not
+    comparable) but absent from PROMOTE_KPIS, so the dashboard could not
+    chart the segment mix at all.
+    """
+
+    def test_segment_mix_is_promoted(self, patch_repo):
+        names = [
+            "SegmentRevenueHealthcare", "SegmentRevenueElectronics",
+            "SegmentRevenueBusinessInnovation", "SegmentRevenueImaging",
+            "SegmentOperatingIncomeHealthcare",
+            "SegmentOperatingIncomeElectronics",
+            "SegmentOperatingIncomeBusinessInnovation",
+            "SegmentOperatingIncomeImaging",
+        ]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestCyberAgentSegmentMixPromotion:
+    """CyberAgent's three reporting segments (4751.T).
+
+    Internet Advertisement, Media (incl. ABEMA) and Games (Cygames) are the
+    three segments the investment thesis is built on -- ABEMA/Media only
+    just turned profitable, Games is hit-driven and volatile around Cygames
+    titles, and Advertising is the stable base funding both. SegmentRevenue
+    Games/Media were already promoted; SegmentRevenueAdvertising and all
+    three SegmentOperatingIncome* names were absent from PROMOTE_KPIS
+    despite being populated in `kpis`, so the dashboard could not chart the
+    segment-mix story (margin turnaround in Media, volatility in Games) at
+    all.
+    """
+
+    def test_segment_revenue_and_operating_income_are_promoted(
+            self, patch_repo):
+        names = [
+            "SegmentRevenueAdvertising",
+            "SegmentOperatingIncomeAdvertising",
+            "SegmentOperatingIncomeGames",
+            "SegmentOperatingIncomeMedia",
+        ]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestYokohamaRubberSegmentPromotion:
+    """Yokohama Rubber (5101.T): the Tires segment (~91% of FY2025 revenue)
+
+    versus the MB (multi-business/industrial products -- hoses, belts,
+    marine/offshore equipment, aerospace components) segment is the
+    disclosed business-mix thesis. Both segment revenue and segment profit
+    are populated in `kpis` for FY2022-FY2025 but were absent from
+    PROMOTE_KPIS, so the dashboard could not chart the segment split.
+    """
+
+    def test_segment_revenue_and_profit_are_promoted(self, patch_repo):
+        names = [
+            "SegmentRevenueTires",
+            "SegmentRevenueMB",
+            "SegmentProfitTires",
+            "SegmentProfitMB",
+        ]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestKonicaMinoltaSegmentMixPromotion:
+    """Konica Minolta's four reported business segments (4902.T).
+
+    Digital Workplace (office MFPs/DW-DX services), Professional Print
+    (production/industrial print), Industry (sensing, performance
+    materials, optical/inkjet components) and Healthcare -- renamed and
+    folded into Imaging Solutions from FY2025 after a resegmentation --
+    are the segment-mix thesis: non-hardware/services and Industry growth
+    offsetting the structurally declining office-hardware installed base.
+    Neither the revenue nor operating-profit split is derivable from the
+    consolidated Revenue/OperatingIncome columns. BusinessContributionProfit
+    is management's own KPI (the headline metric in the new Corporate Plan
+    2026-2028, targeting a 6.5% ratio by FY2028). All nine names were
+    populated in `kpis` (HealthcareRevenue was already promoted) but absent
+    from PROMOTE_KPIS, so the dashboard could not chart the segment mix or
+    business contribution profit at all.
+    """
+
+    def test_segment_mix_and_contribution_profit_are_promoted(
+            self, patch_repo):
+        names = [
+            "DigitalWorkplaceRevenue", "DigitalWorkplaceOperatingProfit",
+            "ProfessionalPrintRevenue", "ProfessionalPrintOperatingProfit",
+            "IndustryRevenue", "IndustryOperatingProfit",
+            "HealthcareOperatingProfit",
+            "ImagingSolutionsRevenue", "ImagingSolutionsOperatingProfit",
+            "BusinessContributionProfit",
+        ]
+        make_db(patch_repo, "SYN", names)
+        assert kpi_coverage.survey(patch_repo)["SYN"]["unmapped"] == []
+        for n in names:
+            assert schema.promote_header(n) == n
+
+
+class TestOrdinaryProfitPromotion:
+    """JGAAP 'ordinary profit' (operating profit adjusted for non-operating
+    items such as FX gains/losses and interest) is a standard Japanese-filer
+    line distinct from OperatingIncome and NetIncome. Nippon Electric Glass
+    (5214.T) has it populated back to FY2015 in `kpis` but it was absent
+    from PROMOTE_KPIS, so the large non-operating swings it captures could
+    not be charted alongside OperatingIncome/NetIncome.
+    """
+
+    def test_ordinary_profit_is_promoted(self, patch_repo):
+        make_db(patch_repo, "SYN", ["OrdinaryProfit"])
+        assert kpi_coverage.survey(patch_repo)["SYN"]["promoted"] == [
+            "OrdinaryProfit"]
+        assert schema.promote_header("OrdinaryProfit") == "OrdinaryProfit"

@@ -213,6 +213,12 @@ PROMOTE_KPIS: dict[str, str] = {
     "RealizedOilPrice": "RealizedOilPrice",
     "RealizedGasPrice": "RealizedGasPrice",
     "SalesVolume": "SalesVolume",
+    # Oriental Land Co. (4661.T): theme-park attendance (thousands of
+    # guests) and net sales per guest (yen) are the standard operator KPIs
+    # for Tokyo Disneyland/DisneySea -- volume and spend-per-visitor, the
+    # theme-park equivalent of same-store sales, not derivable from Revenue.
+    "ThemeParkAttendance": "ThemeParkAttendance",
+    "NetSalesPerGuest": "NetSalesPerGuest",
     # KE Holdings Inc. / Beike (2423.HK): the five reported revenue-segment
     # lines -- existing-home sales, new-home sales, home renovation &
     # furnishing, home rental, and emerging & other services. The mix shift
@@ -1758,6 +1764,362 @@ PROMOTE_KPIS: dict[str, str] = {
     # dashboard could not chart either.
     "RedemptionLiabilityChange": "RedemptionLiabilityChange",
     "NetIncomeAttributable": "NetIncomeAttributable",
+    # Terumo Corporation (4543.T): the three core reporting segments
+    # (Cardiac & Vascular, Medical Care Solutions, Blood & Cell Technologies)
+    # plus Organ Technologies, added FY2026 after the OrganOx acquisition.
+    # The segment mix is the thesis and is not derivable by splitting the
+    # single Revenue/OperatingIncome columns. AdjustedOperatingProfit is
+    # management's own non-GAAP operating profit, distinct from the
+    # reported OperatingIncome column.
+    "SegmentRevenueCardiacVascular": "SegmentRevenueCardiacVascular",
+    "SegmentRevenueMedicalCare": "SegmentRevenueMedicalCare",
+    "SegmentRevenueBloodCell": "SegmentRevenueBloodCell",
+    "SegmentRevenueOrganTech": "SegmentRevenueOrganTech",
+    "SegmentProfitCardiacVascular": "SegmentProfitCardiacVascular",
+    "SegmentProfitMedicalCare": "SegmentProfitMedicalCare",
+    "SegmentProfitBloodCell": "SegmentProfitBloodCell",
+    "SegmentProfitOrganTech": "SegmentProfitOrganTech",
+    "AdjustedOperatingProfit": "AdjustedOperatingProfit",
+    # Daiichi Sankyo (4568.T): ENHERTU and DATROWAY are the oncology ADC
+    # growth drivers overtaking LIXIANA, the legacy anticoagulant -- the
+    # core investment narrative, not derivable by splitting Revenue. The
+    # five-way business segment split (Oncology, Japan, American Regent,
+    # EU Specialty, ASCA) is disclosed only for FY2025-FY2026.
+    "EnhertuRevenue": "EnhertuRevenue",
+    "DatrowayRevenue": "DatrowayRevenue",
+    "LixianaRevenue": "LixianaRevenue",
+    "OncologyBusinessRevenue": "OncologyBusinessRevenue",
+    "JapanBusinessRevenue": "JapanBusinessRevenue",
+    "AmericanRegentRevenue": "AmericanRegentRevenue",
+    "EUSpecialtyRevenue": "EUSpecialtyRevenue",
+    "ASCABusinessRevenue": "ASCABusinessRevenue",
+    "SGAExpense": "SGAExpense",
+    # Otsuka Holdings (4578.T): Business profit is management's own non-IFRS
+    # core operating metric (Revenue - COGS - SG&A - R&D + equity-method
+    # share of profit); all of the company's own guidance and disclosure is
+    # framed in Business profit terms, not IFRS Operating profit. Populated
+    # FY2019-FY2026 in `kpis` but absent from PROMOTE_KPIS.
+    "BusinessProfit": "BusinessProfit",
+    # OBIC Co., Ltd. (4684.T): the three-segment split -- System Integration
+    # (project-based implementation), System Support (recurring
+    # maintenance/cloud, the business behind the RecurringRevenue KPI) and
+    # Office Automation (hardware resale) -- is the segment-mix thesis, not
+    # derivable by splitting the consolidated Revenue/OperatingIncome
+    # columns. OrdersReceived is the forward-looking order-intake figure
+    # management discloses alongside it. Populated FY2022-FY2026 in `kpis`
+    # (FY2021 excluded: pre-revenue-recognition-standard-change) but absent
+    # from PROMOTE_KPIS.
+    "SegmentRevenueSI": "SegmentRevenueSI",
+    "SegmentRevenueSS": "SegmentRevenueSS",
+    "SegmentRevenueOA": "SegmentRevenueOA",
+    "SegmentOperatingIncomeSI": "SegmentOperatingIncomeSI",
+    "SegmentOperatingIncomeSS": "SegmentOperatingIncomeSS",
+    "SegmentOperatingIncomeOA": "SegmentOperatingIncomeOA",
+    "OrdersReceived": "OrdersReceived",
+    # FUJIFILM Holdings Corporation (4901.T): the four reported business
+    # segments -- Healthcare (medical imaging, diagnostics, bio CDMO),
+    # Electronics (semiconductor/display materials), Business Innovation
+    # (office/production printing, formerly Fuji Xerox) and Imaging
+    # (consumer photography, Instax) -- are the segment-mix thesis
+    # (Electronics/Healthcare growth funding the mature Imaging and Business
+    # Innovation lines), not derivable by splitting the consolidated
+    # Revenue/OperatingIncome columns. Populated FY2025-FY2026 only in
+    # `kpis` (the financial-parser agent noted earlier segment structures
+    # are not comparable) but absent from PROMOTE_KPIS.
+    "SegmentRevenueHealthcare": "SegmentRevenueHealthcare",
+    "SegmentRevenueElectronics": "SegmentRevenueElectronics",
+    "SegmentRevenueBusinessInnovation": "SegmentRevenueBusinessInnovation",
+    "SegmentRevenueImaging": "SegmentRevenueImaging",
+    "SegmentOperatingIncomeHealthcare": "SegmentOperatingIncomeHealthcare",
+    "SegmentOperatingIncomeElectronics": "SegmentOperatingIncomeElectronics",
+    "SegmentOperatingIncomeBusinessInnovation":
+        "SegmentOperatingIncomeBusinessInnovation",
+    "SegmentOperatingIncomeImaging": "SegmentOperatingIncomeImaging",
+    # AGC Inc. (5201.T): diversified Japanese materials company across five
+    # segments -- Architectural Glass, Automotive, Electronics, Chemicals
+    # and a residual Ceramics/Other bucket, with Life Science split out of
+    # Chemicals from FY2022. The pre-FY2022 "Glass" segment was itself split
+    # into Architectural Glass and Automotive starting FY2022 (restated in
+    # FY2023), so Glass and the two successor segments do not overlap in any
+    # period -- a structural break, not a parsing gap. Populated back to
+    # FY2016 in `kpis` but absent from PROMOTE_KPIS, so the segment-mix
+    # story (Electronics/Automotive funding mature Architectural Glass) was
+    # stranded.
+    "SegmentRevenueArchitecturalGlass": "SegmentRevenueArchitecturalGlass",
+    "SegmentRevenueAutomotive": "SegmentRevenueAutomotive",
+    "SegmentRevenueChemicals": "SegmentRevenueChemicals",
+    "SegmentRevenueGlass": "SegmentRevenueGlass",
+    "SegmentRevenueLifeScience": "SegmentRevenueLifeScience",
+    "SegmentRevenueCeramicsOther": "SegmentRevenueCeramicsOther",
+    "SegmentOperatingIncomeArchitecturalGlass":
+        "SegmentOperatingIncomeArchitecturalGlass",
+    "SegmentOperatingIncomeAutomotive": "SegmentOperatingIncomeAutomotive",
+    "SegmentOperatingIncomeChemicals": "SegmentOperatingIncomeChemicals",
+    "SegmentOperatingIncomeGlass": "SegmentOperatingIncomeGlass",
+    "SegmentOperatingIncomeLifeScience": "SegmentOperatingIncomeLifeScience",
+    "SegmentOperatingIncomeCeramicsOther": "SegmentOperatingIncomeCeramicsOther",
+    # CyberAgent, Inc. (4751.T): the three reporting segments -- Internet
+    # Advertisement (stable base), Media (ABEMA, only just turned
+    # profitable) and Games (Cygames, hit-driven and volatile) -- are the
+    # investment thesis. SegmentRevenueGames/Media were already promoted;
+    # SegmentRevenueAdvertising and all three SegmentOperatingIncome*
+    # names were absent from PROMOTE_KPIS despite being populated in
+    # `kpis`, so the dashboard could not chart segment profitability at
+    # all, only the two already-promoted revenue lines.
+    "SegmentRevenueAdvertising": "SegmentRevenueAdvertising",
+    "SegmentOperatingIncomeAdvertising": "SegmentOperatingIncomeAdvertising",
+    "SegmentOperatingIncomeGames": "SegmentOperatingIncomeGames",
+    "SegmentOperatingIncomeMedia": "SegmentOperatingIncomeMedia",
+    # Konica Minolta, Inc. (4902.T): the four reported business segments --
+    # Digital Workplace (office MFPs/DW-DX services), Professional Print
+    # (production/industrial print), Industry (sensing, performance
+    # materials, optical/inkjet components) and Healthcare -- renamed and
+    # folded into Imaging Solutions from FY2025 after a resegmentation --
+    # are the segment-mix thesis, not derivable by splitting the
+    # consolidated Revenue/OperatingIncome columns. HealthcareRevenue was
+    # already promoted; the matching OperatingProfit and the FY2025-26
+    # successor segment were not. BusinessContributionProfit is
+    # management's own headline KPI under the new Corporate Plan
+    # 2026-2028 (targeting a 6.5% ratio by FY2028).
+    "DigitalWorkplaceRevenue": "DigitalWorkplaceRevenue",
+    "DigitalWorkplaceOperatingProfit": "DigitalWorkplaceOperatingProfit",
+    "ProfessionalPrintRevenue": "ProfessionalPrintRevenue",
+    "ProfessionalPrintOperatingProfit": "ProfessionalPrintOperatingProfit",
+    "IndustryRevenue": "IndustryRevenue",
+    "IndustryOperatingProfit": "IndustryOperatingProfit",
+    "HealthcareOperatingProfit": "HealthcareOperatingProfit",
+    "ImagingSolutionsRevenue": "ImagingSolutionsRevenue",
+    "ImagingSolutionsOperatingProfit": "ImagingSolutionsOperatingProfit",
+    "BusinessContributionProfit": "BusinessContributionProfit",
+    # Yokohama Rubber (5101.T): the Tires segment (~91% of FY2025 revenue)
+    # versus MB (multi-business/industrial products -- hoses, belts,
+    # marine/offshore equipment, aerospace) is the disclosed segment-mix
+    # thesis, not derivable by splitting the consolidated Revenue/
+    # OperatingIncome columns. Populated FY2022-FY2025 in `kpis` but
+    # absent from PROMOTE_KPIS.
+    "SegmentRevenueTires": "SegmentRevenueTires",
+    "SegmentRevenueMB": "SegmentRevenueMB",
+    "SegmentProfitTires": "SegmentProfitTires",
+    "SegmentProfitMB": "SegmentProfitMB",
+    # Bridgestone Corporation (5108.T): the four-region geographic segment
+    # split (Japan, Americas, EMEA, Asia-Pacific/China) is how management
+    # frames the tire business -- Americas is the largest profit pool but
+    # EMEA swung from a strong FY2022 to a weak FY2023 (chemical/supply
+    # disruption) while Japan and Asia-Pacific have been steadily improving.
+    # Revenue populated FY2020-FY2025, profit FY2021-FY2025 in `kpis` but
+    # absent from PROMOTE_KPIS. SegmentRevenueAmericas/EMEA already promoted
+    # via the BRG.AX entries above (same canonical names, different company).
+    "SegmentRevenueJapan": "SegmentRevenueJapan",
+    "SegmentRevenueAsiaPacific": "SegmentRevenueAsiaPacific",
+    "SegmentProfitJapan": "SegmentProfitJapan",
+    "SegmentProfitAmericas": "SegmentProfitAmericas",
+    "SegmentProfitEMEA": "SegmentProfitEMEA",
+    "SegmentProfitAsiaPacific": "SegmentProfitAsiaPacific",
+    # Nippon Electric Glass (5214.T): JGAAP "ordinary profit" (operating
+    # profit adjusted for non-operating items such as FX gains/losses and
+    # interest) is a standard Japanese-filer line distinct from
+    # OperatingIncome and NetIncome -- material here given the company's
+    # history of large non-operating swings (e.g. the FY2023 ordinary
+    # loss). Populated back to FY2015 in `kpis` but absent from
+    # PROMOTE_KPIS.
+    "OrdinaryProfit": "OrdinaryProfit",
+    # The Japan Steel Works, Ltd. (5631.T): the two-segment split --
+    # Industrial Machinery (plastics/injection-molding machinery plus
+    # defense equipment, ~82% of FY2026 sales) versus Materials &
+    # Engineering (nuclear/thermal power forgings, ~17%) -- plus the
+    # defense-vs-civil order/revenue mix within Industrial Machinery and
+    # the three machinery product lines are the investment thesis.
+    # Populated FY2025-FY2026 only (segment notes are absent from earlier
+    # years' English filing translations) but absent from PROMOTE_KPIS,
+    # so the dashboard could not chart the segment mix at all.
+    "DefenseOrders": "DefenseOrders",
+    "DefenseRevenue": "DefenseRevenue",
+    "IndustrialMachineryOperatingIncome": "IndustrialMachineryOperatingIncome",
+    "IndustrialMachineryOrders": "IndustrialMachineryOrders",
+    "IndustrialMachineryRevenue": "IndustrialMachineryRevenue",
+    "MaterialsEngineeringOperatingIncome": "MaterialsEngineeringOperatingIncome",
+    "MaterialsEngineeringOrders": "MaterialsEngineeringOrders",
+    "MaterialsEngineeringRevenue": "MaterialsEngineeringRevenue",
+    "MoldingMachineRevenue": "MoldingMachineRevenue",
+    "PlasticsMachineryRevenue": "PlasticsMachineryRevenue",
+    "SteelForgingsPlatesRevenue": "SteelForgingsPlatesRevenue",
+    # Sumitomo Osaka Cement (5232.T): the seven-segment revenue/profit split
+    # is the investment thesis in one table -- Cement swung from a
+    # ~JPY19.5bn segment loss (FY2023) to ~JPY5.5bn profit (FY2026) on
+    # price/mix recovery, while Optoelectronics and Advanced Materials (SAW
+    # filters, CMP slurries) sell into a semiconductor/photonics cycle that
+    # moves independently of domestic cement demand. Populated FY2021-FY2026
+    # in `kpis` but absent from PROMOTE_KPIS, so the dashboard could not
+    # chart the segment mix at all.
+    "SegmentRevenueCement": "SegmentRevenueCement",
+    "SegmentRevenueMineralResources": "SegmentRevenueMineralResources",
+    "SegmentRevenueConstructionMaterials": "SegmentRevenueConstructionMaterials",
+    "SegmentRevenueOptoelectronics": "SegmentRevenueOptoelectronics",
+    "SegmentRevenueAdvancedMaterials": "SegmentRevenueAdvancedMaterials",
+    "SegmentRevenueBatteryMaterials": "SegmentRevenueBatteryMaterials",
+    "SegmentRevenueOther": "SegmentRevenueOther",
+    # Mitsubishi Materials (5711.T): April-2026 segment restructure into
+    # Materials, Metals/Resources Circulation, Copper & Copper Alloy
+    # Products, Products, Metalworking Solutions, Advanced Products, Mineral
+    # Resources and Renewable Energy. Populated FY2024-FY2026 only in `kpis`
+    # (older years weren't mapped by the financial-parser due to segment
+    # restructuring ambiguity) but absent from PROMOTE_KPIS, so the dashboard
+    # could not chart the segment mix at all.
+    "SegmentRevenueMaterials": "SegmentRevenueMaterials",
+    "SegmentRevenueMetalsResourcesCirculation": "SegmentRevenueMetalsResourcesCirculation",
+    "SegmentRevenueCopperAlloyProducts": "SegmentRevenueCopperAlloyProducts",
+    "SegmentRevenueProducts": "SegmentRevenueProducts",
+    "SegmentRevenueMetalworkingSolutions": "SegmentRevenueMetalworkingSolutions",
+    "SegmentRevenueAdvancedProducts": "SegmentRevenueAdvancedProducts",
+    "SegmentRevenueRenewableEnergy": "SegmentRevenueRenewableEnergy",
+    "SegmentOpIncomeMaterials": "SegmentOpIncomeMaterials",
+    "SegmentOpIncomeMetalsResourcesCirculation": "SegmentOpIncomeMetalsResourcesCirculation",
+    "SegmentOpIncomeCopperAlloyProducts": "SegmentOpIncomeCopperAlloyProducts",
+    "SegmentOpIncomeProducts": "SegmentOpIncomeProducts",
+    "SegmentOpIncomeMetalworkingSolutions": "SegmentOpIncomeMetalworkingSolutions",
+    "SegmentOpIncomeAdvancedProducts": "SegmentOpIncomeAdvancedProducts",
+    "SegmentOpIncomeMineralResources": "SegmentOpIncomeMineralResources",
+    "SegmentOpIncomeRenewableEnergy": "SegmentOpIncomeRenewableEnergy",
+    "SegmentOpIncomeOther": "SegmentOpIncomeOther",
+    "SegmentProfitCement": "SegmentProfitCement",
+    "SegmentProfitMineralResources": "SegmentProfitMineralResources",
+    "SegmentProfitConstructionMaterials": "SegmentProfitConstructionMaterials",
+    "SegmentProfitOptoelectronics": "SegmentProfitOptoelectronics",
+    "SegmentProfitAdvancedMaterials": "SegmentProfitAdvancedMaterials",
+    "SegmentProfitBatteryMaterials": "SegmentProfitBatteryMaterials",
+    "SegmentProfitOther": "SegmentProfitOther",
+    # Sumitomo Metal Mining (5713.T): three-segment miner/smelter --
+    # Mineral Resources, Smelting & Refining, Materials. Smelting & Refining
+    # is the largest segment by revenue (JPY1.35tn of FY2026's ~JPY1.94tn
+    # total) but neither its revenue nor its profit was in PROMOTE_KPIS, and
+    # neither was Materials' profit, despite all three being populated
+    # FY2019-FY2026 in `kpis` -- the dashboard could show Mineral Resources
+    # and Materials revenue but not the full segment mix or any segment's
+    # profit swing (Materials segment profit went from +JPY13.8bn FY2019 to
+    # -JPY54.2bn FY2025).
+    "SegmentRevenueSmeltingRefining": "SegmentRevenueSmeltingRefining",
+    "SegmentProfitSmeltingRefining": "SegmentProfitSmeltingRefining",
+    "SegmentProfitMaterials": "SegmentProfitMaterials",
+    # Mitsui Kinzoku Company (5706.T, formerly Mitsui Mining & Smelting):
+    # divested Automotive Parts & Components (sold to Hi-Lex Corporation,
+    # completed 4 Nov 2025) and now runs two core segments -- Engineered
+    # Materials (electrolytic copper foil for PCBs/AI servers, autocatalysts,
+    # battery materials, rare-earth compounds, PVD targets) and Metals (zinc/
+    # lead smelting, copper/precious-metals recycling). The 2030 target
+    # roughly doubles Engineered Materials profit, so the segment split is
+    # the thesis, not just the group total. Only FY2025-FY2026 populated in
+    # `kpis` but absent from PROMOTE_KPIS, so the dashboard could not chart
+    # the post-divestiture business mix shift at all.
+    "SegmentRevenueEngineeredMaterials": "SegmentRevenueEngineeredMaterials",
+    "SegmentRevenueMetals": "SegmentRevenueMetals",
+    "SegmentRevenueAutomotiveParts": "SegmentRevenueAutomotiveParts",
+    "SegmentProfitEngineeredMaterials": "SegmentProfitEngineeredMaterials",
+    "SegmentProfitMetals": "SegmentProfitMetals",
+    "SegmentProfitAutomotiveParts": "SegmentProfitAutomotiveParts",
+    # NGK Corporation (5333.T, formerly NGK Insulators): three reporting
+    # segments -- Environment (automotive ceramics/sensors, ~58% of sales,
+    # secular decliner as EV penetration erodes exhaust-hardware demand),
+    # Digital Society (semiconductor-equipment ceramics, ~37%, fastest
+    # growing on AI capex) and Energy & Industry (insulators/NAS batteries,
+    # ~10%) -- plus the product-line detail within them. Only FY2025-FY2026
+    # populated in `kpis` (NGK has renamed/reorganised segments repeatedly),
+    # all absent from PROMOTE_KPIS, so the dashboard could not chart the
+    # segment or product mix at all.
+    "SegmentRevenueEnergyEnvironment": "SegmentRevenueEnergyEnvironment",
+    "SegmentRevenueDigitalSociety": "SegmentRevenueDigitalSociety",
+    "SegmentRevenueIndustry": "SegmentRevenueIndustry",
+    "AutomotiveCeramicsRevenue": "AutomotiveCeramicsRevenue",
+    "SensorsRevenue": "SensorsRevenue",
+    "SemiconductorEquipmentComponentsRevenue": "SemiconductorEquipmentComponentsRevenue",
+    "InsulatorsRevenue": "InsulatorsRevenue",
+    "EnergyStorageRevenue": "EnergyStorageRevenue",
+    # Nippon Light Metal Holdings (5703.T): the four reporting segments --
+    # Ingot & Chemicals (~31% of sales, upstream smelting/alumina/chemicals,
+    # most cyclical), Fabricated Products (~30%), Sheet & Extrusions (~19%)
+    # and Foil & Powder (~19%) -- have differing cyclicality by position in
+    # the aluminium value chain, which is the qualitative-analysis thesis
+    # and not derivable by splitting consolidated Revenue/OperatingIncome.
+    # Populated in `kpis` back to FY2016-2022 depending on segment but
+    # absent from PROMOTE_KPIS, so the dashboard could not chart the
+    # segment mix at all.
+    "SegmentRevenueIngotChemicals": "SegmentRevenueIngotChemicals",
+    "SegmentRevenueSheetExtrusions": "SegmentRevenueSheetExtrusions",
+    "SegmentRevenueFabricatedProducts": "SegmentRevenueFabricatedProducts",
+    "SegmentRevenueFoilPowder": "SegmentRevenueFoilPowder",
+    "SegmentProfitIngotChemicals": "SegmentProfitIngotChemicals",
+    "SegmentProfitSheetExtrusions": "SegmentProfitSheetExtrusions",
+    "SegmentProfitFabricatedProducts": "SegmentProfitFabricatedProducts",
+    "SegmentProfitFoilPowder": "SegmentProfitFoilPowder",
+    # DOWA Holdings (5714.T): five segments -- Environmental Preservation &
+    # Metal Recycling, Non-ferrous Metals Smelting & Refining, Electronic
+    # Materials, Metal Processed Materials and Heat Treatment -- span the
+    # whole value chain from scrap/e-waste recycling through to finished
+    # electronic and automotive components, each with a different
+    # commodity-price and cyclical exposure. Populated in `kpis` back to
+    # FY2014 but absent from PROMOTE_KPIS, so the dashboard could not chart
+    # the segment mix at all.
+    "SegmentRevenueEnvironmental": "SegmentRevenueEnvironmental",
+    "SegmentRevenueNonferrous": "SegmentRevenueNonferrous",
+    "SegmentRevenueElectronicMaterials": "SegmentRevenueElectronicMaterials",
+    "SegmentRevenueMetalProcessing": "SegmentRevenueMetalProcessing",
+    "SegmentRevenueHeatTreatment": "SegmentRevenueHeatTreatment",
+    "SegmentProfitEnvironmental": "SegmentProfitEnvironmental",
+    "SegmentProfitNonferrous": "SegmentProfitNonferrous",
+    "SegmentProfitElectronicMaterials": "SegmentProfitElectronicMaterials",
+    "SegmentProfitMetalProcessing": "SegmentProfitMetalProcessing",
+    "SegmentProfitHeatTreatment": "SegmentProfitHeatTreatment",
+    # Furukawa Electric Co., Ltd. (5801.T): a diversified industrial
+    # conglomerate reporting seven segments -- Infrastructure, Energy
+    # Infrastructure, Automotive Batteries, Electronics & Component
+    # Materials, Electronics-Automotive, Functional Products and
+    # Communications Solutions. Automotive Batteries and Communications
+    # Solutions swinging from segment loss to profit is the investment
+    # thesis, not derivable by splitting the consolidated
+    # Revenue/OperatingIncome columns. Populated in `kpis` but absent from
+    # PROMOTE_KPIS, so the dashboard could not chart the segment mix.
+    "SegmentRevenueInfrastructure": "SegmentRevenueInfrastructure",
+    "SegmentRevenueEnergyInfrastructure": "SegmentRevenueEnergyInfrastructure",
+    "SegmentRevenueAutomotiveBatteries": "SegmentRevenueAutomotiveBatteries",
+    "SegmentRevenueElectronicsComponentMaterials":
+        "SegmentRevenueElectronicsComponentMaterials",
+    "SegmentRevenueElectronicsAutomotive": "SegmentRevenueElectronicsAutomotive",
+    "SegmentRevenueFunctionalProducts": "SegmentRevenueFunctionalProducts",
+    "SegmentRevenueCommunicationsSolutions":
+        "SegmentRevenueCommunicationsSolutions",
+    "SegmentOperatingIncomeInfrastructure":
+        "SegmentOperatingIncomeInfrastructure",
+    "SegmentOperatingIncomeEnergyInfrastructure":
+        "SegmentOperatingIncomeEnergyInfrastructure",
+    "SegmentOperatingIncomeAutomotiveBatteries":
+        "SegmentOperatingIncomeAutomotiveBatteries",
+    "SegmentOperatingIncomeElectronicsComponentMaterials":
+        "SegmentOperatingIncomeElectronicsComponentMaterials",
+    "SegmentOperatingIncomeElectronicsAutomotive":
+        "SegmentOperatingIncomeElectronicsAutomotive",
+    "SegmentOperatingIncomeFunctionalProducts":
+        "SegmentOperatingIncomeFunctionalProducts",
+    "SegmentOperatingIncomeCommunicationsSolutions":
+        "SegmentOperatingIncomeCommunicationsSolutions",
+    # Sumitomo Electric Industries, Ltd. (5802.T): the five reported
+    # business segments -- Automotive (wiring harnesses, by far the
+    # largest), Infocommunications, Electronics, Environment & Energy
+    # (power cables/renewables) and Industrial Materials. The segment mix
+    # (Infocommunications swinging from an FY2024 operating loss to a
+    # strong FY2026 recovery) is the investment thesis, not derivable by
+    # splitting the consolidated Revenue/OperatingIncome columns. None of
+    # the ten names were in PROMOTE_KPIS, so none reached the Metrics CSV
+    # despite being populated in `kpis` FY2019-FY2026.
+    "RevenueAutomotive": "RevenueAutomotive",
+    "RevenueInfocommunications": "RevenueInfocommunications",
+    "RevenueElectronics": "RevenueElectronics",
+    "RevenueEnvironmentEnergy": "RevenueEnvironmentEnergy",
+    "RevenueIndustrialMaterials": "RevenueIndustrialMaterials",
+    "OperatingIncomeAutomotive": "OperatingIncomeAutomotive",
+    "OperatingIncomeInfocommunications": "OperatingIncomeInfocommunications",
+    "OperatingIncomeElectronics": "OperatingIncomeElectronics",
+    "OperatingIncomeEnvironmentEnergy": "OperatingIncomeEnvironmentEnergy",
+    "OperatingIncomeIndustrialMaterials":
+        "OperatingIncomeIndustrialMaterials",
 }
 
 # Owner-FCF components and core-column duplicates. Listed explicitly so a

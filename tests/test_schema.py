@@ -214,6 +214,27 @@ class TestPromotableKpiVocabulary:
         """Opt-in, not opt-out: an unrecognised name stays out of the CSV."""
         assert schema.promote_header("WaferShipments") is None
 
+    def test_promotes_mitsui_kinzoku_segment_kpis(self):
+        """Mitsui Kinzoku Company (5706.T, formerly Mitsui Mining & Smelting):
+        divested Automotive Parts & Components (sold to Hi-Lex Corporation,
+        completed 4 Nov 2025) and now reports Engineered Materials (copper
+        foil, battery/rare-earth materials) and Metals as its two core
+        segments. The 2030 target doubles Engineered Materials profit, so
+        the segment split -- not just group totals -- is the investment
+        thesis. Only FY2025-FY2026 are populated in `kpis`."""
+        assert (schema.promote_header("SegmentRevenueEngineeredMaterials")
+                == "SegmentRevenueEngineeredMaterials")
+        assert (schema.promote_header("SegmentRevenueMetals")
+                == "SegmentRevenueMetals")
+        assert (schema.promote_header("SegmentRevenueAutomotiveParts")
+                == "SegmentRevenueAutomotiveParts")
+        assert (schema.promote_header("SegmentProfitEngineeredMaterials")
+                == "SegmentProfitEngineeredMaterials")
+        assert (schema.promote_header("SegmentProfitMetals")
+                == "SegmentProfitMetals")
+        assert (schema.promote_header("SegmentProfitAutomotiveParts")
+                == "SegmentProfitAutomotiveParts")
+
     def test_promotes_share_award_scheme_purchases(self):
         """Chervon Holdings (2285.HK) discloses no SBC expense line, so the
         dcf-analyst uses on-market share purchases funding the employee
@@ -1307,3 +1328,186 @@ class TestConsumerInternetKpiPromotion:
     def test_common_spellings_resolve_to_one_name(self, spelling, canon):
         assert schema.normalize_kpi(spelling) == canon
         assert schema.promote_header(spelling) == canon
+
+
+class TestSumitomoOsakaCementSegmentKpis:
+    """Sumitomo Osaka Cement (5232.T): the seven-segment revenue/profit
+    split is the investment thesis in one table -- Cement swung from a
+    ~JPY19.5bn segment loss (FY2023) to ~JPY5.5bn profit (FY2026) on
+    price/mix recovery, while Optoelectronics and Advanced Materials
+    (SAW filters, CMP slurries) sell into a semiconductor/photonics
+    cycle that moves independently of domestic cement demand. None of
+    the fourteen SegmentRevenue*/SegmentProfit* names were in
+    PROMOTE_KPIS, so none reached the Metrics CSV despite being
+    populated in `kpis` back to FY2021."""
+
+    @pytest.mark.parametrize("name", [
+        "SegmentRevenueCement",
+        "SegmentRevenueMineralResources",
+        "SegmentRevenueConstructionMaterials",
+        "SegmentRevenueOptoelectronics",
+        "SegmentRevenueAdvancedMaterials",
+        "SegmentRevenueBatteryMaterials",
+        "SegmentRevenueOther",
+        "SegmentProfitCement",
+        "SegmentProfitMineralResources",
+        "SegmentProfitConstructionMaterials",
+        "SegmentProfitOptoelectronics",
+        "SegmentProfitAdvancedMaterials",
+        "SegmentProfitBatteryMaterials",
+        "SegmentProfitOther",
+    ])
+    def test_promoted(self, name):
+        assert schema.promote_header(name) == name
+
+
+class TestSumitomoMetalMiningSegmentKpis:
+    """Sumitomo Metal Mining (5713.T): three segments -- Mineral Resources,
+    Smelting & Refining, Materials. SegmentRevenueMineralResources,
+    SegmentRevenueMaterials and SegmentProfitMineralResources were already
+    promoted, but SegmentRevenueSmeltingRefining, SegmentProfitSmeltingRefining
+    and SegmentProfitMaterials were absent from PROMOTE_KPIS despite being
+    populated FY2019-FY2026 in `kpis`, so the dashboard could not chart the
+    full segment mix (Smelting & Refining is the largest segment by revenue)."""
+
+    @pytest.mark.parametrize("name", [
+        "SegmentRevenueSmeltingRefining",
+        "SegmentProfitSmeltingRefining",
+        "SegmentProfitMaterials",
+    ])
+    def test_promoted(self, name):
+        assert schema.promote_header(name) == name
+
+
+class TestNgkCorporationSegmentKpis:
+    """NGK Corporation (5333.T, formerly NGK Insulators): the three
+    reporting segments -- Environment (automotive ceramics/sensors, ~58%
+    of FY2026 sales, secular decliner as EV penetration erodes exhaust-
+    hardware demand), Digital Society (semiconductor-equipment ceramics,
+    ~37%, fastest growing on AI capex) and Energy & Industry (insulators/
+    NAS batteries, ~10%) -- plus the product-line detail within them, were
+    populated in `kpis` for FY2025-FY2026 but absent from PROMOTE_KPIS, so
+    the dashboard could not chart the segment or product mix at all."""
+
+    @pytest.mark.parametrize("name", [
+        "SegmentRevenueEnergyEnvironment",
+        "SegmentRevenueDigitalSociety",
+        "SegmentRevenueIndustry",
+        "AutomotiveCeramicsRevenue",
+        "SensorsRevenue",
+        "SemiconductorEquipmentComponentsRevenue",
+        "InsulatorsRevenue",
+        "EnergyStorageRevenue",
+    ])
+    def test_promoted(self, name):
+        assert schema.promote_header(name) == name
+
+
+class TestNipponLightMetalSegmentKpis:
+    """Nippon Light Metal Holdings (5703.T): the four reporting segments --
+    Ingot & Chemicals (~31% of sales), Fabricated Products (~30%), Sheet &
+    Extrusions (~19%) and Foil & Powder (~19%) -- have differing cyclicality
+    (upstream smelting/chemicals vs. downstream fabrication), which is the
+    qualitative-analysis thesis and is not derivable by splitting the
+    consolidated Revenue/OperatingIncome columns. Populated in `kpis` back
+    to FY2016-2022 depending on segment but absent from PROMOTE_KPIS, so the
+    dashboard could not chart the segment mix at all."""
+
+    @pytest.mark.parametrize("name", [
+        "SegmentRevenueIngotChemicals",
+        "SegmentRevenueSheetExtrusions",
+        "SegmentRevenueFabricatedProducts",
+        "SegmentRevenueFoilPowder",
+        "SegmentProfitIngotChemicals",
+        "SegmentProfitSheetExtrusions",
+        "SegmentProfitFabricatedProducts",
+        "SegmentProfitFoilPowder",
+    ])
+    def test_promoted(self, name):
+        assert schema.promote_header(name) == name
+
+
+class TestDowaHoldingsSegmentKpis:
+    """DOWA Holdings (5714.T): five segments -- Environmental Preservation
+    & Metal Recycling, Non-ferrous Metals Smelting & Refining, Electronic
+    Materials, Metal Processed Materials and Heat Treatment -- span the
+    whole non-ferrous value chain from scrap/e-waste recycling through to
+    finished electronic and automotive components, each with a different
+    commodity-price and cyclical exposure. None of the ten SegmentRevenue*/
+    SegmentProfit* names were in PROMOTE_KPIS, so none reached the Metrics
+    CSV despite being populated in `kpis` back to FY2014."""
+
+    @pytest.mark.parametrize("name", [
+        "SegmentRevenueEnvironmental",
+        "SegmentRevenueNonferrous",
+        "SegmentRevenueElectronicMaterials",
+        "SegmentRevenueMetalProcessing",
+        "SegmentRevenueHeatTreatment",
+        "SegmentProfitEnvironmental",
+        "SegmentProfitNonferrous",
+        "SegmentProfitElectronicMaterials",
+        "SegmentProfitMetalProcessing",
+        "SegmentProfitHeatTreatment",
+    ])
+    def test_promoted(self, name):
+        assert schema.promote_header(name) == name
+
+
+class TestFurukawaElectricSegmentKpis:
+    """Furukawa Electric Co., Ltd. (5801.T): a diversified industrial
+    conglomerate reporting seven segments -- Infrastructure, Energy
+    Infrastructure, Automotive Batteries, Electronics & Component
+    Materials, Electronics-Automotive, Functional Products and
+    Communications Solutions. The segment mix (Automotive Batteries and
+    Communications Solutions swinging from loss to profit) is the
+    investment thesis, not derivable by splitting the consolidated
+    Revenue/OperatingIncome columns. None of the fourteen SegmentRevenue*/
+    SegmentOperatingIncome* names were in PROMOTE_KPIS, so none reached the
+    Metrics CSV despite being populated in `kpis`."""
+
+    @pytest.mark.parametrize("name", [
+        "SegmentRevenueInfrastructure",
+        "SegmentRevenueEnergyInfrastructure",
+        "SegmentRevenueAutomotiveBatteries",
+        "SegmentRevenueElectronicsComponentMaterials",
+        "SegmentRevenueElectronicsAutomotive",
+        "SegmentRevenueFunctionalProducts",
+        "SegmentRevenueCommunicationsSolutions",
+        "SegmentOperatingIncomeInfrastructure",
+        "SegmentOperatingIncomeEnergyInfrastructure",
+        "SegmentOperatingIncomeAutomotiveBatteries",
+        "SegmentOperatingIncomeElectronicsComponentMaterials",
+        "SegmentOperatingIncomeElectronicsAutomotive",
+        "SegmentOperatingIncomeFunctionalProducts",
+        "SegmentOperatingIncomeCommunicationsSolutions",
+    ])
+    def test_promoted(self, name):
+        assert schema.promote_header(name) == name
+
+
+class TestSumitomoElectricSegmentKpis:
+    """Sumitomo Electric Industries, Ltd. (5802.T): the five reported
+    business segments -- Automotive (wiring harnesses, the largest segment
+    by far), Infocommunications, Electronics, Environment & Energy
+    (includes power cables/renewables) and Industrial Materials. The
+    segment mix (Infocommunications swinging from an FY2024 operating loss
+    to a strong FY2026 recovery) is the investment thesis, not derivable
+    by splitting the consolidated Revenue/OperatingIncome columns. None of
+    the ten RevenueX/OperatingIncomeX names were in PROMOTE_KPIS, so none
+    reached the Metrics CSV despite being populated in `kpis` FY2019-
+    FY2026."""
+
+    @pytest.mark.parametrize("name", [
+        "RevenueAutomotive",
+        "RevenueInfocommunications",
+        "RevenueElectronics",
+        "RevenueEnvironmentEnergy",
+        "RevenueIndustrialMaterials",
+        "OperatingIncomeAutomotive",
+        "OperatingIncomeInfocommunications",
+        "OperatingIncomeElectronics",
+        "OperatingIncomeEnvironmentEnergy",
+        "OperatingIncomeIndustrialMaterials",
+    ])
+    def test_promoted(self, name):
+        assert schema.promote_header(name) == name
