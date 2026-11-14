@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bilibili Inc. (9626.HK / BILI) Financial Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4aa, #00b894);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        .header p { color: #888; font-size: 1.0rem; margin-bottom: 6px; }
+        .price-badge {
+            display: inline-block;
+            background: rgba(0,212,170,0.12);
+            border: 1px solid rgba(0,212,170,0.4);
+            border-radius: 8px;
+            padding: 6px 18px;
+            font-size: 1.0rem;
+            color: #00d4aa;
+            font-weight: 600;
+            margin-top: 6px;
+        }
+        .price-badge span { color: #888; font-size: 0.85rem; font-weight: 400; margin-left: 10px; }
+        .profitability-note {
+            max-width: 1400px;
+            margin: 0 auto 18px;
+            background: rgba(253,203,110,0.08);
+            border: 1px solid rgba(253,203,110,0.3);
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-size: 0.86rem;
+            color: #fdcb6e;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            line-height: 1.5;
+        }
+        /* Overview */
+        .overview-section { max-width: 1400px; margin: 0 auto 30px; }
+        .overview-toggle {
+            width: 100%;
+            background: rgba(0,212,170,0.1);
+            border: 1px solid rgba(0,212,170,0.3);
+            border-radius: 12px;
+            padding: 16px 24px;
+            color: #00d4aa;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+        .overview-toggle:hover { background: rgba(0,212,170,0.2); }
+        .overview-toggle .arrow { transition: transform 0.3s ease; }
+        .overview-toggle.active .arrow { transform: rotate(180deg); }
+        .overview-content {
+            display: none;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            padding: 30px;
+            margin-top: -12px;
+        }
+        .overview-content.active { display: block; }
+        .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+        .overview-card {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .overview-card h3 {
+            color: #00d4aa;
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .overview-card.bull h3 { color: #00d4aa; }
+        .overview-card.bear h3 { color: #ff6b6b; }
+        .overview-card.risks h3 { color: #fdcb6e; }
+        .overview-card p { margin-bottom: 12px; line-height: 1.6; font-size: 0.92rem; }
+        .overview-card ul { list-style: none; padding: 0; margin: 0; }
+        .overview-card li { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); line-height: 1.5; font-size: 0.88rem; }
+        .overview-card li:last-child { border-bottom: none; }
+        .risk-high { color: #ff6b6b; font-weight: 600; }
+        .risk-moderate { color: #fdcb6e; font-weight: 600; }
+        .risk-low { color: #00d4aa; font-weight: 600; }
+        .rev-row { display: flex; justify-content: space-between; align-items: center; }
+        .rev-pct { color: #00d4aa; font-weight: 600; }
+        .trend-growing { color: #00d4aa; font-size: 0.76rem; margin-left: 5px; }
+        .trend-stable { color: #888; font-size: 0.76rem; margin-left: 5px; }
+        .trend-declining { color: #ff6b6b; font-size: 0.76rem; margin-left: 5px; }
+        /* KPI */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            max-width: 1400px;
+            margin: 0 auto 30px;
+        }
+        .kpi-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0,212,170,0.2); }
+        .kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+        .kpi-label { font-size: 0.78rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        .kpi-change { font-size: 0.86rem; margin-top: 5px; }
+        .kpi-change.positive { color: #00d4aa; }
+        .kpi-change.negative { color: #ff6b6b; }
+        .kpi-sub { font-size: 0.72rem; color: #555; margin-top: 3px; }
+        /* Guidance */
+        .guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+        .guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
+        .guidance-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+        .guidance-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px; }
+        .guidance-meta { font-size: 0.85rem; color: #888; }
+        .guidance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .guidance-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 18px; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s ease; }
+        .guidance-card:hover { transform: translateY(-2px); }
+        .guidance-metric { font-size: 0.76rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+        .guidance-target { font-size: 1.2rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; line-height: 1.3; }
+        .guidance-period { font-size: 0.83rem; color: #e0e0e0; margin-bottom: 8px; }
+        .guidance-vs-prior { display: inline-block; font-size: 0.73rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+        .guidance-vs-prior.new { background: rgba(99,102,241,0.15); color: #818cf8; }
+        .guidance-vs-prior.raised { background: rgba(0,212,170,0.15); color: #00d4aa; }
+        .guidance-vs-prior.lowered { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+        .guidance-vs-prior.maintained { background: rgba(255,255,255,0.1); color: #888; }
+        .guidance-notes { font-size: 0.76rem; color: #666; margin-top: 8px; line-height: 1.4; }
+        .guidance-commentary { background: rgba(255,255,255,0.03); border-radius: 10px; padding: 16px 20px; border-left: 3px solid #00d4aa; font-style: italic; color: #b0b0b0; line-height: 1.6; font-size: 0.9rem; }
+        /* Section titles */
+        .section-title { font-size: 1.5rem; color: #fff; margin: 40px auto 20px; padding-bottom: 10px; border-bottom: 2px solid rgba(0,212,170,0.3); max-width: 1400px; }
+        /* Charts */
+        .charts-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 25px; max-width: 1400px; margin: 0 auto; }
+        .chart-card { background: rgba(255,255,255,0.05); border-radius: 15px; padding: 25px; border: 1px solid rgba(255,255,255,0.1); }
+        .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+        .chart-header h3 { color: #fff; font-size: 1.05rem; display: flex; align-items: center; gap: 10px; }
+        .chart-header h3::before { content: ''; display: inline-block; width: 4px; height: 18px; background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px; }
+        .help-btn { width: 24px; height: 24px; border-radius: 50%; background: rgba(0,212,170,0.2); border: 1px solid #00d4aa; color: #00d4aa; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; flex-shrink: 0; }
+        .help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+        .chart-wrapper { position: relative; height: 300px; }
+        /* Modal */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%); border-radius: 16px; max-width: 620px; width: 100%; max-height: 80vh; overflow-y: auto; border: 1px solid rgba(0,212,170,0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+        .modal-header { padding: 20px 25px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h3 { color: #00d4aa; font-size: 1.3rem; margin: 0; }
+        .modal-close { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,107,107,0.2); border: 1px solid #ff6b6b; color: #ff6b6b; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .modal-close:hover { background: #ff6b6b; color: #fff; }
+        .modal-body { padding: 25px; line-height: 1.7; }
+        .modal-body p { margin-bottom: 14px; }
+        .modal-body strong { color: #00d4aa; }
+        .modal-body ul { margin: 12px 0; padding-left: 20px; }
+        .modal-body li { margin-bottom: 8px; }
+        .metric-highlight { background: rgba(0,212,170,0.1); border-left: 3px solid #00d4aa; padding: 12px 15px; margin: 14px 0; border-radius: 0 8px 8px 0; }
+        /* DCF */
+        .dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+        .dcf-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .dcf-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 24px; text-align: center; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s ease; }
+        .dcf-card:hover { transform: translateY(-3px); }
+        .dcf-card.highlight { background: rgba(0,212,170,0.1); border-color: rgba(0,212,170,0.3); }
+        .dcf-label { font-size: 0.82rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .dcf-value { font-size: 2rem; font-weight: bold; color: #00d4aa; }
+        .dcf-card:not(.highlight) .dcf-value { color: #fff; }
+        .dcf-change { font-size: 0.95rem; margin-top: 8px; font-weight: 600; }
+        .dcf-change.positive { color: #00d4aa; }
+        .dcf-change.negative { color: #ff6b6b; }
+        .dcf-sublabel { font-size: 0.76rem; color: #666; margin-top: 8px; line-height: 1.4; }
+        .dcf-warning { background: rgba(253,203,110,0.10); border: 1px solid rgba(253,203,110,0.3); border-radius: 8px; padding: 14px 18px; margin-bottom: 25px; display: flex; align-items: flex-start; gap: 12px; color: #fdcb6e; line-height: 1.5; font-size: 0.88rem; }
+        .warning-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+        .dcf-inputs { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.08); }
+        .dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+        .dcf-inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .dcf-input-card { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
+        .dcf-input-label { font-size: 0.72rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .dcf-input-value { font-size: 1.2rem; font-weight: 600; color: #00d4aa; }
+        .dcf-input-note { font-size: 0.68rem; color: #666; margin-top: 4px; line-height: 1.3; }
+        .fcf-projections h5 { color: #b0b0b0; font-size: 0.88rem; margin-bottom: 10px; }
+        .fcf-projection-table { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 12px; }
+        .fcf-proj-item { text-align: center; }
+        .fcf-proj-item.hdr { font-size: 0.72rem; color: #888; font-weight: 600; padding-bottom: 4px; }
+        .fcf-proj-item .fval { font-size: 0.95rem; color: #e0e0e0; font-weight: 500; }
+        .fcf-proj-item .grate { font-size: 0.72rem; color: #00d4aa; margin-top: 2px; }
+        .dcf-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 25px; margin-bottom: 30px; padding: 25px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
+        .slider-group { display: flex; flex-direction: column; gap: 10px; }
+        .slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+        .slider-group label span { color: #00d4aa; font-weight: 600; }
+        .slider-group input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); outline: none; cursor: pointer; }
+        .slider-group input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #00d4aa; cursor: pointer; transition: transform 0.2s; }
+        .slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        .slider-hint { font-size: 0.78rem; color: #666; }
+        .scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .scenario-tab { padding: 10px 24px; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: #888; border-radius: 8px; cursor: pointer; font-size: 0.92rem; transition: all 0.2s; }
+        .scenario-tab:hover { border-color: rgba(0,212,170,0.5); color: #e0e0e0; }
+        .scenario-tab.active { background: rgba(0,212,170,0.15); border-color: #00d4aa; color: #00d4aa; }
+        .scenario-details { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px; margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.08); }
+        .scenario-details h4 { color: #00d4aa; margin-bottom: 15px; font-size: 0.95rem; }
+        .assumption-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 14px; }
+        .assumption-item { text-align: center; }
+        .assumption-item .alabel { font-size: 0.76rem; color: #888; margin-bottom: 4px; }
+        .assumption-item .avalue { font-size: 1.05rem; color: #e0e0e0; font-weight: 500; }
+        .sensitivity-section { margin-bottom: 30px; }
+        .sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 0.95rem; }
+        .sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.03); border-radius: 8px; overflow: hidden; font-size: 0.86rem; }
+        .sensitivity-table th, .sensitivity-table td { padding: 10px 14px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+        .sensitivity-table th { background: rgba(0,212,170,0.1); color: #00d4aa; font-weight: 600; }
+        .sensitivity-table td { color: #e0e0e0; }
+        .sensitivity-table td.hl { background: rgba(0,212,170,0.15); color: #00d4aa; font-weight: 700; }
+        .sensitivity-table td.above { color: #00d4aa; }
+        .sensitivity-table td.below { color: #ff6b6b; }
+        .historical-growth { margin-bottom: 30px; }
+        .historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 0.95rem; }
+        .growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+        .growth-item { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 14px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+        .growth-item .gmetric { font-size: 0.76rem; color: #888; margin-bottom: 5px; }
+        .growth-item .grate { font-size: 1.15rem; font-weight: 600; }
+        .growth-item .grate.pos { color: #00d4aa; }
+        .growth-item .grate.neg { color: #ff6b6b; }
+        .growth-item .grate.na { color: #555; font-size: 0.9rem; }
+        .growth-item.sel { border-color: #fdcb6e; background: rgba(253,203,110,0.08); }
+        .growth-item.sel .gmetric { color: #fdcb6e; }
+        .stress-test-note { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 14px 18px; border-left: 3px solid #6c5ce7; color: #b0b0b0; font-size: 0.85rem; line-height: 1.6; margin-bottom: 20px; }
+        .stress-test-note strong { color: #a29bfe; }
+        @media (max-width: 768px) {
+            .charts-container { grid-template-columns: 1fr; }
+            .overview-grid { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.8rem; }
+            .fcf-projection-table { grid-template-columns: repeat(3, 1fr); }
+            .scenario-tabs { gap: 6px; }
+            .scenario-tab { padding: 8px 14px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+    <h1>Bilibili Inc. (9626.HK / BILI)</h1>
+    <p>Financial Dashboard &mdash; FY2025 Full Year + Q1 2026 Results | Analysis Date: June 26, 2026</p>
+    <p>China's leading Gen Z video community &nbsp;|&nbsp; 376M MAU &nbsp;|&nbsp; First full year GAAP profitable in FY2025</p>
+    <div class="price-badge">
+        BILI (Nasdaq): $16.14 USD / ADS
+        <span>| 9626.HK: HKD 124.70 | Analyst Consensus PT: ~$31 | Morgan Stanley OW $31 (Apr 2026)</span>
+    </div>
+</div>
+
+<!-- Subtle profitability inflection note -->
+<div class="profitability-note">
+    <span>&#9432;</span>
+    <span><strong>DCF Note (PASS_WITH_NOTES):</strong> FY2025 was Bilibili's first full year of GAAP profitability (net margin 3.9%). This DCF is built on continued FCF margin expansion. Key flag: base case implies 4.9x EV/FY2026E Revenue vs. Chinese internet peers at 1.5-2.0x &mdash; justified by superior growth trajectory, but monitor quarterly gross margin and gaming recovery closely. Every cell in the sensitivity table exceeds current price of $16.14 (minimum cell: $43.10).</span>
+</div>
+
+<!-- Investment Overview -->
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid">
+
+            <div class="overview-card">
+                <h3>Company Overview</h3>
+                <p>Bilibili is an iconic brand and a leading video community for young generations in China, offering a wide array of video-based content anchored by its pioneering "bullet chatting" feature and a deeply engaged Gen Z+ user base of 376M+ monthly active users.</p>
+                <p>The company completed its first full year of GAAP profitability in FY2025 and continues to expand margins through advertising monetization powered by AI and an anticipated new gaming upcycle. Bilibili is dual-listed on HKEX (9626.HK) and Nasdaq (BILI) and operates almost entirely within mainland China.</p>
+            </div>
+
+            <div class="overview-card">
+                <h3>Business Model</h3>
+                <p>Multi-revenue stream model anchored in a vibrant Gen Z video community. Advertising (~33% of FY2025 revenue) is now the largest and fastest-growing segment. VAS including premium memberships and live broadcasting (~39%) provides the largest absolute base. Mobile games (~21%) are in a near-term trough ahead of a new pipeline-driven upcycle in H2 2026 and 2027.</p>
+                <ul>
+                    <li><div class="rev-row"><span>Value-Added Services (VAS)</span><span class="rev-pct">39%<span class="trend-stable"> stable</span></span></div></li>
+                    <li><div class="rev-row"><span>Advertising</span><span class="rev-pct">33%<span class="trend-growing"> growing</span></span></div></li>
+                    <li><div class="rev-row"><span>Mobile Games</span><span class="rev-pct">21%<span class="trend-declining"> trough</span></span></div></li>
+                    <li><div class="rev-row"><span>IP Derivatives &amp; Others</span><span class="rev-pct">7%<span class="trend-stable"> stable</span></span></div></li>
+                </ul>
+            </div>
+
+            <div class="overview-card">
+                <h3>Competitive Position</h3>
+                <p><strong>Competitors:</strong> Douyin (ByteDance), Kuaishou, Tencent Video, iQiyi, WeChat Channels, NetEase Games, miHoYo</p>
+                <p><strong>Market Position:</strong> Dominant video community for Gen Z+ in China with a unique ACG/PUGV long-form niche. Smaller DAU than Douyin or Kuaishou but far higher engagement quality (119 min/day, 80% 12-month retention).</p>
+                <ul>
+                    <li><strong>Community culture &amp; bullet chat:</strong> Culturally embedded with Gen Z; virtually impossible to replicate authentically</li>
+                    <li><strong>Content creator ecosystem:</strong> PUGV creators with symbiotic relationships; daily submissions +19% YoY in Q1 2026 from AI tools</li>
+                    <li><strong>Gen Z brand affinity:</strong> Synonymous with Chinese internet subculture; authentic vs. algorithmically-homogenized rivals</li>
+                    <li><strong>AI advertising infrastructure:</strong> ECPM +10%+ YoY; AIGC ad materials &gt;30% of covers; AI-sector advertiser budgets +170% YoY</li>
+                </ul>
+            </div>
+
+            <div class="overview-card">
+                <h3>Growth Drivers</h3>
+                <ul>
+                    <li>Advertising revenue acceleration: +30% YoY in Q1 2026, outpacing China digital ad market (+12-16%); AI-sector budgets +170% YoY</li>
+                    <li>15 consecutive quarters of gross margin expansion (37.1% in Q1 2026); operating leverage increasingly visible</li>
+                    <li>New gaming upcycle: Romance of the Three Kingdoms: Wangdaotianxia (Q4 2026 expected); Three Kingdoms: Battle for the Realm SLG launched July 2, 2026</li>
+                    <li>AI flywheel: accelerating content supply (+19% daily submissions), creator productivity, recommendation quality, and ad efficiency simultaneously</li>
+                    <li>User engagement deepening: 119 min daily time spent in Q1 2026 (+11 min YoY); total user time +19% YoY</li>
+                    <li>New US$300M buyback program (June 2026); mid-term targets 40-45% gross margin, 15-30% adj operating margin</li>
+                </ul>
+            </div>
+
+            <div class="overview-card risks">
+                <h3>Key Risks</h3>
+                <ul>
+                    <li><span class="risk-high">HIGH:</span> Gaming revenue trough &mdash; Mobile games fell ~12% YoY in Q1 2026; new title execution is unproven</li>
+                    <li><span class="risk-high">HIGH:</span> Competition &mdash; Douyin, Kuaishou, Tencent have multiples of Bilibili's DAU and financial firepower</li>
+                    <li><span class="risk-high">HIGH:</span> China content regulation &mdash; Gaming licenses, algorithm rules, VIE structure all subject to change</li>
+                    <li><span class="risk-moderate">MOD:</span> Advertising growth sustainability &mdash; 30% YoY partly reflects AI-sector tailwinds that could normalize</li>
+                    <li><span class="risk-moderate">MOD:</span> MAU growth stagnating at 376M flat QoQ in Q1 2026</li>
+                    <li><span class="risk-moderate">MOD:</span> HFCAA/ADR delisting risk under Trump; HKEX dual listing significantly mitigates investor risk</li>
+                    <li><span class="risk-moderate">MOD:</span> RMB 4.86B short-term debt on Q1 2026 balance sheet (vs. RMB 24.19B cash &mdash; well covered)</li>
+                    <li><span class="risk-low">LOW:</span> RMB/USD currency fluctuation; AI content labeling regulations (manageable)</li>
+                </ul>
+            </div>
+
+            <div class="overview-card bull">
+                <h3>Bull Case</h3>
+                <ul>
+                    <li>First GAAP-profitable full year (FY2025) extended in Q1 2026; 15 consecutive quarters of gross margin expansion is durable structural improvement</li>
+                    <li>Advertising secular growth engine: 30% YoY in Q1 2026 with AI-sector tailwinds and AI-enhanced ECPM providing platform-specific advantage for multiple years</li>
+                    <li>Gaming upcycle: three new titles plus Battle for the Realm (July 2, 2026); Morgan Stanley models 7.8B RMB game revenue in 2027 vs. 6.4B in FY2025</li>
+                    <li>AI flywheel self-reinforcing: content supply +19%, recommendation precision, ad targeting &mdash; compounding advantage from uniquely rich behavioral data</li>
+                    <li>Shareholder return scaling: new US$300M buyback (50% larger than prior program); funded from RMB 24.19B war chest</li>
+                    <li>Undemanding valuation: 1.25x EV/Revenue, 8-analyst Strong Buy consensus with median target ~$31</li>
+                </ul>
+            </div>
+
+            <div class="overview-card bear">
+                <h3>Bear Case</h3>
+                <ul>
+                    <li>Gaming trough with no certain recovery: Wangdaotianxia launch timing and commercial success unproven; disappointing launch would materially impair H2 2026 rebound thesis</li>
+                    <li>Advertising growth may be peaking: 30% YoY partly reflects AI-sector spending that could normalize; smaller advertiser base is a liability if China ad demand softens</li>
+                    <li>MAU growth plateaued at 376M; without new user cohorts, monetization must bear the entire revenue burden</li>
+                    <li>Regulatory and geopolitical overhang: HFCAA enforcement revival, China content regulation unpredictability, VIE structure limits foreign shareholder recourse</li>
+                    <li>Competition intensifying from all sides: Douyin's long-form push, WeChat Channels' creator tools, Tencent Video with multiples of Bilibili's budgets</li>
+                    <li>Balance sheet leverage elevated relative to earnings maturity: only turned GAAP-profitable in FY2025</li>
+                </ul>
+            </div>
+
+            <div class="overview-card">
+                <h3>Recent Developments</h3>
+                <ul>
+                    <li><strong>Jun 2026:</strong> Board authorized new US$300M share repurchase program (24 months), funded from existing RMB 24.19B liquidity; 50% larger than prior program</li>
+                    <li><strong>Jul 2026:</strong> Three Kingdoms: Battle for the Realm (SLG) officially launched July 2, 2026; first large-scale SLG, building toward flagship Wangdaotianxia in Q4 2026</li>
+                    <li><strong>May 2026:</strong> Q1 2026 results: revenue +7% YoY; advertising +30% YoY; gross margin 37.1% (15th consecutive quarterly expansion); adjusted net profit +62% YoY</li>
+                    <li><strong>Apr 2026:</strong> Morgan Stanley upgraded BILI to Overweight, raising PT from $25 to $31; Citi and JPMorgan also upgraded in March 2026</li>
+                    <li><strong>Mar 2026:</strong> FY2025 results: first full year GAAP profitability; revenue +13%; advertising +23%; gross margin 36.6% (+390bps YoY); OCF RMB 7.15B</li>
+                    <li><strong>Q4 2025:</strong> Launched Escape from Duckov in-house game providing earnings surprise; Double Eleven ad revenue +30%+ YoY with advertiser count more than doubling</li>
+                </ul>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<h2 class="section-title">Key Performance Indicators &mdash; Q1 2026 (Latest Quarter)</h2>
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<!-- Guidance Section -->
+<div class="guidance-section">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of Q1 2026 Earnings (May 19, 2026) | FY2026</span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<!-- Financial Performance Charts -->
+<h2 class="section-title">Revenue &amp; Profitability</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Annual Revenue (RMB M)</h3>
+            <button class="help-btn" onclick="openModal('revenue')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartRevenue"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Gross Margin % &mdash; Quarterly (2023-2026)</h3>
+            <button class="help-btn" onclick="openModal('grossMargin')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartGrossMargin"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Operating &amp; Net Income (Annual, RMB M)</h3>
+            <button class="help-btn" onclick="openModal('profitability')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartProfitability"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Margin % &mdash; Quarterly (2023-2026)</h3>
+            <button class="help-btn" onclick="openModal('netMargin')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartNetMargin"></canvas></div>
+    </div>
+</div>
+
+<!-- Revenue Segments -->
+<h2 class="section-title">Revenue Segments</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Revenue by Segment &mdash; Annual (RMB M)</h3>
+            <button class="help-btn" onclick="openModal('segments')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartSegments"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Advertising Revenue &mdash; Quarterly (RMB M)</h3>
+            <button class="help-btn" onclick="openModal('advertising')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartAdvertising"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Mobile Games Revenue &mdash; Quarterly (RMB M)</h3>
+            <button class="help-btn" onclick="openModal('gaming')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartGaming"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>VAS Revenue &mdash; Quarterly (RMB M)</h3>
+            <button class="help-btn" onclick="openModal('vas')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartVAS"></canvas></div>
+    </div>
+</div>
+
+<!-- User Metrics -->
+<h2 class="section-title">User Metrics &amp; Engagement</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>MAU vs DAU (Millions)</h3>
+            <button class="help-btn" onclick="openModal('users')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartUsers"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Monthly Paying Users (MPU, Millions)</h3>
+            <button class="help-btn" onclick="openModal('mpu')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartMPU"></canvas></div>
+    </div>
+</div>
+
+<!-- Cash Flow & Balance Sheet -->
+<h2 class="section-title">Cash Flow &amp; Balance Sheet</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Operating Cash Flow &mdash; Annual (RMB M)</h3>
+            <button class="help-btn" onclick="openModal('ocf')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartOCF"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Cash vs Debt vs Net Cash (RMB M)</h3>
+            <button class="help-btn" onclick="openModal('balance')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="chartBalance"></canvas></div>
+    </div>
+</div>
+
+<!-- DCF Valuation -->
+<h2 class="section-title">DCF Valuation</h2>
+<div class="dcf-section">
+
+    <div class="dcf-warning">
+        <span class="warning-icon">&#9432;</span>
+        <span>
+            <strong>Profitability Inflection (PASS_WITH_NOTES):</strong> FY2025 was Bilibili's first full year of GAAP profitability (net margin 3.9%). This DCF assumes FCF margin expansion from 20.6% (FY2025) toward 25-33% over Years 1-5 (base). Monitor quarterly gross margin and OCF trends. Sanity check note: base case implies 4.9x EV/FY2026E Revenue vs. Chinese internet peers at 1.5-2.0x &mdash; justified by superior growth, but execution-dependent. Every WACC/TGR combination in the sensitivity table still exceeds current price of <strong>$16.14</strong> (minimum cell: $43.10).
+        </span>
+    </div>
+
+    <div class="dcf-summary">
+        <div class="dcf-card highlight">
+            <div class="dcf-label">Base Case IV</div>
+            <div class="dcf-value" id="dcfIV">$57</div>
+            <div class="dcf-change positive" id="dcfUpside">+254% upside</div>
+            <div class="dcf-sublabel">WACC 11.5% / TGR 3.5%</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Entry Price (15% CAGR)</div>
+            <div class="dcf-value" id="dcfEntry">$33</div>
+            <div class="dcf-sublabel">Buy below for 15% annual return to terminal value</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Current Price (BILI)</div>
+            <div class="dcf-value">$16.14</div>
+            <div class="dcf-sublabel">USD/ADS as of 2026-06-26 | 9626.HK: HKD 124.70</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Prob-Weighted IV</div>
+            <div class="dcf-value" id="dcfWeighted">$59</div>
+            <div class="dcf-sublabel">25% Bull / 50% Base / 25% Bear</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Bull Case IV</div>
+            <div class="dcf-value" style="color:#00d4aa;">$92</div>
+            <div class="dcf-sublabel">+470% upside | WACC 10.5% / TGR 4.0%</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Bear Case IV</div>
+            <div class="dcf-value" style="color:#fdcb6e;">$28</div>
+            <div class="dcf-sublabel">+75% upside even in bear | WACC 13.0% / TGR 2.5%</div>
+        </div>
+    </div>
+
+    <div class="stress-test-note">
+        <strong>Stress Test:</strong> FCF margins capped at 20-22% (no expansion from FY2025 baseline) with base revenue growth rates yields <strong>$40.54 per ADS</strong> &mdash; still 151% above current price of $16.14. Current market price implies the market assigns near-zero terminal FCF value to a platform generating RMB 7.15B OCF and holding RMB 14.6B net cash (~86% of market cap at current prices).
+    </div>
+
+    <div class="dcf-inputs">
+        <h4>DCF Model Inputs (FY2025 Base)</h4>
+        <div class="dcf-inputs-grid">
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Base Year FCF</div>
+                <div class="dcf-input-value">RMB 6.2B</div>
+                <div class="dcf-input-note">FY2025 OCF minus estimated CapEx (3% of revenue)</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Shares Outstanding</div>
+                <div class="dcf-input-value">459M</div>
+                <div class="dcf-input-note">Diluted ADS-equiv; post US$200M buyback completion</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Net Cash Position</div>
+                <div class="dcf-input-value" style="color:#00d4aa;">RMB 14.6B</div>
+                <div class="dcf-input-note">Cash RMB 24.19B minus debt RMB 9.57B (Q1 2026)</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">FCF Margin (FY2025)</div>
+                <div class="dcf-input-value">20.6%</div>
+                <div class="dcf-input-note">Expanding toward 25-33% in base case (Y1-Y5)</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">FX Rate</div>
+                <div class="dcf-input-value">7.10</div>
+                <div class="dcf-input-note">RMB/USD used for per-ADS conversion</div>
+            </div>
+        </div>
+        <div class="fcf-projections">
+            <h5>Projected FCF &mdash; Base Case (RMB B)</h5>
+            <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+        </div>
+    </div>
+
+    <div class="dcf-controls">
+        <div class="slider-group">
+            <label>Growth Rate (Year 1): <span id="growthValue">15%</span></label>
+            <input type="range" id="growthSlider" min="0" max="30" value="15" step="1">
+            <div class="slider-hint">Anchor: FY2025 actual revenue growth 13.1%; base case 15% (ad +30% partially offset by gaming trough)</div>
+        </div>
+        <div class="slider-group">
+            <label>WACC: <span id="waccValue">11.5%</span></label>
+            <input type="range" id="waccSlider" min="6" max="18" value="11.5" step="0.5">
+            <div class="slider-hint">Risk-free 2.5% + 9% ERP (China tech / VIE / geopolitical premium) + beta 1.2</div>
+        </div>
+        <div class="slider-group">
+            <label>Terminal Growth: <span id="terminalValue">3.5%</span></label>
+            <input type="range" id="terminalSlider" min="0" max="5" value="3.5" step="0.5">
+            <div class="slider-hint">China nominal GDP ~4.5-5%; Bilibili grows at modest discount due to niche platform maturation</div>
+        </div>
+    </div>
+
+    <div class="scenario-tabs">
+        <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+        <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+        <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+    </div>
+
+    <div class="scenario-details" id="scenarioDetails">
+        <h4 id="scenarioTitle">Base Case Assumptions</h4>
+        <div class="assumption-grid" id="assumptionGrid"></div>
+        <p id="scenarioDesc" style="font-size:0.84rem;color:#888;margin-top:16px;line-height:1.6;"></p>
+    </div>
+
+    <div class="sensitivity-section">
+        <h4>Sensitivity Analysis: Intrinsic Value per ADS (USD) by WACC &amp; Terminal Growth</h4>
+        <table class="sensitivity-table" id="sensitivityMatrix"></table>
+        <p style="font-size:0.78rem;color:#555;margin-top:8px;">All cells are above current price of $16.14. Highlighted cell = base case (WACC 11.5% / TGR 3.5% = $57.08).</p>
+    </div>
+
+    <div class="historical-growth">
+        <h4>Historical Growth Rates (CAGR) &mdash; *EPS CAGR not calculable from negative base (first profitable year FY2025)</h4>
+        <div class="growth-grid" id="growthGrid"></div>
+    </div>
+
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&#215;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// EMBEDDED CSV DATA
+// ============================================================
+const csvData = `Period,Revenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,NetIncome,NetMargin,EPS,OperatingCashFlow,FreeCashFlow,ShareholdersEquity,TotalDebt,CashAndEquivalents,SharesOutstanding,DAU,MAU,MPU,MobileGamesRevenue,VASRevenue,AdvertisingRevenue,EcommerceRevenue
+Q1 2018,868.0,213.1,24.5,-74.3,-8.6,-57.8,-6.7,-1.73,471.1,,,,,77.5,,2.5,688.5,95.8,70.4,13.3
+Q2 2018,1026.5,250.7,24.4,-106.9,-10.4,-70.3,-6.8,-0.26,,,,,85.0,,3.0,791.0,118.6,95.9,21.1
+Q3 2018,1110.0,308.1,27.8,-137.3,-12.4,-242.0,-21.8,-3.48,,,,,,,,,,,
+Q4 2018,1155.5,197.0,17.1,-288.8,-25.0,-190.8,-16.5,-0.59,,,,,,,,,,,
+FY2018,4129.0,862.5,20.9,-729.0,-17.7,-565.0,-13.7,-2.64,,,6950.8,,3540.0,307.0,,,,,,
+Q1 2019,1327.0,389.6,29.4,-179.7,-13.5,-194.0,-14.6,-2.75,,,,,,,,,,,
+Q2 2019,1517.0,402.1,26.5,-258.7,-17.1,-313.7,-20.7,-4.45,,,,,,,,,,,
+Q3 2019,1859.0,351.3,18.9,-423.1,-22.8,-405.7,-21.8,-1.24,,,,,,,,,,,
+Q4 2019,2007.8,397.9,19.8,-419.9,-20.9,-387.2,-19.3,-1.17,,,,,37.9,130.3,8.8,871.4,570.9,289.6,275.9
+FY2019,6778.0,1190.2,17.6,-1495.2,-22.1,-1303.6,-19.2,-3.99,,,7052.5,3414.6,4962.7,327.7,,,,,,
+Q1 2020,2314.0,666.0,28.8,-452.7,-19.6,-540.7,-23.4,-7.71,,,,,,,,,,,
+Q2 2020,2624.0,728.4,27.8,-596.9,-22.7,-626.7,-23.9,-8.85,,,,,,,,,,,
+Q3 2020,3207.0,838.5,26.1,-874.1,-27.3,-1110.5,-34.6,-15.41,,,,,,,,,,,
+Q4 2020,3821.0,979.7,25.6,-939.8,-24.6,-951.6,-24.9,-13.16,,,,,,,,,,,
+FY2020,11966.0,3212.6,26.9,-2863.5,-23.9,-3229.5,-27.0,-44.13,,,,,,,,,,,
+Q1 2021,3906.0,1212.2,31.0,-900.0,-23.0,-905.7,-23.2,-11.59,,,,,,,,,,,
+Q2 2021,4475.0,1299.5,29.0,-1117.9,-25.0,-1365.2,-30.5,-17.26,,,,,,,,,,,
+Q3 2021,5210.0,1533.6,29.4,-1371.9,-26.3,-1693.1,-32.5,-20.79,,,,,,,,,,,
+Q4 2021,5703.0,1548.6,27.2,-1626.3,-28.5,-2057.5,-36.1,-25.12,,,,,,,,,,,
+FY2021,19294.0,5593.9,29.0,-5015.1,-26.0,-6021.5,-31.2,-74.76,,,,,,,,,,,
+Q1 2022,5043.0,1418.3,28.1,-911.8,-18.1,-890.6,-17.7,-2.14,,,,,145.0,,,,,,
+Q2 2022,4912.0,1255.3,25.6,-1327.6,-27.0,-1420.6,-28.9,-3.40,,,,,,,,,,,
+Q3 2022,5790.0,1513.6,26.1,-1371.7,-23.7,-1631.5,-28.2,-3.91,,,,,,,,,,,
+Q4 2022,6255.0,1519.8,24.3,-1453.2,-23.2,-1538.5,-24.6,-3.69,,,,,93.5,,,,,,
+FY2022,22000.0,5707.0,25.9,-5064.3,-23.0,-5480.2,-24.9,-13.14,,,,,,,,,,,
+Q1 2023,5664.6,1605.4,28.3,-818.6,-14.5,-764.6,-13.5,-1.80,637.7,,,,,102.4,334.0,29.0,982.8,2528.9,1668.6,484.3
+Q2 2023,6127.1,1833.2,29.9,-585.1,-9.5,-608.1,-9.9,-1.46,1750.5,,,,,,,,,1007.4,2565.9,2037.5,516.4
+Q3 2023,7305.6,2547.2,34.9,-66.7,-0.9,-79.8,-1.1,-0.19,2225.6,,,,,,,,,1822.6,2821.3,2094.4,567.3
+Q4 2023,6349.1,1660.0,26.1,-1304.7,-20.6,-1296.7,-20.4,-3.13,640.4,,,,,100.1,328.0,,1006.9,2857.1,1929.2,556.0
+FY2023,22527.0,5441.9,24.2,-5064.2,-22.5,-4811.7,-21.4,-11.67,266.6,,14391.9,7456.4,7191.8,414.8,,,,,,
+Q1 2024,5664.6,1605.4,28.3,-818.6,-14.5,-764.6,-13.5,-1.80,637.7,,,,,102.4,334.0,,982.8,2528.9,1668.6,484.3
+Q2 2024,6127.1,1833.2,29.9,-585.1,-9.5,-608.1,-9.9,-1.46,1750.5,,,,,102.2,342.0,,1007.4,2565.9,2037.5,516.4
+Q3 2024,7305.6,2547.2,34.9,-66.7,-0.9,-79.8,-1.1,-0.19,2225.6,,,,,103.2,362.0,,1822.6,2821.3,2094.4,567.3
+Q4 2024,7734.2,2788.2,36.1,126.4,1.6,88.9,1.2,0.21,1401.0,,,,,103.0,340.0,,1797.5,3083.1,2388.7,464.9
+FY2024,26831.5,8774.0,32.7,-1344.0,-5.0,-1363.7,-5.1,-3.23,6014.9,,14108.4,4835.9,10249.4,416.6,,,,,,
+Q1 2025,7003.2,2539.1,36.3,15.0,0.2,-10.7,-0.2,-0.02,1302.1,,,,,106.7,368.0,32.0,1731.2,2807.3,1997.6,467.1
+Q2 2025,7337.7,2675.8,36.5,251.6,3.4,218.3,3.0,0.51,1989.3,,,,,109.4,360.0,,1612.3,2836.6,2448.9,439.9
+Q3 2025,7685.5,2817.9,36.7,353.9,4.6,469.4,6.1,1.05,2016.2,,,,,117.3,376.0,35.0,1510.7,3022.5,2569.9,582.3
+Q4 2025,8321.4,3081.2,37.0,503.9,6.1,513.9,6.2,1.14,1839.6,,15573.3,9636.7,24153.1,457.6,113.0,366.0,,1540.4,3261.8,3042.0,477.2
+FY2025,30347.8,11114.1,36.6,1124.5,3.7,1190.9,3.9,2.74,7147.1,,15573.3,9636.7,24153.1,444.0,,,,6394.6,11928.3,10058.4,1966.4
+Q1 2026,7472.0,2773.2,37.1,166.8,2.2,202.0,2.7,0.48,,,15641.5,9566.5,24194.1,459.5,115.2,376.0,,1522.6,2912.5,2588.8,448.2`;
+
+// ============================================================
+// EMBEDDED ANALYSIS JSON
+// ============================================================
+const analysis = {
+  guidance: {
+    as_of: "Q1 2026 Earnings (May 19, 2026)",
+    fiscal_year: "FY2026",
+    items: [
+      {metric:"Gross Profit Margin",target:"Continued sequential expansion",period:"FY2026 (ongoing)",vs_prior:"maintained",notes:"Q1 2026 at 37.1% marks 15th consecutive quarterly expansion; management committed to further improvement"},
+      {metric:"Adjusted Net Profit Margin",target:"Continued growth trajectory",period:"FY2026",vs_prior:"maintained",notes:"Q1 2026 adjusted net margin 7.8% (up from 5.2% in Q1 2025); targeting sustained profitability with disciplined AI investment"},
+      {metric:"AI CapEx Investment",target:"+RMB 1 billion vs. prior year",period:"FY2026",vs_prior:"raised",notes:"Incremental AI infrastructure investment to improve content discovery, ad efficiency (ECPM), and creator productivity; R&D +9% YoY in Q1 2026"},
+      {metric:"Mid-term Gross Margin",target:"40-45%",period:"Medium-term (2-3 years from 2025)",vs_prior:"maintained",notes:"Reiterated; current trajectory (36.6% FY2025, 37.1% Q1 2026) on track"},
+      {metric:"Mid-term Adj. Operating Margin",target:"15-30%",period:"Medium-term (2-3 years from 2025)",vs_prior:"maintained",notes:"Wide range reflects uncertainty in gaming recovery and AI investment timing"},
+      {metric:"Advertising Revenue Growth",target:"Double-digit growth, outpacing market",period:"FY2026",vs_prior:"maintained",notes:"30% YoY in Q1 2026; AI-sector advertiser budgets +170% YoY; ECPM improving 10%+ annually"},
+      {metric:"Share Repurchase",target:"Up to US$300M",period:"24 months from June 2026",vs_prior:"raised",notes:"New program (announced June 24, 2026) is 50% larger than the prior US$200M program which was completed in Q1 2026"},
+      {metric:"Gaming Revenue",target:"H2 2026 / 2027 upcycle",period:"H2 2026 onwards",vs_prior:"new",notes:"Morgan Stanley projects Romance of the Three Kingdoms: Wangdaotianxia (Q4 2026 launch) at 1.7B RMB annualized; 2027 gaming consensus ~6.8B RMB, MS at 7.8B RMB"}
+    ],
+    management_commentary: "CEO Rui Chen (Q1 2026): 'Our community is thriving with more high-quality content offerings... As user value deepens, commercialization follows as a natural extension of our ecosystem. Today, AI is accelerating every aspect of this flywheel by transforming content creation, discovery and commercial efficiency. We are poised to translate this momentum into sustained growth and compounding value over the long term.' CFO Sam Fan: 'Gross profit margin improved to 37.1%, marking our 15th consecutive quarter of margin expansion... we remain committed to driving sustained profitability while maintaining a disciplined approach to investing in AI-driven innovation.'"
+  }
+};
+
+// ============================================================
+// EMBEDDED DCF JSON
+// ============================================================
+const dcfData = {
+  current_price: 16.14,
+  inputs: {
+    shares_outstanding_m: 459.0,
+    last_fcf_rmb_m: 6236.7,
+    net_debt_rmb_m: -14627.6,
+    fx_rmb_per_usd: 7.10
+  },
+  historical_growth: {
+    revenue_3yr_cagr: 11.3,
+    revenue_5yr_cagr: 20.5,
+    revenue_1yr_growth: 13.1,
+    eps_3yr_cagr: null,
+    eps_5yr_cagr: null,
+    equity_2yr_cagr: 4.0,
+    fcf_1yr_growth: 19.7,
+    ocf_1yr_growth: 18.8,
+    growth_rate_source: "revenue_1yr_growth"
+  },
+  assumptions: {
+    base: {
+      scenario_description: "Moderate growth with ongoing FCF margin expansion toward mid-term management targets. Advertising sustains high-teens growth, gaming recovers in H2 2026 from new title launches. Company reaches ~33% FCF margin by Year 5 (gross margin ~40-42%, operating margin ~12-15%).",
+      growth_rates: [15.0, 13.0, 11.0, 9.0, 7.0],
+      fcf_margin: [25.0, 27.0, 29.0, 31.0, 33.0],
+      wacc: 11.5,
+      terminal_growth: 3.5
+    },
+    bull: {
+      scenario_description: "Strong execution: advertising continues 25%+ growth on AI tailwinds, Romance of the Three Kingdoms: Wangdaotianxia launches successfully in Q4 2026 (Morgan Stanley projects 1.7B RMB annualized), FCF margin reaches upper management guidance. Regulatory environment remains stable.",
+      growth_rates: [20.0, 17.0, 14.0, 12.0, 10.0],
+      fcf_margin: [27.0, 30.0, 33.0, 36.0, 39.0],
+      wacc: 10.5,
+      terminal_growth: 4.0
+    },
+    bear: {
+      scenario_description: "Gaming disappointment: Wangdaotianxia delayed or underperforms; advertising growth reverts toward market rates; macro headwinds from China consumer weakness; competition from Douyin/Tencent intensifies. Profitability at risk of reversal in weaker quarters.",
+      growth_rates: [8.0, 6.0, 5.0, 4.0, 3.0],
+      fcf_margin: [20.0, 21.0, 22.0, 23.0, 24.0],
+      wacc: 13.0,
+      terminal_growth: 2.5
+    }
+  },
+  valuation: {
+    base: {intrinsic_value_usd: 57.08, upside_pct: 253.7},
+    bull: {intrinsic_value_usd: 92.01, upside_pct: 470.1},
+    bear: {intrinsic_value_usd: 28.18, upside_pct: 74.6}
+  },
+  sensitivity: {
+    wacc_range: [9.5, 10.5, 11.5, 12.5, 13.5],
+    terminal_growth_range: [2.5, 3.0, 3.5, 4.0, 4.5],
+    matrix: [
+      [67.15, 71.10, 75.71, 81.16, 87.70],
+      [58.86, 61.75, 65.06, 68.87, 73.31],
+      [52.43, 54.62, 57.08, 59.87, 63.05],
+      [47.29, 48.99, 50.88, 52.99, 55.36],
+      [43.10, 44.45, 45.94, 47.57, 49.40]
+    ]
+  },
+  probability_weighted: {weighted_iv_usd: 58.59}
+};
+
+// ============================================================
+// CSV PARSING
+// ============================================================
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => { obj[h.trim()] = (values[i] || '').trim(); });
+        return obj;
+    });
+}
+
+const allData = parseCSV(csvData);
+
+function parseDate(p) {
+    const year = parseInt((p.match(/\d{4}/) || ['0'])[0]);
+    const sub = p.includes('Q1') ? 1 : p.includes('Q2') ? 2 : p.includes('Q3') ? 3 : p.includes('Q4') ? 4 : 5;
+    return year * 10 + sub;
+}
+allData.sort((a, b) => parseDate(a.Period) - parseDate(b.Period));
+
+const fyData = allData.filter(d => d.Period.startsWith('FY'));
+const qData  = allData.filter(d => /^Q[1-4]/.test(d.Period));
+
+function v(d, key) { const x = parseFloat(d[key]); return isNaN(x) ? null : x; }
+
+// ============================================================
+// KPI CARDS
+// ============================================================
+const kpis = [
+    {label:'Revenue (Q1 2026)',     value:'RMB 7.47B', change:'+7.3% YoY',  dir:'positive', sub:'vs Q1 2025: RMB 7.00B'},
+    {label:'Gross Margin (Q1 2026)',value:'37.1%',      change:'+0.8pp YoY', dir:'positive', sub:'15th consecutive quarterly expansion'},
+    {label:'Ad Revenue (Q1 2026)',  value:'RMB 2.59B', change:'+30.2% YoY', dir:'positive', sub:'Largest &amp; fastest-growing segment'},
+    {label:'Net Income (Q1 2026)',  value:'RMB 202M',  change:'GAAP profitable', dir:'positive', sub:'vs RMB -10.7M in Q1 2025'},
+    {label:'DAU (Q1 2026)',         value:'115.2M',    change:'+7.7% YoY',  dir:'positive', sub:'119 min avg daily time (record)'},
+    {label:'MAU (Q1 2026)',         value:'376M',      change:'Stable',      dir:'positive', sub:'80% 12-month user retention rate'},
+    {label:'FY2025 Revenue',        value:'RMB 30.35B',change:'+13.1% YoY', dir:'positive', sub:'First full year GAAP profitable'},
+    {label:'Net Cash (Q1 2026)',    value:'RMB 14.6B', change:'~86% of mkt cap', dir:'positive', sub:'RMB 24.19B cash minus RMB 9.57B debt'}
+];
+const kpiGrid = document.getElementById('kpiGrid');
+kpis.forEach(k => {
+    kpiGrid.innerHTML += `<div class="kpi-card">
+        <div class="kpi-value">${k.value}</div>
+        <div class="kpi-label">${k.label}</div>
+        <div class="kpi-change ${k.dir}">${k.change}</div>
+        <div class="kpi-sub">${k.sub}</div>
+    </div>`;
+});
+
+// ============================================================
+// GUIDANCE
+// ============================================================
+(function renderGuidance() {
+    const g = analysis.guidance;
+    document.getElementById('guidanceGrid').innerHTML = g.items.map(item => `
+        <div class="guidance-card">
+            <div class="guidance-metric">${item.metric}</div>
+            <div class="guidance-target">${item.target}</div>
+            <div class="guidance-period">${item.period}</div>
+            <span class="guidance-vs-prior ${item.vs_prior}">${item.vs_prior.charAt(0).toUpperCase()+item.vs_prior.slice(1)}</span>
+            ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+        </div>`).join('');
+    document.getElementById('guidanceCommentary').textContent = g.management_commentary;
+})();
+
+// ============================================================
+// CHART HELPERS
+// ============================================================
+const C = {
+    primary:'#00d4aa', secondary:'#00b894', tertiary:'#0984e3',
+    quaternary:'#6c5ce7', warning:'#fdcb6e', danger:'#ff6b6b'
+};
+function baseOpts(overrides) {
+    const o = {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color:'#e0e0e0', font:{size:11} } } },
+        scales: {
+            x: { ticks:{color:'#888',maxRotation:45}, grid:{color:'rgba(255,255,255,0.05)'} },
+            y: { ticks:{color:'#888'}, grid:{color:'rgba(255,255,255,0.05)'} }
+        }
+    };
+    function merge(a, b) {
+        const r = Object.assign({}, a);
+        for (const k of Object.keys(b)) {
+            r[k] = (b[k] && typeof b[k]==='object' && !Array.isArray(b[k])) ? merge(a[k]||{}, b[k]) : b[k];
+        }
+        return r;
+    }
+    return overrides ? merge(o, overrides) : o;
+}
+
+// ============================================================
+// CHARTS
+// ============================================================
+
+// 1. Annual Revenue
+new Chart(document.getElementById('chartRevenue'), {
+    type:'bar',
+    data:{
+        labels: fyData.map(d=>d.Period),
+        datasets:[{label:'Revenue (RMB M)', data:fyData.map(d=>v(d,'Revenue')),
+            backgroundColor:C.primary+'99', borderColor:C.primary, borderWidth:1}]
+    },
+    options: baseOpts({plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:ctx=>'RMB '+ctx.parsed.y.toLocaleString()+'M'}}}})
+});
+
+// 2. Quarterly Gross Margin (2023+)
+const qGM = qData.filter(d => parseInt((d.Period.match(/\d{4}/)||['0'])[0]) >= 2023 && v(d,'GrossMargin') !== null);
+new Chart(document.getElementById('chartGrossMargin'), {
+    type:'line',
+    data:{
+        labels: qGM.map(d=>d.Period),
+        datasets:[{label:'Gross Margin %', data:qGM.map(d=>v(d,'GrossMargin')),
+            borderColor:C.primary, backgroundColor:C.primary+'22', fill:true, tension:0.3, pointRadius:4}]
+    },
+    options: baseOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.parsed.y.toFixed(1)+'%'}}},
+        scales:{x:{ticks:{color:'#888',maxRotation:45},grid:{color:'rgba(255,255,255,0.05)'}},
+                y:{min:20,ticks:{color:'#888',callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.05)'}}}})
+});
+
+// 3. Annual Profitability
+new Chart(document.getElementById('chartProfitability'), {
+    type:'bar',
+    data:{
+        labels: fyData.map(d=>d.Period),
+        datasets:[
+            {label:'Operating Income', data:fyData.map(d=>v(d,'OperatingIncome')), backgroundColor:C.tertiary+'99', borderColor:C.tertiary, borderWidth:1},
+            {label:'Net Income',       data:fyData.map(d=>v(d,'NetIncome')),        backgroundColor:C.primary+'99',  borderColor:C.primary,  borderWidth:1}
+        ]
+    },
+    options: baseOpts({plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': RMB '+ctx.parsed.y.toLocaleString()+'M'}}}})
+});
+
+// 4. Quarterly Net Margin (2023+)
+const qNM = qData.filter(d => parseInt((d.Period.match(/\d{4}/)||['0'])[0]) >= 2023 && v(d,'NetMargin') !== null);
+new Chart(document.getElementById('chartNetMargin'), {
+    type:'line',
+    data:{
+        labels: qNM.map(d=>d.Period),
+        datasets:[{label:'Net Margin %', data:qNM.map(d=>v(d,'NetMargin')),
+            borderColor:C.tertiary, backgroundColor:C.tertiary+'22', fill:true, tension:0.3, pointRadius:4}]
+    },
+    options: baseOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.parsed.y.toFixed(1)+'%'}}},
+        scales:{x:{ticks:{color:'#888',maxRotation:45},grid:{color:'rgba(255,255,255,0.05)'}},
+                y:{ticks:{color:'#888',callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.05)'}}}})
+});
+
+// 5. Annual Revenue Segments (stacked)
+const fyS = fyData.filter(d => v(d,'VASRevenue') !== null);
+new Chart(document.getElementById('chartSegments'), {
+    type:'bar',
+    data:{
+        labels: fyS.map(d=>d.Period),
+        datasets:[
+            {label:'VAS',         data:fyS.map(d=>v(d,'VASRevenue')),         backgroundColor:C.tertiary+'bb',   borderColor:C.tertiary,   borderWidth:1},
+            {label:'Advertising', data:fyS.map(d=>v(d,'AdvertisingRevenue')), backgroundColor:C.primary+'bb',   borderColor:C.primary,   borderWidth:1},
+            {label:'Mobile Games',data:fyS.map(d=>v(d,'MobileGamesRevenue')), backgroundColor:C.quaternary+'bb',borderColor:C.quaternary,borderWidth:1},
+            {label:'IP/Ecomm',    data:fyS.map(d=>v(d,'EcommerceRevenue')),   backgroundColor:C.warning+'bb',   borderColor:C.warning,   borderWidth:1}
+        ]
+    },
+    options: baseOpts({
+        scales:{
+            x:{stacked:true,ticks:{color:'#888',maxRotation:45},grid:{color:'rgba(255,255,255,0.05)'}},
+            y:{stacked:true,ticks:{color:'#888'},grid:{color:'rgba(255,255,255,0.05)'}}
+        },
+        plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': RMB '+(ctx.parsed.y||0).toLocaleString()+'M'}}}
+    })
+});
+
+// 6. Quarterly Advertising Revenue
+const qAd = qData.filter(d => v(d,'AdvertisingRevenue') !== null);
+new Chart(document.getElementById('chartAdvertising'), {
+    type:'bar',
+    data:{
+        labels: qAd.map(d=>d.Period),
+        datasets:[{label:'Advertising (RMB M)', data:qAd.map(d=>v(d,'AdvertisingRevenue')),
+            backgroundColor:C.primary+'99', borderColor:C.primary, borderWidth:1}]
+    },
+    options: baseOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'RMB '+ctx.parsed.y.toLocaleString()+'M'}}}})
+});
+
+// 7. Quarterly Mobile Games Revenue
+const qGame = qData.filter(d => v(d,'MobileGamesRevenue') !== null);
+new Chart(document.getElementById('chartGaming'), {
+    type:'bar',
+    data:{
+        labels: qGame.map(d=>d.Period),
+        datasets:[{label:'Mobile Games (RMB M)', data:qGame.map(d=>v(d,'MobileGamesRevenue')),
+            backgroundColor:C.quaternary+'99', borderColor:C.quaternary, borderWidth:1}]
+    },
+    options: baseOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'RMB '+ctx.parsed.y.toLocaleString()+'M'}}}})
+});
+
+// 8. Quarterly VAS Revenue
+const qVAS = qData.filter(d => v(d,'VASRevenue') !== null);
+new Chart(document.getElementById('chartVAS'), {
+    type:'line',
+    data:{
+        labels: qVAS.map(d=>d.Period),
+        datasets:[{label:'VAS (RMB M)', data:qVAS.map(d=>v(d,'VASRevenue')),
+            borderColor:C.tertiary, backgroundColor:C.tertiary+'22', fill:true, tension:0.3, pointRadius:3}]
+    },
+    options: baseOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'RMB '+ctx.parsed.y.toLocaleString()+'M'}}}})
+});
+
+// 9. MAU vs DAU
+const qU = qData.filter(d => v(d,'MAU') !== null || v(d,'DAU') !== null);
+new Chart(document.getElementById('chartUsers'), {
+    type:'line',
+    data:{
+        labels: qU.map(d=>d.Period),
+        datasets:[
+            {label:'MAU (M)', data:qU.map(d=>v(d,'MAU')), borderColor:C.primary,  backgroundColor:C.primary+'22',  fill:false, tension:0.3, pointRadius:3},
+            {label:'DAU (M)', data:qU.map(d=>v(d,'DAU')), borderColor:C.tertiary, backgroundColor:C.tertiary+'22', fill:false, tension:0.3, pointRadius:3}
+        ]
+    },
+    options: baseOpts({plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+(ctx.parsed.y||0).toFixed(0)+'M'}}}})
+});
+
+// 10. Monthly Paying Users
+const qMPU = qData.filter(d => v(d,'MPU') !== null);
+new Chart(document.getElementById('chartMPU'), {
+    type:'bar',
+    data:{
+        labels: qMPU.map(d=>d.Period),
+        datasets:[{label:'MPU (M)', data:qMPU.map(d=>v(d,'MPU')),
+            backgroundColor:C.warning+'99', borderColor:C.warning, borderWidth:1}]
+    },
+    options: baseOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.parsed.y.toFixed(1)+'M paying users'}}}})
+});
+
+// 11. Annual OCF
+const fyOCF = fyData.filter(d => v(d,'OperatingCashFlow') !== null);
+new Chart(document.getElementById('chartOCF'), {
+    type:'bar',
+    data:{
+        labels: fyOCF.map(d=>d.Period),
+        datasets:[{label:'OCF (RMB M)', data:fyOCF.map(d=>v(d,'OperatingCashFlow')),
+            backgroundColor: fyOCF.map(d=>(v(d,'OperatingCashFlow')||0)>=0?C.primary+'99':C.danger+'99'),
+            borderColor:     fyOCF.map(d=>(v(d,'OperatingCashFlow')||0)>=0?C.primary:C.danger),
+            borderWidth:1}]
+    },
+    options: baseOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'RMB '+ctx.parsed.y.toLocaleString()+'M'}}}})
+});
+
+// 12. Cash / Debt / Net Cash
+const fyBS = fyData.filter(d => v(d,'CashAndEquivalents') !== null);
+const bsLabels = [...fyBS.map(d=>d.Period), 'Q1 2026'];
+const bsCash   = [...fyBS.map(d=>v(d,'CashAndEquivalents')), 24194.1];
+const bsDebt   = [...fyBS.map(d=>v(d,'TotalDebt')), 9566.5];
+const bsNet    = bsCash.map((c,i) => (c!==null && bsDebt[i]!==null) ? c-bsDebt[i] : null);
+new Chart(document.getElementById('chartBalance'), {
+    type:'bar',
+    data:{
+        labels: bsLabels,
+        datasets:[
+            {label:'Cash & Equiv',  data:bsCash, backgroundColor:C.primary+'99',  borderColor:C.primary,  borderWidth:1},
+            {label:'Total Debt',    data:bsDebt, backgroundColor:C.danger+'99',   borderColor:C.danger,   borderWidth:1},
+            {label:'Net Cash', type:'line', data:bsNet, borderColor:C.warning, backgroundColor:'transparent', borderWidth:2, pointRadius:4, tension:0.2}
+        ]
+    },
+    options: baseOpts({plugins:{tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': RMB '+(ctx.parsed.y||0).toLocaleString()+'M'}}}})
+});
+
+// ============================================================
+// METRIC DESCRIPTIONS (modals)
+// ============================================================
+const metricDescriptions = {
+    revenue:{title:"Revenue",content:`<p><strong>Revenue</strong> is Bilibili's total income from four segments: VAS (~39%), Advertising (~33%), Mobile Games (~21%), and IP Derivatives (~7%).</p>
+        <div class="metric-highlight"><strong>FY2025:</strong> RMB 30.35B (+13.1% YoY) — first full year of GAAP profitability. Q1 2026: RMB 7.47B (+7.3% YoY).</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>Advertising revenue growth rate — sustaining 20%+ is key to the bull thesis</li>
+        <li>Gaming revenue recovery — in a trough; watch for H2 2026 uplift from new title launches</li>
+        <li>Overall revenue growth rate vs. management 40-45% gross margin target timeline</li></ul>`},
+    grossMargin:{title:"Gross Margin",content:`<p><strong>Gross Margin</strong> is revenue minus direct costs (content creator revenue sharing, bandwidth, game licensing), divided by revenue.</p>
+        <div class="metric-highlight"><strong>15 consecutive quarterly expansions:</strong> from 24.3% in Q4 2022 to 37.1% in Q1 2026. Management targets 40-45% medium-term.</div>
+        <p><strong>Why it matters:</strong> Gross margin expansion is Bilibili's #1 structural trend proving the advertising-led model is more profitable than gaming-led. Every 1pp improvement from the FY2025 revenue base adds ~RMB 303M FCF.</p><ul>
+        <li>Watch for any quarterly gross margin contraction — would signal ad monetization softening or cost pressure</li>
+        <li>The 40-45% medium-term target implies ~3-8pp more expansion from Q1 2026 levels</li></ul>`},
+    profitability:{title:"Operating & Net Income",content:`<p>Bilibili operated at significant losses from 2018 through 2024 as it invested heavily in user growth and content. <strong>FY2025 was the first full year of GAAP net profitability</strong> (net income RMB 1.19B).</p>
+        <div class="metric-highlight"><strong>Key inflection:</strong> Operating income turned positive in FY2025 (RMB 1.12B). Q1 2026 GAAP net income: RMB 202M; adjusted net: RMB 585M (7.8% margin).</div><ul>
+        <li>The path from losses to profitability validates the advertising-led monetization model</li>
+        <li>Watch for Q-o-Q improvement in both GAAP and adjusted net margin</li>
+        <li>FY2025 net margin 3.9% — substantial room to expand toward management's 15-30% adj operating margin target</li></ul>`},
+    netMargin:{title:"Net Margin",content:`<p><strong>Net Margin</strong> = Net Income / Revenue. Bilibili turned positive in Q4 2024 (1.2%) and expanded through FY2025 and Q1 2026 (2.7% GAAP).</p>
+        <div class="metric-highlight"><strong>Q1 2026:</strong> GAAP net margin 2.7%; Adjusted net margin 7.8% (up from 5.2% in Q1 2025, +260bps YoY).</div><ul>
+        <li>Adjusted margins are more useful near-term (removes ~5-6% stock compensation impact)</li>
+        <li>Watch for the trajectory from 7.8% adjusted toward the 15-30% medium-term operating target</li>
+        <li>Gaming revenue trough in H1 2026 may create some QoQ pressure before H2 2026 recovery</li></ul>`},
+    segments:{title:"Revenue Segments",content:`<p>Bilibili has four revenue segments: <strong>VAS</strong> (premium memberships, live broadcasting, comics, audio), <strong>Advertising</strong>, <strong>Mobile Games</strong>, and <strong>IP Derivatives/E-commerce</strong>.</p>
+        <div class="metric-highlight"><strong>Key structural shift:</strong> Advertising (~33% in FY2025) is the fastest-growing segment (+23% in FY2025, +30% YoY in Q1 2026), overtaking mobile games as the growth engine. Games are in a trough ahead of new 2026/2027 title launches.</div><ul>
+        <li>Advertising and VAS are both higher-margin than games, driving gross margin expansion</li>
+        <li>Watch for gaming revenue stabilization and eventual recovery from Q3/Q4 2026</li></ul>`},
+    advertising:{title:"Advertising Revenue",content:`<p><strong>Advertising</strong> is Bilibili's largest and fastest-growing segment (~33% of FY2025 revenue). Growth is driven by AI-enhanced ad targeting (ECPM +10%+ YoY), AIGC ad material generation, and AI-sector advertiser budgets (+170% YoY in Q1 2026).</p>
+        <div class="metric-highlight"><strong>Q1 2026:</strong> RMB 2.59B, +30.2% YoY — significantly outpacing the China digital ad market (+12-16%). FY2025: RMB 10.06B, +23% YoY.</div><ul>
+        <li>Sustaining 20%+ advertising growth for 2-3 years is the core bull thesis</li>
+        <li>AI-sector advertiser tailwind (+170% budgets) may normalize — watch for deceleration below 15%</li>
+        <li>Performance advertising growth (Double Eleven 2025: +30%+ with advertiser count doubling) shows platform is becoming a real commercial platform</li></ul>`},
+    gaming:{title:"Mobile Games Revenue",content:`<p><strong>Mobile Games</strong> (~21% of FY2025 revenue) is Bilibili's hit-dependent segment. FY2025 was driven by San Guo: Mou Ding Tian Xia (+14% YoY). Q1 2026 saw ~12-14% YoY decline as that title matures.</p>
+        <div class="metric-highlight"><strong>Key catalyst:</strong> Romance of the Three Kingdoms: Wangdaotianxia (expected Q4 2026 launch). Morgan Stanley projects 1.7B RMB annualized. Three Kingdoms: Battle for the Realm (SLG) launched July 2, 2026.</div><ul>
+        <li>Gaming is currently in a trough — near-term weakness is expected and partly priced in</li>
+        <li>Watch for Q3 2026 game revenue as a leading indicator of the H2 upcycle</li>
+        <li>2027 gaming revenue consensus: ~6.8B RMB; Morgan Stanley: 7.8B RMB vs. 6.4B in FY2025</li></ul>`},
+    vas:{title:"VAS Revenue",content:`<p><strong>Value-Added Services (VAS)</strong> (~39% of FY2025 revenue) includes premium memberships, live broadcasting tipping, Bilibili Comics, Maoer audio, and other community VAS. FY2025: RMB 11.93B.</p>
+        <div class="metric-highlight"><strong>Q1 2026:</strong> RMB 2.91B — stable YoY. 35M monthly paying users (MPU) from 376M MAU = 9.3% penetration. Increasing to 12-15% could add RMB 1-2B annually.</div><ul>
+        <li>Premium memberships are sticky and provide predictable recurring revenue</li>
+        <li>Live broadcasting can be volatile (dependent on content events and user gifting behavior)</li>
+        <li>Watch MPU growth as a leading indicator of monetization deepening</li></ul>`},
+    users:{title:"MAU & DAU",content:`<p><strong>Monthly Active Users (MAU)</strong> and <strong>Daily Active Users (DAU)</strong> are Bilibili's primary reach metrics. Q1 2026: 376M MAU, 115.2M DAU.</p>
+        <div class="metric-highlight"><strong>Engagement quality over quantity:</strong> 119 minutes average daily time spent in Q1 2026 (platform record, +11 min YoY); total user time +19% YoY. 80% 12-month user retention rate is exceptionally high.</div><ul>
+        <li>MAU has plateaued at ~376M — watch for any sequential decline as a concern</li>
+        <li>Deepening time-per-user is more important than raw MAU growth at this stage</li>
+        <li>DAU/MAU ratio ~30.6% is healthy for a long-form content platform</li></ul>`},
+    mpu:{title:"Monthly Paying Users (MPU)",content:`<p><strong>Monthly Paying Users (MPU)</strong> measures how many of Bilibili's users are paying for premium services (memberships, live broadcasting, in-game). Q3 2025: 35M (latest data point).</p>
+        <div class="metric-highlight"><strong>Monetization penetration:</strong> 35M paying users from 376M MAU = 9.3% penetration. Peers like iQiyi/Tencent Video have 12-18% subscriber penetration, suggesting meaningful room to grow.</div><ul>
+        <li>Growing MPU indicates successful conversion of free users to paying</li>
+        <li>Watch for MPU trend to accelerate as the platform improves premium content and live event quality</li></ul>`},
+    ocf:{title:"Operating Cash Flow",content:`<p><strong>Operating Cash Flow (OCF)</strong> is the cash generated from core business operations. For Bilibili, this is the most meaningful cash metric as it eliminates non-cash stock compensation (~5-6% of revenue).</p>
+        <div class="metric-highlight"><strong>FY2025:</strong> RMB 7.15B (+18.8% YoY). FCF estimated at RMB 6.24B (OCF minus ~3% CapEx rate). Net cash position RMB 14.6B provides 2+ years of investment buffer.</div><ul>
+        <li>OCF is the primary input to the DCF model — watch for sustained 15%+ annual growth</li>
+        <li>FCF margin expansion from 20.6% (FY2025) toward management's target range is the #1 value driver</li>
+        <li>New US$300M buyback funded from existing cash — watch for buyback execution pace</li></ul>`},
+    balance:{title:"Cash & Debt",content:`<p>Bilibili's balance sheet improved significantly in FY2025. As of Q1 2026: <strong>Cash RMB 24.19B</strong>, <strong>Debt RMB 9.57B</strong>, <strong>Net Cash RMB 14.63B</strong>.</p>
+        <div class="metric-highlight"><strong>Net cash = ~86% of market cap</strong> at current prices ($16.14 BILI). RMB 14.6B net cash provides a substantial floor on valuation and eliminates near-term financial distress risk.</div><ul>
+        <li>Watch for RMB 4.86B short-term debt maturity management — refinancing cost in current rate environment</li>
+        <li>US$300M buyback (~RMB 2.1B) funded from existing cash — sustainable given the war chest</li>
+        <li>AI CapEx ramp (+RMB 1B planned in FY2026) reduces net cash but is self-funded from operations</li></ul>`}
+};
+
+function openModal(key) {
+    document.getElementById('modalTitle').textContent = metricDescriptions[key].title;
+    document.getElementById('modalBody').innerHTML = metricDescriptions[key].content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { document.getElementById('modalOverlay').classList.remove('active'); document.body.style.overflow = ''; }
+});
+
+// ============================================================
+// OVERVIEW TOGGLE
+// ============================================================
+function toggleOverview() {
+    document.querySelector('.overview-toggle').classList.toggle('active');
+    document.getElementById('overviewContent').classList.toggle('active');
+}
+
+// ============================================================
+// DCF SECTION
+// ============================================================
+function renderFCFProjections(startGrowth) {
+    const baseFCF = dcfData.inputs.last_fcf_rmb_m;
+    const endGrowth = 8;
+    const gRates = [];
+    for (let i = 0; i < 5; i++) {
+        gRates.push(startGrowth > endGrowth ? startGrowth - (startGrowth - endGrowth) * (i / 4) : startGrowth);
+    }
+    let fcf = baseFCF;
+    const vals = [baseFCF];
+    for (let i = 0; i < 5; i++) { fcf *= (1 + gRates[i] / 100); vals.push(fcf); }
+    const fmt = n => 'RMB ' + (n / 1000).toFixed(1) + 'B';
+    let html = '<div class="fcf-proj-item hdr">Base</div><div class="fcf-proj-item hdr">2026E</div><div class="fcf-proj-item hdr">2027E</div><div class="fcf-proj-item hdr">2028E</div><div class="fcf-proj-item hdr">2029E</div><div class="fcf-proj-item hdr">2030E</div>';
+    html += `<div class="fcf-proj-item"><div class="fval">${fmt(vals[0])}</div><div class="grate">&#8212;</div></div>`;
+    for (let i = 1; i <= 5; i++) {
+        html += `<div class="fcf-proj-item"><div class="fval">${fmt(vals[i])}</div><div class="grate">+${gRates[i-1].toFixed(0)}%</div></div>`;
+    }
+    document.getElementById('fcfProjectionTable').innerHTML = html;
+}
+
+function calcDCF(startGrowth, wacc, termGrowth) {
+    const { last_fcf_rmb_m: fcf, net_debt_rmb_m: netDebt, shares_outstanding_m: shares, fx_rmb_per_usd: fx } = dcfData.inputs;
+    const endGrowth = 8;
+    let pvFCF = 0, projFCF = fcf;
+    for (let i = 0; i < 5; i++) {
+        const yr = startGrowth > endGrowth ? startGrowth - (startGrowth - endGrowth) * (i / 4) : startGrowth;
+        projFCF *= (1 + yr / 100);
+        pvFCF += projFCF / Math.pow(1 + wacc / 100, i + 1);
+    }
+    const tvFCF = projFCF * (1 + termGrowth / 100);
+    const tv = tvFCF / (wacc / 100 - termGrowth / 100);
+    const pvTV = tv / Math.pow(1 + wacc / 100, 5);
+    const iv = ((pvFCF + pvTV - netDebt) / shares) / fx;
+    const entry = (tv / shares / fx) / Math.pow(1.15, 5);
+    return { iv, entry };
+}
+
+window.updateDCFDisplay = function() {
+    const growth   = parseFloat(document.getElementById('growthSlider').value);
+    const wacc     = parseFloat(document.getElementById('waccSlider').value);
+    const terminal = parseFloat(document.getElementById('terminalSlider').value);
+    document.getElementById('growthValue').textContent   = growth + '%';
+    document.getElementById('waccValue').textContent     = wacc + '%';
+    document.getElementById('terminalValue').textContent = terminal + '%';
+    renderFCFProjections(growth);
+    const { iv, entry } = calcDCF(growth, wacc, terminal);
+    document.getElementById('dcfIV').textContent    = '$' + iv.toFixed(0);
+    document.getElementById('dcfEntry').textContent = '$' + entry.toFixed(0);
+    const upside = ((iv - dcfData.current_price) / dcfData.current_price * 100);
+    const uEl = document.getElementById('dcfUpside');
+    uEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(0) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+    uEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+    document.getElementById('dcfWeighted').textContent = '$' + dcfData.probability_weighted.weighted_iv_usd.toFixed(0);
+};
+
+window.switchScenario = function(scenario) {
+    document.querySelectorAll('.scenario-tab').forEach(t => t.classList.toggle('active', t.dataset.scenario === scenario));
+    const a = dcfData.assumptions[scenario];
+    const val = dcfData.valuation[scenario];
+    document.getElementById('growthSlider').value   = a.growth_rates[0];
+    document.getElementById('waccSlider').value     = a.wacc;
+    document.getElementById('terminalSlider').value = a.terminal_growth;
+    const titles = {base:'Base Case Assumptions', bull:'Bull Case Assumptions', bear:'Bear Case Assumptions'};
+    document.getElementById('scenarioTitle').textContent = titles[scenario];
+    document.getElementById('assumptionGrid').innerHTML = `
+        <div class="assumption-item"><div class="alabel">Year 1 Growth</div><div class="avalue">${a.growth_rates[0]}%</div></div>
+        <div class="assumption-item"><div class="alabel">Year 5 Growth</div><div class="avalue">${a.growth_rates[4]}%</div></div>
+        <div class="assumption-item"><div class="alabel">Y1 FCF Margin</div><div class="avalue">${a.fcf_margin[0]}%</div></div>
+        <div class="assumption-item"><div class="alabel">Y5 FCF Margin</div><div class="avalue">${a.fcf_margin[4]}%</div></div>
+        <div class="assumption-item"><div class="alabel">WACC</div><div class="avalue">${a.wacc}%</div></div>
+        <div class="assumption-item"><div class="alabel">Terminal Growth</div><div class="avalue">${a.terminal_growth}%</div></div>
+        <div class="assumption-item"><div class="alabel">Intrinsic Value</div><div class="avalue" style="color:#00d4aa;">$${val.intrinsic_value_usd.toFixed(0)}</div></div>
+        <div class="assumption-item"><div class="alabel">Upside vs $16.14</div><div class="avalue" style="color:#00d4aa;">+${val.upside_pct.toFixed(0)}%</div></div>`;
+    document.getElementById('scenarioDesc').textContent = a.scenario_description;
+    updateDCFDisplay();
+};
+
+function renderSensitivity() {
+    const s = dcfData.sensitivity;
+    const cp = dcfData.current_price;
+    let html = '<tr><th>WACC \\ TGR</th>';
+    s.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+    html += '</tr>';
+    s.wacc_range.forEach((wacc, i) => {
+        html += `<tr><th>${wacc}%</th>`;
+        s.matrix[i].forEach((val, j) => {
+            const isHL = Math.abs(wacc - 11.5) < 0.01 && Math.abs(s.terminal_growth_range[j] - 3.5) < 0.01;
+            const cls  = isHL ? 'hl' : val >= cp ? 'above' : 'below';
+            html += `<td class="${cls}">$${val.toFixed(0)}</td>`;
+        });
+        html += '</tr>';
+    });
+    document.getElementById('sensitivityMatrix').innerHTML = html;
+}
+
+function renderHistoricalGrowth() {
+    const g = dcfData.historical_growth;
+    const source = g.growth_rate_source;
+    const items = [
+        {key:'revenue_3yr_cagr',   label:'Revenue 3Y CAGR'},
+        {key:'revenue_5yr_cagr',   label:'Revenue 5Y CAGR'},
+        {key:'revenue_1yr_growth', label:'Revenue 1Y Growth'},
+        {key:'fcf_1yr_growth',     label:'FCF 1Y Growth'},
+        {key:'ocf_1yr_growth',     label:'OCF 1Y Growth'},
+        {key:'equity_2yr_cagr',    label:'Equity 2Y CAGR'},
+        {key:'eps_3yr_cagr',       label:'EPS 3Y CAGR'},
+        {key:'eps_5yr_cagr',       label:'EPS 5Y CAGR'}
+    ];
+    document.getElementById('growthGrid').innerHTML = items.map(item => {
+        const rate = g[item.key];
+        const isSel = item.key === source;
+        let rHtml;
+        if (rate === null || rate === undefined) {
+            rHtml = '<div class="grate na">N/A*</div>';
+        } else {
+            rHtml = `<div class="grate ${rate >= 0 ? 'pos' : 'neg'}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div>`;
+        }
+        return `<div class="growth-item ${isSel ? 'sel' : ''}"><div class="gmetric">${item.label}</div>${rHtml}</div>`;
+    }).join('');
+}
+
+// Initialize DCF
+renderFCFProjections(15);
+renderSensitivity();
+renderHistoricalGrowth();
+switchScenario('base');
+
+// Bind slider events
+['growthSlider','waccSlider','terminalSlider'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.oninput = window.updateDCFDisplay; el.onchange = window.updateDCFDisplay; }
+});
+</script>
+
+</body>
+</html>

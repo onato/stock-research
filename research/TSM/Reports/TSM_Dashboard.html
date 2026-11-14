@@ -1,0 +1,2819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taiwan Semiconductor (TSM) Financial Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4aa, #00b894);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #888;
+            font-size: 1.1rem;
+        }
+        .header .market-info {
+            margin-top: 10px;
+            font-size: 0.95rem;
+            color: #aaa;
+        }
+
+        /* Investment Overview Section */
+        .overview-section {
+            max-width: 1400px;
+            margin: 0 auto 30px;
+        }
+        .overview-toggle {
+            width: 100%;
+            background: rgba(0, 212, 170, 0.1);
+            border: 1px solid rgba(0, 212, 170, 0.3);
+            border-radius: 12px;
+            padding: 16px 24px;
+            color: #00d4aa;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+        .overview-toggle:hover {
+            background: rgba(0, 212, 170, 0.2);
+        }
+        .overview-toggle .arrow {
+            transition: transform 0.3s ease;
+        }
+        .overview-toggle.active .arrow {
+            transform: rotate(180deg);
+        }
+        .overview-content {
+            display: none;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            padding: 30px;
+            margin-top: -12px;
+        }
+        .overview-content.active {
+            display: block;
+        }
+        .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+        }
+        .overview-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .overview-card h3 {
+            color: #00d4aa;
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .overview-card p {
+            margin-bottom: 12px;
+            line-height: 1.6;
+            color: #d0d0d0;
+        }
+        .overview-card ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .overview-card li {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            line-height: 1.5;
+        }
+        .overview-card li:last-child {
+            border-bottom: none;
+        }
+        .overview-card.bull h3 { color: #00d4aa; }
+        .overview-card.bear h3 { color: #ff6b6b; }
+        .overview-card.risks h3 { color: #fdcb6e; }
+        .risk-extreme { color: #ff3838; font-weight: 600; }
+        .risk-high { color: #ff6b6b; }
+        .risk-moderate { color: #fdcb6e; }
+        .risk-low { color: #00d4aa; }
+        .revenue-stream {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .revenue-stream .percent {
+            color: #00d4aa;
+            font-weight: 600;
+        }
+        .trend-growing { color: #00d4aa; }
+        .trend-stable { color: #888; }
+        .trend-declining { color: #ff6b6b; }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .kpi-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .kpi-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 212, 170, 0.2);
+        }
+        .kpi-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #00d4aa;
+            margin-bottom: 5px;
+        }
+        .kpi-label {
+            font-size: 0.85rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .kpi-change {
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+        .kpi-change.positive { color: #00d4aa; }
+        .kpi-change.negative { color: #ff6b6b; }
+
+        /* Guidance Section */
+        .guidance-section {
+            max-width: 1400px;
+            margin: 0 auto 30px;
+        }
+        .guidance-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .guidance-header h3 {
+            color: #fff;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .guidance-header h3::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, #00d4aa, #00b894);
+            border-radius: 2px;
+        }
+        .guidance-meta {
+            font-size: 0.85rem;
+            color: #888;
+        }
+        .guidance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .guidance-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.2s ease;
+        }
+        .guidance-card:hover {
+            transform: translateY(-2px);
+        }
+        .guidance-metric {
+            font-size: 0.8rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .guidance-target {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #00d4aa;
+            margin-bottom: 6px;
+        }
+        .guidance-period {
+            font-size: 0.85rem;
+            color: #e0e0e0;
+            margin-bottom: 8px;
+        }
+        .guidance-vs-prior {
+            display: inline-block;
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        .guidance-vs-prior.raised {
+            background: rgba(0, 212, 170, 0.15);
+            color: #00d4aa;
+        }
+        .guidance-vs-prior.lowered {
+            background: rgba(255, 107, 107, 0.15);
+            color: #ff6b6b;
+        }
+        .guidance-vs-prior.maintained {
+            background: rgba(255, 255, 255, 0.1);
+            color: #888;
+        }
+        .guidance-vs-prior.new {
+            background: rgba(99, 102, 241, 0.15);
+            color: #818cf8;
+        }
+        .guidance-notes {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 8px;
+            line-height: 1.4;
+        }
+        .guidance-commentary {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+            padding: 16px 20px;
+            border-left: 3px solid #00d4aa;
+            font-style: italic;
+            color: #b0b0b0;
+            line-height: 1.6;
+        }
+        .guidance-commentary::before {
+            content: '"';
+            font-size: 1.5rem;
+            color: #00d4aa;
+            margin-right: 4px;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            color: #fff;
+            margin: 40px auto 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(0, 212, 170, 0.3);
+            max-width: 1400px;
+        }
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 25px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .chart-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .chart-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .chart-header h3 {
+            color: #fff;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .chart-header h3::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, #00d4aa, #00b894);
+            border-radius: 2px;
+        }
+        .help-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(0, 212, 170, 0.2);
+            border: 1px solid #00d4aa;
+            color: #00d4aa;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        .help-btn:hover {
+            background: #00d4aa;
+            color: #1a1a2e;
+        }
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+        }
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%);
+            border-radius: 16px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid rgba(0, 212, 170, 0.3);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+        .modal-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h3 {
+            color: #00d4aa;
+            font-size: 1.4rem;
+            margin: 0;
+        }
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(255, 107, 107, 0.2);
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-close:hover {
+            background: #ff6b6b;
+            color: #fff;
+        }
+        .modal-body {
+            padding: 25px;
+            line-height: 1.7;
+        }
+        .modal-body p { margin-bottom: 15px; }
+        .modal-body strong { color: #00d4aa; }
+        .modal-body ul { margin: 15px 0; padding-left: 20px; }
+        .modal-body li { margin-bottom: 8px; }
+        .metric-highlight {
+            background: rgba(0, 212, 170, 0.1);
+            border-left: 3px solid #00d4aa;
+            padding: 12px 15px;
+            margin: 15px 0;
+            border-radius: 0 8px 8px 0;
+        }
+
+        /* DCF Valuation Section */
+        .dcf-section {
+            max-width: 1400px;
+            margin: 0 auto 40px;
+        }
+        .dcf-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .dcf-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease;
+        }
+        .dcf-card:hover {
+            transform: translateY(-3px);
+        }
+        .dcf-card.highlight {
+            background: rgba(0, 212, 170, 0.1);
+            border-color: rgba(0, 212, 170, 0.3);
+        }
+        .dcf-label {
+            font-size: 0.85rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        .dcf-value {
+            font-size: 2.2rem;
+            font-weight: bold;
+            color: #00d4aa;
+        }
+        .dcf-card:not(.highlight) .dcf-value {
+            color: #fff;
+        }
+        .dcf-change {
+            font-size: 1rem;
+            margin-top: 8px;
+            font-weight: 600;
+        }
+        .dcf-change.positive { color: #00d4aa; }
+        .dcf-change.negative { color: #ff6b6b; }
+        .dcf-sublabel {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 8px;
+        }
+        .dcf-warning {
+            background: rgba(253, 203, 110, 0.15);
+            border: 1px solid rgba(253, 203, 110, 0.4);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #fdcb6e;
+        }
+        .warning-icon {
+            font-size: 1.2rem;
+        }
+
+        /* DCF Inputs Display */
+        .dcf-inputs {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .dcf-inputs h4 {
+            color: #e0e0e0;
+            margin-bottom: 15px;
+            font-size: 1rem;
+        }
+        .dcf-inputs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .dcf-input-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .dcf-input-label {
+            font-size: 0.75rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        .dcf-input-value {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #00d4aa;
+        }
+        .dcf-input-note {
+            font-size: 0.7rem;
+            color: #666;
+            margin-top: 4px;
+        }
+        .fcf-projections h5 {
+            color: #b0b0b0;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+        .fcf-projection-table {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .fcf-projection-item {
+            text-align: center;
+        }
+        .fcf-projection-item.header {
+            font-size: 0.75rem;
+            color: #888;
+            font-weight: 600;
+        }
+        .fcf-projection-item .year {
+            font-size: 0.75rem;
+            color: #888;
+            margin-bottom: 2px;
+        }
+        .fcf-projection-item .fcf-value {
+            font-size: 1rem;
+            color: #e0e0e0;
+            font-weight: 500;
+        }
+        .fcf-projection-item .growth-rate {
+            font-size: 0.75rem;
+            color: #00d4aa;
+            margin-top: 2px;
+        }
+
+        .dcf-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+            padding: 25px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .slider-group label {
+            font-size: 0.95rem;
+            color: #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+        }
+        .slider-group label span {
+            color: #00d4aa;
+            font-weight: 600;
+        }
+        .slider-group input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            outline: none;
+        }
+        .slider-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #00d4aa;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .slider-group input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+        .slider-group input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #00d4aa;
+            cursor: pointer;
+            border: none;
+        }
+        .slider-hint {
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .scenario-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .scenario-tab {
+            padding: 10px 24px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: transparent;
+            color: #888;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+        .scenario-tab:hover {
+            border-color: rgba(0, 212, 170, 0.5);
+            color: #e0e0e0;
+        }
+        .scenario-tab.active {
+            background: rgba(0, 212, 170, 0.15);
+            border-color: #00d4aa;
+            color: #00d4aa;
+        }
+
+        .scenario-details {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .scenario-details h4 {
+            color: #00d4aa;
+            margin-bottom: 15px;
+        }
+        .assumption-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        .assumption-item {
+            text-align: center;
+        }
+        .assumption-item .label {
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 4px;
+        }
+        .assumption-item .value {
+            font-size: 1.1rem;
+            color: #e0e0e0;
+            font-weight: 500;
+        }
+
+        .sensitivity-section {
+            margin-bottom: 30px;
+        }
+        .sensitivity-section h4 {
+            color: #e0e0e0;
+            margin-bottom: 15px;
+        }
+        .sensitivity-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .sensitivity-table th,
+        .sensitivity-table td {
+            padding: 12px 16px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .sensitivity-table th {
+            background: rgba(0, 212, 170, 0.1);
+            color: #00d4aa;
+            font-weight: 600;
+        }
+        .sensitivity-table td {
+            color: #e0e0e0;
+        }
+        .sensitivity-table td.highlight {
+            background: rgba(0, 212, 170, 0.15);
+            color: #00d4aa;
+            font-weight: 600;
+        }
+        .sensitivity-table td.below-current {
+            color: #ff6b6b;
+        }
+        .sensitivity-table td.above-current {
+            color: #00d4aa;
+        }
+
+        .historical-growth {
+            margin-bottom: 30px;
+        }
+        .historical-growth h4 {
+            color: #e0e0e0;
+            margin-bottom: 15px;
+        }
+        .growth-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+        }
+        .growth-item {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .growth-item .metric {
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 6px;
+        }
+        .growth-item .rate {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+        .growth-item .rate.positive { color: #00d4aa; }
+        .growth-item .rate.negative { color: #ff6b6b; }
+        .growth-item.selected {
+            border-color: #00d4aa;
+            background: rgba(0, 212, 170, 0.1);
+        }
+
+        .dcf-download {
+            text-align: center;
+            margin-top: 30px;
+        }
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 28px;
+            background: rgba(0, 212, 170, 0.15);
+            border: 1px solid #00d4aa;
+            border-radius: 8px;
+            color: #00d4aa;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .download-btn:hover {
+            background: #00d4aa;
+            color: #1a1a2e;
+        }
+        .download-icon {
+            font-size: 1.2rem;
+        }
+
+        @media (max-width: 768px) {
+            .charts-container { grid-template-columns: 1fr; }
+            .overview-grid { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.8rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Taiwan Semiconductor Manufacturing Company (TSM)</h1>
+        <p>World's Leading Semiconductor Foundry</p>
+        <div class="market-info">NYSE: TSM (ADR) | 68% Global Foundry Market Share | Last Updated: January 2026</div>
+    </div>
+
+    <!-- Investment Overview Section -->
+    <div class="overview-section">
+        <button class="overview-toggle" onclick="toggleOverview()">
+            <span>Investment Overview & Analysis</span>
+            <span class="arrow">▼</span>
+        </button>
+        <div class="overview-content" id="overviewContent">
+            <div class="overview-grid">
+                <!-- Company Overview -->
+                <div class="overview-card">
+                    <h3>Company Overview</h3>
+                    <p>TSMC is the world's largest and most advanced dedicated semiconductor foundry, manufacturing chips for leading technology companies including Apple, NVIDIA, AMD, and Qualcomm. The company operates under a pure-play foundry model, producing semiconductors based on proprietary designs provided by customers without competing in chip design. TSMC commands approximately 68% market share in the foundry industry and operates advanced fabs in Taiwan, with expanding operations in Arizona (U.S.), Japan, and Germany.</p>
+                </div>
+
+                <!-- Business Model -->
+                <div class="overview-card">
+                    <h3>Business Model</h3>
+                    <p><strong>Pure-Play Foundry:</strong> Manufacturing services without designing competing chips. Revenue from wafer fabrication, advanced packaging, testing, and mask making.</p>
+                    <ul>
+                        <li class="revenue-stream">
+                            <span>Wafer Fabrication</span>
+                            <span class="percent">87%</span>
+                        </li>
+                        <li class="revenue-stream">
+                            <span>Advanced Packaging (CoWoS, InFO)</span>
+                            <span class="percent trend-growing">8% (Rapidly Growing)</span>
+                        </li>
+                        <li class="revenue-stream">
+                            <span>Testing, Mask, Design Services</span>
+                            <span class="percent">5%</span>
+                        </li>
+                    </ul>
+                    <p style="margin-top: 15px;"><strong>By Platform (2024):</strong></p>
+                    <ul>
+                        <li class="revenue-stream">
+                            <span>High Performance Computing (AI/Data Center)</span>
+                            <span class="percent trend-growing">51% (up from 41% in 2022)</span>
+                        </li>
+                        <li class="revenue-stream">
+                            <span>Smartphone</span>
+                            <span class="percent trend-declining">35%</span>
+                        </li>
+                        <li class="revenue-stream">
+                            <span>IoT / Automotive / Consumer</span>
+                            <span class="percent">14%</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Competitive Position -->
+                <div class="overview-card">
+                    <h3>Competitive Position</h3>
+                    <p><strong>Market Leader:</strong> 68% foundry market share - 8x larger than second-place Samsung (7.7%)</p>
+                    <p><strong>Key Competitors:</strong> Samsung Foundry (yield issues at 3nm/2nm), Intel Foundry Services (late to market, execution challenges), GlobalFoundries (exited advanced nodes)</p>
+                    <p><strong>Moat Factors:</strong></p>
+                    <ul>
+                        <li><strong class="trend-growing">Technology Leadership:</strong> 2-3 year lead over Samsung at most advanced nodes. N2 (2nm) entering production 2025.</li>
+                        <li><strong class="trend-growing">Manufacturing Scale:</strong> 17 million wafer capacity, $50B+ annual capex dwarfs competitors.</li>
+                        <li><strong class="trend-growing">Customer Switching Costs:</strong> 18-24+ month qualification cycles. Deep ecosystem lock-in.</li>
+                        <li><strong class="trend-growing">Advanced Packaging Leadership:</strong> CoWoS is gold standard for AI chips. Fully booked through 2027.</li>
+                        <li><strong class="trend-growing">Execution Excellence:</strong> Track record of on-time technology delivery. Arizona fab achieving 92% yields.</li>
+                    </ul>
+                </div>
+
+                <!-- Growth Drivers -->
+                <div class="overview-card">
+                    <h3>Growth Drivers</h3>
+                    <ul>
+                        <li><strong class="trend-growing">AI Chip Demand Explosion:</strong> AI accelerator 5-year CAGR of mid-to-high 50%. NVIDIA, AMD, hyperscaler custom chips all dependent on TSMC.</li>
+                        <li><strong class="trend-growing">HPC Platform Dominance:</strong> Grew from 41% (2022) to 51% (2024) to 58% (2025) of revenue. Structural demand shift to high-margin advanced nodes.</li>
+                        <li><strong class="trend-growing">3nm & 2nm Technology Ramps:</strong> N3 already 18% of revenue (2024), ramping to 23% in 2025. N2 volume production starting 2025.</li>
+                        <li><strong class="trend-growing">CoWoS Capacity Expansion:</strong> Doubling capacity from 75k to 130k wafers/month by end 2026. High-margin business with pricing power.</li>
+                        <li><strong>Geographic Diversification:</strong> Arizona, Japan, Germany fabs reduce Taiwan concentration. $10B+ government subsidies.</li>
+                        <li><strong>Market Share Gains:</strong> Samsung's yield struggles and Intel's delays driving customers to TSMC.</li>
+                    </ul>
+                </div>
+
+                <!-- Key Risks -->
+                <div class="overview-card risks">
+                    <h3>Key Risks</h3>
+                    <ul>
+                        <li><span class="risk-extreme">EXTREME:</span> <strong>Geopolitical - Taiwan-China Tensions:</strong> 90%+ of advanced production in Taiwan. Conflict would be catastrophic for global supply chain.</li>
+                        <li><span class="risk-high">HIGH:</span> <strong>Customer Concentration:</strong> Top 10 = 76% of revenue (Apple ~22%, NVIDIA ~12%). Loss of major customer would materially impact revenue.</li>
+                        <li><span class="risk-high">HIGH:</span> <strong>AI Demand Cyclicality / Bubble Risk:</strong> If AI adoption disappoints or cloud capex pulls back, growth would decelerate sharply. CoWoS overcapacity risk.</li>
+                        <li><span class="risk-moderate">MODERATE:</span> <strong>Currency Fluctuation (NT$ vs USD):</strong> Sales in USD, costs in NT$. NT$ strengthening pressures margins.</li>
+                        <li><span class="risk-moderate">MODERATE:</span> <strong>Massive Capital Intensity:</strong> $50B+ annual capex strains cash flow. Rising interest rates increase financing costs.</li>
+                        <li><span class="risk-moderate">MODERATE:</span> <strong>Export Controls & China Revenue:</strong> China 11% of revenue. Further restrictions possible.</li>
+                        <li><span class="risk-moderate">MODERATE:</span> <strong>Natural Disasters:</strong> Taiwan earthquakes (Apr 2024 NT$3B loss, Jan 2025 NT$5.3B loss). Power/water disruption risks.</li>
+                    </ul>
+                </div>
+
+                <!-- Bull Case -->
+                <div class="overview-card bull">
+                    <h3>Bull Case</h3>
+                    <ul>
+                        <li><strong>AI Super Cycle:</strong> Multi-year structural demand growing 50%+ annually through 2029. TSMC is only foundry capable of producing cutting-edge AI chips at scale.</li>
+                        <li><strong>Unassailable Technology Moat:</strong> 2-3 year lead over Samsung, 4-5+ years over Intel. N2 ramping with no credible competitor. Premium pricing and market share gains.</li>
+                        <li><strong>CoWoS Monopoly:</strong> Only proven solution for AI chip integration. Fully booked through 2027. High-margin business with pricing power.</li>
+                        <li><strong>Operating Leverage:</strong> $158B+ revenue at 63-65% gross margins generates massive cash flow. Fixed-cost structure means high incremental margins.</li>
+                        <li><strong>Geographic Diversification:</strong> Arizona, Japan, Germany fabs reduce Taiwan risk. $10B+ subsidies. Improves customer confidence.</li>
+                        <li><strong>Customer Lock-In:</strong> 18-24 month qualification. Top customers (Apple, NVIDIA) won't switch from proven supplier.</li>
+                        <li><strong>Margin Expansion:</strong> Advanced nodes commanding premium pricing. Mix shift driving blended margin expansion.</li>
+                    </ul>
+                </div>
+
+                <!-- Bear Case -->
+                <div class="overview-card bear">
+                    <h3>Bear Case</h3>
+                    <ul>
+                        <li><strong>Geopolitical Catastrophe:</strong> China-Taiwan conflict would be catastrophic. 90%+ of leading-edge production in Taiwan. Existential risk.</li>
+                        <li><strong>AI Bubble:</strong> If AI hype deflates or cloud capex contracts, TSMC's 30% growth assumptions collapse. CoWoS overcapacity. Prior semiconductor bubbles ended badly.</li>
+                        <li><strong>Customer Concentration:</strong> Apple (22%), NVIDIA (12%), Top 10 (76%). Loss of key customer would devastate revenue. Enormous customer bargaining power.</li>
+                        <li><strong>Samsung/Intel Catch Up:</strong> If competitors resolve yield issues, competitive gap narrows. Pricing power and margins could erode.</li>
+                        <li><strong>Massive Capex = Stranded Assets:</strong> $50B+ annual capex assumes sustained demand. Cyclical downturn = underutilized fabs, margin compression.</li>
+                        <li><strong>Margin Compression from Overseas Expansion:</strong> Arizona fabs reportedly 30-40% higher costs than Taiwan. Mix shift = margin dilution.</li>
+                        <li><strong>Regulatory Interference:</strong> CHIPS Act funding comes with restrictions. Risk of government pressure on pricing, capacity, or technology.</li>
+                        <li><strong>Valuation - Expensive:</strong> Trading at 30x+ P/E despite cyclical industry. If growth slows to 10-15%, multiple could contract 30-40%.</li>
+                    </ul>
+                </div>
+
+                <!-- Recent Developments -->
+                <div class="overview-card">
+                    <h3>Recent Developments</h3>
+                    <ul>
+                        <li><strong>Jan 2026:</strong> <span class="trend-growing">Q4 2025 earnings beat.</span> Raised 2026 revenue guidance to ~30% growth. AI accelerator CAGR raised to mid-to-high 50%.</li>
+                        <li><strong>Dec 2025:</strong> <span class="trend-growing">Arizona Fab 21 achieves 92% yields.</span> Demonstrates execution capability outside Taiwan.</li>
+                        <li><strong>Dec 2024:</strong> <span class="trend-growing">Japan Fab 23 enters volume production</span> (28nm specialty). Phase 2 announced.</li>
+                        <li><strong>Nov 2024:</strong> <span class="trend-growing">$6.6B U.S. CHIPS Act funding finalized</span> + $5B loans. Reduces Arizona capex burden but includes China restrictions.</li>
+                        <li><strong>Jul 2025:</strong> <span class="trend-growing">CoWoS capacity expansion accelerated</span> to 130k wafers/month by end 2026.</li>
+                        <li><strong>Oct 2025:</strong> <span class="trend-declining">Export control compliance issue disclosed.</span> Customer chip may have been diverted to restricted entity.</li>
+                        <li><strong>Apr 2024 & Jan 2025:</strong> <span class="risk-moderate">Taiwan earthquakes</span> caused NT$3B and NT$5.3B losses respectively.</li>
+                        <li><strong>Apr & Oct 2024:</strong> <span class="risk-moderate">Electricity tariff increases</span> of 25% and 14% in Taiwan raise manufacturing costs.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid" id="kpiGrid"></div>
+
+    <!-- Management Guidance Section -->
+    <div class="guidance-section" id="guidanceSection">
+        <div class="guidance-header">
+            <h3>Management Guidance</h3>
+            <span class="guidance-meta">As of <span id="guidanceAsOf">Q4 2025 Earnings - January 15, 2026</span> | <span id="guidanceFY">2026</span></span>
+        </div>
+        <div class="guidance-grid" id="guidanceGrid"></div>
+        <div class="guidance-commentary" id="guidanceCommentary"></div>
+    </div>
+
+    <!-- Charts -->
+    <h2 class="section-title">Financial Performance</h2>
+    <div class="charts-container">
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>Revenue Trend (NT$ Billions)</h3>
+                <button class="help-btn" onclick="openModal('revenue')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="revenueChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>EPS Growth (NT$)</h3>
+                <button class="help-btn" onclick="openModal('eps')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="epsChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>Margin Trends</h3>
+                <button class="help-btn" onclick="openModal('margins')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="marginsChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>Free Cash Flow vs CapEx (NT$ Billions)</h3>
+                <button class="help-btn" onclick="openModal('fcf')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="fcfChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>Operating Cash Flow (NT$ Billions)</h3>
+                <button class="help-btn" onclick="openModal('ocf')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="ocfChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <h3>R&D Investment (NT$ Billions)</h3>
+                <button class="help-btn" onclick="openModal('rnd')">?</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="rndChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- DCF Valuation Section -->
+    <h2 class="section-title">DCF Valuation</h2>
+    <div class="dcf-section">
+        <!-- Valuation Summary Cards -->
+        <div class="dcf-summary">
+            <div class="dcf-card highlight">
+                <div class="dcf-label">Intrinsic Value</div>
+                <div class="dcf-value" id="dcfIV">$206</div>
+                <div class="dcf-change negative" id="dcfUpside">-42% downside</div>
+            </div>
+            <div class="dcf-card">
+                <div class="dcf-label">Entry Price (15% CAGR)</div>
+                <div class="dcf-value" id="dcfEntry">$129</div>
+                <div class="dcf-sublabel">Buy below for 15% annual return</div>
+            </div>
+            <div class="dcf-card">
+                <div class="dcf-label">Current Price</div>
+                <div class="dcf-value" id="dcfCurrent">$455</div>
+            </div>
+            <div class="dcf-card">
+                <div class="dcf-label">Prob-Weighted IV</div>
+                <div class="dcf-value" id="dcfWeighted">$222</div>
+                <div class="dcf-sublabel">30% Bull / 50% Base / 20% Bear</div>
+            </div>
+        </div>
+
+        <!-- Growth Rate Warning -->
+        <div class="dcf-warning" id="growthWarning">
+            <span class="warning-icon">&#9888;</span>
+            <span id="warningText">Historical growth very strong. FCF 5yr CAGR of 41% reflects operational leverage.</span>
+        </div>
+
+        <!-- DCF Inputs Display -->
+        <div class="dcf-inputs">
+            <h4>DCF Model Inputs</h4>
+            <div class="dcf-inputs-grid">
+                <div class="dcf-input-card">
+                    <div class="dcf-input-label">Base Year FCF</div>
+                    <div class="dcf-input-value" id="baseFCF">$32.9B</div>
+                    <div class="dcf-input-note">FY2024 Free Cash Flow</div>
+                </div>
+                <div class="dcf-input-card">
+                    <div class="dcf-input-label">Shares Outstanding</div>
+                    <div class="dcf-input-value" id="sharesOut">5.19B ADRs</div>
+                </div>
+                <div class="dcf-input-card">
+                    <div class="dcf-input-label">Net Debt</div>
+                    <div class="dcf-input-value" id="netDebt">-$56.9B</div>
+                    <div class="dcf-input-note">Negative = net cash</div>
+                </div>
+            </div>
+            <div class="fcf-projections">
+                <h5>Projected FCF (5-Year, Base Case)</h5>
+                <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+            </div>
+        </div>
+
+        <!-- Interactive Sliders -->
+        <div class="dcf-controls">
+            <div class="slider-group">
+                <label>Growth Rate: <span id="growthValue">22%</span></label>
+                <input type="range" id="growthSlider" min="0" max="40" value="22" step="1">
+                <div class="slider-hint" id="growthHint">Based on 5-year revenue CAGR</div>
+            </div>
+            <div class="slider-group">
+                <label>WACC: <span id="waccValue">10.5%</span></label>
+                <input type="range" id="waccSlider" min="6" max="18" value="10.5" step="0.5">
+            </div>
+            <div class="slider-group">
+                <label>Terminal Growth: <span id="terminalValue">4%</span></label>
+                <input type="range" id="terminalSlider" min="0" max="7" value="4" step="0.5">
+            </div>
+        </div>
+
+        <!-- Scenario Tabs -->
+        <div class="scenario-tabs">
+            <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+            <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+            <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+        </div>
+
+        <!-- Scenario Details -->
+        <div class="scenario-details" id="scenarioDetails">
+            <div class="scenario-assumptions">
+                <h4>Assumptions</h4>
+                <div class="assumption-grid" id="assumptionGrid"></div>
+            </div>
+        </div>
+
+        <!-- Sensitivity Table -->
+        <div class="sensitivity-section">
+            <h4>Sensitivity Analysis: Intrinsic Value by WACC & Terminal Growth</h4>
+            <table class="sensitivity-table" id="sensitivityMatrix"></table>
+        </div>
+
+        <!-- Historical Growth Rates -->
+        <div class="historical-growth">
+            <h4>Historical Growth Rates (CAGR)</h4>
+            <div class="growth-grid" id="growthGrid"></div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modalTitle"></h3>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+
+    <script>
+        // EMBEDDED CSV DATA
+        const csvData = `Period,Revenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,NetIncome,NetMargin,EPS,TotalAssets,ShareholdersEquity,TotalDebt,CashAndEquivalents,SharesOutstanding,OperatingCashFlow,CapEx,FreeCashFlow,RnDExpense,AdvancedTechPct,WaferShipments,CapacityUtilization,HPCRevenuePct,SmartphoneRevenuePct
+FY2014,762.8,377.7,49.5,295.9,38.8,254.2,33.3,9.81,,,,,25.930,421.5,288.5,133.0,,,,,,
+FY2015,843.5,410.4,48.7,320.0,37.9,302.8,35.9,11.68,,,,,25.930,529.9,257.5,272.4,,,,,,
+FY2016,947.9,474.8,50.1,378.0,39.9,331.8,35.0,12.79,,,,,25.930,539.8,328.0,211.8,71.2,,,,,
+FY2017,977.4,494.8,50.6,386.9,39.6,345.0,35.3,13.30,,,,,25.930,585.3,330.6,254.7,80.7,,,,,
+FY2018,1031.5,497.9,48.3,385.7,37.4,363.1,35.2,14.00,,,,,25.930,574.0,315.6,258.4,85.9,,,,,
+FY2019,1070.0,492.7,46.0,372.7,34.8,354.0,33.1,13.65,,,,,25.929,615.1,460.4,154.7,91.4,,,,,
+FY2020,1339.3,711.1,53.1,566.8,42.3,511.0,38.2,19.70,,,,,25.929,822.7,507.2,315.5,109.5,,,,,
+FY2021,1587.4,819.5,51.6,650.0,41.0,592.9,37.3,22.84,,,,,25.929,1112.2,839.2,273.0,124.7,,,,,
+FY2022,2263.9,1348.4,59.6,1121.3,49.5,993.3,43.9,38.29,,,,,25.929,1610.6,1082.7,527.9,163.3,,,,,
+FY2023,2161.7,1175.1,54.4,921.5,42.6,851.0,39.4,32.85,5532.2,3453.9,918.3,1465.4,25.929,1242.0,949.8,292.2,182.4,,,,,
+FY2024,2894.3,1624.4,56.1,1322.1,45.7,1157.5,40.0,44.68,6691.8,4279.3,958.4,2127.6,25.932,1826.2,956.0,870.2,204.2,,,,,
+FY2025,3809.1,2281.3,59.9,1936.1,50.8,1715.4,45.0,66.26,7933.0,5460.8,1033.0,2767.9,25.932,2275.0,1272.4,1002.6,246.4,,,,,`;
+
+        // EMBEDDED ANALYSIS JSON
+        const analysis = {
+  "ticker": "TSM",
+  "company_name": "Taiwan Semiconductor Manufacturing Company Limited",
+  "analysis_date": "2026-06-30",
+  "overview": "TSMC is the world's largest and most advanced dedicated semiconductor foundry, manufacturing chips for leading technology companies including Apple, NVIDIA, AMD, and Qualcomm. The company operates under a pure-play foundry model, producing semiconductors based on proprietary designs provided by customers without competing in chip design. TSMC commands approximately 72% market share in the foundry industry — now 11x larger than second-place Samsung — and is in high-volume production on N2 (2nm) in Taiwan, with Arizona Fab 21 Phase 1 (4nm/5nm) fully ramped and overseas expansion across Japan, Germany, and additional Arizona phases underway. All financial results are reported in New Taiwan Dollars (NT$); the U.S.-listed ADR (NYSE: TSM) trades in USD.",
+  "business_model": {
+    "summary": "Pure-play foundry model providing semiconductor manufacturing services without designing competing chips. Revenue primarily from wafer fabrication (~87%), with a rapidly growing advanced packaging segment (CoWoS, InFO, SoIC). FY2025 revenue NT$3,809.1B (+31.6% YoY); HPC now 58-61% of revenue driven by AI accelerators.",
+    "revenue_streams": [
+      {
+        "name": "Wafer Fabrication",
+        "percent": 87,
+        "trend": "stable",
+        "description": "Core manufacturing service across all technology nodes; advanced nodes (7nm and below) now 74-77% of wafer revenue"
+      },
+      {
+        "name": "Advanced Packaging (CoWoS, InFO, SoIC)",
+        "percent": 8,
+        "trend": "rapidly growing",
+        "description": "3DFabric technologies enabling AI chip integration. CoWoS scaling from ~75k wafers/month to 130k by end-2026. Supply-demand gap narrowing from 20% to ~10% by end-2026. Fully booked through 2027."
+      },
+      {
+        "name": "Testing, Mask Making, Design Services",
+        "percent": 5,
+        "trend": "stable",
+        "description": "Supporting services for comprehensive foundry offering"
+      }
+    ],
+    "revenue_by_platform": [
+      {
+        "platform": "High Performance Computing (HPC)",
+        "percent_2025": 58,
+        "percent_2024": 51,
+        "percent_2023": 43,
+        "trend": "strongly growing",
+        "description": "AI accelerators, data center CPUs/GPUs, networking chips. HPC rose to 61% in Q1 2026. AI accelerators represent high-teens % of total revenue and growing at mid-to-high 50% CAGR through 2029."
+      },
+      {
+        "platform": "Smartphone",
+        "percent_2025": 30,
+        "percent_2024": 35,
+        "percent_2023": 38,
+        "trend": "declining share",
+        "description": "Mobile processors for premium and mainstream devices. Absolute revenue stable but declining as a share of total."
+      },
+      {
+        "platform": "Internet of Things (IoT)",
+        "percent_2025": 6,
+        "percent_2024": 6,
+        "percent_2023": 8,
+        "trend": "stable",
+        "description": "Connected devices, wearables, smart home"
+      },
+      {
+        "platform": "Automotive",
+        "percent_2025": 4,
+        "percent_2024": 5,
+        "percent_2023": 6,
+        "trend": "stable",
+        "description": "ADAS, infotainment, EV controllers. N3A (automotive 3nm) PDKs released 2024; long-term growth expected."
+      },
+      {
+        "platform": "Digital Consumer Electronics",
+        "percent_2025": 2,
+        "percent_2024": 1,
+        "percent_2023": 2,
+        "trend": "declining",
+        "description": "Smart TVs, cameras, set-top boxes"
+      }
+    ],
+    "revenue_by_technology": [
+      {
+        "node": "3nm",
+        "percent_q1_2026": 25,
+        "percent_2025": 28,
+        "percent_2024": 18,
+        "trend": "ramping, nearing plateau"
+      },
+      {
+        "node": "5nm",
+        "percent_q1_2026": 36,
+        "percent_2025": 35,
+        "percent_2024": 34,
+        "trend": "mature/stable"
+      },
+      {
+        "node": "7nm",
+        "percent_q1_2026": 13,
+        "percent_2025": 14,
+        "percent_2024": 17,
+        "trend": "declining"
+      },
+      {
+        "node": "Advanced (7nm and below)",
+        "percent_q1_2026": 74,
+        "percent_2025": 77,
+        "percent_2024": 69,
+        "trend": "dominant and growing"
+      },
+      {
+        "node": "2nm (N2)",
+        "percent_q1_2026": "ramping",
+        "percent_2025": "initial volume",
+        "percent_2024": "N/A",
+        "trend": "entering high-volume manufacturing; expected to become 'large and long-lasting node'"
+      }
+    ],
+    "geographic_revenue": {
+      "North America": {"percent": 72, "trend": "growing", "description": "Primarily U.S. fabless companies (Apple, NVIDIA, AMD, Qualcomm, Broadcom). Taiwan negotiated 15% tariff rate in 2026 semiconductor deal, reducing trade friction."},
+      "China": {"percent": 9, "trend": "declining", "description": "Subject to U.S. export control restrictions. Declining as advanced node restrictions tighten. Proactive compliance."},
+      "Asia Pacific (ex-China, Japan)": {"percent": 9, "trend": "stable", "description": "Taiwan, Korea, Southeast Asia customers"},
+      "EMEA": {"percent": 4, "trend": "stable", "description": "Europe, Middle East, Africa"},
+      "Japan": {"percent": 6, "trend": "growing", "description": "Japanese semiconductor and electronics companies; supported by Kumamoto fab relationship"}
+    },
+    "customer_concentration": {
+      "top_customer_percent": 22,
+      "top_customer_identity": "Apple Inc. (estimated)",
+      "second_largest_percent": 13,
+      "second_largest_identity": "NVIDIA Corporation (estimated, growing)",
+      "top_10_percent": 76,
+      "note": "High concentration creates revenue visibility but also dependency risk. Switching costs are extremely high given 18-24 month qualification cycles."
+    },
+    "capacity": {
+      "annual_capacity_2025": "18+ million 12-inch equivalent wafers",
+      "capex_2025_actual": "NT$1,272.4B (~$39B USD)",
+      "capex_2026_guidance": "$52-56B USD (guided to high end of range as of Q1 2026 earnings)",
+      "cowos_capacity_2025": "~75,000 wafers/month",
+      "cowos_capacity_end_2026_target": "~130,000 wafers/month"
+    }
+  },
+  "competitive_position": {
+    "market_position": "Dominant foundry leader with ~72% global market share in Q1 2026 (up from 67.6% in Q1 2025), now 11x larger than second-place Samsung Foundry at ~6.5%",
+    "main_competitors": [
+      {
+        "name": "Samsung Foundry",
+        "market_share": "~6.5% (declining from ~10.5% in Q1 2024)",
+        "strengths": ["Integrated device manufacturer scale", "Memory + logic synergies", "Korean government support", "$73B announced 2026 capex commitment"],
+        "weaknesses": ["Persistent yield issues at 3nm/2nm nodes", "Customers fleeing to TSMC", "Customer trust impaired by reliability concerns", "Revenue gap vs. TSMC widening dramatically"],
+        "threat_level": "low-to-moderate"
+      },
+      {
+        "name": "Intel Foundry Services (IFS)",
+        "market_share": "<1% (generated ~$223M in Q3 2025)",
+        "strengths": ["U.S. government CHIPS Act support", "Advanced packaging capabilities (EMIB, Foveros)", "Domestic U.S. manufacturing push", "18A process node in development"],
+        "weaknesses": ["Effectively de minimis market presence", "NVIDIA paused 18A testing", "Cultural/structural challenges as ex-IDM", "No meaningful external customer wins at advanced nodes"],
+        "threat_level": "minimal near-term; potential longer-term if 18A succeeds"
+      },
+      {
+        "name": "GlobalFoundries",
+        "market_share": "4-5%",
+        "strengths": ["Strong in mature nodes", "Automotive and IoT focus", "U.S. domestic presence"],
+        "weaknesses": ["Exited leading-edge race at 12nm", "No advanced node competition"],
+        "threat_level": "minimal"
+      },
+      {
+        "name": "UMC, SMIC (China)",
+        "market_share": "3-5% each",
+        "strengths": ["Lower cost", "China domestic market", "SMIC growing in China due to export controls"],
+        "weaknesses": ["Technology gap (SMIC at ~7nm with workarounds, constrained by export controls)", "Blocked from advanced equipment access"],
+        "threat_level": "minimal at advanced nodes; growing at mature nodes in China"
+      }
+    ],
+    "moat_factors": [
+      {
+        "factor": "Technology Leadership",
+        "strength": "very strong",
+        "description": "N2 (2nm using nanosheet/GAA transistors) in high-volume manufacturing as of Q4 2025/Q1 2026. N2P and N2X variants in development. A16 (1.6nm with backside power delivery) targeting H2 2026 mass production. A14 (second-gen nanosheet) on track for 2028. Samsung SF2 continues to lag; Intel 18A facing delays with minimal customer adoption."
+      },
+      {
+        "factor": "Manufacturing Scale & Capacity",
+        "strength": "very strong",
+        "description": "18M+ wafer capacity, with $52-56B capex in 2026 alone dwarfing all competitors. Scale enables superior yields, fastest technology ramps, and lowest cost-per-wafer at each node. CoWoS capacity at 80%+ CAGR from 2022-2027."
+      },
+      {
+        "factor": "Customer Switching Costs",
+        "strength": "very strong",
+        "description": "Qualifying a new foundry takes 18-24+ months. Design ecosystem lock-in via OIP, PDKs, IP libraries. Risk-averse customers (Apple, NVIDIA, AMD, Broadcom) will not risk production on unproven alternatives. AI chip designs are co-developed with TSMC process engineers."
+      },
+      {
+        "factor": "CoWoS Advanced Packaging Monopoly",
+        "strength": "very strong",
+        "description": "CoWoS is the gold standard for integrating AI chips (GPU + HBM stacking). Capacity expanding from ~75k to 130k wafers/month by end-2026. TSMC CoWoS fully booked; supply-demand gap narrowing from 20% to ~10% by end-2026. 80%+ CAGR in capacity 2022-2027. No credible competitor at scale."
+      },
+      {
+        "factor": "Ecosystem & Partnerships",
+        "strength": "strong",
+        "description": "Deep integration with EDA vendors (Synopsys, Cadence), IP providers, and equipment makers (ASML). Open Innovation Platform with 400+ partners. NVIDIA, Apple, AMD co-developing chip designs on new process nodes."
+      },
+      {
+        "factor": "Execution Excellence",
+        "strength": "strong",
+        "description": "Arizona Fab 21 Phase 1 achieving ~92% yields — comparable to Taiwan fabs. On-time delivery of every node from N7 through N2. Track record in simultaneous complex fab ramps (3 Arizona phases, Japan Fab 23 in volume production, Germany Fab 24 under construction)."
+      },
+      {
+        "factor": "Capital Requirements as Barrier",
+        "strength": "strong",
+        "description": "Leading-edge fab construction costs $20-25B+ each. EUV tooling from ASML (monopoly supplier) is constrained and long-lead. $52-56B annual capex is simply beyond the financial reach of any credible challenger outside Samsung (which is struggling to deploy capital effectively)."
+      }
+    ],
+    "competitive_advantages_summary": "TSMC's competitive position is stronger than it has ever been. Market share rose to ~72% in Q1 2026, Samsung is 11x smaller and declining, and Intel Foundry is effectively negligible. The combination of technology leadership (N2 ramping, A16 imminent), CoWoS monopoly in AI packaging, 92% Arizona fab yields, and irreplaceable customer relationships creates a near-unbreakable competitive moat.",
+    "weaknesses": [
+      "Geographic concentration — 80%+ of advanced production still in Taiwan despite overseas expansion",
+      "High customer concentration (top 10 = 76% of revenue, top 2 = ~35%)",
+      "Sole-source dependence on ASML for EUV lithography equipment",
+      "Overseas fabs carry 30-40% higher cost structures than Taiwan, diluting blended margins",
+      "Premium pricing limits addressable market in cost-sensitive, mature-node segments"
+    ]
+  },
+  "growth_drivers": [
+    {
+      "driver": "AI Chip Demand — Structural Multi-Year Megatrend",
+      "timeframe": "2026-2030+",
+      "impact": "very high",
+      "description": "CEO C.C. Wei at Q1 2026 earnings described AI demand as 'extremely robust,' driven by agentic AI requiring dramatically more compute per query. AI accelerators are high-teens % of TSMC total revenue growing at mid-to-high 50% CAGR through 2029. NVIDIA B200/GB200, AMD MI400, custom hyperscaler ASICs (Google, Amazon, Microsoft, Meta) all manufactured exclusively at TSMC on N3/N2."
+    },
+    {
+      "driver": "HPC Platform Expansion",
+      "timeframe": "2026-2029",
+      "impact": "high",
+      "description": "HPC reached 58% of FY2025 revenue, rising to 61% in Q1 2026. Data center buildout, cloud AI training/inference, custom silicon (ARM-based CPUs, TPUs, networking ASICs) driving continued mix shift to highest-margin advanced nodes. Management targeting further share gains in HPC vs. other platforms."
+    },
+    {
+      "driver": "N2 (2nm) Volume Ramp & A16 (1.6nm) Production Launch",
+      "timeframe": "2026-2028",
+      "impact": "high",
+      "description": "N2 entered high-volume manufacturing Q4 2025 with Apple (A20), NVIDIA, AMD as launch customers. Described as 'another large and long-lasting node' — similar durability to N5/N3 families. N2P and N2X variants follow. A16, with backside power delivery (Super Power Rail), targeting H2 2026 mass production in Taichung and Kaohsiung — first node with backside power rail, improving power efficiency 10-15%. Management flagged N2 creates ~2-3% gross margin dilution in full-year 2026 during initial ramp."
+    },
+    {
+      "driver": "CoWoS Advanced Packaging — Capacity Doubles",
+      "timeframe": "2026-2027",
+      "impact": "high",
+      "description": "CoWoS capacity scaling from ~75k to 130k wafers/month by end-2026 (73% increase), against demand estimated at ~1M wafers for 2026. TSMC projects CoWoS CAGR of 80%+ from 2022-2027 per May 2026 Technology Symposium. Supply-demand gap narrowing from 20% to ~10% by end-2026. High-margin, high-pricing-power business with 2+ year forward visibility."
+    },
+    {
+      "driver": "Geographic Diversification — Arizona, Japan, Germany",
+      "timeframe": "2025-2030",
+      "impact": "moderate-to-high",
+      "description": "Arizona Fab 21 Phase 1 (4nm/5nm) in volume production at ~92% yields. Phase 2 (3nm) equipment installation beginning Q3 2026, production in 2027. Phase 3 (2nm/A16) equipment in Q3 2026 for 2027 ramp. Japan Fab 23 (28nm) in volume production; Phase 2 planned. Germany Fab 24 (28nm) under construction with EUR5B state aid. U.S. CHIPS Act: $6.6B direct + $5B loans. Total announced global investment ~$165B. Reduces geopolitical risk premium over time."
+    },
+    {
+      "driver": "Tariff Clarity — Taiwan Semiconductor Deal",
+      "timeframe": "2026",
+      "impact": "moderate",
+      "description": "Taiwan negotiated a $250B U.S. semiconductor deal locking in a 15% effective tariff rate, well below most Asian nations. Semiconductor-specific exemptions reduce effective burden further. Removes a key investor uncertainty. Taiwan GDP forecast revised from 3.54% to 7.71% for 2026 on semiconductor strength."
+    },
+    {
+      "driver": "Market Share Gains from Competitor Weakness",
+      "timeframe": "2026-2027",
+      "impact": "moderate",
+      "description": "TSMC market share grew from 62.8% (Q1 2024) to ~72% (Q1 2026). Samsung's foundry share fell from ~10.5% to ~6.5% over same period. Intel Foundry at <1% share. Customers seeking supply certainty are consolidating onto TSMC. Incremental wins from former Samsung customers provide upside."
+    },
+    {
+      "driver": "Agentic AI — Next Compute Wave",
+      "timeframe": "2026-2029",
+      "impact": "high",
+      "description": "Management highlighted at Q1 2026 earnings that the shift from generative to agentic AI dramatically increases compute per query/task, supporting sustained demand for more and more advanced AI chip production. This 'inference scaling' trend suggests AI chip demand is not a one-time training surge but a durable demand floor."
+    }
+  ],
+  "risks": {
+    "business": [
+      {
+        "risk": "Customer Concentration",
+        "severity": "high",
+        "probability": "low-to-moderate",
+        "description": "Apple (~22%) and NVIDIA (~13% estimated) together represent ~35% of revenue. Top 10 customers are ~76% of revenue. Loss of Apple (e.g., to Intel Foundry or Samsung) or a demand shock from NVIDIA's AI chip sales would materially impact results. Mitigating factor: Switching costs are extreme, qualifying alternatives takes 18-24 months minimum, and TSMC's technology advantage offers no credible near-term replacement."
+      },
+      {
+        "risk": "AI Demand Cyclicality / Bubble Risk",
+        "severity": "high",
+        "probability": "moderate",
+        "description": "Approximately 30% YoY revenue growth in 2026 is predicated on AI demand continuation. Management CAGR targets (mid-to-high 50% for AI accelerators through 2029) are ambitious. If AI ROI disappoints, hyperscaler capex pulls back, or AI 'hype cycle' deflates, TSMC's growth would decelerate sharply. CoWoS overcapacity risk if AI chip demand normalizes. N2 margin dilution with lower utilization would be severe. Mitigating factor: Agentic AI and inference scaling provide demand beyond training; structural adoption broadening."
+      },
+      {
+        "risk": "Export Controls & China Revenue",
+        "severity": "moderate",
+        "probability": "high",
+        "description": "China revenue declining to ~9% of total. U.S. export controls restricting advanced chip equipment sales to China and TSMC's ability to serve Chinese customers with advanced nodes. Ongoing investigation of Oct 2025 chip-to-restricted-entity diversion incident. Further tightening possible. Mitigating factor: Non-China demand more than offsets; proactive compliance; U.S. CHIPS Act restricts China investment for 10 years regardless."
+      },
+      {
+        "risk": "Semiconductor Cyclicality",
+        "severity": "moderate",
+        "probability": "moderate",
+        "description": "Historical semiconductor cycles see 20-30% earnings declines. While AI/HPC is structural, smartphone, PC, consumer electronics, and IoT verticals remain cyclical and represent ~36-40% of non-HPC revenue. High fixed costs mean utilization drops hit margins hard. Mitigating factor: Advanced node capacity harder to idle than mature; long-term customer commitments; AI demand counter-cyclical."
+      },
+      {
+        "risk": "Technological Obsolescence / Competition Catching Up",
+        "severity": "moderate",
+        "probability": "low",
+        "description": "If Samsung resolves SF2 yield issues or Intel's 18A succeeds at scale, competitive gap could narrow. Breakthrough packaging (SRAM replacement, photonics) could disrupt conventional scaling. Mitigating factor: TSMC's 2-3 year node lead is widening, not narrowing; A14 in 2028 already in development; Samsung's $73B 2026 commitment has not translated into meaningful market share recovery."
+      }
+    ],
+    "financial": [
+      {
+        "risk": "Currency Fluctuation (NT$ vs. USD)",
+        "severity": "moderate",
+        "probability": "high",
+        "description": "Revenue priced in USD, but majority of costs (labor, utilities, local suppliers) in NT$. ADR investors see USD results; TWD fluctuation creates translation effects. NT$ appreciation pressures reported margins. Every 1% NT$ appreciation vs. USD reduces operating margin ~0.4 percentage points. Note: TSMC financials are reported in TWD; the ADR (NYSE: TSM) converts at prevailing exchange rates. Mitigating factor: Natural hedging as USD capex in Arizona/Germany rises; derivative hedging program."
+      },
+      {
+        "risk": "Massive Capital Intensity & Execution Risk",
+        "severity": "moderate",
+        "probability": "certain",
+        "description": "$52-56B capex in 2026 alone (guided to high end of range). Simultaneous construction across Arizona (3 phases), Japan (2 fabs), Germany, and Taiwan expansions. Cost overruns, delays, or yield disappointments in multiple simultaneous projects. Rising debt levels. Mitigating factor: Arizona Phase 1's 92% yields demonstrates capability; $50B+ operating cash flow; government subsidies reducing net outlay; investment-grade credit rating."
+      },
+      {
+        "risk": "N2 Margin Dilution — Temporary Headwind",
+        "severity": "low-to-moderate",
+        "probability": "certain",
+        "description": "Management guided that N2 ramp creates 2-3% gross margin dilution for full-year 2026 as yields and utilization build. This is expected and temporary — N3 margins reached corporate averages in H2 2026 per guidance. N2 margins expected to follow similar trajectory. Mitigating factor: Structural gross margin target raised to 56%+ through the cycle; Q1 2026 gross margin already 66.2%."
+      },
+      {
+        "risk": "Margin Pressure from Overseas Fabs",
+        "severity": "low-to-moderate",
+        "probability": "high",
+        "description": "Arizona, Germany, Japan fabs carry 30-40% higher operating costs (labor, energy, materials) vs. Taiwan. As overseas contribution to revenue grows from negligible to meaningful over 2026-2030, blended margins may face structural headwinds. Mitigating factor: Government subsidies partially offset; pricing premiums from U.S.-made chips (some customers will pay); advanced node mix improving."
+      }
+    ],
+    "regulatory": [
+      {
+        "risk": "U.S. CHIPS Act Compliance Requirements",
+        "severity": "moderate",
+        "probability": "high",
+        "description": "$6.6B direct funding + $5B loans contingent on: no advanced capacity expansion in China for 10 years; no joint research with 'foreign entities of concern'; quarterly reporting. Non-compliance = clawback. Mitigating factor: Company already aligned with U.S. policy; restrictions are strategically consistent with TSMC's geographic diversification goals."
+      },
+      {
+        "risk": "Tariff & Trade Policy Uncertainty",
+        "severity": "moderate",
+        "probability": "moderate",
+        "description": "Taiwan's $250B semiconductor deal locked in a 15% tariff rate in 2026, but U.S. trade policy can change. Further escalation in U.S.-China trade war could impact equipment imports, customer supply chains, or market access. Mitigating factor: TSMC's strategic importance to U.S. AI competitiveness gives significant political leverage; Arizona fabs build domestic goodwill."
+      },
+      {
+        "risk": "Environmental & Energy Regulations",
+        "severity": "low-to-moderate",
+        "probability": "high",
+        "description": "Taiwan electricity tariffs rose 25% (Apr 2024) and 14% (Oct 2024). Semiconductor manufacturing is energy- and water-intensive. Carbon pricing, renewable energy mandates, water restrictions could raise costs. Drought risk in Taiwan. Mitigating factor: 4.4 GW renewable PPAs signed; water recycling programs; energy efficiency investments."
+      }
+    ],
+    "macro": [
+      {
+        "risk": "Geopolitical Risk — Taiwan-China Tensions",
+        "severity": "extreme",
+        "probability": "low (but non-zero and receiving sustained attention)",
+        "description": "Despite overseas expansion, 80%+ of TSMC's advanced chip production remains in Taiwan. China-Taiwan military conflict or selective blockade would be catastrophic for global technology supply chains and could render TSMC equity impaired. Rest of World (2026 analysis) flagged this as the world's single most dangerous economic geopolitical flashpoint. 'Silicon Shield' theory — that TSMC's strategic importance deters conflict — may weaken as Arizona capacity grows. Mitigating factor: U.S. military commitment to Taiwan, TSMC's strategic value to allied nations, geographic diversification in progress, deterrence remains robust."
+      },
+      {
+        "risk": "Natural Disasters (Earthquakes, Typhoons, Drought)",
+        "severity": "moderate-to-high",
+        "probability": "moderate-to-high",
+        "description": "Taiwan is seismically active. Apr 2024 earthquake caused NT$3B loss; Jan 2025 earthquake caused NT$5.3B loss. Typhoons, droughts can disrupt production and water supply. Power outages (Taiwan grid reliability) remain a concern. Mitigating factor: Robust disaster recovery; insurance; geographic diversification beginning to meaningfully diversify production risk."
+      },
+      {
+        "risk": "Global Recession / Demand Slowdown",
+        "severity": "moderate",
+        "probability": "moderate",
+        "description": "Consumer spending slowdown impacts smartphones, PCs, consumer electronics (~36-40% of non-HPC revenue). Enterprise IT capex cuts impact data center even if AI spending holds. High fixed-cost fab structure means utilization declines hit margins hard. Mitigating factor: AI/HPC demand appears more durable; long-term customer commitments; advanced nodes less susceptible to near-term cancellations."
+      },
+      {
+        "risk": "U.S.-China Tech War Escalation",
+        "severity": "moderate",
+        "probability": "high",
+        "description": "Further restrictions on semiconductor equipment exports (ASML, U.S. toolmakers), chip design software, or services could disrupt supply chains. Risk of being caught between U.S. and China strategic competition. Mitigating factor: Company committed to U.S. compliance; CHIPS Act alignment; China revenue already declining as a % of total."
+      }
+    ],
+    "execution": [
+      {
+        "risk": "Fab Ramp Execution Risk — Simultaneous Global Expansion",
+        "severity": "moderate",
+        "probability": "low-to-moderate",
+        "description": "TSMC managing simultaneous ramps: Arizona Phase 2 (3nm, equipment starting Q3 2026, production 2027), Arizona Phase 3 (2nm/A16, equipment Q3 2026), Japan Fab 23 Phase 2, Germany Fab 24 (construction), plus Taiwan N2 and A16 ramps. Cultural/workforce challenges in new geographies. Mitigating factor: Arizona Phase 1's ~92% yields is exceptional execution proof point; decades of ramp experience; proven project management."
+      },
+      {
+        "risk": "Technology Transition Risk — A16 and Beyond",
+        "severity": "moderate",
+        "probability": "low",
+        "description": "A16 (1.6nm) introduces backside power delivery — a novel architectural change. While N2 uses nanosheet (GAA) transistors successfully, A16's Super Power Rail is a more complex innovation. Yield ramps, customer EDA flow compatibility, and cost structures at sub-2nm face physics limits. Mitigating factor: Extensive R&D co-development with Apple/NVIDIA; A14 (2028) already in planning; A16 H2 2026 target appears on track per Q1 2026 management commentary."
+      },
+      {
+        "risk": "Talent Shortage & Retention",
+        "severity": "low-to-moderate",
+        "probability": "moderate",
+        "description": "Fierce competition for semiconductor process engineers globally. Arizona and Germany face acute local talent shortages; knowledge transfer from Taiwan engineers is complex and time-consuming. Mitigating factor: Competitive compensation, university partnerships, U.S. visa programs, substantial training investment."
+      }
+    ]
+  },
+  "macro_factors": {
+    "industry_outlook": "Global foundry market growing ~30% YoY in Q1 2026, primarily AI-driven. Pure-play foundry market projected to sustain 10-15% CAGR 2026-2030 with advanced nodes (3nm and below) growing at 20%+ CAGR. AI accelerator demand — the primary driver — growing at mid-to-high 50% CAGR through 2029 per TSMC management. The shift to agentic AI (inference scaling) supports sustained demand beyond the initial training build-out.",
+    "cyclicality": "Historically highly cyclical, but AI/HPC demand providing structural support in the current cycle. TSMC's revenue composition has shifted materially toward HPC (now 58-61% vs. 41% in 2022), reducing smartphone/consumer cyclicality exposure. Advanced nodes (74-77% of revenue) are less cyclical than mature nodes due to long customer qualification cycles and AI-driven structural demand.",
+    "interest_rate_sensitivity": "Moderate indirect. Higher rates dampen consumer spending (smartphones, PCs) and could slow enterprise AI capex. Significant direct impact via financing costs on TSMC's $52-56B annual capex program. Mitigated by strong operating cash flow generation (~$50B+ annually) and government subsidies.",
+    "key_input_costs": [
+      {"input": "Electricity", "trend": "rising-but-stabilizing", "impact": "Taiwan tariffs increased 25% (Apr 2024) + 14% (Oct 2024). Major cost component. Investing in 4.4 GW renewable PPAs to partially offset. Energy demand rising with advanced fab expansion."},
+      {"input": "Silicon Wafers", "trend": "stable-to-rising", "impact": "Long-term contracts with suppliers. Supply adequate. Prices rising modestly with demand."},
+      {"input": "EUV Lithography Tools (ASML)", "trend": "constrained/long-lead", "impact": "Critical monopoly supplier. High Numerical Aperture (High-NA) EUV tools required for A16 and beyond. Export controls limit ASML's ability to service China customers, indirectly benefiting TSMC's equipment access priority."},
+      {"input": "Labor — Engineers", "trend": "rising", "impact": "Wage inflation, especially acute in U.S. (Arizona) and Germany. Talent shortage constraining overseas ramp speed."},
+      {"input": "Gases & Chemicals", "trend": "stable", "impact": "Multiple suppliers. No major concerns currently."}
+    ],
+    "regulatory_environment_trends": "Governments competing aggressively to subsidize domestic semiconductor capacity (U.S. CHIPS Act, European Chips Act, Japan METI subsidies, Korea K-Chips Act). This is net-positive for TSMC's geographic expansion economics. Export controls on advanced technology to China tightening (ASML equipment, U.S. EDA tools, AI chip exports). Taiwan secured a favorable $250B U.S. semiconductor trade deal with 15% effective tariff rate in 2026. Overall regulatory environment: supportive via subsidies, complex via export controls, increasingly interventionist on national security grounds."
+  },
+  "recent_developments": [
+    {
+      "date": "2026-04",
+      "event": "Q1 2026 Earnings — Beat All Metrics",
+      "impact": "very positive",
+      "description": "Revenue $35.9B (+40.6% YoY, +6.4% QoQ), beating guidance midpoint of $35.2B. Gross margin 66.2% (+390 bps sequential), operating margin 58.1% (+410 bps). EPS NT$22.08. Net income +58.3% YoY. HPC platform 61% of revenue. 3nm at 25%, 5nm at 36%, advanced nodes 74% of revenue. Strongest quarterly results in company history at that point."
+    },
+    {
+      "date": "2026-04",
+      "event": "Q2 2026 Guidance — Revenue $39.0-$40.2B",
+      "impact": "very positive",
+      "description": "Midpoint $39.6B implies +10% sequential and +32% YoY growth. Gross margin guided 65.5-67.5%, operating margin 56.5-58.5%. Raised full-year 2026 revenue growth guidance to above 30% in USD (from ~30%). CapEx guided to high end of $52-56B range. Confirmed N3 margins reaching corporate averages in H2 2026. Confirmed N2 creating ~2-3% full-year gross margin dilution from ramp."
+    },
+    {
+      "date": "2026-05",
+      "event": "TSMC Technology Symposium — CoWoS 80%+ CAGR, A16 Confirmed",
+      "impact": "positive",
+      "description": "TSMC hosted its annual technology symposium. Confirmed CoWoS advanced packaging CAGR of 80%+ from 2022-2027. A16 (1.6nm with Super Power Rail backside power delivery) on track for H2 2026 mass production. A14 (second-gen nanosheet, 2028) announced. Expanded SoIC (3D stacking) capacity for AI chiplet integration."
+    },
+    {
+      "date": "2026-06",
+      "event": "CoWoS Supply-Demand Gap Narrowing — June 2026 TrendForce Report",
+      "impact": "positive",
+      "description": "Industry data shows TSMC's CoWoS supply-demand gap narrowing from ~20% to ~10% by end-2026 as capacity expands to 130k wafers/month. AI chip demand broadening from GPU to ASICs, networking, and PMICs, further increasing overall packaging demand across TSMC's product portfolio."
+    },
+    {
+      "date": "2026-06",
+      "event": "TSMC Now 11x Larger Than Samsung Foundry",
+      "impact": "positive",
+      "description": "TrendForce Q1 2026 data shows TSMC at ~72% global foundry market share, Samsung Foundry at ~6.5%. TSMC is now 11x larger by revenue than Samsung's foundry business. Share gap has widened steadily from 8x in Q1 2025, reflecting Samsung's continued yield challenges and customer defections."
+    },
+    {
+      "date": "2026-Q2",
+      "event": "Arizona Fab 21 Phase 2 & 3 — Equipment Installation Begins Q3 2026",
+      "impact": "positive",
+      "description": "TSMC accelerated timeline: equipment installation for Phase 2 (3nm) and Phase 3 (2nm/A16) in Arizona both beginning in Q3 2026 (July-September). Phase 2 production targeted 2027. Total Arizona investment now ~$165B committed (4 phases planned). Reduces long-term geopolitical risk and qualifies for U.S. CHIPS Act funding."
+    },
+    {
+      "date": "2026-01",
+      "event": "Taiwan Semiconductor Trade Deal — 15% Tariff Rate",
+      "impact": "positive",
+      "description": "Taiwan negotiated a $250B U.S. semiconductor deal, locking in effective tariff rates of ~15% — well below most Asian competitors. Semiconductor-specific exemptions reduce burden further. Removes a major overhang for TSMC's U.S. customers and supply chain economics."
+    },
+    {
+      "date": "2025-Q4 / 2026-Q1",
+      "event": "N2 (2nm) Enters High-Volume Manufacturing",
+      "impact": "positive",
+      "description": "TSMC commenced high-volume manufacturing of N2 (2nm nanosheet/GAA transistors) at Fab 22 in Kaohsiung. Apple (A20 chip), NVIDIA, and AMD are launch customers. N2 is described by management as 'another large and long-lasting node.' N2P and N2X variants in development to extend the platform."
+    },
+    {
+      "date": "2025-01",
+      "event": "January 2025 Earthquake — NT$5.3B Loss",
+      "impact": "negative",
+      "description": "Earthquake caused NT$5.3B net loss (after insurance). Second major quake in under a year (after Apr 2024 NT$3B loss). Highlights persistent natural disaster risk concentration in Taiwan. Operations restored quickly; underscores need for geographic diversification."
+    },
+    {
+      "date": "2025-10",
+      "event": "Export Control Compliance Incident",
+      "impact": "neutral-to-negative",
+      "description": "TSMC disclosed a chip may have been diverted to a restricted Chinese entity. Company notified U.S. and Taiwan authorities proactively. Investigation ongoing. Highlights risk of inadvertent export control violations at scale, but proactive disclosure demonstrates compliance culture."
+    }
+  ],
+  "guidance": {
+    "as_of": "Q1 2026 Earnings — April 2026",
+    "fiscal_year": "2026 (Calendar Year 2026)",
+    "items": [
+      {
+        "metric": "Full-Year 2026 Revenue Growth",
+        "target": "Above 30% YoY in USD",
+        "period": "Full Year 2026",
+        "vs_prior": "raised from '~30%' guided in January 2026",
+        "notes": "Implies revenue above ~$122B * 1.30 = $158B USD. Driven by AI accelerator demand, N2/N3 ramps, and CoWoS expansion. Management expressed high confidence at Q1 2026 earnings."
+      },
+      {
+        "metric": "Q2 2026 Revenue",
+        "target": "$39.0B - $40.2B USD",
+        "period": "Q2 2026",
+        "vs_prior": "new guidance (first issued April 2026)",
+        "notes": "Midpoint $39.6B, +10% sequential and +32% YoY. Continued AI-driven demand strength."
+      },
+      {
+        "metric": "Q2 2026 Gross Margin",
+        "target": "65.5% - 67.5%",
+        "period": "Q2 2026",
+        "vs_prior": "maintained near Q1 2026 level of 66.2%",
+        "notes": "Sustained by advanced node mix and pricing power; N2 dilution offset by N3 margin maturation."
+      },
+      {
+        "metric": "Q2 2026 Operating Margin",
+        "target": "56.5% - 58.5%",
+        "period": "Q2 2026",
+        "vs_prior": "maintained (Q1 2026 achieved 58.1%)",
+        "notes": "Operating leverage from scale; R&D as % of revenue declining."
+      },
+      {
+        "metric": "Gross Margin — Through-the-Cycle Target",
+        "target": "56% and higher",
+        "period": "Long-term",
+        "vs_prior": "raised (previously 53%+)",
+        "notes": "Management updated long-term gross margin floor to 56%+. Current run-rate (66-67%) is well above this, reflecting premium-cycle pricing."
+      },
+      {
+        "metric": "AI Accelerator Revenue Growth",
+        "target": "Mid-to-high 50% CAGR",
+        "period": "2024-2029 (5-year)",
+        "vs_prior": "raised (previously low-to-mid 50% CAGR at January 2026 earnings); further raised at Q1 to 54-56%",
+        "notes": "AI accelerators are high-teens % of total TSMC revenue. Agentic AI inference scaling driving demand beyond training."
+      },
+      {
+        "metric": "Capital Expenditure",
+        "target": "$52B - $56B USD (guided to high end)",
+        "period": "2026",
+        "vs_prior": "high end confirmed at Q1 2026 (vs. $38-42B in 2025 actual ~$39B)",
+        "notes": "70-80% for advanced technology (N2, N3, N5 capacity). Remainder for mature nodes, advanced packaging, overseas fabs. Arizona Phase 2/3 equipment begins Q3 2026."
+      },
+      {
+        "metric": "CoWoS Capacity",
+        "target": "~130,000 wafers/month",
+        "period": "End of 2026",
+        "vs_prior": "maintained (confirmed at May 2026 Technology Symposium)",
+        "notes": "Up from ~75k in 2025. CAGR of 80%+ from 2022-2027. Supply-demand gap narrowing to ~10% by end-2026. Fully booked through 2027."
+      },
+      {
+        "metric": "N3 Margins",
+        "target": "Reach corporate average gross margins in H2 2026",
+        "period": "H2 2026",
+        "vs_prior": "maintained",
+        "notes": "N3 yield maturation driving margin improvement. Historically consistent with N5 trajectory."
+      },
+      {
+        "metric": "N2 Gross Margin Dilution",
+        "target": "~2-3% full-year 2026 headwind",
+        "period": "FY2026",
+        "vs_prior": "new disclosure (Q1 2026 earnings)",
+        "notes": "Temporary ramp dilution expected to diminish as N2 yields and utilization scale. Expected to follow N3 margin trajectory with 12-18 month lag."
+      },
+      {
+        "metric": "A16 Mass Production",
+        "target": "H2 2026 volume production",
+        "period": "H2 2026",
+        "vs_prior": "maintained/on track",
+        "notes": "1.6nm with Super Power Rail (backside power delivery). Production in Taichung and Kaohsiung. First foundry node with backside power delivery, enabling 10-15% speed or 25-30% power improvement vs. N2."
+      }
+    ],
+    "management_commentary": "CEO C.C. Wei at Q1 2026 earnings stated AI demand is 'extremely robust' and that the shift to agentic AI is 'driving even more compute per query,' reinforcing confidence in the mid-to-high 50% AI accelerator CAGR through 2029. He described N2 as 'another large and long-lasting node' and confirmed A16 is on track for H2 2026. CFO Wendell Huang noted the gross margin through-the-cycle target raised to 56%+, reflecting confidence in structural margin improvement. Management guided full-year 2026 revenue growth to 'above 30%' in USD — a raise from the prior '~30%' guidance given in January 2026. Both executives characterized AI as a multi-decade structural megatrend, not a cyclical surge."
+  },
+  "bull_case": [
+    "AI Demand Structural Megatrend with Agentic AI Upside: AI accelerators growing at mid-to-high 50% CAGR through 2029. The shift to agentic AI (agents that take actions, not just generate text) drives dramatically higher compute per task, sustaining demand beyond the initial training buildout. NVIDIA, AMD, and hyperscaler custom ASICs (Google TPU, Amazon Trainium, Microsoft Maia, Meta MTIA) all exclusively manufactured at TSMC. This is a decade-long demand driver with no credible foundry alternative.",
+    "Unassailable Technology Lead — Widening, Not Narrowing: TSMC is now 11x larger than Samsung Foundry and holds ~72% global market share (up from ~63% two years ago). N2 ramping successfully; A16 on track for H2 2026; A14 in 2028 planning. Samsung SF2 continues to disappoint; Intel Foundry at <1% market share. Every competitive crisis (Samsung yields, Intel 18A delays) drives more volume to TSMC, widening the competitive gap rather than narrowing it.",
+    "CoWoS Advanced Packaging Monopoly with Explosive Growth: CoWoS is the only proven solution for integrating AI chips at the scale demanded by NVIDIA, AMD, and hyperscalers. Capacity ramping from 75k to 130k wafers/month by end-2026 at 80%+ CAGR 2022-2027. Fully booked through 2027. High-margin, high-pricing-power segment where TSMC faces no meaningful competitor. Supply-demand gap of ~10% by end-2026 means pricing power persists.",
+    "Margin Expansion + Operating Leverage: Q1 2026 gross margin of 66.2% and operating margin of 58.1% are exceptional and above long-term guidance (56%+). Advanced node mix continues to improve; N3 reaching corporate average margins in H2 2026; N2 dilution temporary. $52-56B capex generates $50B+ operating cash flow. Fixed-cost leverage means each incremental dollar of revenue at 30% YoY growth has very high incremental margins. Q2 2026 guided to 65.5-67.5% gross margin.",
+    "Geographic Diversification Removing Geopolitical Discount: Arizona Fab 21 Phase 1 at ~92% yields; Phase 2/3 equipment beginning Q3 2026. Japan in volume production. Germany under construction. U.S. CHIPS Act $11.6B in direct funding + loans. Taiwan tariff deal at 15% removes trade friction overhang. As overseas capacity grows from negligible to meaningful through 2027-2030, the Taiwan invasion risk premium embedded in TSM's valuation may diminish, supporting multiple expansion.",
+    "Capital Return Potential: As overseas fab construction peaks in 2027-2028, free cash flow generation could accelerate dramatically. TSMC has historically returned cash via dividends. Rising FCF and a more geographically stable production footprint could prompt increased buybacks or special dividends, catalyzing stock price appreciation.",
+    "Valuation — Discounted for Geopolitical Risk: At ~$455 USD ADR (as of late June 2026), TSM trades at approximately 25-28x 2026E EPS on consensus estimates. Given 30%+ revenue growth, 66%+ gross margins, monopoly-like market position, and AI megatrend exposure, this multiple may be considered modest vs. peers. Geopolitical risk discount (~10-20% vs. a 'Taiwan-risk-free' scenario) provides upside if tensions stabilize."
+  ],
+  "bear_case": [
+    "Taiwan Invasion or Blockade — Existential Tail Risk: 80%+ of TSMC's advanced chip production remains in Taiwan. A China military action — even a blockade without invasion — could shut down global AI chip supply chains overnight. Overseas fabs (Arizona, Japan, Germany) are years from covering meaningful percentage of advanced production. While probability remains low, it is non-zero and potentially rising. Equity impairment in a severe scenario would be catastrophic. The 'Silicon Shield' deterrence theory may be weakening as Arizona capacity builds.",
+    "AI Bubble — Demand Could Disappoint in 2027-2028: TSMC's 30%+ growth is premised on AI accelerator demand sustaining mid-to-high 50% CAGR through 2029. If hyperscaler AI ROI disappoints, AI application adoption is slower than expected, or regulatory constraints on AI emerge, cloud capex could fall sharply. CoWoS overcapacity and N2 underutilization would compress margins severely. Prior tech bubbles (dot-com, crypto mining) ended with sudden demand collapses — the risk is real even for structural trends.",
+    "Overseas Fab Cost Dilution — Structural Margin Headwind: Arizona, Germany, and Japan fabs carry 30-40% higher operating costs vs. Taiwan. As these fabs scale from negligible to meaningful (2027-2030), blended margins face structural downward pressure. Government subsidies are time-limited and declining. CHIPS Act restrictions (no China expansion, reporting burdens, technology sharing limits) add compliance costs. The 56%+ through-the-cycle gross margin target may be tested if overseas revenue grows to 20%+ of total.",
+    "Customer Concentration — Single Point of Failure Risk: Apple (~22%) and NVIDIA (~13%) = ~35% of revenue from two customers. If Apple were to diversify to Intel Foundry (unlikely near-term but possible long-term), or NVIDIA's AI chip demand slows from inventory digestion or architectural shifts (e.g., optical computing, neuromorphic), revenue impact would be severe. Top 10 customers are 76% of revenue — concentrated exposure to tech sector capex cycles.",
+    "Valuation Premium Requires Flawless Execution: At $455+ USD ADR with consensus targets of $416-$590, the stock is priced for sustained 30% growth, expanding margins, and geopolitical stability. Any guidance miss, technology ramp delay (A16 yields, N2 utilization ramp), natural disaster, or geopolitical escalation could cause rapid multiple compression. At 25-28x 2026E EPS on a semiconductor cyclical company with tail risk, valuation leaves limited margin of safety for disappointment.",
+    "Export Control Escalation — China Revenue and Equipment Risk: China revenue declining but further U.S. restrictions could accelerate the decline or restrict equipment access (ASML High-NA EUV for future nodes). Being caught between U.S. and China strategic competition creates compliance and reputational risk. The Oct 2025 chip diversion incident demonstrates the complexity of compliance at scale, and enforcement risks are asymmetric."
+  ],
+  "analyst_sentiment": {
+    "consensus_rating": "Strong Buy",
+    "current_adr_price_usd": "~$455.10 (as of late June 2026)",
+    "average_price_target_usd": "~$473-$494 (19 analyst consensus, 12-month forward)",
+    "price_target_range": "$400 - $590",
+    "notable_targets": [
+      {"firm": "Bank of America", "target": "$590", "rating": "Buy", "note": "Recently raised from $490"},
+      {"firm": "Susquehanna", "target": "$575", "rating": "Positive", "note": "Raised on robust AI chip momentum"},
+      {"firm": "UBS", "target": "Raised (specific target pending)", "rating": "Buy", "note": "Raised ahead of Q2 2026 earnings on strong AI demand"},
+      {"firm": "S&P Global Consensus (19 analysts)", "target": "$473", "rating": "Strong Buy", "note": "Average of 19 polled analysts"},
+      {"firm": "Broad Consensus (multiple sources)", "target": "$494", "rating": "Strong Buy", "note": "High estimate $590, low $400"}
+    ],
+    "ratings_breakdown": {
+      "strong_buy": 10,
+      "buy": 9,
+      "hold": 1,
+      "sell": 0,
+      "note": "Approximately 19 analysts tracked; 19 out of 20 are Buy or Strong Buy"
+    },
+    "bull_analyst_view": "AI super cycle structural and multi-year. TSMC's technology lead expanding, not narrowing (11x Samsung). CoWoS monopoly in AI packaging with 80%+ CAGR. N2 ramping successfully; A16 next. Operating margins above 58% with further leverage potential. Geographic diversification removing geopolitical discount over time. Price targets $490-590 based on 25-30x 2026-2027E EPS on 30%+ growth trajectory.",
+    "bear_analyst_view": "Geopolitical risk underappreciated — Taiwan conflict is low-probability but catastrophic. AI demand could disappoint in 2027-2028. Customer concentration extreme (top 2 = ~35%). Overseas fab cost dilution structural headwind. N2 margin dilution is near-term headwind. At 25-28x P/E on a cyclical foundry, valuation requires flawless execution. Bear case $380-420.",
+    "key_debates": [
+      "Duration and sustainability of AI demand cycle — structural megatrend or bubble?",
+      "Geopolitical risk — Taiwan invasion/blockade probability and impact on 80%+ Taiwan-concentrated production",
+      "Overseas fab margin dilution — how much will Arizona/Germany/Japan cost premiums weigh on through-cycle margins?",
+      "N2 and A16 ramp execution — will yields and customer adoption match management confidence?",
+      "Valuation — is 25-28x P/E appropriate for a company with monopoly characteristics but cyclical and geopolitical risks?"
+    ]
+  },
+  "analyst_sources_summary": "Consensus from ~19-20 Wall Street analysts is Strong Buy with average 12-month ADR price target of $473-$494 vs. current ~$455 (approximately 4-9% upside). Notable high targets from Bank of America ($590) and Susquehanna ($575) reflect strong conviction on AI super cycle. Prior stale target of $344 in the January 2026 file reflected pre-Q1 2026 estimates; updated to current consensus. Bullish on AI demand, technology widening moat, CoWoS monopoly, and N2/A16 execution. Main concerns: geopolitical tail risk, AI bubble scenario, overseas cost dilution. FY2025 actuals: revenue NT$3,809.1B (+31.6% YoY), gross margin 59.9%, operating margin 50.8%, net income NT$1,717.9B (+56.1% YoY), EPS NT$66.25, capex NT$1,272.4B. Q1 2026 actuals: revenue NT$1,134B ($35.9B USD, +40.6% YoY), gross margin 66.2%, operating margin 58.1%, net income margin 50.5%+.",
+  "last_updated": "2026-06-30"
+};
+
+        // EMBEDDED DCF JSON
+        const dcfData = {
+  "ticker": "TSM",
+  "company_name": "Taiwan Semiconductor Manufacturing Company Limited",
+  "valuation_date": "2026-06-30",
+  "current_price": 375.44,
+  "currency": "USD",
+  "note": "Prices in USD per ADR (1 ADR = 5 ordinary shares). TSMC reports in NT$ (New Taiwan Dollars); financials converted at NT$30.5:US$1. Base year is FY2025 actuals.",
+  "inputs": {
+    "shares_outstanding_adr": 5186.4,
+    "shares_outstanding_ordinary": 25932.0,
+    "adr_ratio": 5,
+    "net_debt": -56882.0,
+    "net_cash": 56882.0,
+    "last_fcf": 32872.0,
+    "last_revenue": 124889.0,
+    "last_net_income": 56243.0,
+    "fcf_margin_fy2025": 26.3,
+    "last_eps_adr_usd": 10.86,
+    "units": "millions USD",
+    "exchange_rate": 30.5,
+    "quote_currency": "USD"
+  },
+  "historical_growth": {
+    "revenue_3yr_cagr": 20.0,
+    "revenue_5yr_cagr": 23.2,
+    "eps_3yr_cagr": 20.0,
+    "eps_5yr_cagr": 27.5,
+    "fcf_note": "FY2025 FCF margin 26% depressed by record NT$1,272B capex; normalizes as fabs ramp",
+    "selected_growth_rate": 20.0,
+    "growth_rate_source": "revenue_3yr_cagr_decelerating",
+    "growth_divergence_warning": "FY2025 revenue +31.6% YoY and Q1-2026 revenue +35% YoY driven by AI accelerator demand. Growth assumed to decelerate from cyclical peak."
+  },
+  "assumptions": {
+    "base": {
+      "growth_rates": [
+        25,
+        20,
+        16,
+        13,
+        10
+      ],
+      "fcf_margin": 32.0,
+      "wacc": 11.0,
+      "terminal_growth": 4.0,
+      "description": "AI demand sustains, capex normalizes lifting FCF margin to ~32%, N2 ramp on track"
+    },
+    "bull": {
+      "growth_rates": [
+        30,
+        26,
+        20,
+        16,
+        13
+      ],
+      "fcf_margin": 36.0,
+      "wacc": 10.0,
+      "terminal_growth": 4.5,
+      "description": "AI super-cycle extends, TSM pricing power expands margins, Arizona/Japan scale"
+    },
+    "bear": {
+      "growth_rates": [
+        15,
+        10,
+        8,
+        6,
+        5
+      ],
+      "fcf_margin": 26.0,
+      "wacc": 13.0,
+      "terminal_growth": 3.0,
+      "description": "AI demand moderates, geopolitical risk premium rises, capex stays elevated"
+    }
+  },
+  "projections": {
+    "base": {
+      "years": [
+        2026,
+        2027,
+        2028,
+        2029,
+        2030
+      ],
+      "revenue": [
+        156111.0,
+        187334.0,
+        217307.0,
+        245557.0,
+        270112.0
+      ],
+      "fcf": [
+        49956.0,
+        59947.0,
+        69538.0,
+        78578.0,
+        86436.0
+      ],
+      "discount_factors": [
+        0.9009,
+        0.8116,
+        0.7312,
+        0.6587,
+        0.5935
+      ],
+      "pv_fcf": [
+        45005.0,
+        48653.0,
+        50846.0,
+        51759.0,
+        51300.0
+      ]
+    },
+    "bull": {
+      "years": [
+        2026,
+        2027,
+        2028,
+        2029,
+        2030
+      ],
+      "revenue": [
+        162356.0,
+        204568.0,
+        245482.0,
+        284759.0,
+        321778.0
+      ],
+      "fcf": [
+        58448.0,
+        73645.0,
+        88373.0,
+        102513.0,
+        115840.0
+      ],
+      "discount_factors": [
+        0.9091,
+        0.8264,
+        0.7513,
+        0.683,
+        0.6209
+      ],
+      "pv_fcf": [
+        53135.0,
+        60860.0,
+        66395.0,
+        70016.0,
+        71925.0
+      ]
+    },
+    "bear": {
+      "years": [
+        2026,
+        2027,
+        2028,
+        2029,
+        2030
+      ],
+      "revenue": [
+        143622.0,
+        157985.0,
+        170623.0,
+        180861.0,
+        189904.0
+      ],
+      "fcf": [
+        37342.0,
+        41076.0,
+        44362.0,
+        47024.0,
+        49375.0
+      ],
+      "discount_factors": [
+        0.885,
+        0.7831,
+        0.6931,
+        0.6133,
+        0.5428
+      ],
+      "pv_fcf": [
+        33048.0,
+        32167.0,
+        30747.0,
+        28840.0,
+        26801.0
+      ]
+    }
+  },
+  "valuation": {
+    "base": {
+      "sum_pv_fcf": 247563.0,
+      "terminal_value": 1284192.0,
+      "pv_terminal": 762168.0,
+      "enterprise_value": 1009731.0,
+      "equity_value": 1066613.0,
+      "intrinsic_value": 205.66,
+      "upside": -45.2
+    },
+    "bull": {
+      "sum_pv_fcf": 322331.0,
+      "terminal_value": 2200960.0,
+      "pv_terminal": 1366576.0,
+      "enterprise_value": 1688907.0,
+      "equity_value": 1745789.0,
+      "intrinsic_value": 336.61,
+      "upside": -10.3
+    },
+    "bear": {
+      "sum_pv_fcf": 151603.0,
+      "terminal_value": 508562.0,
+      "pv_terminal": 276047.0,
+      "enterprise_value": 427650.0,
+      "equity_value": 484532.0,
+      "intrinsic_value": 93.42,
+      "upside": -75.1
+    }
+  },
+  "entry_price": {
+    "base": {
+      "terminal_value_per_share": 258.58,
+      "years_to_terminal": 5,
+      "target_cagr": 15.0,
+      "entry_price": 128.56,
+      "entry_discount_from_current": -65.8
+    },
+    "bull": {
+      "terminal_value_per_share": 435.34,
+      "years_to_terminal": 5,
+      "target_cagr": 15.0,
+      "entry_price": 216.44,
+      "entry_discount_from_current": -42.4
+    },
+    "bear": {
+      "terminal_value_per_share": 109.02,
+      "years_to_terminal": 5,
+      "target_cagr": 15.0,
+      "entry_price": 54.2,
+      "entry_discount_from_current": -85.6
+    }
+  },
+  "sensitivity": {
+    "wacc_range": [
+      9.0,
+      10.0,
+      11.0,
+      12.0,
+      13.0
+    ],
+    "terminal_growth_range": [
+      3.0,
+      3.5,
+      4.0,
+      4.5,
+      5.0
+    ],
+    "matrix": [
+      [
+        247.39,
+        265.27,
+        286.74,
+        312.97,
+        345.77
+      ],
+      [
+        212.31,
+        224.81,
+        239.41,
+        256.65,
+        277.35
+      ],
+      [
+        186.05,
+        195.2,
+        205.66,
+        217.72,
+        231.8
+      ],
+      [
+        165.63,
+        172.55,
+        180.34,
+        189.17,
+        199.25
+      ],
+      [
+        149.35,
+        154.73,
+        160.71,
+        167.39,
+        174.91
+      ]
+    ],
+    "description": "Intrinsic value per ADR under different WACC and terminal growth assumptions (Base Case projections)"
+  },
+  "probability_weighted": {
+    "weights": {
+      "bull": 0.3,
+      "base": 0.5,
+      "bear": 0.2
+    },
+    "weighted_iv": 222.5,
+    "upside_to_weighted": -51.1
+  },
+  "sanity_check": {
+    "ran": true,
+    "passed": true,
+    "implied_multiples": {
+      "pe": 18.9,
+      "pb": 5.96,
+      "ev_ebitda": 11.9
+    },
+    "historical_averages_ex_outliers": {
+      "pe_avg": 24.5,
+      "pe_max": 32.7,
+      "pb_max": 8.8,
+      "ev_ebitda_max": 18.0
+    },
+    "trip_reasons": [],
+    "diagnosis": "Base case implied multiples within historical range",
+    "fix_applied": "None required"
+  },
+  "interpretation": {
+    "valuation_verdict": "Fully valued / modest downside at current price",
+    "market_implies": "Market pricing in sustained 20%+ growth with AI super-cycle durability and margin expansion",
+    "key_insights": [
+      "TSM trading at $455.1 vs Base Case IV $205.66 (-55%)",
+      "Bull Case IV $336.61 (-26%), Bear Case IV $93.42 (-80%)",
+      "Probability-weighted IV $222.5 (-51%)",
+      "FY2025: revenue NT$3,809B (+31.6% YoY), net income NT$1,715B (+48% YoY), EPS NT$66.26",
+      "Q1-2026: revenue NT$1,134B (+35% YoY), gross margin jumped to 66.2%, net margin 50.5%",
+      "Implied base-case P/E 18.9x vs 10yr avg ~24.5x; trailing P/E at $455.1 is ~42x"
+    ],
+    "risks": [
+      "Geopolitical risk (Taiwan-China tensions)",
+      "AI demand cyclicality / multiple compression risk",
+      "Customer concentration (Apple, NVIDIA top customers)",
+      "Record capex (NT$1.27T FY2025) pressures near-term FCF",
+      "FX translation (TWD/USD) and overseas fab cost dilution (Arizona, Japan, Germany)",
+      "Elevated valuation leaves limited margin of safety"
+    ],
+    "catalysts_for_rerating": [
+      "Sustained AI accelerator demand >40% CAGR",
+      "N2 (2nm) ramp with premium pricing",
+      "Margin recovery as overseas fabs scale",
+      "Capex intensity normalizing -> FCF inflection",
+      "Geopolitical de-escalation"
+    ]
+  },
+  "methodology_notes": {
+    "fcf_margin_assumptions": "FY2025 FCF margin of 26% reflects record NT$1,272B capex (+33% YoY). Base case assumes capex intensity moderates, lifting FCF margin to 32% (bull 36%, bear 26%).",
+    "wacc_justification": "11% base WACC includes a geopolitical/Taiwan risk premium. Bull 10% (tensions ease), bear 13% (elevated risk).",
+    "terminal_growth_rationale": "4% base terminal growth reflects semiconductor secular growth plus TSM technology leadership.",
+    "currency_basis": "All financials converted from NT$ at 30.5:1. ADR EPS = ordinary EPS x 5 / FX. Price basis is USD ADR.",
+    "net_cash_benefit": "$56882.0M net cash position adds per-share value and funds capex."
+  },
+  "price_refresh": {
+    "refreshed_at": "2026-11-07T18:20:19Z",
+    "price_source": "yahoo:regularMarketPrice",
+    "previous_price": 412.61,
+    "current_price": 375.44,
+    "drift_pct": 9.0,
+    "valuation_date": "2026-06-30",
+    "fields_updated": [
+      "current_price",
+      "valuation.bear.upside",
+      "valuation.base.upside",
+      "valuation.bull.upside",
+      "entry_price.bear.entry_discount_from_current",
+      "entry_price.base.entry_discount_from_current",
+      "entry_price.bull.entry_discount_from_current",
+      "price_refresh.current_price"
+    ],
+    "prose_is_stale": false,
+    "prose_paths_quoting_previous_price": [],
+    "dashboard_stale": false
+  }
+};
+
+        // Parse embedded CSV
+        function parseCSV(csv) {
+            const lines = csv.trim().split('\n');
+            const headers = lines[0].split(',');
+            return lines.slice(1).map(line => {
+                const values = line.split(',');
+                const obj = {};
+                headers.forEach((h, i) => obj[h.trim()] = values[i]?.trim());
+                return obj;
+            });
+        }
+
+        const data = parseCSV(csvData);
+
+        // Sort data chronologically (oldest first)
+        data.sort((a, b) => {
+            const parseDate = (p) => {
+                const year = parseInt(p.match(/\d{4}/)?.[0] || '0');
+                const isQ1 = p.includes('Q1');
+                const isQ2 = p.includes('Q2');
+                const isQ3 = p.includes('Q3');
+                const isQ4 = p.includes('Q4');
+                const isH1 = p.includes('H1');
+                const isH2 = p.includes('H2');
+                const isFY = p.startsWith('FY');
+                const subOrder = isQ1 ? 1 : isQ2 ? 2 : isH1 ? 3 : isQ3 ? 4 : isQ4 ? 5 : isH2 ? 6 : isFY ? 7 : 0;
+                return year * 10 + subOrder;
+            };
+            return parseDate(a.Period) - parseDate(b.Period);
+        });
+
+        const fyData = data.filter(d => d.Period.startsWith('FY'));
+
+        // Helper functions
+        function calcYoYChange(current, previous) {
+            if (!previous || !current) return null;
+            return ((parseFloat(current) - parseFloat(previous)) / Math.abs(parseFloat(previous)) * 100).toFixed(1);
+        }
+
+        // Render KPI Cards
+        function renderKPIs() {
+            const latest = fyData[fyData.length - 1];
+            const previous = fyData[fyData.length - 2];
+
+            const kpis = [
+                {
+                    label: 'FY2024 Revenue',
+                    value: 'NT$' + parseFloat(latest.Revenue).toFixed(1) + 'B',
+                    change: calcYoYChange(latest.Revenue, previous.Revenue)
+                },
+                {
+                    label: 'FY2024 Gross Margin',
+                    value: latest.GrossMargin + '%',
+                    change: (parseFloat(latest.GrossMargin) - parseFloat(previous.GrossMargin)).toFixed(1)
+                },
+                {
+                    label: 'FY2024 Operating Margin',
+                    value: latest.OperatingMargin + '%',
+                    change: (parseFloat(latest.OperatingMargin) - parseFloat(previous.OperatingMargin)).toFixed(1)
+                },
+                {
+                    label: 'FY2024 Net Income',
+                    value: 'NT$' + parseFloat(latest.NetIncome).toFixed(1) + 'B',
+                    change: calcYoYChange(latest.NetIncome, previous.NetIncome)
+                },
+                {
+                    label: 'FY2024 EPS',
+                    value: 'NT$' + parseFloat(latest.EPS).toFixed(2),
+                    change: calcYoYChange(latest.EPS, previous.EPS)
+                },
+                {
+                    label: 'FY2024 Free Cash Flow',
+                    value: 'NT$' + parseFloat(latest.FreeCashFlow).toFixed(1) + 'B',
+                    change: calcYoYChange(latest.FreeCashFlow, previous.FreeCashFlow)
+                },
+                {
+                    label: 'FY2024 R&D Expense',
+                    value: 'NT$' + parseFloat(latest.RnDExpense).toFixed(1) + 'B',
+                    change: calcYoYChange(latest.RnDExpense, previous.RnDExpense)
+                },
+                {
+                    label: 'FY2024 Operating Cash Flow',
+                    value: 'NT$' + parseFloat(latest.OperatingCashFlow).toFixed(1) + 'B',
+                    change: calcYoYChange(latest.OperatingCashFlow, previous.OperatingCashFlow)
+                }
+            ];
+
+            const grid = document.getElementById('kpiGrid');
+            grid.innerHTML = kpis.map(kpi => {
+                const changeClass = kpi.change > 0 ? 'positive' : kpi.change < 0 ? 'negative' : '';
+                const changeSymbol = kpi.change > 0 ? '+' : '';
+                return `
+                    <div class="kpi-card">
+                        <div class="kpi-value">${kpi.value}</div>
+                        <div class="kpi-label">${kpi.label}</div>
+                        ${kpi.change ? `<div class="kpi-change ${changeClass}">${changeSymbol}${kpi.change}% YoY</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Render guidance section
+        function renderGuidance() {
+            if (!analysis.guidance || !analysis.guidance.items || analysis.guidance.items.length === 0) {
+                document.getElementById('guidanceSection').style.display = 'none';
+                return;
+            }
+
+            const guidance = analysis.guidance;
+            document.getElementById('guidanceAsOf').textContent = guidance.as_of || '';
+            document.getElementById('guidanceFY').textContent = guidance.fiscal_year || '';
+
+            const grid = document.getElementById('guidanceGrid');
+            grid.innerHTML = guidance.items.map(item => {
+                const vsClass = item.vs_prior ? item.vs_prior.toLowerCase().replace(' ', '-') : 'new';
+                const vsLabel = item.vs_prior ? item.vs_prior.charAt(0).toUpperCase() + item.vs_prior.slice(1) : 'New';
+                return `
+                    <div class="guidance-card">
+                        <div class="guidance-metric">${item.metric}</div>
+                        <div class="guidance-target">${item.target}</div>
+                        <div class="guidance-period">${item.period}</div>
+                        <span class="guidance-vs-prior ${vsClass}">${vsLabel}</span>
+                        ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+
+            const commentary = document.getElementById('guidanceCommentary');
+            if (guidance.management_commentary) {
+                commentary.textContent = guidance.management_commentary;
+                commentary.style.display = 'block';
+            } else {
+                commentary.style.display = 'none';
+            }
+        }
+
+        // Toggle overview section
+        function toggleOverview() {
+            const btn = document.querySelector('.overview-toggle');
+            const content = document.getElementById('overviewContent');
+            btn.classList.toggle('active');
+            content.classList.toggle('active');
+        }
+
+        // Chart defaults
+        const chartDefaults = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { labels: { color: '#e0e0e0', font: { size: 11 } } }
+            },
+            scales: {
+                x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+            }
+        };
+
+        const colors = {
+            primary: '#00d4aa',
+            secondary: '#00b894',
+            tertiary: '#0984e3',
+            quaternary: '#6c5ce7',
+            warning: '#fdcb6e',
+            danger: '#ff6b6b'
+        };
+
+        // Create charts
+        new Chart(document.getElementById('revenueChart'), {
+            type: 'bar',
+            data: {
+                labels: fyData.map(d => d.Period),
+                datasets: [{
+                    label: 'Revenue (NT$ Billions)',
+                    data: fyData.map(d => parseFloat(d.Revenue)),
+                    backgroundColor: colors.primary,
+                    borderRadius: 6
+                }]
+            },
+            options: chartDefaults
+        });
+
+        new Chart(document.getElementById('epsChart'), {
+            type: 'line',
+            data: {
+                labels: fyData.map(d => d.Period),
+                datasets: [{
+                    label: 'EPS (NT$)',
+                    data: fyData.map(d => parseFloat(d.EPS)),
+                    borderColor: colors.primary,
+                    backgroundColor: 'rgba(0, 212, 170, 0.1)',
+                    tension: 0.3,
+                    fill: true,
+                    borderWidth: 3
+                }]
+            },
+            options: chartDefaults
+        });
+
+        new Chart(document.getElementById('marginsChart'), {
+            type: 'line',
+            data: {
+                labels: fyData.map(d => d.Period),
+                datasets: [
+                    {
+                        label: 'Gross Margin (%)',
+                        data: fyData.map(d => parseFloat(d.GrossMargin)),
+                        borderColor: colors.primary,
+                        tension: 0.3,
+                        borderWidth: 2
+                    },
+                    {
+                        label: 'Operating Margin (%)',
+                        data: fyData.map(d => parseFloat(d.OperatingMargin)),
+                        borderColor: colors.tertiary,
+                        tension: 0.3,
+                        borderWidth: 2
+                    },
+                    {
+                        label: 'Net Margin (%)',
+                        data: fyData.map(d => parseFloat(d.NetMargin)),
+                        borderColor: colors.quaternary,
+                        tension: 0.3,
+                        borderWidth: 2
+                    }
+                ]
+            },
+            options: chartDefaults
+        });
+
+        new Chart(document.getElementById('fcfChart'), {
+            type: 'bar',
+            data: {
+                labels: fyData.map(d => d.Period),
+                datasets: [
+                    {
+                        label: 'Free Cash Flow',
+                        data: fyData.map(d => parseFloat(d.FreeCashFlow)),
+                        backgroundColor: colors.primary,
+                        borderRadius: 6
+                    },
+                    {
+                        label: 'CapEx',
+                        data: fyData.map(d => -parseFloat(d.CapEx)),
+                        backgroundColor: colors.danger,
+                        borderRadius: 6
+                    }
+                ]
+            },
+            options: chartDefaults
+        });
+
+        new Chart(document.getElementById('ocfChart'), {
+            type: 'line',
+            data: {
+                labels: fyData.map(d => d.Period),
+                datasets: [{
+                    label: 'Operating Cash Flow (NT$ Billions)',
+                    data: fyData.map(d => parseFloat(d.OperatingCashFlow)),
+                    borderColor: colors.primary,
+                    backgroundColor: 'rgba(0, 212, 170, 0.1)',
+                    tension: 0.3,
+                    fill: true,
+                    borderWidth: 3
+                }]
+            },
+            options: chartDefaults
+        });
+
+        new Chart(document.getElementById('rndChart'), {
+            type: 'bar',
+            data: {
+                labels: fyData.filter(d => d.RnDExpense).map(d => d.Period),
+                datasets: [{
+                    label: 'R&D Expense (NT$ Billions)',
+                    data: fyData.filter(d => d.RnDExpense).map(d => parseFloat(d.RnDExpense)),
+                    backgroundColor: colors.tertiary,
+                    borderRadius: 6
+                }]
+            },
+            options: chartDefaults
+        });
+
+        // Metric descriptions for help modals
+        const metricDescriptions = {
+            revenue: {
+                title: "Revenue",
+                content: `
+                    <p><strong>Revenue</strong> represents the total income from TSMC's semiconductor manufacturing services.</p>
+                    <div class="metric-highlight">
+                        <strong>For TSMC:</strong> Revenue is primarily driven by wafer fabrication (87%), with growing contributions from advanced packaging services like CoWoS (8%). TSMC reports in New Taiwan Dollars (NT$) but most sales are priced in USD.
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li><strong>Platform Mix:</strong> HPC revenue grew from 41% (2022) to 51% (2024) to 58% (2025). Shift to HPC/AI is very positive for margins and growth.</li>
+                        <li><strong>Technology Node Mix:</strong> Advanced nodes (7nm and below) now 69% of revenue. Higher mix = better margins and pricing power.</li>
+                        <li><strong>Customer Concentration:</strong> Apple ~22%, NVIDIA ~12%, Top 10 = 76%. Monitor quarterly customer trends.</li>
+                        <li><strong>Currency Impact:</strong> NT$ strength vs USD reduces reported revenue. Every 1% NT$ appreciation = ~1% revenue headwind.</li>
+                    </ul>
+                `
+            },
+            eps: {
+                title: "Earnings Per Share (EPS)",
+                content: `
+                    <p><strong>EPS</strong> measures net income divided by shares outstanding. It's the bottom-line profitability metric.</p>
+                    <div class="metric-highlight">
+                        <strong>For TSMC:</strong> EPS reported in NT$ per ordinary share. On NYSE, TSM is an ADR (1 ADR = 5 ordinary shares), so ADR EPS is 5x the ordinary share EPS. FY2024 EPS of NT$44.68 = ~$8.94 ADR EPS.
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li><strong>EPS Growth Rate:</strong> 5-year CAGR of 26.8% reflects strong operational leverage. Management guiding for continued double-digit growth.</li>
+                        <li><strong>Margin Expansion:</strong> EPS growth faster than revenue growth = margin expansion. Look for gross margins sustained at 63-65%.</li>
+                        <li><strong>Share Buybacks:</strong> TSMC historically stable share count (~25.9B shares). Future buybacks would be EPS accretive.</li>
+                        <li><strong>Currency Impact:</strong> NT$ strength reduces USD-denominated earnings when translated back to NT$.</li>
+                    </ul>
+                `
+            },
+            margins: {
+                title: "Profit Margins",
+                content: `
+                    <p><strong>Margins</strong> show what percentage of revenue becomes profit at different stages of the income statement.</p>
+                    <div class="metric-highlight">
+                        <strong>For TSMC:</strong> Semiconductor foundries have high fixed costs (fabs, equipment), so margins are very sensitive to utilization and product mix.
+                    </div>
+                    <p><strong>Key Margins:</strong></p>
+                    <ul>
+                        <li><strong>Gross Margin (56.1% in FY2024):</strong> Revenue minus cost of goods sold. Reflects manufacturing efficiency, pricing power, and technology mix. TSMC's 63-65% target for 2026 is industry-leading.</li>
+                        <li><strong>Operating Margin (45.7% in FY2024):</strong> Gross profit minus R&D and SG&A. TSMC's R&D spending (~7% of revenue) is massive in absolute terms but declining as % of revenue due to scale.</li>
+                        <li><strong>Net Margin (40.0% in FY2024):</strong> Final profit after taxes. TSMC's 40% net margin is exceptional for a capital-intensive manufacturer.</li>
+                    </ul>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li><strong>Advanced Node Mix:</strong> 3nm/5nm chips have 55-65% gross margins vs. 30-40% for mature nodes. Mix shift to advanced = margin expansion.</li>
+                        <li><strong>Utilization Rates:</strong> High fixed costs mean underutilization = margin compression. Monitor fab utilization in earnings calls.</li>
+                        <li><strong>Geographic Mix:</strong> Overseas fabs (Arizona, Germany) reportedly have 30-40% higher costs initially. Watch for margin dilution as these ramp.</li>
+                        <li><strong>Pricing Power:</strong> TSMC's technology lead enables premium pricing. Any pricing pressure from Samsung/Intel would compress margins.</li>
+                    </ul>
+                `
+            },
+            fcf: {
+                title: "Free Cash Flow & CapEx",
+                content: `
+                    <p><strong>Free Cash Flow (FCF)</strong> is Operating Cash Flow minus Capital Expenditures. It's the cash available for dividends, buybacks, or debt reduction.</p>
+                    <div class="metric-highlight">
+                        <strong>For TSMC:</strong> FCF is critical for evaluating investment returns. TSMC is extremely capital-intensive - annual capex of $50-56B dwarfs most companies' entire revenue.
+                    </div>
+                    <p><strong>FY2024 FCF:</strong> NT$870B ($27.2B USD) despite NT$956B capex. This represents 30% FCF margin.</p>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li><strong>CapEx Cycle:</strong> TSMC guiding for $52-56B capex in 2026 (70-80% for advanced nodes). Elevated capex depresses FCF short-term but drives future growth.</li>
+                        <li><strong>FCF Margin:</strong> Target 28-38% depending on scenario. Higher margins = better ROIC despite massive capex.</li>
+                        <li><strong>FCF vs Earnings:</strong> TSMC's depreciation is massive (~NT$500B annually). FCF closer to true economic earnings than net income.</li>
+                        <li><strong>Investment Efficiency:</strong> Each $1 of capex should generate ~$0.40-0.50 of incremental revenue at maturity. Monitor revenue/capex ratios over multi-year periods.</li>
+                        <li><strong>Government Subsidies:</strong> U.S. CHIPS Act ($6.6B), European Chips Act, Japan subsidies reduce net capex burden by $10B+ over time.</li>
+                    </ul>
+                `
+            },
+            ocf: {
+                title: "Operating Cash Flow",
+                content: `
+                    <p><strong>Operating Cash Flow (OCF)</strong> is cash generated from core business operations before capital expenditures.</p>
+                    <div class="metric-highlight">
+                        <strong>For TSMC:</strong> OCF shows the raw cash-generating power of the business. FY2024 OCF of NT$1,826B ($57B USD) represents 63% of revenue - exceptional for manufacturing.
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li><strong>OCF Growth vs Revenue Growth:</strong> OCF growing faster than revenue = improving cash conversion. Look for operating leverage.</li>
+                        <li><strong>OCF as % of Revenue:</strong> TSMC's 63% OCF/revenue ratio reflects high margins and efficient working capital management. Industry-leading.</li>
+                        <li><strong>Working Capital Changes:</strong> Receivables, inventory, and payables changes can materially impact OCF quarter-to-quarter. Focus on annual trends.</li>
+                        <li><strong>OCF vs Net Income:</strong> OCF should exceed net income due to depreciation add-back. If OCF < net income, may indicate working capital issues or aggressive accounting.</li>
+                        <li><strong>CapEx Coverage:</strong> OCF must exceed capex for positive FCF. TSMC's OCF of NT$1,826B vs capex NT$956B = healthy 1.9x coverage in FY2024.</li>
+                    </ul>
+                `
+            },
+            rnd: {
+                title: "R&D Investment",
+                content: `
+                    <p><strong>R&D Expense</strong> represents investment in developing next-generation semiconductor technologies.</p>
+                    <div class="metric-highlight">
+                        <strong>For TSMC:</strong> R&D is critical for maintaining 2-3 year technology lead over Samsung/Intel. FY2024 R&D of NT$204B ($6.4B USD) is ~7% of revenue.
+                    </div>
+                    <p><strong>What to watch:</strong></p>
+                    <ul>
+                        <li><strong>Absolute R&D Spending:</strong> TSMC's $6-7B annual R&D dwarfs competitors. Samsung ~$5B, Intel Foundry ~$3-4B. Scale advantage in technology development.</li>
+                        <li><strong>R&D as % of Revenue:</strong> Declining from 9.4% (FY2019) to 7.1% (FY2024) due to operating leverage. More revenue spreading fixed R&D costs.</li>
+                        <li><strong>Technology Roadmap:</strong> R&D funds development of N2 (2nm), N2P, A16 (1.6nm), and future nodes. Also CoWoS advanced packaging, GAA transistors, backside power delivery.</li>
+                        <li><strong>Competitive Positioning:</strong> TSMC's R&D efficiency (revenue per R&D dollar) is 14:1 vs Samsung's 8:1. Better execution and higher yields from R&D investment.</li>
+                        <li><strong>Customer Co-Development:</strong> TSMC co-develops with Apple, NVIDIA, AMD. Customer input improves R&D ROI and deepens switching costs.</li>
+                    </ul>
+                `
+            }
+        };
+
+        // Modal functions
+        function openModal(key) {
+            document.getElementById('modalTitle').textContent = metricDescriptions[key].title;
+            document.getElementById('modalBody').innerHTML = metricDescriptions[key].content;
+            document.getElementById('modalOverlay').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeModal(event) {
+            if (event && event.target !== document.getElementById('modalOverlay') && !event.target.classList.contains('modal-close')) return;
+            document.getElementById('modalOverlay').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+        // DCF Functions
+        let currentScenario = 'base';
+
+        function initDCF() {
+            if (!dcfData || !dcfData.valuation) return;
+
+            document.getElementById('dcfCurrent').textContent = '$' + dcfData.current_price.toFixed(0);
+
+            if (dcfData.historical_growth.growth_divergence_warning) {
+                document.getElementById('growthWarning').style.display = 'flex';
+                document.getElementById('warningText').textContent = dcfData.historical_growth.growth_divergence_warning;
+            }
+
+            const base = dcfData.assumptions.base;
+            document.getElementById('growthSlider').value = dcfData.historical_growth.selected_growth_rate;
+            document.getElementById('waccSlider').value = base.wacc;
+            document.getElementById('terminalSlider').value = base.terminal_growth;
+
+            document.getElementById('growthValue').textContent = dcfData.historical_growth.selected_growth_rate + '%';
+            document.getElementById('waccValue').textContent = base.wacc + '%';
+            document.getElementById('terminalValue').textContent = base.terminal_growth + '%';
+
+            document.getElementById('growthHint').textContent = 'Based on ' + dcfData.historical_growth.growth_rate_source.replace(/_/g, ' ');
+
+            renderDCFInputs();
+            renderHistoricalGrowth();
+            renderSensitivityMatrix();
+            updateDCFDisplay();
+            switchScenario('base');
+        }
+
+        function renderDCFInputs() {
+            const inputs = dcfData.inputs;
+            const formatNum = (n) => {
+                if (Math.abs(n) >= 1000) return '$' + (n/1000).toFixed(1) + 'B';
+                return '$' + n.toFixed(0) + 'M';
+            };
+
+            document.getElementById('baseFCF').textContent = formatNum(inputs.last_fcf);
+
+            const shares = inputs.shares_outstanding_adr;
+            document.getElementById('sharesOut').textContent = (shares/1000).toFixed(2) + 'B ADRs';
+
+            const netDebt = inputs.net_debt;
+            const netDebtEl = document.getElementById('netDebt');
+            netDebtEl.textContent = (netDebt < 0 ? '-' : '') + formatNum(Math.abs(netDebt));
+            if (netDebt < 0) netDebtEl.style.color = '#00d4aa';
+
+            renderFCFProjections();
+        }
+
+        function renderFCFProjections() {
+            const growth = parseFloat(document.getElementById('growthSlider')?.value || dcfData.historical_growth.selected_growth_rate);
+            const baseFCF = dcfData.inputs.last_fcf;
+
+            const formatFCF = (n) => {
+                if (Math.abs(n) >= 1000) return '$' + (n/1000).toFixed(1) + 'B';
+                return '$' + n.toFixed(0) + 'M';
+            };
+
+            let html = `
+                <div class="fcf-projection-item header">Base</div>
+                <div class="fcf-projection-item header">Year 1</div>
+                <div class="fcf-projection-item header">Year 2</div>
+                <div class="fcf-projection-item header">Year 3</div>
+                <div class="fcf-projection-item header">Year 4</div>
+                <div class="fcf-projection-item header">Year 5</div>
+            `;
+
+            let fcf = baseFCF;
+            const fcfValues = [baseFCF];
+            const growthRates = dcfData.assumptions[currentScenario]?.growth_rates || [growth, growth, growth, growth, growth];
+
+            for (let i = 0; i < 5; i++) {
+                fcf = fcf * (1 + growthRates[i] / 100);
+                fcfValues.push(fcf);
+            }
+
+            html += `<div class="fcf-projection-item">
+                <div class="fcf-value">${formatFCF(fcfValues[0])}</div>
+                <div class="growth-rate">-</div>
+            </div>`;
+
+            for (let i = 1; i <= 5; i++) {
+                html += `<div class="fcf-projection-item">
+                    <div class="fcf-value">${formatFCF(fcfValues[i])}</div>
+                    <div class="growth-rate">+${growthRates[i-1]}%</div>
+                </div>`;
+            }
+
+            document.getElementById('fcfProjectionTable').innerHTML = html;
+        }
+
+        function calculateDCF(growthRate, wacc, terminalGrowth) {
+            const years = 5;
+            const fcf = dcfData.inputs.last_fcf;
+            let pvFCF = 0;
+            let projectedFCF = fcf;
+
+            for (let i = 0; i < years; i++) {
+                projectedFCF *= (1 + growthRate / 100);
+                pvFCF += projectedFCF / Math.pow(1 + wacc/100, i + 1);
+            }
+
+            const terminalFCF = projectedFCF * (1 + terminalGrowth/100);
+            const terminalValue = terminalFCF / (wacc/100 - terminalGrowth/100);
+            const pvTerminal = terminalValue / Math.pow(1 + wacc/100, years);
+
+            const enterpriseValue = pvFCF + pvTerminal;
+            const equityValue = enterpriseValue - dcfData.inputs.net_debt;
+            const iv = equityValue / dcfData.inputs.shares_outstanding_adr;
+
+            const terminalPerShare = terminalValue / dcfData.inputs.shares_outstanding_adr;
+            const entryPrice = terminalPerShare / Math.pow(1.15, years);
+
+            return { iv, entryPrice, terminalPerShare, pvFCF, pvTerminal, enterpriseValue };
+        }
+
+        window.updateDCFDisplay = function() {
+            const growth = parseFloat(document.getElementById('growthSlider').value);
+            const wacc = parseFloat(document.getElementById('waccSlider').value);
+            const terminal = parseFloat(document.getElementById('terminalSlider').value);
+
+            document.getElementById('growthValue').textContent = growth + '%';
+            document.getElementById('waccValue').textContent = wacc + '%';
+            document.getElementById('terminalValue').textContent = terminal + '%';
+
+            const result = calculateDCF(growth, wacc, terminal);
+
+            document.getElementById('dcfIV').textContent = '$' + result.iv.toFixed(0);
+            document.getElementById('dcfEntry').textContent = '$' + result.entryPrice.toFixed(0);
+
+            const upside = ((result.iv - dcfData.current_price) / dcfData.current_price * 100);
+            const upsideEl = document.getElementById('dcfUpside');
+            upsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(0) + '% ' + (upside >= 0 ? 'upside' : 'downside');
+            upsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+            document.getElementById('dcfWeighted').textContent = '$' + dcfData.probability_weighted.weighted_iv.toFixed(0);
+
+            const grid = document.getElementById('assumptionGrid');
+            if (grid) {
+                grid.innerHTML = `
+                    <div class="assumption-item">
+                        <div class="label">Growth Rate</div>
+                        <div class="value">${growth}%</div>
+                    </div>
+                    <div class="assumption-item">
+                        <div class="label">WACC</div>
+                        <div class="value">${wacc}%</div>
+                    </div>
+                    <div class="assumption-item">
+                        <div class="label">Terminal Growth</div>
+                        <div class="value">${terminal}%</div>
+                    </div>
+                    <div class="assumption-item">
+                        <div class="label">Intrinsic Value</div>
+                        <div class="value" style="color: #00d4aa;">$${result.iv.toFixed(0)}</div>
+                    </div>
+                    <div class="assumption-item">
+                        <div class="label">Entry Price</div>
+                        <div class="value" style="color: #00d4aa;">$${result.entryPrice.toFixed(0)}</div>
+                    </div>
+                `;
+            }
+
+            renderFCFProjections();
+        };
+
+        window.switchScenario = function(scenario) {
+            currentScenario = scenario;
+
+            document.querySelectorAll('.scenario-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.scenario === scenario);
+            });
+
+            const assumptions = dcfData.assumptions[scenario];
+            const valuation = dcfData.valuation[scenario];
+
+            document.getElementById('growthSlider').value = assumptions.growth_rates[0];
+            document.getElementById('waccSlider').value = assumptions.wacc;
+            document.getElementById('terminalSlider').value = assumptions.terminal_growth;
+
+            const grid = document.getElementById('assumptionGrid');
+            grid.innerHTML = `
+                <div class="assumption-item">
+                    <div class="label">Year 1 Growth</div>
+                    <div class="value">${assumptions.growth_rates[0]}%</div>
+                </div>
+                <div class="assumption-item">
+                    <div class="label">Year 5 Growth</div>
+                    <div class="value">${assumptions.growth_rates[4]}%</div>
+                </div>
+                <div class="assumption-item">
+                    <div class="label">FCF Margin</div>
+                    <div class="value">${assumptions.fcf_margin}%</div>
+                </div>
+                <div class="assumption-item">
+                    <div class="label">WACC</div>
+                    <div class="value">${assumptions.wacc}%</div>
+                </div>
+                <div class="assumption-item">
+                    <div class="label">Terminal Growth</div>
+                    <div class="value">${assumptions.terminal_growth}%</div>
+                </div>
+                <div class="assumption-item">
+                    <div class="label">Intrinsic Value</div>
+                    <div class="value" style="color: #00d4aa;">$${valuation.intrinsic_value.toFixed(0)}</div>
+                </div>
+                <div class="assumption-item">
+                    <div class="label">Description</div>
+                    <div class="value" style="font-size: 0.85rem; color: #aaa;">${assumptions.description}</div>
+                </div>
+            `;
+
+            updateDCFDisplay();
+        };
+
+        function renderHistoricalGrowth() {
+            const growth = dcfData.historical_growth;
+            const selectedSource = growth.growth_rate_source;
+            const grid = document.getElementById('growthGrid');
+
+            const metrics = [
+                { key: 'revenue_3yr_cagr', label: 'Revenue 3Y' },
+                { key: 'revenue_5yr_cagr', label: 'Revenue 5Y' },
+                { key: 'revenue_10yr_cagr', label: 'Revenue 10Y' },
+                { key: 'eps_3yr_cagr', label: 'EPS 3Y' },
+                { key: 'eps_5yr_cagr', label: 'EPS 5Y' },
+                { key: 'eps_10yr_cagr', label: 'EPS 10Y' },
+                { key: 'fcf_3yr_cagr', label: 'FCF 3Y' },
+                { key: 'fcf_5yr_cagr', label: 'FCF 5Y' }
+            ];
+
+            grid.innerHTML = metrics.map(m => {
+                const rate = growth[m.key];
+                const isSelected = m.key === selectedSource;
+                const colorClass = rate >= 0 ? 'positive' : 'negative';
+                return `
+                    <div class="growth-item ${isSelected ? 'selected' : ''}">
+                        <div class="metric">${m.label}</div>
+                        <div class="rate ${colorClass}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderSensitivityMatrix() {
+            const sens = dcfData.sensitivity;
+            const table = document.getElementById('sensitivityMatrix');
+            const currentPrice = dcfData.current_price;
+
+            let html = '<tr><th>WACC \\ Term G</th>';
+            sens.terminal_growth_range.forEach(tg => {
+                html += `<th>${tg}%</th>`;
+            });
+            html += '</tr>';
+
+            sens.wacc_range.forEach((wacc, i) => {
+                html += `<tr><th>${wacc}%</th>`;
+                sens.matrix[i].forEach((val, j) => {
+                    const isHighlight = wacc === dcfData.assumptions.base.wacc &&
+                                       sens.terminal_growth_range[j] === dcfData.assumptions.base.terminal_growth;
+                    const colorClass = val >= currentPrice ? 'above-current' : 'below-current';
+                    html += `<td class="${isHighlight ? 'highlight' : colorClass}">$${val.toFixed(0)}</td>`;
+                });
+                html += '</tr>';
+            });
+
+            table.innerHTML = html;
+        }
+
+        // Initialize
+        renderKPIs();
+        renderGuidance();
+        initDCF();
+
+        // Bind slider events
+        (function() {
+            var growthSlider = document.getElementById('growthSlider');
+            var waccSlider = document.getElementById('waccSlider');
+            var terminalSlider = document.getElementById('terminalSlider');
+
+            if (growthSlider) {
+                growthSlider.oninput = window.updateDCFDisplay;
+                growthSlider.onchange = window.updateDCFDisplay;
+            }
+            if (waccSlider) {
+                waccSlider.oninput = window.updateDCFDisplay;
+                waccSlider.onchange = window.updateDCFDisplay;
+            }
+            if (terminalSlider) {
+                terminalSlider.oninput = window.updateDCFDisplay;
+                terminalSlider.onchange = window.updateDCFDisplay;
+            }
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,1896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AppLovin Corporation (APP) Financial Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4aa, #00b894);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        .header p { color: #888; font-size: 1.1rem; }
+        .header .meta { color: #666; font-size: 0.85rem; margin-top: 6px; }
+
+        /* Overview */
+        .overview-section { max-width: 1400px; margin: 0 auto 30px; }
+        .overview-toggle {
+            width: 100%;
+            background: rgba(0,212,170,0.1);
+            border: 1px solid rgba(0,212,170,0.3);
+            border-radius: 12px;
+            padding: 16px 24px;
+            color: #00d4aa;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+        .overview-toggle:hover { background: rgba(0,212,170,0.2); }
+        .overview-toggle .arrow { transition: transform 0.3s ease; }
+        .overview-toggle.active .arrow { transform: rotate(180deg); }
+        .overview-content {
+            display: none;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            padding: 30px;
+            margin-top: -12px;
+        }
+        .overview-content.active { display: block; }
+        .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+        }
+        .overview-card {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .overview-card h3 {
+            color: #00d4aa;
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .overview-card.bull h3 { color: #00d4aa; }
+        .overview-card.bear h3 { color: #ff6b6b; }
+        .overview-card.risks h3 { color: #fdcb6e; }
+        .overview-card p { margin-bottom: 12px; line-height: 1.6; font-size: 0.9rem; }
+        .overview-card ul { list-style: none; padding: 0; margin: 0; }
+        .overview-card li {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            line-height: 1.5;
+            font-size: 0.88rem;
+        }
+        .overview-card li:last-child { border-bottom: none; }
+        .risk-high { color: #ff6b6b; }
+        .risk-moderate { color: #fdcb6e; }
+        .risk-low { color: #00d4aa; }
+        .overview-full { grid-column: 1 / -1; }
+
+        /* KPI */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .kpi-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+        }
+        .kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0,212,170,0.2); }
+        .kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+        .kpi-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        .kpi-change { font-size: 0.9rem; margin-top: 5px; }
+        .kpi-change.positive { color: #00d4aa; }
+        .kpi-change.negative { color: #ff6b6b; }
+        .kpi-period { font-size: 0.75rem; color: #666; margin-top: 3px; }
+
+        /* Guidance */
+        .guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+        .guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .guidance-header h3 {
+            color: #fff;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .guidance-header h3::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, #00d4aa, #00b894);
+            border-radius: 2px;
+        }
+        .guidance-meta { font-size: 0.85rem; color: #888; }
+        .guidance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .guidance-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 18px;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.2s ease;
+        }
+        .guidance-card:hover { transform: translateY(-2px); }
+        .guidance-metric { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+        .guidance-target { font-size: 1.4rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; }
+        .guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
+        .guidance-vs-prior { display: inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+        .guidance-vs-prior.raised { background: rgba(0,212,170,0.15); color: #00d4aa; }
+        .guidance-vs-prior.lowered { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+        .guidance-vs-prior.maintained { background: rgba(255,255,255,0.1); color: #888; }
+        .guidance-vs-prior.new { background: rgba(99,102,241,0.15); color: #818cf8; }
+        .guidance-notes { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
+        .guidance-commentary {
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            padding: 16px 20px;
+            border-left: 3px solid #00d4aa;
+            font-style: italic;
+            color: #b0b0b0;
+            line-height: 1.6;
+        }
+
+        /* Section titles */
+        .section-title {
+            font-size: 1.5rem;
+            color: #fff;
+            margin: 40px auto 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(0,212,170,0.3);
+            max-width: 1400px;
+        }
+
+        /* Charts */
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 25px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .chart-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .chart-card.full-width { grid-column: 1 / -1; }
+        .chart-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .chart-header h3 {
+            color: #fff;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .chart-header h3::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, #00d4aa, #00b894);
+            border-radius: 2px;
+        }
+        .help-btn {
+            width: 24px; height: 24px;
+            border-radius: 50%;
+            background: rgba(0,212,170,0.2);
+            border: 1px solid #00d4aa;
+            color: #00d4aa;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+        .help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+        .chart-wrapper { position: relative; height: 300px; }
+        .chart-wrapper.tall { height: 380px; }
+        .chart-note {
+            margin-top: 10px;
+            font-size: 0.78rem;
+            color: #666;
+            line-height: 1.5;
+            padding: 8px 12px;
+            background: rgba(253,203,110,0.06);
+            border-left: 2px solid rgba(253,203,110,0.4);
+            border-radius: 0 6px 6px 0;
+        }
+
+        /* Divestiture callout */
+        .divestiture-banner {
+            max-width: 1400px;
+            margin: 0 auto 20px;
+            padding: 14px 20px;
+            background: rgba(253,203,110,0.08);
+            border: 1px solid rgba(253,203,110,0.35);
+            border-radius: 10px;
+            font-size: 0.88rem;
+            line-height: 1.6;
+            color: #d0d0d0;
+        }
+        .divestiture-banner strong { color: #fdcb6e; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%);
+            border-radius: 16px;
+            max-width: 620px;
+            width: 100%;
+            max-height: 82vh;
+            overflow-y: auto;
+            border: 1px solid rgba(0,212,170,0.3);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .modal-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            background: #1e2a4a;
+            border-radius: 16px 16px 0 0;
+        }
+        .modal-header h3 { color: #00d4aa; font-size: 1.3rem; margin: 0; }
+        .modal-close {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            background: rgba(255,107,107,0.2);
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-close:hover { background: #ff6b6b; color: #fff; }
+        .modal-body { padding: 25px; line-height: 1.7; }
+        .modal-body p { margin-bottom: 15px; font-size: 0.93rem; }
+        .modal-body strong { color: #00d4aa; }
+        .modal-body ul { margin: 15px 0; padding-left: 20px; }
+        .modal-body li { margin-bottom: 8px; font-size: 0.9rem; }
+        .metric-highlight {
+            background: rgba(0,212,170,0.1);
+            border-left: 3px solid #00d4aa;
+            padding: 12px 15px;
+            margin: 15px 0;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.9rem;
+        }
+
+        /* DCF Section */
+        .dcf-warning-banner {
+            max-width: 1400px;
+            margin: 0 auto 20px;
+            padding: 16px 20px;
+            background: rgba(253,203,110,0.08);
+            border: 1px solid rgba(253,203,110,0.3);
+            border-radius: 10px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #d0d0d0;
+        }
+        .dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+        .dcf-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .dcf-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.3s ease;
+        }
+        .dcf-card:hover { transform: translateY(-3px); }
+        .dcf-card.highlight { background: rgba(0,212,170,0.1); border-color: rgba(0,212,170,0.3); }
+        .dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .dcf-value { font-size: 2.2rem; font-weight: bold; color: #00d4aa; }
+        .dcf-card:not(.highlight) .dcf-value { color: #fff; }
+        .dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+        .dcf-change.positive { color: #00d4aa; }
+        .dcf-change.negative { color: #ff6b6b; }
+        .dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
+        .dcf-inputs {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+        .dcf-inputs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .dcf-input-card {
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #00d4aa; }
+        .dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
+        .fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
+        .fcf-projection-table {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .fcf-projection-item { text-align: center; }
+        .fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
+        .fcf-projection-item .fcf-val { font-size: 1rem; color: #e0e0e0; font-weight: 500; }
+        .fcf-projection-item .growth-rate { font-size: 0.75rem; color: #00d4aa; margin-top: 2px; }
+        .dcf-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+            padding: 25px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .slider-group { display: flex; flex-direction: column; gap: 10px; }
+        .slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+        .slider-group label span { color: #00d4aa; font-weight: 600; }
+        .slider-group input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.1);
+            outline: none;
+        }
+        .slider-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px; height: 18px;
+            border-radius: 50%;
+            background: #00d4aa;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        .slider-hint { font-size: 0.8rem; color: #666; }
+        .scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .scenario-tab {
+            padding: 10px 24px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: transparent;
+            color: #888;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+        .scenario-tab:hover { border-color: rgba(0,212,170,0.5); color: #e0e0e0; }
+        .scenario-tab.active { background: rgba(0,212,170,0.15); border-color: #00d4aa; color: #00d4aa; }
+        .scenario-details {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .scenario-details h4 { color: #00d4aa; margin-bottom: 15px; }
+        .assumption-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        .assumption-item { text-align: center; }
+        .assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+        .assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
+        .sensitivity-section { margin-bottom: 30px; }
+        .sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; }
+        .sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.03); border-radius: 8px; overflow: hidden; }
+        .sensitivity-table th, .sensitivity-table td { padding: 12px 16px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+        .sensitivity-table th { background: rgba(0,212,170,0.1); color: #00d4aa; font-weight: 600; }
+        .sensitivity-table td { color: #e0e0e0; }
+        .sensitivity-table td.highlight { background: rgba(0,212,170,0.15); color: #00d4aa; font-weight: 600; }
+        .sensitivity-table td.below-current { color: #ff6b6b; }
+        .sensitivity-table td.above-current { color: #00d4aa; }
+        .historical-growth { margin-bottom: 30px; }
+        .historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
+        .growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
+        .growth-item {
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .growth-item .g-metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
+        .growth-item .g-rate { font-size: 1.2rem; font-weight: 600; }
+        .growth-item .g-rate.positive { color: #00d4aa; }
+        .growth-item .g-rate.negative { color: #ff6b6b; }
+        .growth-item .g-note { font-size: 0.68rem; color: #555; margin-top: 4px; line-height: 1.3; }
+        .growth-item.selected { border-color: #00d4aa; background: rgba(0,212,170,0.1); }
+        .dcf-download { text-align: center; margin-top: 30px; }
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 28px;
+            background: rgba(0,212,170,0.15);
+            border: 1px solid #00d4aa;
+            border-radius: 8px;
+            color: #00d4aa;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .download-btn:hover { background: #00d4aa; color: #1a1a2e; }
+        .download-icon { font-size: 1.2rem; }
+
+        @media (max-width: 768px) {
+            .charts-container { grid-template-columns: 1fr; }
+            .overview-grid { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.8rem; }
+            .fcf-projection-table { grid-template-columns: repeat(3, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+    <h1>AppLovin Corporation (APP)</h1>
+    <p>AI-Powered Advertising Technology Platform &bull; NASDAQ: APP</p>
+    <div class="meta">Dashboard updated June 24, 2026 &bull; Data through Q1 2026 (10-Q) &bull; FY2025 Annual</div>
+</div>
+
+<!-- INVESTMENT OVERVIEW -->
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid">
+            <div class="overview-card overview-full">
+                <h3>Company Overview</h3>
+                <p>AppLovin is a pure-play AI-powered advertising technology platform that connects advertisers with audiences across mobile apps and the web. Following the June 2025 divestiture of its mobile gaming studios to Tripledot Studios, the company is now exclusively a software and advertising business, generating revenue through its AXON AI recommendation engine (Axon Ads Manager), MAX mediation platform, Adjust analytics, and Wurl connected TV distribution. Approximately 51% of Q1 2026 revenue was generated outside the United States.</p>
+            </div>
+            <div class="overview-card">
+                <h3>Business Model</h3>
+                <p>AppLovin operates as an agent in the digital advertising marketplace. Revenue is generated net of publisher payouts, priced dynamically on advertisers' ROAS goals. AXON AI drives substantially all revenue; MAX handles in-app bidding mediation (rev-share); Adjust provides SaaS attribution subscriptions; Wurl covers CTV distribution (CPM/usage-based).</p>
+                <ul>
+                    <li><strong>Axon Ads Manager</strong> &mdash; ~$5.4B FY2025; 70% YoY growth; dynamically priced on ROAS</li>
+                    <li><strong>MAX mediation</strong> &mdash; % of winning auction spend; grows with in-app bidding adoption</li>
+                    <li><strong>Adjust analytics</strong> &mdash; Annual SaaS subscriptions; stable recurring revenue</li>
+                    <li><strong>Wurl (CTV)</strong> &mdash; CPM and usage-based; nascent but strategic</li>
+                </ul>
+            </div>
+            <div class="overview-card">
+                <h3>Competitive Position</h3>
+                <p>Largest pure-play adtech company by market cap. Dominant platform for performance-based mobile advertising — AXON is a near-mandatory UA channel for mobile gaming studios.</p>
+                <p><strong>Key competitors:</strong> Meta (social/intent data, weaker in gaming performance), Google (scale but fragmented mobile stack), Unity (direct gaming rival, struggling), The Trade Desk (programmatic open-web, not mobile performance).</p>
+                <p>Now expanding aggressively into e-commerce — the consumer vertical surpassed all prior peaks by March 2026 and hit an all-time monthly high in April 2026 following a material AXON model upgrade.</p>
+            </div>
+            <div class="overview-card">
+                <h3>Economic Moat</h3>
+                <ul>
+                    <li><strong>AXON data flywheel:</strong> Billions of daily interactions across tens of thousands of apps compound model accuracy — near-impossible to replicate without equivalent data scale</li>
+                    <li><strong>MAX supply-side lock-in:</strong> Leading in-app bidding mediation layer; publishers integrated into AXON demand ecosystem face high switching costs</li>
+                    <li><strong>Performance vs. brand differentiation:</strong> Measurable ROAS targeting is fundamentally different from brand-focused platforms</li>
+                    <li><strong>Lean AI-driven scalability:</strong> ~1,700 employees vs. $5.5B revenue; cost structure is infrastructure, not headcount</li>
+                    <li><strong>Advertiser switching costs:</strong> Deep integration into AXON bidding, attribution, and creative feedback loops creates friction</li>
+                </ul>
+            </div>
+            <div class="overview-card">
+                <h3>Growth Drivers</h3>
+                <ul>
+                    <li>E-commerce expansion — TAM orders of magnitude larger than mobile gaming UA; consumer vertical at all-time highs as of April 2026</li>
+                    <li>Axon self-service platform — global public launch June 2026; removes managed-service bottleneck; opens long tail of advertisers</li>
+                    <li>Continuous AXON model upgrades — each release delivers step-changes in advertiser ROAS; Q1 2026 net revenue per install +93% YoY</li>
+                    <li>Operating leverage — 84-85% Adjusted EBITDA margins; incremental revenue flows directly to FCF</li>
+                    <li>MAX and publisher ecosystem expansion — more publishers improve AXON supply-side data</li>
+                    <li>Connected TV via Wurl — optionality in premium video advertising market</li>
+                    <li>S&amp;P 500 inclusion (late 2025) — institutional ownership expansion, compressed equity risk premium</li>
+                </ul>
+            </div>
+            <div class="overview-card risks">
+                <h3>Key Risks</h3>
+                <ul>
+                    <li><span class="risk-high">[HIGH]</span> SEC &amp; FTC investigations into identifier-bridging / data practices — core AXON risk</li>
+                    <li><span class="risk-high">[HIGH]</span> Securities class action litigation (Brownback Action, 2025)</li>
+                    <li><span class="risk-high">[HIGH]</span> Valuation embeds near-perfect execution; stock fell ~50% during Q1 2025 short-seller period</li>
+                    <li><span class="risk-moderate">[MOD]</span> AXON model performance dependence — no contractual lock-in; clients can leave anytime</li>
+                    <li><span class="risk-moderate">[MOD]</span> Apple ATT / iOS privacy &amp; Google Privacy Sandbox — degrades signal quality</li>
+                    <li><span class="risk-moderate">[MOD]</span> E-commerce expansion execution risk — unproven at scale</li>
+                    <li><span class="risk-moderate">[MOD]</span> Key-person risk: CEO Adam Foroughi (no employment agreement, no key-man insurance)</li>
+                    <li><span class="risk-moderate">[MOD]</span> Aggressive buybacks at elevated multiples ($1B/quarter Q4 2025 &amp; Q1 2026)</li>
+                    <li><span class="risk-low">[LOW]</span> $3.5B long-term debt; net debt/EBITDA ~0.2x — manageable but present</li>
+                    <li><span class="risk-low">[LOW]</span> Ad market cyclicality; US-China trade tensions; currency exposure (51% intl revenue)</li>
+                </ul>
+            </div>
+            <div class="overview-card bull">
+                <h3>Bull Case</h3>
+                <ul>
+                    <li>E-commerce TAM is multiples of gaming; early traction suggests AXON transfers well; even low-single-digit capture is transformative</li>
+                    <li>Self-service launch is non-linear — mirrors DTC flywheel that drove Meta and Google growth; dramatically expands addressable advertiser count</li>
+                    <li>Margin profile among best in software: 84-85% Adjusted EBITDA, 65%+ GAAP net margins at scale</li>
+                    <li>AXON data flywheel self-reinforces: better model → more spend → more data → better model</li>
+                    <li>$1B/quarter buybacks + $1.3B+ quarterly FCF provides strong downside support and EPS growth</li>
+                    <li>DCF Bull Case IV: $590.81 (+26.5% upside from $467)</li>
+                </ul>
+            </div>
+            <div class="overview-card bear">
+                <h3>Bear Case</h3>
+                <ul>
+                    <li>SEC/FTC consent decree mandating changes to identifier-bridging could impair AXON targeting accuracy — existential risk to core value proposition</li>
+                    <li>Valuation at $467 prices in near-perfect execution; base-case DCF IV is $359 (-23% downside)</li>
+                    <li>E-commerce advertisers are sophisticated with established Meta/Google/Amazon frameworks; AXON may not sustain durable large-scale budgets</li>
+                    <li>Four short-seller attacks in 12 months; sustained scrutiny creates headline risk and deters some institutional capital</li>
+                    <li>CEO concentration: Foroughi is irreplaceable architect of lean, high-performance model</li>
+                    <li>DCF Bear Case IV: $165.63 (-64.5% downside from $467)</li>
+                </ul>
+            </div>
+            <div class="overview-card">
+                <h3>Recent Developments</h3>
+                <ul>
+                    <li><strong>Jun 2026:</strong> AXON self-service platform opened globally — all advertisers can now onboard without managed-service</li>
+                    <li><strong>May 2026:</strong> Q1 2026 earnings beat: Revenue $1.84B (+59% YoY), Adj. EBITDA $1.557B (85% margin), FCF $1.287B; consumer vertical at all-time monthly high in April</li>
+                    <li><strong>May 2026:</strong> Q2 2026 guidance: Revenue $1.915B-$1.945B, Adj. EBITDA $1.615B-$1.645B (84-85% margin)</li>
+                    <li><strong>Feb 2026:</strong> CapitalWatch retracted allegations vs. Hao Tang; stock +14% on retraction</li>
+                    <li><strong>Feb 2026:</strong> FY2025 results: Revenue $5.48B (+70% YoY), NI $3.34B, FCF $3.95B (+91% YoY)</li>
+                    <li><strong>Oct 2025:</strong> SEC and FTC separately launch investigations into data collection / identifier-bridging practices</li>
+                    <li><strong>Late 2025:</strong> S&amp;P 500 inclusion — triggering significant institutional buying</li>
+                    <li><strong>Jun 2025:</strong> Apps business divested to Tripledot Studios for $715.6M ($430.6M cash + ~22% equity stake). AppLovin now pure-play adtech.</li>
+                    <li><strong>Feb-Mar 2025:</strong> Fuzzy Panda, Culper Research, Muddy Waters publish short reports; stock fell ~50% from peak before recovering</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KPI CARDS -->
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<!-- GUIDANCE SECTION -->
+<div class="guidance-section">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of Q1 2026 Earnings (May 2026) | Q2 2026</span>
+    </div>
+    <div class="guidance-grid">
+        <div class="guidance-card">
+            <div class="guidance-metric">Revenue</div>
+            <div class="guidance-target">$1.915B – $1.945B</div>
+            <div class="guidance-period">Q2 2026</div>
+            <span class="guidance-vs-prior raised">Raised</span>
+            <div class="guidance-notes">+52% to +55% YoY growth. Q1 2026 actuals of $1.842B beat top-end of prior guidance, driving upward revision.</div>
+        </div>
+        <div class="guidance-card">
+            <div class="guidance-metric">Adjusted EBITDA</div>
+            <div class="guidance-target">$1.615B – $1.645B</div>
+            <div class="guidance-period">Q2 2026</div>
+            <span class="guidance-vs-prior raised">Raised</span>
+            <div class="guidance-notes">84%–85% Adjusted EBITDA margin. Reflects continued operating leverage as infrastructure costs grow slower than revenue.</div>
+        </div>
+        <div class="guidance-card">
+            <div class="guidance-metric">Axon Self-Serve Launch</div>
+            <div class="guidance-target">Global Public Launch</div>
+            <div class="guidance-period">June 2026</div>
+            <span class="guidance-vs-prior new">New</span>
+            <div class="guidance-notes">CEO Foroughi: "a major milestone that will change the company's trajectory." Opens platform to all global advertisers without managed-service onboarding.</div>
+        </div>
+        <div class="guidance-card">
+            <div class="guidance-metric">E-Commerce Vertical</div>
+            <div class="guidance-target">All-Time Monthly High</div>
+            <div class="guidance-period">April 2026</div>
+            <span class="guidance-vs-prior raised">Raised</span>
+            <div class="guidance-notes">Consumer vertical surpassed every prior Q4 seasonal peak by March 2026. April hit all-time monthly high following a "material model release" in AXON.</div>
+        </div>
+        <div class="guidance-card">
+            <div class="guidance-metric">Share Repurchases</div>
+            <div class="guidance-target">$1.0B / Quarter</div>
+            <div class="guidance-period">Ongoing</div>
+            <span class="guidance-vs-prior maintained">Maintained</span>
+            <div class="guidance-notes">$2.3B remaining under buyback authorization as of March 2026. Generating $1.3B+ FCF per quarter supports sustained repurchases.</div>
+        </div>
+        <div class="guidance-card">
+            <div class="guidance-metric">Adj. EBITDA Margin (LT)</div>
+            <div class="guidance-target">84%–85%+</div>
+            <div class="guidance-period">FY2026 trajectory</div>
+            <span class="guidance-vs-prior raised">Raised</span>
+            <div class="guidance-notes">Management expects operating leverage to continue. Cloud infrastructure is the dominant cost; headcount growth is minimal. Q1 2026 achieved 85% margin.</div>
+        </div>
+    </div>
+    <div class="guidance-commentary">
+        CEO Adam Foroughi on Q1 2026 earnings call: "The consumer vertical is exceeding our expectations — March spend was up ~25% from January, and April hit an all-time monthly high. The material model release we did in AXON is showing the kind of step-function improvement we expect with each major upgrade. Opening the platform globally in June is going to be a fundamental shift in how we reach advertisers."
+    </div>
+</div>
+
+<!-- DIVESTITURE BANNER -->
+<div class="divestiture-banner">
+    <strong>Data Caveat — Apps Business Divestiture:</strong> FY2021 through Q1 2025 figures represent TOTAL COMPANY revenue (Advertising + Apps segments). From Q2 2025 onward (and in FY2025 full-year), figures represent ADVERTISING-ONLY revenue from continuing operations. AppLovin divested its mobile gaming studios to Tripledot Studios in June 2025. The apparent revenue dip from Q1 2025 ($1,484M total) to Q2 2025 ($1,259M advertising-only) is <strong>NOT a real decline</strong> — it reflects the ~$325M Apps segment being removed from reported results. All charts use a dashed vertical line and annotation to mark this transition. Like-for-like advertising revenue grew 70% in FY2025.
+</div>
+
+<!-- REVENUE & VOLUME CHARTS -->
+<h2 class="section-title">Revenue &amp; Scale</h2>
+<div class="charts-container">
+    <div class="chart-card full-width">
+        <div class="chart-header">
+            <h3>Quarterly Revenue (with Divestiture Annotation)</h3>
+            <button class="help-btn" onclick="openModal('revenue')">?</button>
+        </div>
+        <div class="chart-wrapper tall">
+            <canvas id="revenueQuarterly"></canvas>
+        </div>
+        <div class="chart-note">
+            <strong style="color:#fdcb6e">Divestiture break:</strong> Q1 2025 ($1,484M) includes Apps segment. Q2 2025 ($1,259M) is advertising-only. The dip is NOT organic — it reflects Apps divestiture. Like-for-like advertising revenue: Q1 2025 ~$1,159M vs Q2 2025 $1,259M (+9% sequential). Q1 2026: $1,842M (+59% YoY on advertising basis).
+        </div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Annual Revenue (FY2021–FY2025)</h3>
+            <button class="help-btn" onclick="openModal('revenueAnnual')">?</button>
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="revenueAnnual"></canvas>
+        </div>
+        <div class="chart-note">FY2021–FY2024: Total company (Advertising + Apps). FY2025: Advertising-only ($5.48B, +70% YoY on like-for-like advertising basis).</div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Revenue YoY Growth Rate (Quarterly)</h3>
+            <button class="help-btn" onclick="openModal('revenueGrowth')">?</button>
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="revenueGrowth"></canvas>
+        </div>
+        <div class="chart-note">Q2–Q4 2025 growth rates use advertising-only current period vs. prior year total-company — understates true like-for-like growth. Q1 2026 is a clean +59% YoY comparison (both advertising-only).</div>
+    </div>
+</div>
+
+<!-- PROFITABILITY CHARTS -->
+<h2 class="section-title">Profitability &amp; Margins</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Adjusted EBITDA &amp; Margin</h3>
+            <button class="help-btn" onclick="openModal('ebitda')">?</button>
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="ebitdaChart"></canvas>
+        </div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Income (Quarterly)</h3>
+            <button class="help-btn" onclick="openModal('netIncome')">?</button>
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="netIncomeChart"></canvas>
+        </div>
+    </div>
+    <div class="chart-card full-width">
+        <div class="chart-header">
+            <h3>Margin Expansion Over Time (Gross / Operating / Net / Adj. EBITDA)</h3>
+            <button class="help-btn" onclick="openModal('margins')">?</button>
+        </div>
+        <div class="chart-wrapper tall">
+            <canvas id="marginsChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- CASH FLOW CHARTS -->
+<h2 class="section-title">Cash Flow &amp; Capital Allocation</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Free Cash Flow (Quarterly)</h3>
+            <button class="help-btn" onclick="openModal('fcf')">?</button>
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="fcfChart"></canvas>
+        </div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Annual FCF vs. Net Income</h3>
+            <button class="help-btn" onclick="openModal('fcfAnnual')">?</button>
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="fcfAnnualChart"></canvas>
+        </div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>EPS (Diluted) — Quarterly</h3>
+            <button class="help-btn" onclick="openModal('eps')">?</button>
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="epsChart"></canvas>
+        </div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Cash &amp; Debt Position</h3>
+            <button class="help-btn" onclick="openModal('balance')">?</button>
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="balanceChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- DCF WARNING BANNER -->
+<div class="dcf-warning-banner">
+    <strong style="color:#fdcb6e">Model approach:</strong> The valuation sanity check tripped in the OPPOSITE direction from a typical over-valuation: the base-case intrinsic value ($359) sits BELOW the current market price ($467), not implausibly above it — so no assumptions were padded down. All scenarios (and the current price) carry a PEG ratio under 1.0x on AppLovin's ~56% trailing FCF growth, i.e. "growth at a reasonable price." The framing: at $467 the market is pricing execution near the BULL case, leaving no margin of safety on base-case assumptions. The 15%-CAGR entry price is $224 (&#8722;52%); the regulatory bear case (SEC/FTC identifier-bridging investigations) is $166 (&#8722;64%). This is a high-quality, high-multiple growth name where the binary risk is regulatory, not cyclical.
+</div>
+
+<!-- DCF VALUATION -->
+<h2 class="section-title">DCF Valuation</h2>
+<div class="dcf-section">
+    <div class="dcf-summary">
+        <div class="dcf-card highlight">
+            <div class="dcf-label">Base Case Intrinsic Value</div>
+            <div class="dcf-value" id="dcfIV">$359</div>
+            <div class="dcf-change negative" id="dcfUpside">-23.2% vs current</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Entry Price (15% CAGR)</div>
+            <div class="dcf-value" id="dcfEntry">$224</div>
+            <div class="dcf-sublabel">Buy below for 15% annual return</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Current Price</div>
+            <div class="dcf-value" id="dcfCurrent">$467</div>
+            <div class="dcf-sublabel">As of June 24, 2026</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Prob-Weighted IV</div>
+            <div class="dcf-value" id="dcfWeighted">$368</div>
+            <div class="dcf-sublabel">25% Bull / 50% Base / 25% Bear</div>
+        </div>
+    </div>
+
+    <div class="dcf-inputs">
+        <h4>DCF Model Inputs</h4>
+        <div class="dcf-inputs-grid">
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Base Year FCF</div>
+                <div class="dcf-input-value">$3,952M</div>
+                <div class="dcf-input-note">FY2025 actual (advertising-only continuing ops)</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Shares Outstanding</div>
+                <div class="dcf-input-value">338.7M</div>
+                <div class="dcf-input-note">As of Q1 2026 10-Q</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Net Debt</div>
+                <div class="dcf-input-value">$755M</div>
+                <div class="dcf-input-note">$3,514M debt less $2,759M cash</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Q1 2026 FCF Run-Rate</div>
+                <div class="dcf-input-value">$5,147M</div>
+                <div class="dcf-input-note">Annualized; FY2025 used as conservative base</div>
+            </div>
+        </div>
+        <div class="fcf-projections">
+            <h5>Projected FCF — Base Case (5-Year, $M)</h5>
+            <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+        </div>
+    </div>
+
+    <div class="dcf-controls">
+        <div class="slider-group">
+            <label>Year 1 Growth Rate: <span id="growthValue">40%</span></label>
+            <input type="range" id="growthSlider" min="5" max="70" value="40" step="1">
+            <div class="slider-hint">Base: 40% | Bull: 50% | Bear: 22% (FY2025 FCF +91% YoY; Q1 2026 FCF +56% YoY)</div>
+        </div>
+        <div class="slider-group">
+            <label>WACC: <span id="waccValue">11%</span></label>
+            <input type="range" id="waccSlider" min="7" max="15" value="11" step="0.5">
+            <div class="slider-hint">Base: 11% | Bull: 10% | Bear: 12% (S&amp;P 500 constituent; regulatory + key-person premium)</div>
+        </div>
+        <div class="slider-group">
+            <label>Terminal Growth: <span id="terminalValue">3.0%</span></label>
+            <input type="range" id="terminalSlider" min="1" max="5" value="3" step="0.5">
+            <div class="slider-hint">Base: 3.0% | Bull: 3.5% | Bear: 2.0%</div>
+        </div>
+    </div>
+
+    <div class="scenario-tabs">
+        <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case ($359)</button>
+        <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case ($591)</button>
+        <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case ($166)</button>
+    </div>
+
+    <div class="scenario-details">
+        <h4>Scenario Assumptions &amp; Results</h4>
+        <div class="assumption-grid" id="assumptionGrid"></div>
+    </div>
+
+    <div class="sensitivity-section">
+        <h4>Sensitivity Analysis: Intrinsic Value by WACC &amp; Terminal Growth Rate</h4>
+        <div style="overflow-x:auto;">
+            <table class="sensitivity-table" id="sensitivityMatrix"></table>
+        </div>
+        <div style="font-size:0.78rem;color:#666;margin-top:8px;">Highlighted cell = base case (WACC 11%, TG 3.0%). Green = above current price ($467). Red = below current price.</div>
+    </div>
+
+    <div class="historical-growth">
+        <h4>Historical Growth Rates (Selected)</h4>
+        <div class="growth-grid" id="growthGrid"></div>
+    </div>
+
+    <div class="dcf-download">
+        <a href="APP_DCF_Model.xlsx" class="download-btn" download>
+            <span class="download-icon">&#8681;</span> Download Excel DCF Model
+        </a>
+    </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle">Metric Details</h3>
+            <button class="modal-close" onclick="closeModal()">&#215;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ── EMBEDDED CSV ──────────────────────────────────────────────────────────────
+const csvData = `Period,Revenue,CostOfRevenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,NetIncome,EPS,AdjustedEBITDA,CashFromOps,CapEx,FreeCashFlow,ShareholdersEquity,TotalDebt,CashAndEquivalents,SharesOutstanding,Notes
+Q1 2021,603.9,223.1,380.8,63.1,11.5,1.9,-10.6,-0.05,131.1,61.8,0.1,60.9,-130.0,2155.9,761.1,222.4,Pre-IPO (IPO Apr 2021); total company incl. Apps; equity = stockholders deficit
+Q2 2021,668.8,245.9,422.9,63.2,35.0,5.2,14.4,0.04,183.7,90.5,0.5,86.1,1997.4,1752.0,1183.7,353.9,Post-IPO; total company incl. Apps
+Q3 2021,727.0,254.1,472.9,65.1,45.0,6.2,0.1,0.00,190.7,124.6,0.3,119.2,2049.1,1749.3,1049.6,384.3,Total company incl. Apps
+Q4 2021,793.5,265.1,528.4,66.6,58.5,7.4,31.4,,221.3,85.0,0.4,79.0,2138.1,3227.6,1520.5,375.1,Derived (FY2021 minus 9-month); balance sheet = Dec 31 2021
+FY2021,2793.1,988.1,1805.0,64.6,150.0,5.4,35.3,0.09,726.8,361.9,1.4,345.2,2138.1,3227.6,1520.5,342.8,From FY2021 10-K; total company incl. Apps
+Q1 2022,625.4,281.8,343.6,54.9,-128.0,-20.5,-115.3,-0.31,276.2,-31.7,0.3,-38.2,2012.3,3225.5,1413.3,372.0,Total company incl. Apps; MoPub acq. Jan 2022
+Q2 2022,776.2,303.9,472.3,60.9,53.4,6.9,-21.8,-0.06,269.7,106.8,0.1,100.5,1907.2,3223.3,951.6,373.9,Total company incl. Apps
+Q3 2022,713.1,301.0,412.1,57.8,49.3,6.9,23.7,0.06,257.6,174.5,0.2,168.5,1881.9,3217.5,943.5,378.5,Total company incl. Apps
+Q4 2022,702.3,369.4,332.9,47.4,-22.4,-3.2,-79.5,,259.6,163.2,0.0,157.2,1902.7,3211.7,1080.5,373.9,Derived (FY2022 minus 9-month); balance sheet = Dec 31 2022
+FY2022,2817.1,1256.1,1561.0,55.4,-47.8,-1.7,-192.9,-0.52,1063.2,412.8,0.7,388.0,1902.7,3211.7,1080.5,371.6,From FY2022 10-K; total company incl. Apps
+Q1 2023,715.4,262.0,453.4,63.4,61.0,8.5,-4.5,-0.01,273.7,288.7,0.1,283.1,1898.6,3205.9,1245.9,373.2,Total company incl. Apps
+Q2 2023,750.2,258.6,491.6,65.5,131.3,17.5,80.4,0.22,333.5,229.8,3.7,220.6,1517.4,3200.1,876.2,357.0,Total company incl. Apps
+Q3 2023,864.3,265.0,599.3,69.3,186.3,21.6,108.6,0.30,419.3,199.1,0.2,193.6,1095.8,3127.3,332.5,356.9,Total company incl. Apps
+Q4 2023,953.3,273.6,679.7,71.3,269.5,28.3,172.2,,476.2,344.0,0.2,339.8,1256.3,3120.9,502.2,339.9,Derived (FY2023 minus 9-month); balance sheet = Dec 31 2023
+FY2023,3283.1,1059.2,2223.9,67.7,648.2,19.7,356.7,0.98,1502.7,1061.5,4.2,1037.1,1256.3,3120.9,502.2,362.6,From FY2024 10-K (as filed); total company incl. Apps
+Q1 2024,1058.1,294.1,764.0,72.2,339.6,32.1,236.2,0.67,548.8,392.8,0.2,387.6,760.2,3525.5,436.3,348.6,Total company incl. Apps; from Q1-2024 10-Q
+Q2 2024,1080.1,282.5,797.6,73.8,391.0,36.2,310.0,0.89,601.2,454.5,3.9,445.5,814.8,3517.8,460.4,348.0,Total company incl. Apps; from Q2-2024 10-Q
+Q3 2024,1198.2,269.7,928.5,77.5,534.9,44.7,434.4,1.25,721.6,550.7,0.1,545.1,938.2,3510.1,567.6,348.2,Total company incl. Apps; from Q3-2024 10-Q
+Q4 2024,1372.8,320.5,1052.3,76.7,608.0,44.3,599.2,,848.0,701.0,0.5,695.2,1089.8,3509.0,741.4,340.0,Derived (FY2024 minus 9-month); balance sheet = Dec 31 2024
+FY2024,4709.2,1166.8,3542.4,75.2,1873.5,39.8,1579.8,4.53,2719.6,2099.0,4.8,2073.4,1089.8,3509.0,741.4,347.8,From FY2024 10-K (as filed); total company incl. Apps
+Q1 2025,1484.0,271.2,1212.8,81.7,663.5,44.7,576.4,1.67,1005.0,831.7,0.1,825.7,575.4,3710.0,551.0,344.9,From Q1-2025 10-Q (as originally filed); includes Apps rev (~$325M est.) before discontinued ops reclassification; goodwill impairment $188.9M in OpEx
+Q2 2025,1258.8,155.1,1103.7,87.7,957.7,76.1,819.5,2.39,1018.3,772.2,0.0,768.1,1167.1,3511.0,1192.6,342.2,Advertising revenue only (Apps = discontinued ops in Q2-2025 10-Q); total NI includes +$47.7M from discontinued ops; CFO/FCF derived from 6-month minus Q1
+Q3 2025,1405.0,174.9,1230.2,87.6,1079.0,76.8,835.5,2.45,1157.7,1053.4,0.1,1049.0,1473.9,3512.0,1666.9,341.0,Advertising revenue only (Apps = discontinued ops); $0 discontinued ops in Q3 2025
+Q4 2025,1657.9,183.5,1474.4,88.9,1275.2,76.9,1102.3,,1398.7,1313.7,0.2,1309.2,2134.7,3513.0,2487.1,338.3,Derived (FY2025 minus 9-month); Advertising only; balance sheet = Dec 31 2025
+FY2025,5480.7,665.1,4815.6,87.9,4151.9,75.8,3333.8,9.75,4512.5,3971.1,0.5,3952.0,2134.7,3513.0,2487.1,342.0,From FY2025 10-K; Advertising only (Apps divested in 2025); NI includes -$99.4M loss from discontinued ops
+Q1 2026,1842.4,203.6,1638.8,89.0,1439.9,78.2,1205.6,3.56,1556.9,1291.4,0.4,1286.7,2363.5,3514.0,2758.7,338.7,Advertising only; from Q1-2026 10-Q`;
+
+// ── EMBEDDED DCF DATA ─────────────────────────────────────────────────────────
+const dcfData = {
+    ticker: "APP",
+    company_name: "AppLovin Corporation",
+    valuation_date: "2026-06-24",
+    current_price: 467.02,
+    inputs: {
+        shares_outstanding: 338.7,
+        total_debt: 3514.0,
+        cash: 2758.7,
+        net_debt: 755.3,
+        last_fcf: 3952.0,
+        currency: "USD",
+        units: "millions"
+    },
+    historical_growth: {
+        advertising_revenue_1yr_cagr: 70.4,
+        advertising_revenue_q1_yoy: 59.0,
+        fcf_2yr_cagr: 95.2,
+        fcf_3yr_cagr: 116.8,
+        fcf_4yr_cagr: 83.9,
+        ebitda_3yr_cagr: 61.9,
+        ebitda_4yr_cagr: 57.9,
+        selected_growth_rate: 40,
+        growth_rate_source: "fcf_based_base_case",
+        growth_divergence_warning: null
+    },
+    assumptions: {
+        base: { growth_rates: [40,32,24,17,12], wacc: 11, terminal_growth: 3.0, fcf_margin: 72 },
+        bull: { growth_rates: [50,42,34,24,16], wacc: 10, terminal_growth: 3.5, fcf_margin: 80 },
+        bear: { growth_rates: [22,14,8,4,2],   wacc: 12, terminal_growth: 2.0, fcf_margin: 55 }
+    },
+    projections: {
+        base: { fcf: [5532.8,7303.3,9056.1,10595.6,11867.1] },
+        bull: { fcf: [5928.0,8417.8,11279.8,13986.9,16224.8] },
+        bear: { fcf: [4821.4,5496.4,5936.1,6173.6,6297.1] }
+    },
+    valuation: {
+        base: { intrinsic_value: 358.65, upside: -23.2 },
+        bull: { intrinsic_value: 590.81, upside: 26.5 },
+        bear: { intrinsic_value: 165.63, upside: -64.5 }
+    },
+    entry_price: {
+        base: { entry_price: 224.28, target_cagr: 15 },
+        bull: { entry_price: 379.23, target_cagr: 15 },
+        bear: { entry_price: 94.28, target_cagr: 15 }
+    },
+    sensitivity: {
+        wacc_range: [9,10,11,12,13],
+        terminal_growth_range: [2.0,2.5,3.0,3.5,4.0],
+        matrix: [
+            [428,456,487,525,570],
+            [371,391,414,440,471],
+            [327,342,359,378,400],
+            [291,303,316,330,347],
+            [262,271,282,293,306]
+        ]
+    },
+    probability_weighted: {
+        weights: { bull: 0.25, base: 0.5, bear: 0.25 },
+        weighted_iv: 368.43
+    }
+};
+
+// ── CSV PARSER ────────────────────────────────────────────────────────────────
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        // Handle commas in Notes column by capping at header count
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => { obj[h.trim()] = (values[i] || '').trim(); });
+        return obj;
+    });
+}
+
+const allData = parseCSV(csvData);
+
+// Separate quarterly from annual
+const qData = allData.filter(d => !d.Period.startsWith('FY'));
+const fyData = allData.filter(d => d.Period.startsWith('FY'));
+
+// Sort quarterly chronologically
+const qOrder = { 'Q1':1,'Q2':2,'Q3':3,'Q4':4 };
+qData.sort((a,b) => {
+    const [qa, ya] = [a.Period.split(' ')[0], parseInt(a.Period.split(' ')[1])];
+    const [qb, yb] = [b.Period.split(' ')[0], parseInt(b.Period.split(' ')[1])];
+    return ya !== yb ? ya - yb : qOrder[qa] - qOrder[qb];
+});
+fyData.sort((a,b) => parseInt(a.Period.replace('FY','')) - parseInt(b.Period.replace('FY','')));
+
+const n = (v) => parseFloat(v) || 0;
+const fmt = (v, d=1) => isNaN(v) || v === null ? 'N/A' : v.toFixed(d);
+const fmtB = (v) => Math.abs(v) >= 1000 ? `$${(v/1000).toFixed(2)}B` : `$${v.toFixed(0)}M`;
+
+// ── CHART DEFAULTS ────────────────────────────────────────────────────────────
+const CD = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: { labels: { color: '#e0e0e0', font: { size: 11 } } },
+        tooltip: {
+            backgroundColor: 'rgba(26,26,46,0.95)',
+            titleColor: '#00d4aa',
+            bodyColor: '#e0e0e0',
+            borderColor: 'rgba(0,212,170,0.3)',
+            borderWidth: 1
+        }
+    },
+    scales: {
+        x: { ticks: { color: '#888', font:{size:11} }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888', font:{size:11} }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+
+const C = {
+    primary:   '#00d4aa',
+    secondary: '#00b894',
+    blue:      '#0984e3',
+    purple:    '#6c5ce7',
+    yellow:    '#fdcb6e',
+    red:       '#ff6b6b',
+    teal:      '#00cec9',
+    pink:      '#e84393'
+};
+
+// ── KPI CARDS ─────────────────────────────────────────────────────────────────
+function buildKPIs() {
+    // Most recent quarter = Q1 2026
+    const latest = qData[qData.length - 1]; // Q1 2026
+    const prevYearQ = qData.find(d => d.Period === 'Q1 2025'); // Q1 2025
+
+    // For YoY revenue on Q1 2026, compare to advertising Q1 2025 (~$1,159M from DCF notes)
+    const advRevQ12025 = 1159.0; // advertising-only Q1 2025 (from DCF JSON)
+
+    const revYoY = ((n(latest.Revenue) - advRevQ12025) / advRevQ12025 * 100).toFixed(1);
+    const ebitdaYoY = prevYearQ ? ((n(latest.AdjustedEBITDA) - n(prevYearQ.AdjustedEBITDA)) / Math.abs(n(prevYearQ.AdjustedEBITDA)) * 100).toFixed(1) : null;
+    const niYoY = prevYearQ ? ((n(latest.NetIncome) - n(prevYearQ.NetIncome)) / Math.abs(n(prevYearQ.NetIncome)) * 100).toFixed(1) : null;
+    const fcfYoY = prevYearQ ? ((n(latest.FreeCashFlow) - n(prevYearQ.FreeCashFlow)) / Math.abs(n(prevYearQ.FreeCashFlow)) * 100).toFixed(1) : null;
+
+    const latestFY = fyData[fyData.length - 1]; // FY2025
+    const prevFY   = fyData[fyData.length - 2]; // FY2024
+
+    const kpis = [
+        {
+            label: 'Revenue (Q1 2026)',
+            value: fmtB(n(latest.Revenue)),
+            change: `+${revYoY}% YoY (adv-only)`,
+            positive: true,
+            key: 'revenue'
+        },
+        {
+            label: 'Adj. EBITDA (Q1 2026)',
+            value: fmtB(n(latest.AdjustedEBITDA)),
+            change: ebitdaYoY ? `+${ebitdaYoY}% YoY` : '',
+            positive: true,
+            key: 'ebitda'
+        },
+        {
+            label: 'Adj. EBITDA Margin',
+            value: `${(n(latest.AdjustedEBITDA)/n(latest.Revenue)*100).toFixed(1)}%`,
+            change: 'Q1 2026 record high',
+            positive: true,
+            key: 'ebitdaMargin'
+        },
+        {
+            label: 'Net Income (Q1 2026)',
+            value: fmtB(n(latest.NetIncome)),
+            change: niYoY ? `+${niYoY}% YoY` : '',
+            positive: parseFloat(niYoY) >= 0,
+            key: 'netIncome'
+        },
+        {
+            label: 'EPS Diluted (Q1 2026)',
+            value: `$${n(latest.EPS).toFixed(2)}`,
+            change: prevYearQ && n(prevYearQ.EPS) ? `vs $${n(prevYearQ.EPS).toFixed(2)} Q1 2025` : '',
+            positive: true,
+            key: 'eps'
+        },
+        {
+            label: 'Free Cash Flow (Q1 2026)',
+            value: fmtB(n(latest.FreeCashFlow)),
+            change: fcfYoY ? `+${fcfYoY}% YoY` : '',
+            positive: true,
+            key: 'fcf'
+        },
+        {
+            label: 'Operating Margin (Q1 2026)',
+            value: `${n(latest.OperatingMargin).toFixed(1)}%`,
+            change: `vs ${n(prevYearQ ? prevYearQ.OperatingMargin : 0).toFixed(1)}% Q1 2025`,
+            positive: true,
+            key: 'opMargin'
+        },
+        {
+            label: 'FY2025 Revenue (Adv-only)',
+            value: fmtB(n(latestFY.Revenue)),
+            change: `+70% YoY like-for-like`,
+            positive: true,
+            key: 'fy25rev'
+        }
+    ];
+
+    const grid = document.getElementById('kpiGrid');
+    grid.innerHTML = kpis.map(k => `
+        <div class="kpi-card" onclick="openModal('${k.key}')">
+            <div class="kpi-value">${k.value}</div>
+            <div class="kpi-label">${k.label}</div>
+            ${k.change ? `<div class="kpi-change ${k.positive ? 'positive' : 'negative'}">${k.positive && !k.change.startsWith('vs') && !k.change.startsWith('Q') ? (k.change.startsWith('+') ? '' : '') : ''}${k.change}</div>` : ''}
+        </div>
+    `).join('');
+}
+
+// ── CHARTS ────────────────────────────────────────────────────────────────────
+
+// Quarterly Revenue with divestiture annotation
+function buildRevenueQuarterly() {
+    const labels = qData.map(d => d.Period);
+    const revenues = qData.map(d => n(d.Revenue));
+
+    // Colors: orange for total-company, teal for adv-only
+    // Q1 2025 = index where divestiture starts to show
+    // Q2 2025 onward = advertising only
+    const divIdx = qData.findIndex(d => d.Period === 'Q2 2025');
+
+    const bgColors = qData.map((d, i) => {
+        if (d.Period === 'Q1 2025') return 'rgba(253,203,110,0.7)'; // transition quarter
+        if (i >= divIdx && divIdx >= 0) return 'rgba(0,212,170,0.75)';
+        return 'rgba(0,152,198,0.7)';
+    });
+    const borderColors = qData.map((d, i) => {
+        if (d.Period === 'Q1 2025') return '#fdcb6e';
+        if (i >= divIdx && divIdx >= 0) return '#00d4aa';
+        return '#0984e3';
+    });
+
+    const ctx = document.getElementById('revenueQuarterly').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Revenue ($M)',
+                data: revenues,
+                backgroundColor: bgColors,
+                borderColor: borderColors,
+                borderWidth: 2,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            ...CD,
+            plugins: {
+                ...CD.plugins,
+                annotation: {
+                    annotations: {
+                        divLine: {
+                            type: 'line',
+                            xMin: divIdx - 0.5,
+                            xMax: divIdx - 0.5,
+                            borderColor: '#fdcb6e',
+                            borderWidth: 2,
+                            borderDash: [6, 3],
+                            label: {
+                                display: true,
+                                content: 'Apps Divested',
+                                color: '#fdcb6e',
+                                backgroundColor: 'rgba(26,26,46,0.9)',
+                                position: 'start'
+                            }
+                        }
+                    }
+                },
+                legend: {
+                    display: true,
+                    labels: {
+                        color: '#e0e0e0',
+                        generateLabels: () => [
+                            { text: 'Total Company (incl. Apps)', fillStyle: 'rgba(0,152,198,0.7)', strokeStyle: '#0984e3', lineWidth: 2 },
+                            { text: 'Q1 2025 (transition quarter)', fillStyle: 'rgba(253,203,110,0.7)', strokeStyle: '#fdcb6e', lineWidth: 2 },
+                            { text: 'Advertising-Only (post-divestiture)', fillStyle: 'rgba(0,212,170,0.75)', strokeStyle: '#00d4aa', lineWidth: 2 }
+                        ]
+                    }
+                },
+                tooltip: {
+                    ...CD.plugins.tooltip,
+                    callbacks: {
+                        afterLabel: (ctx) => {
+                            const d = qData[ctx.dataIndex];
+                            if (d.Period === 'Q1 2025') return 'Includes ~$325M Apps (transition)';
+                            if (ctx.dataIndex >= divIdx && divIdx >= 0) return 'Advertising-only (Apps divested)';
+                            return 'Total company incl. Apps';
+                        }
+                    }
+                }
+            },
+            scales: {
+                ...CD.scales,
+                y: { ...CD.scales.y, ticks: { ...CD.scales.y.ticks, callback: v => `$${v}M` } }
+            }
+        }
+    });
+}
+
+// Annual Revenue
+function buildRevenueAnnual() {
+    const ctx = document.getElementById('revenueAnnual').getContext('2d');
+    const labels = fyData.map(d => d.Period);
+    const revenues = fyData.map(d => n(d.Revenue));
+    const bgColors = fyData.map(d => d.Period === 'FY2025' ? 'rgba(0,212,170,0.75)' : 'rgba(0,152,198,0.6)');
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Annual Revenue ($M)',
+                data: revenues,
+                backgroundColor: bgColors,
+                borderColor: fyData.map(d => d.Period === 'FY2025' ? '#00d4aa' : '#0984e3'),
+                borderWidth: 2,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            ...CD,
+            scales: { ...CD.scales, y: { ...CD.scales.y, ticks: { ...CD.scales.y.ticks, callback: v => `$${(v/1000).toFixed(1)}B` } } }
+        }
+    });
+}
+
+// Revenue YoY Growth (quarterly)
+function buildRevenueGrowth() {
+    const ctx = document.getElementById('revenueGrowth').getContext('2d');
+    const growthData = [];
+    const growthLabels = [];
+
+    for (let i = 4; i < qData.length; i++) {
+        const cur = qData[i];
+        const prev = qData[i - 4];
+        if (prev && n(prev.Revenue) !== 0) {
+            const g = (n(cur.Revenue) - n(prev.Revenue)) / Math.abs(n(prev.Revenue)) * 100;
+            growthData.push(parseFloat(g.toFixed(1)));
+            growthLabels.push(cur.Period);
+        }
+    }
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: growthLabels,
+            datasets: [{
+                label: 'Revenue YoY %',
+                data: growthData,
+                borderColor: C.yellow,
+                backgroundColor: 'rgba(253,203,110,0.15)',
+                borderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            ...CD,
+            scales: { ...CD.scales, y: { ...CD.scales.y, ticks: { ...CD.scales.y.ticks, callback: v => `${v}%` } } }
+        }
+    });
+}
+
+// Adj. EBITDA & Margin (quarterly)
+function buildEBITDA() {
+    const ctx = document.getElementById('ebitdaChart').getContext('2d');
+    const labels = qData.map(d => d.Period);
+    const ebitda = qData.map(d => n(d.AdjustedEBITDA));
+    const margins = qData.map(d => n(d.Revenue) > 0 ? +(n(d.AdjustedEBITDA)/n(d.Revenue)*100).toFixed(1) : null);
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Adj. EBITDA ($M)',
+                    data: ebitda,
+                    backgroundColor: 'rgba(108,92,231,0.65)',
+                    borderColor: C.purple,
+                    borderWidth: 1,
+                    borderRadius: 3,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Adj. EBITDA Margin %',
+                    data: margins,
+                    type: 'line',
+                    borderColor: C.yellow,
+                    backgroundColor: 'rgba(253,203,110,0.1)',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    fill: false,
+                    tension: 0.3,
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            ...CD,
+            scales: {
+                x: CD.scales.x,
+                y: { ...CD.scales.y, ticks: { ...CD.scales.y.ticks, callback: v => `$${v}M` } },
+                y1: {
+                    position: 'right',
+                    ticks: { color: '#888', callback: v => `${v}%` },
+                    grid: { drawOnChartArea: false },
+                    min: 0, max: 100
+                }
+            }
+        }
+    });
+}
+
+// Net Income (quarterly)
+function buildNetIncome() {
+    const ctx = document.getElementById('netIncomeChart').getContext('2d');
+    const labels = qData.map(d => d.Period);
+    const ni = qData.map(d => n(d.NetIncome));
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Net Income ($M)',
+                data: ni,
+                backgroundColor: ni.map(v => v >= 0 ? 'rgba(0,212,170,0.65)' : 'rgba(255,107,107,0.65)'),
+                borderColor: ni.map(v => v >= 0 ? C.primary : C.red),
+                borderWidth: 1,
+                borderRadius: 3
+            }]
+        },
+        options: {
+            ...CD,
+            scales: { ...CD.scales, y: { ...CD.scales.y, ticks: { ...CD.scales.y.ticks, callback: v => `$${v}M` } } }
+        }
+    });
+}
+
+// Margin expansion over time (annual)
+function buildMargins() {
+    const ctx = document.getElementById('marginsChart').getContext('2d');
+    // Use annual + Q1 2026 for clean view
+    const combined = [...fyData, qData[qData.length-1]];
+    const labels = combined.map(d => d.Period);
+    const gross = combined.map(d => n(d.GrossMargin));
+    const op = combined.map(d => n(d.OperatingMargin));
+    const net = combined.map(d => n(d.Revenue) > 0 ? +(n(d.NetIncome)/n(d.Revenue)*100).toFixed(1) : null);
+    const ebitdaM = combined.map(d => n(d.Revenue) > 0 ? +(n(d.AdjustedEBITDA)/n(d.Revenue)*100).toFixed(1) : null);
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                { label: 'Gross Margin %', data: gross, borderColor: C.blue, backgroundColor:'rgba(9,132,227,0.1)', fill:true, borderWidth:2, pointRadius:4, tension:0.3 },
+                { label: 'Adj. EBITDA Margin %', data: ebitdaM, borderColor: C.yellow, backgroundColor:'rgba(253,203,110,0.1)', fill:false, borderWidth:2, pointRadius:4, tension:0.3 },
+                { label: 'Operating Margin %', data: op, borderColor: C.purple, backgroundColor:'rgba(108,92,231,0.1)', fill:false, borderWidth:2, pointRadius:4, tension:0.3 },
+                { label: 'Net Margin %', data: net, borderColor: C.primary, backgroundColor:'rgba(0,212,170,0.1)', fill:false, borderWidth:2, pointRadius:4, tension:0.3 }
+            ]
+        },
+        options: {
+            ...CD,
+            scales: { ...CD.scales, y: { ...CD.scales.y, ticks: { ...CD.scales.y.ticks, callback: v => `${v}%` } } }
+        }
+    });
+}
+
+// FCF (quarterly)
+function buildFCF() {
+    const ctx = document.getElementById('fcfChart').getContext('2d');
+    const labels = qData.map(d => d.Period);
+    const fcf = qData.map(d => n(d.FreeCashFlow));
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Free Cash Flow ($M)',
+                data: fcf,
+                backgroundColor: fcf.map(v => v >= 0 ? 'rgba(0,200,201,0.65)' : 'rgba(255,107,107,0.65)'),
+                borderColor: fcf.map(v => v >= 0 ? C.teal : C.red),
+                borderWidth: 1,
+                borderRadius: 3
+            }]
+        },
+        options: {
+            ...CD,
+            scales: { ...CD.scales, y: { ...CD.scales.y, ticks: { ...CD.scales.y.ticks, callback: v => `$${v}M` } } }
+        }
+    });
+}
+
+// Annual FCF vs Net Income
+function buildFCFAnnual() {
+    const ctx = document.getElementById('fcfAnnualChart').getContext('2d');
+    const labels = fyData.map(d => d.Period);
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Free Cash Flow ($M)',
+                    data: fyData.map(d => n(d.FreeCashFlow)),
+                    backgroundColor: 'rgba(0,200,201,0.65)',
+                    borderColor: C.teal,
+                    borderWidth: 1,
+                    borderRadius: 3
+                },
+                {
+                    label: 'Net Income ($M)',
+                    data: fyData.map(d => n(d.NetIncome)),
+                    backgroundColor: 'rgba(0,212,170,0.4)',
+                    borderColor: C.primary,
+                    borderWidth: 1,
+                    borderRadius: 3
+                }
+            ]
+        },
+        options: {
+            ...CD,
+            scales: { ...CD.scales, y: { ...CD.scales.y, ticks: { ...CD.scales.y.ticks, callback: v => `$${v}M` } } }
+        }
+    });
+}
+
+// EPS (quarterly)
+function buildEPS() {
+    const ctx = document.getElementById('epsChart').getContext('2d');
+    const epsData = qData.filter(d => d.EPS !== '' && d.EPS !== null);
+    const labels = epsData.map(d => d.Period);
+    const eps = epsData.map(d => n(d.EPS));
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: 'EPS Diluted ($)',
+                data: eps,
+                borderColor: C.primary,
+                backgroundColor: 'rgba(0,212,170,0.15)',
+                borderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 7,
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            ...CD,
+            scales: { ...CD.scales, y: { ...CD.scales.y, ticks: { ...CD.scales.y.ticks, callback: v => `$${v.toFixed(2)}` } } }
+        }
+    });
+}
+
+// Cash & Debt
+function buildBalance() {
+    const ctx = document.getElementById('balanceChart').getContext('2d');
+    const combined = [...fyData, qData[qData.length-1]];
+    const labels = combined.map(d => d.Period);
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Cash & Equivalents ($M)',
+                    data: combined.map(d => n(d.CashAndEquivalents)),
+                    backgroundColor: 'rgba(0,212,170,0.6)',
+                    borderColor: C.primary,
+                    borderWidth: 1,
+                    borderRadius: 3
+                },
+                {
+                    label: 'Total Debt ($M)',
+                    data: combined.map(d => -n(d.TotalDebt)),
+                    backgroundColor: 'rgba(255,107,107,0.5)',
+                    borderColor: C.red,
+                    borderWidth: 1,
+                    borderRadius: 3
+                }
+            ]
+        },
+        options: {
+            ...CD,
+            scales: {
+                ...CD.scales,
+                y: { ...CD.scales.y, ticks: { ...CD.scales.y.ticks, callback: v => `$${Math.abs(v/1000).toFixed(1)}B` } }
+            }
+        }
+    });
+}
+
+// ── DCF SECTION ───────────────────────────────────────────────────────────────
+let currentScenario = 'base';
+
+function formatM(n) {
+    return Math.abs(n) >= 1000 ? `$${(n/1000).toFixed(2)}B` : `$${n.toFixed(0)}M`;
+}
+
+function renderFCFProjections() {
+    const g1 = parseFloat(document.getElementById('growthSlider').value);
+    const baseFCF = dcfData.inputs.last_fcf;
+    const endG = 10;
+    const rates = [];
+    for (let i = 0; i < 5; i++) {
+        const r = g1 > endG ? g1 - (g1 - endG) * (i/4) : g1;
+        rates.push(r);
+    }
+    let fcf = baseFCF;
+    const fcfVals = [baseFCF];
+    for (let i = 0; i < 5; i++) {
+        fcf = fcf * (1 + rates[i]/100);
+        fcfVals.push(fcf);
+    }
+
+    let html = '<div class="fcf-projection-item header">Base</div>';
+    for (let i = 1; i <= 5; i++) html += `<div class="fcf-projection-item header">Year ${i}</div>`;
+    html += `<div class="fcf-projection-item"><div class="fcf-val">${formatM(fcfVals[0])}</div><div class="growth-rate">—</div></div>`;
+    for (let i = 1; i <= 5; i++) {
+        html += `<div class="fcf-projection-item"><div class="fcf-val">${formatM(fcfVals[i])}</div><div class="growth-rate">+${rates[i-1].toFixed(0)}%</div></div>`;
+    }
+    document.getElementById('fcfProjectionTable').innerHTML = html;
+}
+
+function calculateDCF(g1, wacc, tg) {
+    const years = 5;
+    let fcf = dcfData.inputs.last_fcf;
+    let pvFCF = 0;
+    const endG = 10;
+
+    for (let i = 0; i < years; i++) {
+        const r = g1 > endG ? g1 - (g1 - endG)*(i/4) : g1;
+        fcf *= (1 + r/100);
+        pvFCF += fcf / Math.pow(1 + wacc/100, i+1);
+    }
+
+    const termFCF = fcf * (1 + tg/100);
+    const tv = termFCF / (wacc/100 - tg/100);
+    const pvTV = tv / Math.pow(1 + wacc/100, years);
+    const EV = pvFCF + pvTV;
+    const equity = EV - dcfData.inputs.net_debt;
+    const iv = equity / dcfData.inputs.shares_outstanding;
+    const entryPrice = (tv / dcfData.inputs.shares_outstanding) / Math.pow(1.15, years);
+
+    return { iv, entryPrice, pvFCF, pvTV };
+}
+
+window.updateDCFDisplay = function() {
+    const g1 = parseFloat(document.getElementById('growthSlider').value);
+    const wacc = parseFloat(document.getElementById('waccSlider').value);
+    const tg = parseFloat(document.getElementById('terminalSlider').value);
+
+    document.getElementById('growthValue').textContent = g1 + '%';
+    document.getElementById('waccValue').textContent = wacc + '%';
+    document.getElementById('terminalValue').textContent = tg.toFixed(1) + '%';
+
+    renderFCFProjections();
+
+    const res = calculateDCF(g1, wacc, tg);
+    document.getElementById('dcfIV').textContent = '$' + res.iv.toFixed(0);
+    document.getElementById('dcfEntry').textContent = '$' + res.entryPrice.toFixed(0);
+
+    const upside = ((res.iv - dcfData.current_price) / dcfData.current_price * 100);
+    const el = document.getElementById('dcfUpside');
+    el.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(1) + '% vs current';
+    el.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+    document.getElementById('dcfWeighted').textContent = '$' + dcfData.probability_weighted.weighted_iv.toFixed(0);
+
+    // Update assumptions grid
+    const grid = document.getElementById('assumptionGrid');
+    if (grid) {
+        grid.innerHTML = `
+            <div class="assumption-item"><div class="label">Year 1 Growth</div><div class="value">${g1}%</div></div>
+            <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc}%</div></div>
+            <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${tg.toFixed(1)}%</div></div>
+            <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa">$${res.iv.toFixed(0)}</div></div>
+            <div class="assumption-item"><div class="label">Entry (15% CAGR)</div><div class="value" style="color:#00d4aa">$${res.entryPrice.toFixed(0)}</div></div>
+        `;
+    }
+};
+
+window.switchScenario = function(scenario) {
+    currentScenario = scenario;
+    document.querySelectorAll('.scenario-tab').forEach(t => t.classList.toggle('active', t.dataset.scenario === scenario));
+
+    const a = dcfData.assumptions[scenario];
+    const v = dcfData.valuation[scenario];
+    const ep = dcfData.entry_price[scenario];
+    const proj = dcfData.projections[scenario];
+
+    document.getElementById('growthSlider').value = a.growth_rates[0];
+    document.getElementById('waccSlider').value = a.wacc;
+    document.getElementById('terminalSlider').value = a.terminal_growth;
+
+    const grid = document.getElementById('assumptionGrid');
+    grid.innerHTML = `
+        <div class="assumption-item"><div class="label">Year 1 Growth</div><div class="value">${a.growth_rates[0]}%</div></div>
+        <div class="assumption-item"><div class="label">Year 3 Growth</div><div class="value">${a.growth_rates[2]}%</div></div>
+        <div class="assumption-item"><div class="label">Year 5 Growth</div><div class="value">${a.growth_rates[4]}%</div></div>
+        <div class="assumption-item"><div class="label">WACC</div><div class="value">${a.wacc}%</div></div>
+        <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${a.terminal_growth}%</div></div>
+        <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa">$${v.intrinsic_value.toFixed(0)}</div></div>
+        <div class="assumption-item"><div class="label">vs Current Price</div><div class="value" style="color:${v.upside >= 0 ? '#00d4aa' : '#ff6b6b'}">${v.upside >= 0 ? '+' : ''}${v.upside.toFixed(1)}%</div></div>
+        <div class="assumption-item"><div class="label">Entry (15% CAGR)</div><div class="value">$${ep.entry_price.toFixed(0)}</div></div>
+        <div class="assumption-item"><div class="label">FCF Y1</div><div class="value">${formatM(proj.fcf[0])}</div></div>
+        <div class="assumption-item"><div class="label">FCF Y5</div><div class="value">${formatM(proj.fcf[4])}</div></div>
+    `;
+
+    window.updateDCFDisplay();
+};
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const cp = dcfData.current_price;
+    let html = '<tr><th>WACC \\ Term G</th>';
+    sens.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+    html += '</tr>';
+
+    sens.wacc_range.forEach((wacc, i) => {
+        html += `<tr><th>${wacc}%</th>`;
+        sens.matrix[i].forEach((val, j) => {
+            const isBase = wacc === 11 && sens.terminal_growth_range[j] === 3.0;
+            const cls = isBase ? 'highlight' : (val >= cp ? 'above-current' : 'below-current');
+            html += `<td class="${cls}">$${val}</td>`;
+        });
+        html += '</tr>';
+    });
+    document.getElementById('sensitivityMatrix').innerHTML = html;
+}
+
+function renderHistoricalGrowth() {
+    const g = dcfData.historical_growth;
+    const items = [
+        { label: 'Adv. Revenue 1Y CAGR', rate: g.advertising_revenue_1yr_cagr, note: 'FY2024→FY2025 like-for-like' },
+        { label: 'Adv. Revenue Q1 YoY', rate: g.advertising_revenue_q1_yoy, note: 'Q1 2025→Q1 2026' },
+        { label: 'FCF 2Y CAGR', rate: g.fcf_2yr_cagr, note: 'FY2023→FY2025' },
+        { label: 'FCF 3Y CAGR', rate: g.fcf_3yr_cagr, note: 'FY2022→FY2025' },
+        { label: 'FCF 4Y CAGR', rate: g.fcf_4yr_cagr, note: 'FY2021→FY2025' },
+        { label: 'Adj. EBITDA 3Y CAGR', rate: g.ebitda_3yr_cagr, note: 'FY2022→FY2025' },
+        { label: 'Adj. EBITDA 4Y CAGR', rate: g.ebitda_4yr_cagr, note: 'FY2021→FY2025' },
+        { label: 'Base Case Y1 Growth', rate: g.selected_growth_rate, note: 'Selected for DCF', selected: true }
+    ];
+
+    document.getElementById('growthGrid').innerHTML = items.map(item => `
+        <div class="growth-item ${item.selected ? 'selected' : ''}">
+            <div class="g-metric">${item.label}</div>
+            <div class="g-rate ${item.rate >= 0 ? 'positive' : 'negative'}">${item.rate >= 0 ? '+' : ''}${item.rate.toFixed(1)}%</div>
+            <div class="g-note">${item.note}</div>
+        </div>
+    `).join('');
+}
+
+function initDCF() {
+    document.getElementById('dcfCurrent').textContent = '$' + dcfData.current_price.toFixed(0);
+    document.getElementById('dcfWeighted').textContent = '$' + dcfData.probability_weighted.weighted_iv.toFixed(0);
+    renderFCFProjections();
+    renderSensitivityMatrix();
+    renderHistoricalGrowth();
+    switchScenario('base');
+
+    ['growthSlider','waccSlider','terminalSlider'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.oninput = window.updateDCFDisplay; el.onchange = window.updateDCFDisplay; }
+    });
+}
+
+// ── MODALS ────────────────────────────────────────────────────────────────────
+const metricDescriptions = {
+    revenue: {
+        title: 'Revenue',
+        content: `<p><strong>Revenue</strong> is AppLovin's net advertising revenue — the spread between what advertisers pay and what AppLovin pays publishers, after netting. It is NOT gross billings.</p>
+        <div class="metric-highlight"><strong>Critical caveat:</strong> FY2021–Q1 2025 figures include both Advertising and Apps segments. Q2 2025 onward is advertising-only following the June 2025 Tripledot divestiture. The Q1→Q2 2025 "dip" is structural, not organic.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Q1 2026: $1,842M (+59% YoY on like-for-like advertising basis)</li>
+            <li>Q2 2026 guidance: $1,915M–$1,945M (+52%–55% YoY)</li>
+            <li>E-commerce vertical contribution — currently not disclosed separately but tracked by management commentary</li>
+            <li>International revenue share (~51% in Q1 2026) — FX risk and geographic diversification</li>
+        </ul>`
+    },
+    revenueAnnual: {
+        title: 'Annual Revenue',
+        content: `<p>Annual revenue from FY2021 to FY2025, with FY2025 being the first advertising-only year following the Apps divestiture.</p>
+        <div class="metric-highlight"><strong>Like-for-like growth:</strong> FY2024 advertising-only was ~$3,216M; FY2025 advertising-only was $5,481M — a 70% YoY increase. The raw FY2024 total ($4,709M) vs FY2025 ($5,481M) only shows +16% because FY2024 included the Apps segment.</div>
+        <p><strong>Key milestones:</strong></p>
+        <ul>
+            <li>FY2022: Near-zero GAAP net income; massive goodwill from MoPub/ironSource acquisitions</li>
+            <li>FY2023: Profitability inflection — AXON 2.0 launch drove dramatic margin expansion</li>
+            <li>FY2024: First year of $1B+ quarterly revenue; AppLovin added to S&P 500</li>
+            <li>FY2025: Pure-play adtech; $5.48B revenue, $3.95B FCF, 82% Adj. EBITDA margin</li>
+        </ul>`
+    },
+    revenueGrowth: {
+        title: 'Revenue YoY Growth Rate',
+        content: `<p>Quarterly revenue growth versus the same period in the prior year. Growth rates for Q2–Q4 2025 compare advertising-only current periods to total-company prior-year periods, which mechanically understates true growth.</p>
+        <div class="metric-highlight"><strong>Q1 2026 is the cleanest comparison:</strong> Both Q1 2025 (advertising-only basis) and Q1 2026 are advertising-only. Q1 2026 grew +59% YoY on this basis.</div>
+        <p><strong>Trend context:</strong></p>
+        <ul>
+            <li>Growth re-accelerated sharply in 2023 driven by AXON 2.0 improvements</li>
+            <li>AXON model releases are the primary driver of step-changes in growth rates</li>
+            <li>Management guided Q2 2026 at +52%–55% YoY — suggesting sustained high growth</li>
+        </ul>`
+    },
+    ebitda: {
+        title: 'Adjusted EBITDA & Margin',
+        content: `<p><strong>Adjusted EBITDA</strong> is AppLovin's primary profitability metric, adding back stock-based compensation, depreciation, amortization, and one-time items to GAAP operating income.</p>
+        <div class="metric-highlight"><strong>Why this matters for AppLovin:</strong> With ~1,700 employees and infrastructure-heavy costs, AXON's AI improvements directly reduce cost-per-outcome for advertisers while AppLovin retains the efficiency gains as margin. Q1 2026 Adj. EBITDA margin reached 85% — among the highest of any scaled software company.</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>Q1 2026: $1,557M (85% margin) — record high</li>
+            <li>Q2 2026 guidance: $1,615M–$1,645B (84–85% margin)</li>
+            <li>Margin expansion driven by operating leverage — infrastructure costs grow slower than revenue</li>
+            <li>SBC is a meaningful add-back; GAAP operating margin (78% Q1 2026) is directionally similar</li>
+        </ul>`
+    },
+    ebitdaMargin: {
+        title: 'Adjusted EBITDA Margin',
+        content: `<p>Adjusted EBITDA as a percentage of revenue. AppLovin's rapid margin expansion from ~18% in FY2021 to 85% in Q1 2026 reflects the scalability of the AXON AI model.</p>
+        <div class="metric-highlight">The cost structure is dominated by cloud computing (data center) spend, which grows sublinearly with revenue. Each AXON model improvement extracts more value from existing infrastructure.</div>`
+    },
+    netIncome: {
+        title: 'Net Income',
+        content: `<p>GAAP net income including discontinued operations (Apps segment in 2025). FY2022 was deeply negative due to MoPub acquisition goodwill impairment and integration costs.</p>
+        <div class="metric-highlight"><strong>Profitability inflection:</strong> FY2022 NI was -$193M. FY2025 NI was +$3,334M. This 4-year transformation underpins the entire re-rating from $10 (Dec 2022) to $467 (Jun 2026).</div>
+        <p><strong>Notes on comparability:</strong></p>
+        <ul>
+            <li>Q1 2025 NI includes $188.9M goodwill impairment (Apps segment write-down)</li>
+            <li>Q2 2025 NI includes +$47.7M from discontinued ops (Apps divestiture gain)</li>
+            <li>FY2025 NI includes -$99.4M net loss from discontinued ops</li>
+            <li>Tax rate is stepping up (9% Q1 2025 → 16% Q1 2026) as SBC tax benefits decline</li>
+        </ul>`
+    },
+    margins: {
+        title: 'Margin Expansion Over Time',
+        content: `<p>AppLovin's margin profile has undergone a dramatic transformation driven by AXON AI efficiency improvements and the divestiture of lower-margin Apps segment businesses.</p>
+        <div class="metric-highlight"><strong>The structural shift:</strong> Gross margin expanded from 55% (FY2022) to 89% (Q1 2026) primarily because Apps segment costs (app development, store fees) are no longer included. The advertising business has near-100% gross margins on an incremental basis.</div>
+        <p><strong>Key drivers:</strong></p>
+        <ul>
+            <li>Gross margin: Hardware/app removal + better publisher cost management</li>
+            <li>Operating margin: SBC declining as % of revenue; fixed costs growing slower than revenue</li>
+            <li>Adj. EBITDA margin: Infrastructure-light model; AXON processes billions of bids with minimal marginal cost</li>
+            <li>Net margin: Tax rate headwind from 9% → 16%; partially offsets operating leverage</li>
+        </ul>`
+    },
+    fcf: {
+        title: 'Free Cash Flow (Quarterly)',
+        content: `<p><strong>Free Cash Flow</strong> = Cash from Operations minus Capital Expenditures. For AppLovin, CapEx is negligible (~$0.1–0.4M/quarter) because the business runs on leased cloud infrastructure rather than owned data centers.</p>
+        <div class="metric-highlight"><strong>FCF Quality:</strong> AppLovin's FCF conversion from Adj. EBITDA is approximately 85–88% — very high quality because working capital is minimal (advertising is largely collected before publisher payouts) and CapEx is nearly zero. Q1 2026 FCF: $1,287M (annualized ~$5.1B).</div>
+        <p><strong>What to watch:</strong></p>
+        <ul>
+            <li>FCF per share growth as buybacks reduce share count</li>
+            <li>FCF yield at current price: ~$5.1B annualized / ~$158B market cap = ~3.2% — high-growth premium</li>
+            <li>Q1 2022 FCF was negative due to MoPub integration; structural FCF generation began Q2 2022</li>
+        </ul>`
+    },
+    fcfAnnual: {
+        title: 'Annual FCF vs. Net Income',
+        content: `<p>Annual comparison of FCF and GAAP net income. FCF typically exceeds net income for AppLovin due to stock-based compensation (non-cash) add-back and near-zero CapEx.</p>
+        <div class="metric-highlight"><strong>FY2025:</strong> FCF $3,952M vs. NI $3,334M — a ~18% conversion premium. The gap primarily reflects $611M of stock-based compensation (add-back) partially offset by deferred taxes. FY2025 FCF grew +91% YoY, demonstrating the compounding effect of operating leverage.</div>`
+    },
+    eps: {
+        title: 'EPS (Diluted)',
+        content: `<p>Earnings per diluted share. AppLovin was unprofitable (negative EPS) through most of 2022. Aggressive share buybacks ($1B/quarter in late 2025 and Q1 2026) are reducing diluted share count, accelerating EPS growth relative to net income growth.</p>
+        <div class="metric-highlight"><strong>EPS trajectory:</strong> FY2022: -$0.52 → FY2023: $0.98 → FY2024: $4.53 → FY2025: $9.75 → Q1 2026: $3.56 (annualized ~$14). The share count has declined from ~384M (Q3 2021) to ~339M (Q1 2026) via buybacks, providing an additional EPS tailwind.</div>`
+    },
+    balance: {
+        title: 'Cash & Debt Position',
+        content: `<p>AppLovin's balance sheet evolution. The company carries $3.5B in long-term debt (term loans maturing 2028-2030 and senior notes due 2029-2054), but cash has grown rapidly from FCF generation, reducing net debt significantly.</p>
+        <div class="metric-highlight"><strong>Net debt has collapsed:</strong> Peak net debt was approximately $2,500M+ in 2021-2022. As of Q1 2026, net debt = $3,514M debt - $2,759M cash = $755M net debt, vs $4,513M FY2025 Adj. EBITDA — or approximately 0.2x net debt/EBITDA. Essentially debt-free on a leverage basis.</div>
+        <p><strong>Debt terms:</strong></p>
+        <ul>
+            <li>Term loans (SOFR-based floating rate) maturing 2028-2030</li>
+            <li>Senior notes at fixed rates (4.0%-5.0%) due 2029-2054</li>
+            <li>~$51M quarterly interest expense</li>
+            <li>$780M of $1.3B cloud computing commitment paid through March 2026</li>
+        </ul>`
+    },
+    opMargin: {
+        title: 'Operating Margin',
+        content: `<p>GAAP operating income as a percentage of revenue. Distinct from Adjusted EBITDA margin in that it includes stock-based compensation and amortization of intangibles.</p>
+        <div class="metric-highlight">Q1 2026 operating margin: 78.2% — one of the highest of any scaled technology company. Stock-based compensation runs at approximately $100-130M per quarter, which is the primary wedge between GAAP operating margin (78%) and Adj. EBITDA margin (85%).</div>`
+    },
+    fy25rev: {
+        title: 'FY2025 Revenue (Advertising-Only)',
+        content: `<p>Full-year 2025 revenue of $5,481M from the continuing advertising business only, following the June 2025 divestiture of the Apps segment.</p>
+        <div class="metric-highlight"><strong>Like-for-like growth:</strong> FY2024 advertising-only revenue was approximately $3,216M (the remainder of FY2024's $4,709M total after removing Apps). FY2025 advertising revenue of $5,481M represents approximately 70% YoY growth on this comparable basis — the correct growth figure for evaluating business momentum.</div>`
+    }
+};
+
+function openModal(key) {
+    const desc = metricDescriptions[key];
+    if (!desc) return;
+    document.getElementById('modalTitle').textContent = desc.title;
+    document.getElementById('modalBody').innerHTML = desc.content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+function closeModalOutside(e) {
+    if (e.target === document.getElementById('modalOverlay')) closeModal();
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ── OVERVIEW TOGGLE ───────────────────────────────────────────────────────────
+function toggleOverview() {
+    const btn = document.querySelector('.overview-toggle');
+    const content = document.getElementById('overviewContent');
+    btn.classList.toggle('active');
+    content.classList.toggle('active');
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+buildKPIs();
+buildRevenueQuarterly();
+buildRevenueAnnual();
+buildRevenueGrowth();
+buildEBITDA();
+buildNetIncome();
+buildMargins();
+buildFCF();
+buildFCFAnnual();
+buildEPS();
+buildBalance();
+initDCF();
+</script>
+</body>
+</html>

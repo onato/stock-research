@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RTO Limited (RTO.NZ) Financial Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 20px;
+}
+.header {
+    text-align: center;
+    margin-bottom: 20px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+}
+.header h1 {
+    font-size: 2.3rem;
+    background: linear-gradient(90deg, #00d4aa, #00b894);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+}
+.header p { color: #888; font-size: 1.05rem; }
+
+/* Warning banners */
+.warning-banner {
+    max-width: 1400px;
+    margin: 0 auto 20px;
+    border-radius: 12px;
+    padding: 18px 24px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+}
+.warning-banner.critical {
+    background: rgba(255, 82, 82, 0.12);
+    border: 2px solid rgba(255, 82, 82, 0.55);
+}
+.warning-banner.going-concern {
+    background: rgba(255, 107, 107, 0.1);
+    border: 2px solid rgba(255, 159, 67, 0.5);
+}
+.warning-banner .icon { font-size: 1.8rem; line-height: 1; flex-shrink: 0; }
+.warning-banner .content h4 {
+    color: #ff6b6b;
+    font-size: 1.05rem;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.warning-banner.going-concern .content h4 { color: #fdcb6e; }
+.warning-banner .content p { color: #e0c9c9; line-height: 1.6; font-size: 0.92rem; margin-bottom: 6px; }
+.warning-banner .content p strong { color: #fff; }
+.warning-banner.going-concern .content p { color: #e5dcc9; }
+
+.model-warning-banner {
+    max-width: 1400px;
+    margin: 0 auto 20px;
+    background: rgba(253, 203, 110, 0.1);
+    border: 2px solid rgba(253, 203, 110, 0.5);
+    border-radius: 12px;
+    padding: 18px 24px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+}
+.model-warning-banner .icon { font-size: 1.8rem; line-height: 1; flex-shrink: 0; }
+.model-warning-banner h4 { color: #fdcb6e; font-size: 1.05rem; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+.model-warning-banner p { color: #e5dcc9; line-height: 1.6; font-size: 0.92rem; margin-bottom: 8px; }
+.model-warning-banner p strong { color: #fff; }
+.model-warning-banner ul { margin: 8px 0 8px 20px; color: #e5dcc9; font-size: 0.9rem; line-height: 1.6; }
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.kpi-card {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0, 212, 170, 0.2); }
+.kpi-card.warn { border-color: rgba(255, 107, 107, 0.4); }
+.kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+.kpi-card.warn .kpi-value { color: #ff6b6b; }
+.kpi-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.kpi-change { font-size: 0.9rem; margin-top: 5px; }
+.kpi-change.positive { color: #00d4aa; }
+.kpi-change.negative { color: #ff6b6b; }
+
+/* Guidance */
+.guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+.guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 8px; }
+.guidance-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.guidance-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px; }
+.guidance-meta { font-size: 0.85rem; color: #888; }
+.guidance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.guidance-card { background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 18px; border: 1px solid rgba(255, 255, 255, 0.1); transition: transform 0.2s ease; }
+.guidance-card:hover { transform: translateY(-2px); }
+.guidance-metric { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.guidance-target { font-size: 1.15rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; line-height: 1.4; }
+.guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
+.guidance-vs-prior { display: inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 500; }
+.guidance-vs-prior.raised { background: rgba(0, 212, 170, 0.15); color: #00d4aa; }
+.guidance-vs-prior.lowered { background: rgba(255, 107, 107, 0.15); color: #ff6b6b; }
+.guidance-vs-prior.maintained { background: rgba(255, 255, 255, 0.1); color: #888; }
+.guidance-vs-prior.new,
+.guidance-vs-prior.na { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
+.guidance-notes { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
+.guidance-commentary { background: rgba(255, 255, 255, 0.03); border-radius: 10px; padding: 16px 20px; border-left: 3px solid #00d4aa; font-style: italic; color: #b0b0b0; line-height: 1.6; }
+.guidance-commentary::before { content: '"'; font-size: 1.5rem; color: #00d4aa; margin-right: 4px; }
+
+.section-title { font-size: 1.5rem; color: #fff; margin: 40px auto 20px; padding-bottom: 10px; border-bottom: 2px solid rgba(0, 212, 170, 0.3); max-width: 1400px; }
+.charts-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 25px; max-width: 1400px; margin: 0 auto; }
+.chart-card { background: rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 25px; border: 1px solid rgba(255, 255, 255, 0.1); }
+.chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.chart-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+.chart-header h3::before { content: ''; display: inline-block; width: 4px; height: 20px; background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px; }
+.help-btn { width: 24px; height: 24px; border-radius: 50%; background: rgba(0, 212, 170, 0.2); border: 1px solid #00d4aa; color: #00d4aa; font-size: 14px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; }
+.help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.chart-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.log-toggle { padding: 3px 10px; border-radius: 12px; background: transparent; border: 1px solid rgba(255, 255, 255, 0.2); color: #888; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+.log-toggle:hover { border-color: #00d4aa; color: #00d4aa; }
+.log-toggle.active { background: rgba(0, 212, 170, 0.2); border-color: #00d4aa; color: #00d4aa; }
+.chart-wrapper { position: relative; height: 300px; }
+
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
+.modal-overlay.active { display: flex; }
+.modal { background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%); border-radius: 16px; max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto; border: 1px solid rgba(0, 212, 170, 0.3); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); }
+.modal-header { padding: 20px 25px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); display: flex; justify-content: space-between; align-items: center; }
+.modal-header h3 { color: #00d4aa; font-size: 1.4rem; margin: 0; }
+.modal-close { width: 32px; height: 32px; border-radius: 50%; background: rgba(255, 107, 107, 0.2); border: 1px solid #ff6b6b; color: #ff6b6b; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.modal-close:hover { background: #ff6b6b; color: #fff; }
+.modal-body { padding: 25px; line-height: 1.7; }
+.modal-body p { margin-bottom: 15px; }
+.modal-body strong { color: #00d4aa; }
+.modal-body ul { margin: 15px 0; padding-left: 20px; }
+.modal-body li { margin-bottom: 8px; }
+.metric-highlight { background: rgba(0, 212, 170, 0.1); border-left: 3px solid #00d4aa; padding: 12px 15px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+
+/* Investment Overview */
+.overview-section { max-width: 1400px; margin: 0 auto 30px; }
+.overview-toggle { width: 100%; background: rgba(0, 212, 170, 0.1); border: 1px solid rgba(0, 212, 170, 0.3); border-radius: 12px; padding: 16px 24px; color: #00d4aa; font-size: 1.1rem; font-weight: 600; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s ease; }
+.overview-toggle:hover { background: rgba(0, 212, 170, 0.2); }
+.overview-toggle .arrow { transition: transform 0.3s ease; }
+.overview-toggle.active .arrow { transform: rotate(180deg); }
+.overview-content { display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-top: none; border-radius: 0 0 12px 12px; padding: 30px; margin-top: -12px; }
+.overview-content.active { display: block; }
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+.overview-card { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 20px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.overview-card h3 { color: #00d4aa; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+.overview-card p { margin-bottom: 12px; line-height: 1.6; }
+.overview-card ul { list-style: none; padding: 0; margin: 0; }
+.overview-card li { padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); line-height: 1.5; }
+.overview-card li:last-child { border-bottom: none; }
+.overview-card.bull h3 { color: #00d4aa; }
+.overview-card.bear h3 { color: #ff6b6b; }
+.overview-card.risks h3 { color: #fdcb6e; }
+.risk-high { color: #ff6b6b; }
+.risk-moderate { color: #fdcb6e; }
+.risk-low { color: #00d4aa; }
+.revenue-stream { display: flex; justify-content: space-between; align-items: center; }
+.revenue-stream .percent { color: #00d4aa; font-weight: 600; }
+.trend-growing { color: #00d4aa; }
+.trend-stable { color: #888; }
+.trend-declining { color: #ff6b6b; }
+
+/* DCF / valuation section */
+.dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+.dcf-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+.dcf-card { background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 24px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.1); transition: transform 0.3s ease; }
+.dcf-card:hover { transform: translateY(-3px); }
+.dcf-card.highlight { background: rgba(0, 212, 170, 0.1); border-color: rgba(0, 212, 170, 0.3); }
+.dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.dcf-value { font-size: 2.2rem; font-weight: bold; color: #00d4aa; }
+.dcf-card:not(.highlight) .dcf-value { color: #fff; }
+.dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+.dcf-change.positive { color: #00d4aa; }
+.dcf-change.negative { color: #ff6b6b; }
+.dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
+
+/* Key concepts help strip */
+.concepts-strip { max-width: 1400px; margin: 0 auto 25px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.concepts-strip .concepts-label { color: #888; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px; }
+.concept-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 20px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(0, 212, 170, 0.3); color: #00d4aa; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease; }
+.concept-btn:hover { background: rgba(0, 212, 170, 0.15); border-color: #00d4aa; }
+.concept-btn .q { width: 16px; height: 16px; border-radius: 50%; background: rgba(0, 212, 170, 0.25); font-size: 10px; display: inline-flex; align-items: center; justify-content: center; font-weight: bold; }
+
+.scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+.scenario-tab { padding: 10px 24px; border: 1px solid rgba(255, 255, 255, 0.2); background: transparent; color: #888; border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s; }
+.scenario-tab:hover { border-color: rgba(0, 212, 170, 0.5); color: #e0e0e0; }
+.scenario-tab.active { background: rgba(0, 212, 170, 0.15); border-color: #00d4aa; color: #00d4aa; }
+.scenario-tab.bear-tab.active { background: rgba(255, 107, 107, 0.15); border-color: #ff6b6b; color: #ff6b6b; }
+.scenario-tab.bull-tab.active { background: rgba(129, 140, 248, 0.15); border-color: #818cf8; color: #818cf8; }
+
+.scenario-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; margin-bottom: 30px; }
+.scenario-card { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 22px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.scenario-card.bear { border-color: rgba(255, 107, 107, 0.35); }
+.scenario-card.base { border-color: rgba(0, 212, 170, 0.35); }
+.scenario-card.bull { border-color: rgba(129, 140, 248, 0.35); }
+.scenario-card h4 { font-size: 1.05rem; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+.scenario-card.bear h4 { color: #ff6b6b; }
+.scenario-card.base h4 { color: #00d4aa; }
+.scenario-card.bull h4 { color: #818cf8; }
+.scenario-weight { font-size: 0.8rem; padding: 2px 9px; border-radius: 10px; background: rgba(255,255,255,0.08); color: #ccc; }
+.scenario-price { font-size: 1.7rem; font-weight: 700; color: #fff; margin: 8px 0 4px; }
+.scenario-pnta { font-size: 0.82rem; color: #888; margin-bottom: 10px; }
+.scenario-card p { font-size: 0.85rem; color: #b0b0b0; line-height: 1.55; }
+
+.weight-controls { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 24px; margin-bottom: 30px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.weight-controls h4 { color: #e0e0e0; margin-bottom: 6px; }
+.weight-controls .hint { color: #888; font-size: 0.85rem; margin-bottom: 18px; }
+.slider-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+.slider-group label span { color: #00d4aa; font-weight: 600; }
+.slider-group input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); outline: none; }
+.slider-group input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #00d4aa; cursor: pointer; transition: transform 0.2s; }
+.slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.weight-total { font-size: 0.9rem; margin-top: 4px; }
+.weight-total.ok { color: #00d4aa; }
+.weight-total.bad { color: #ff6b6b; }
+
+.sensitivity-section { margin-bottom: 30px; }
+.sensitivity-section h4 { color: #e0e0e0; margin-bottom: 6px; }
+.sensitivity-section .hint { color: #888; font-size: 0.85rem; margin-bottom: 15px; }
+.sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255, 255, 255, 0.03); border-radius: 8px; overflow: hidden; }
+.sensitivity-table th, .sensitivity-table td { padding: 10px 14px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.08); font-size: 0.9rem; }
+.sensitivity-table th { background: rgba(0, 212, 170, 0.1); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td { color: #e0e0e0; }
+.sensitivity-table td.highlight { background: rgba(0, 212, 170, 0.15); color: #00d4aa; font-weight: 600; }
+.sensitivity-table td.below-current { color: #ff6b6b; }
+.sensitivity-table td.above-current { color: #00d4aa; }
+
+.dcf-download { text-align: center; margin-top: 30px; }
+.download-btn { display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; background: rgba(0, 212, 170, 0.15); border: 1px solid #00d4aa; border-radius: 8px; color: #00d4aa; text-decoration: none; font-weight: 600; transition: all 0.2s; }
+.download-btn:hover { background: #00d4aa; color: #1a1a2e; }
+.download-icon { font-size: 1.2rem; }
+
+@media (max-width: 768px) {
+    .charts-container { grid-template-columns: 1fr; }
+    .overview-grid { grid-template-columns: 1fr; }
+    .header h1 { font-size: 1.6rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>RTO Limited <span style="color:#888; font-size:1.2rem;">(formerly Blackwell Global Holdings)</span></h1>
+    <p>NZX: <strong style="color:#00d4aa;">RTO.NZ</strong> | Dormant NZX Main Board Cash Shell | FY ends 31 March</p>
+</div>
+
+<div class="warning-banner critical" id="lineageBanner">
+    <div class="icon">&#9888;&#65039;</div>
+    <div class="content">
+        <h4>Ticker Lineage &mdash; Do Not "Correct" the Price Down</h4>
+        <p id="lineageText"></p>
+    </div>
+</div>
+
+<div class="warning-banner going-concern">
+    <div class="icon">&#128721;</div>
+    <div class="content">
+        <h4>Going Concern &mdash; Material Uncertainty</h4>
+        <p>Auditor <strong>William Buck</strong> (signed 24 June 2026) issued an unmodified opinion with an explicit <strong>Material Uncertainty Relating to Going Concern</strong> paragraph. Survival depends on a <strong>$200,000 related-party shareholder loan</strong> from majority owner Blackwell Global Group Limited, entered into after the 31 March 2026 balance date and expected to be advanced in July 2026.</p>
+        <p>Cash at FY2026 year-end was just <strong>$114,903</strong> against an annual cash burn of <strong>~$173,632</strong> &mdash; under 8 months of self-funded runway <strong>before</strong> the pending loan. There is no operating business, no revenue-generating asset, and no committed timeline for a reverse takeover (RTO) transaction.</p>
+    </div>
+</div>
+
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid" id="overviewGrid"></div>
+    </div>
+</div>
+
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of <span id="guidanceAsOf"></span> | <span id="guidanceFY"></span></span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<h2 class="section-title">Balance Sheet &amp; Shell Wind-Down</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Tangible Assets / Shareholders' Equity</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('ntaChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('nta')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="ntaChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Cash Balance</h3>
+            <div class="chart-header-actions">
+                <button class="log-toggle" onclick="toggleLogScale('cashChart', this)" title="Toggle logarithmic y-axis">Log</button>
+                <button class="help-btn" onclick="openModal('cash')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="cashChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Loss by Year</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('netloss')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="netLossChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Total Liabilities &amp; Total Debt</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('liabilities')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="liabChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>NTA per Share (Post-Consolidation Restated, cents)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('ntaps')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="ntapsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Cash Runway: Burn vs Cash on Hand</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('runway')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="runwayChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shares Outstanding (Consolidation Break)</h3>
+            <div class="chart-header-actions">
+                <button class="help-btn" onclick="openModal('shares')">?</button>
+            </div>
+        </div>
+        <div class="chart-wrapper"><canvas id="sharesChart"></canvas></div>
+    </div>
+</div>
+
+<h2 class="section-title">Valuation</h2>
+
+<div class="model-warning-banner" id="modelWarningBanner">
+    <div class="icon">&#9888;&#65039;</div>
+    <div>
+        <h4 id="modelWarningTitle">Model Approach &mdash; Sanity Check Tripped</h4>
+        <div id="modelWarningBody"></div>
+    </div>
+</div>
+
+<div class="concepts-strip">
+    <span class="concepts-label">Key Concepts:</span>
+    <button class="concept-btn" onclick="openModal('rto')"><span class="q">?</span> What is an RTO?</button>
+    <button class="concept-btn" onclick="openModal('pnta')"><span class="q">?</span> Why P/NTA?</button>
+    <button class="concept-btn" onclick="openModal('nodcf')"><span class="q">?</span> Why no DCF?</button>
+    <button class="concept-btn" onclick="openModal('consolidation')"><span class="q">?</span> The share consolidation</button>
+    <button class="concept-btn" onclick="openModal('goingconcern')"><span class="q">?</span> Going concern uncertainty</button>
+</div>
+
+<div class="dcf-section">
+    <div class="dcf-summary">
+        <div class="dcf-card highlight">
+            <div class="dcf-label">Probability-Weighted Intrinsic Value</div>
+            <div class="dcf-value" id="weightedIV">$0.0432</div>
+            <div class="dcf-change negative" id="weightedUpside">-63.4% vs current price</div>
+            <div class="dcf-sublabel">60% Bear / 32% Base / 8% Bull &mdash; asset &amp; scenario weighted, not FCF DCF</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Current Price (RTO.NZ)</div>
+            <div class="dcf-value" id="dcfCurrentPrice">$0.118</div>
+            <div class="dcf-sublabel" id="dcfCurrentPriceSub">13 Aug 2026 close &mdash; implies ~6.31x FY2026 NTA</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">FY2026 NTA / Share</div>
+            <div class="dcf-value">1.87&cent;</div>
+            <div class="dcf-sublabel">Down from 3.61&cent; FY2025 (-48%)</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">"Entry Price" (Fair Value Basis)</div>
+            <div class="dcf-value">$0.0432</div>
+            <div class="dcf-sublabel">No IRR-hurdle math applies &mdash; there is no cash-flow stream. Reported entry price = probability-weighted IV itself.</div>
+        </div>
+    </div>
+
+    <div class="scenario-tabs">
+        <button class="scenario-tab bull-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case ($0.25)</button>
+        <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case ($0.0687)</button>
+        <button class="scenario-tab bear-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case ($0.002)</button>
+    </div>
+
+    <div class="scenario-cards" id="scenarioCards"></div>
+
+    <div class="weight-controls">
+        <h4>Scenario Probability Weights</h4>
+        <p class="hint">The only meaningful "lever" for a shell valuation is how likely each outcome is &mdash; not a growth rate or discount rate. Adjust the weights below (they are constrained to sum to 100%); the probability-weighted intrinsic value recomputes live from the three fixed per-scenario shell values ($0.002 bear / $0.0687 base / $0.25 bull, matching the Excel model's gray input cells). Defaults match the DCF model's published weights.</p>
+        <div class="slider-group">
+            <label>Bear Weight (Intrinsic Value $0.0020): <span id="bearWeightLabel">60%</span></label>
+            <input type="range" id="bearWeightSlider" min="0" max="100" value="60" step="1" oninput="onWeightChange('bear')">
+        </div>
+        <div class="slider-group">
+            <label>Base Weight (Intrinsic Value $0.0687): <span id="baseWeightLabel">32%</span></label>
+            <input type="range" id="baseWeightSlider" min="0" max="100" value="32" step="1" oninput="onWeightChange('base')">
+        </div>
+        <div class="slider-group">
+            <label>Bull Weight (Intrinsic Value $0.2500): <span id="bullWeightLabel">8%</span></label>
+            <input type="range" id="bullWeightSlider" min="0" max="100" value="8" step="1" oninput="onWeightChange('bull')">
+        </div>
+        <div class="weight-total ok" id="weightTotal">Total: 100% &mdash; Recomputed Weighted IV: <strong id="liveWeightedIV">$0.0432</strong> (<span id="liveWeightedUpside">-63.4%</span> vs current price)</div>
+    </div>
+
+    <div class="sensitivity-section">
+        <h4>Sensitivity: Base-Case Intrinsic Value by NTA Haircut &times; Shell Scarcity Value</h4>
+        <p class="hint">No WACC/terminal-growth grid applies (there is no perpetuity cash-flow stream). Instead this sensitizes the base case to (rows) a haircut on FY2026 tangible NTA and (columns) the assumed shell scarcity/optionality premium. Highlighted cell = published base case ($0.0687). Colour coding shows whether each cell is above or below the current market price.</p>
+        <table class="sensitivity-table" id="sensitivityMatrix"></table>
+    </div>
+
+    <div class="dcf-download">
+        <a href="RTO.NZ_DCF_Model.xlsx" class="download-btn" download>
+            <span class="download-icon">&#8681;</span> Download Excel Model
+        </a>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ============ EMBEDDED DATA ============
+const csvData = `Period,Revenue,CostOfRevenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,EBITDA,NetIncome,NetMargin,EPS,OperatingCashFlow,CapEx,FreeCashFlow,ShareholdersEquity,TotalAssets,TotalLiabilities,TotalDebt,CashAndEquivalents,SharesOutstanding,StockBasedComp,DividendPerShare,EBITDABeforeSignificant,RevenueContinuing,EBITDAContinuingBeforeSignificant,EBITContinuingBeforeSignificant,Units,Currency
+FY2018,,,,,,,,-0.75216,,-0.21,-4.075179,-0.002669,,1.534093,4.146663,2.61257,2.341678,0.801387,439.830488,,,,,,,millions,NZD
+H1 FY2019,,,,,,,,-0.308804,,-0.07,,,,1.250792,7.258594,6.007802,5.773785,1.535897,439.830488,,,,,,,millions,NZD
+FY2019,,,,,,,,-0.58493,,-0.13,-2.688332,,,0.974666,6.995909,6.021243,5.813895,1.513055,439.830488,,,,,,,millions,NZD
+H1 FY2020,,,,,,,,-0.323617,,,,,,0.651049,3.781742,3.130694,,1.646384,502.330488,,,,,,,millions,NZD
+FY2020,,,,,,,,-0.665347,,-0.15,3.207463,-0.010532,,0.690233,3.456537,2.766303,2.512124,1.805615,502.330488,,,,,,,millions,NZD
+H1 FY2021,,,,,,,,-0.341749,,-0.07,,,,0.348484,3.128841,2.780357,2.526516,1.986671,502.330488,,,,,,,millions,NZD
+FY2021,,,,,,,,-0.779559,,-0.16,0.18201,-0.000954,,0.190764,2.719548,2.528784,2.36856,1.986671,502.330488,,,,,,,millions,NZD
+H1 FY2022,,,,,,,,-0.215688,,-0.04,,,,-0.076564,1.477644,1.554208,1.435859,0.152433,502.330488,,,,,,,millions,NZD
+FY2022,,,,,,,,-0.455083,,-0.09,0.127124,0.0,,0.230983,1.239855,1.008872,0.985538,0.148294,573.759059,,,,,,,millions,NZD
+H1 FY2023,,,,,,,,-0.101215,,-0.02,,,,0.129768,1.104653,0.974885,0.930256,1.001223,573.759059,,,,,,,millions,NZD
+FY2023,,,,,,,,-0.264717,,-0.04,-0.280052,,,0.411925,0.950726,0.538801,0.526482,0.8639,673.759059,,,,,,,millions,NZD
+H1 FY2024,,,,,,,,-0.124757,,-0.02,,,,0.287168,0.843099,0.555931,0.542161,0.736485,673.759059,,,,,,,millions,NZD
+FY2024,,,,,,,,-0.245732,,-0.04,-0.229058,,,0.166193,0.724182,0.557989,0.54608,0.634842,673.759059,,,,,,,millions,NZD
+H1 FY2025,,,,,,,,0.151937,,0.03,,,,0.56813,0.588748,0.020619,0.0,0.480897,10.000026,,,,,,,millions,NZD
+FY2025,,,,,,,,-0.055236,,-0.02,-0.346307,,,0.360956,0.376909,0.015953,0.0,0.288535,10.000026,,,,,,,millions,NZD
+H1 FY2026,,,,,,,,-0.055957,,-0.02,,,,0.305,0.326704,0.021704,0.0,0.21764,10.000026,,,,,,,millions,NZD
+FY2026,,,,,,,,-0.173831,,-0.06,-0.173632,,,0.187125,0.202081,0.014956,0.0,0.114903,10.000026,,,,,,,millions,NZD`;
+
+const analysis = {
+  "ticker": "RTO.NZ",
+  "company_name": "RTO Limited (formerly Blackwell Global Holdings)",
+  "sector": "Shell Company / Cash Shell (NZX)",
+  "analysis_date": "2026-08-13",
+  "ticker_lineage_notice": "RTO.NZ is the live, currently-quoted continuation of BGI.NZ. The company was renamed from Blackwell Global Holdings Limited to RTO Limited and its NZX ticker changed from BGI to RTO effective 1 May 2024, followed by a 73.6259:1 share consolidation completed 30 August 2024 (673,759,059 shares reduced to 10,000,026 shares). Yahoo/other feeds still carrying a 'BGI.NZ' quote are frozen at a pre-consolidation, pre-rename price and share count and should not be used; RTO.NZ (last close ~NZ$0.118-0.16, mid-Aug 2026) on 10,000,026 shares is the correct instrument.",
+  "overview": "RTO Limited is a dormant, non-operating cash shell listed on the NZX Main Board with no revenue-generating business. It previously operated a financial-services/mortgage-lending business as Blackwell Global Holdings Limited, discontinued in the year ended 31 March 2023. Since then its sole activity has been searching for a private company to bring public via a reverse takeover (RTO) transaction, which is why it renamed itself RTO Limited in 2024 — the ticker and company name are themselves the investment thesis.",
+  "business_model": {
+    "summary": "There is no operating business and no conventional revenue model. The company's only 'product' is its NZX Main Board listing itself, which has scarcity/optionality value to a private company seeking a faster, cheaper route to public markets than a traditional IPO. FY2026 (year ended 31 March 2026) total income was $70,031, comprised of $69,000 of 'other income' (a reverse-listing cost reimbursement, likely from a director-related company) plus $1,031 of bank interest on the cash balance — neither is repeatable operating revenue. Costs are the fixed overhead of maintaining a listed shell: directors' fees ($138,000, ~57% of total FY2026 expenses of $243,862), audit, NZX fees, insurance, and share registry costs, producing a $173,831 net loss for the year (versus a $55,236 net loss in FY2025).",
+    "revenue_streams": [
+      {"name": "Bank interest on shell cash balance", "percent": 1, "trend": "declining (cash balance shrinking each year: $634,842 at 1-Apr-2024 to $114,903 at 31-Mar-2026)"},
+      {"name": "Reimbursements / other income (non-recurring)", "percent": 99, "trend": "erratic and non-operating — $300,000 in FY2025, $69,000 in FY2026, driven by one-off reimbursement/related-party items rather than any business"}
+    ],
+    "customer_type": "None. No customers, no products, no employees. Sole counterparties are the auditor (William Buck), NZX, the share registry, and the majority shareholder providing funding support.",
+    "geographic_mix": "New Zealand incorporated and NZX-listed (Auckland registered office); majority shareholder Blackwell Global Group Limited is Cayman Islands-incorporated, its controlling individual (Mr Kaw (Michael) Sing Chai) linked to a Singapore-based group."
+  },
+  "competitive_position": {
+    "main_competitors": [
+      "Other dormant/thinly-traded NZX shells seeking RTO deals",
+      "Traditional NZX/ASX IPO process (the alternative route to listing for a target company)",
+      "ASX and other exchange shell/backdoor-listing vehicles competing for the same private-company targets",
+      "Private equity / trade buyers competing for the same acquisition targets RTO Limited is chasing"
+    ],
+    "market_position": "Nano-cap dormant shell; not a market participant in any operating industry. Its only differentiated position is being an already-listed NZX Main Board vehicle with a clean (audited, going-concern-qualified but current) reporting history and a majority shareholder willing to fund overheads.",
+    "moat_factors": [
+      {"factor": "Existing NZX Main Board listing", "strength": "moderate", "description": "Avoids the time, cost and execution risk of a fresh IPO for a private company wanting to go public via reverse listing; this listing is essentially the company's only asset of note beyond cash."},
+      {"factor": "Clean, low-liability balance sheet", "strength": "moderate", "description": "No debt (secured bonds fully forgiven/converted in Aug 2024); minimal payables, making it a simple, low-friction acquisition vehicle for a target's advisers to work with."},
+      {"factor": "Committed majority shareholder as funding backstop", "strength": "moderate", "description": "Blackwell Global Group Limited (~74.08% owner) has repeatedly forgiven debt, converted bonds to equity, and committed a further ~$200,000 shareholder loan around July 2026 — reducing near-term insolvency risk but increasing dilution risk and related-party dependence."},
+      {"factor": "Brand / reputation", "strength": "weak", "description": "No operating brand; the prior mortgage-lending business was wound down in FY2023 and offers no ongoing goodwill."},
+      {"factor": "Scale/cost advantages", "strength": "none", "description": "Not applicable — no operations to scale."}
+    ],
+    "weaknesses": [
+      "No operating business, no revenue-generating assets, no employees",
+      "Extreme illiquidity — average daily trading volume reported around 937 shares, with many sessions in the single digits to low hundreds, making any meaningful position difficult to build or exit",
+      "Ongoing operating losses funded entirely by shareholder capital injections and loans, not by any business activity",
+      "Heavy concentration risk: Blackwell Global Group Limited ~74.08%, plus ~7.59% held by the same controlling individual (Mr Kaw (Michael) Sing Chai) — over 81% combined control by one interest group",
+      "No tangible operating track record to attract acquisition targets other than the listing shell itself",
+      "Tax losses of ~$3.9 million carried forward are of uncertain future value given continuity-of-shareholders rules that an RTO transaction (large new share issuance to vendors) would likely breach"
+    ]
+  },
+  "growth_drivers": [
+    "Successful completion of a reverse takeover transaction bringing in an operating business with real earnings — this is the entire investment thesis and the only credible growth driver",
+    "Ability to raise additional 'growth capital' alongside any RTO completion, as flagged in the chairman's report as part of the intended process",
+    "Continued financial support from majority shareholder Blackwell Global Group Limited, which has both forgiven debt and committed further funding (a ~$200,000 shareholder loan around July 2026), extending the runway during which a deal can be found",
+    "NZX's principles-based (rather than prescriptive profit/NTA/working-capital) listing eligibility framework, which does not impose an automatic delisting trigger purely for being non-operating, giving the board more time than a stricter regime might allow",
+    "A July-August 2026 shareholder director-nomination process (open 21 Jul-7 Aug 2026) is a normal governance mechanism ahead of the annual meeting; it could refresh the board with directors more suited to executing a transaction, though nothing disclosed publicly ties it to a specific incoming deal"
+  ],
+  "risks": {
+    "business": [
+      {"risk": "No operating business", "severity": "high", "description": "The company generates no product or service revenue; its entire value proposition depends on management successfully identifying, negotiating and completing an RTO — an outcome that has not occurred despite 'discussions with several potential acquisition targets' as recently as the FY2026 annual report (24 June 2026)."},
+      {"risk": "Deal risk / indefinite search", "severity": "high", "description": "There is no disclosed deadline or committed target; the board has been searching for years (business discontinued FY2023, renamed RTO Limited May 2024) without success. A prospective investor has no visibility on timing or probability of a transaction."},
+      {"risk": "Dilution from any RTO", "severity": "high", "description": "Any acquisition would almost certainly be funded via substantial new share issuance to vendors and/or a capital raise, heavily diluting existing minority holders and potentially changing control. Deal terms (valuation of the incoming asset relative to the shell) would be set by the counterparty and the controlling shareholder, not by minority holders."}
+    ],
+    "financial": [
+      {"risk": "Short cash runway", "severity": "high", "description": "Cash of $114,903 at 31 March 2026 against an annual cash burn of $173,632 (FY2026 operating outflow) implies well under one year of runway at the current burn rate absent further funding."},
+      {"risk": "Going concern qualification", "severity": "high", "description": "The FY2026 audit opinion (William Buck, 24 June 2026) includes an explicit material uncertainty related to going concern, citing the net loss, operating cash outflow, and dependence on identifying a suitable RTO and on ongoing shareholder support."},
+      {"risk": "Dependence on related-party funding", "severity": "high", "description": "Going-concern basis rests explicitly on 'ongoing financial support from the majority shareholder,' including a ~$200,000 shareholder loan agreement entered into after the 31 March 2026 balance date and expected to be advanced around July 2026. Withdrawal of this support would leave the shell unable to meet obligations."},
+      {"risk": "Erosion of net tangible assets", "severity": "moderate", "description": "Equity fell from $360,956 (31-Mar-2025) to $187,125 (31-Mar-2026), roughly halving in one year, and has swung repeatedly over prior years purely via capital injections/forgiveness and losses, not operations (FY2018 ~$1.53m down to FY2021 ~$0.19m, back up to FY2023 ~$0.41m, down to FY2024 ~$0.17m, up to FY2025 ~$0.36m, down to FY2026 ~$0.19m)."}
+    ],
+    "regulatory": [
+      {"risk": "NZX continued-listing / suspension risk", "severity": "moderate", "description": "While NZX does not apply prescriptive profit/working-capital/NTA eligibility criteria the way some exchanges do, a persistently non-operating issuer with a going-concern qualification carries elevated risk of increased NZX scrutiny, potential suspension, or eventual delisting if no transaction materialises and shareholder funding support lapses. No explicit shell-clock deadline was identified in public sources, but this is a standing structural risk for any long-dormant listed shell."},
+      {"risk": "Takeovers Code / substantial shareholder dynamics", "severity": "moderate", "description": "Blackwell Global Group Limited's ~74.08% stake (plus ~7.59% held by the same controlling individual) means any RTO structuring or further share issuance must navigate NZ Takeovers Code constraints; the 2024 bond-to-equity conversion already used the Code's 'creep' provisions, showing the majority holder is willing and able to increase its stake incrementally."},
+      {"risk": "Tax loss continuity", "severity": "low", "description": "Carried-forward tax losses (unrecognised, historically ~$3.9 million) could shelter future profits of an acquired business, but utilisation depends on continuity-of-shareholders requirements that a reverse takeover — which typically issues large numbers of new shares to vendors — could jeopardise."}
+    ],
+    "macro": [
+      {"risk": "NZX small-cap illiquidity and sentiment", "severity": "moderate", "description": "As a nano-cap shell with negligible free float turnover (average volume ~937 shares/day per third-party data), the stock is highly exposed to general NZX small-cap sentiment and illiquidity discounts/premiums that have little to do with fundamentals."},
+      {"risk": "M&A/IPO market conditions", "severity": "moderate", "description": "The attractiveness and pricing of a backdoor listing (versus a traditional IPO or trade sale) for a prospective target depends on broader capital markets conditions; a weak IPO market can make RTO shells more attractive, while a strong one can reduce demand for the shell route."}
+    ]
+  },
+  "recent_developments": [
+    {"date": "2026-07-29", "event": "NZX 'Call for Director Nominations' announcement released, opening a shareholder nomination window from 21 July 2026 to 5pm 7 August 2026 for shareholders to propose director candidates ahead of the annual meeting. This is a standard governance process; no disclosed link to a specific incoming RTO transaction was found."},
+    {"date": "2026-06-24", "event": "FY2026 annual report released: net loss $173,831 (vs $55,236 in FY2025), cash down to $114,903 (from $288,535), equity down to $187,125 (from $360,956). Auditor William Buck issued a material uncertainty related to going concern paragraph. Chairman's report confirms discussions with several potential RTO targets during the year, none yet converted into a tangible transaction, and states the board is 'hopeful of having a transaction underway during the course of this calendar year' (2026)."},
+    {"date": "2026 (subsequent event, ~July)", "event": "Company entered into a further ~$200,000 shareholder loan agreement with majority shareholder Blackwell Global Group Limited, after the 31 March 2026 balance date, explicitly relied upon by directors to support the going-concern basis of preparation."},
+    {"date": "2025-04 to 2026-03 (FY2026)", "event": "No new shares issued during the year; share count held flat at 10,000,026 for the second consecutive year following the August 2024 consolidation."},
+    {"date": "2024-08-30", "event": "Completed a 73.6259:1 share consolidation, reducing shares on issue from 673,759,059 to 10,000,026."},
+    {"date": "2024-08-26", "event": "Blackwell Global Group Limited converted $250,000 of secured bonds into new shares (pre-consolidation) using Takeovers Code 'creep' provisions, and forgave the remaining balance of bonds with immediate effect (following an earlier tranche of debt forgiveness in April 2024) — eliminating all debt from the balance sheet."},
+    {"date": "2024-05-01", "event": "Company renamed from Blackwell Global Holdings Limited to RTO Limited; NZX ticker changed from BGI to RTO."},
+    {"date": "2023 (FY2023)", "event": "Discontinued its previously-operated financial services (mortgage lending) business, becoming non-trading from that point forward."}
+  ],
+  "guidance": {
+    "as_of": "FY2026 Annual Report, 24 June 2026",
+    "fiscal_year": "FY2027 (year ending 31 March 2027)",
+    "items": [
+      {
+        "metric": "Revenue / operating targets",
+        "target": "None provided — management gives no quantitative revenue, earnings, margin or capex guidance because there is no operating business",
+        "period": "N/A",
+        "vs_prior": "N/A",
+        "notes": "Guidance in the conventional sense does not exist for this issuer."
+      },
+      {
+        "metric": "Shareholder funding",
+        "target": "~$200,000 shareholder loan from Blackwell Global Group Limited",
+        "period": "Expected to be advanced around July 2026",
+        "vs_prior": "new",
+        "notes": "Explicitly relied upon by directors as part of the going-concern basis of preparation; extends the cash runway beyond the $114,903 balance at 31 March 2026."
+      },
+      {
+        "metric": "RTO transaction timing",
+        "target": "No committed timeline; board states it is 'hopeful of having a transaction underway during the course of this calendar year' (2026)",
+        "period": "Calendar year 2026 (aspirational, not committed)",
+        "vs_prior": "maintained",
+        "notes": "Discussions with several potential acquisition targets have occurred but none has developed into a tangible transaction as of the FY2026 report date (24 June 2026) or as of this analysis (13 August 2026)."
+      }
+    ],
+    "management_commentary": "Chairman Sean Joyce reiterated that the company undertook no business activities during FY2026, that the board is actively engaged in seeking an RTO target satisfying criteria such as strong management, a robust business model, solid historical earnings (or a credible plan to generate them), proprietary IP, growth potential (organic, acquisitive, or via capital investment), international scalability, and a need for additional capital that a public listing could satisfy. Management explicitly frames the company itself as 'an attractive vehicle for a reverse takeover transaction.' No specific target, sector focus, or transaction timetable has been disclosed publicly as of this analysis."
+  },
+  "bull_case": [
+    "Pure optionality: any completed RTO with a genuinely viable operating business would represent a step-change in value versus a ~$187,000 net-asset shell, and the market's multi-times premium to NTA shows investors are already pricing some odds of a deal happening",
+    "Clean balance sheet with no debt (all bonds forgiven or converted in 2024) makes RTO Limited a simple, low-friction vehicle for a private company's advisers to structure a reverse listing around",
+    "Committed, deep-pocketed majority shareholder (Blackwell Global Group Limited, ~74.08%) has repeatedly funded the shell — forgiving bonds, injecting equity, and now committing a further ~$200,000 loan around July 2026 — reducing near-term risk of an uncontrolled insolvency before a deal can be found",
+    "Carried-forward tax losses (historically ~$3.9 million) could shelter future profits of an acquired business if shareholder-continuity requirements can be navigated as part of deal structuring",
+    "NZX's principles-based listing framework (no strict profit/NTA/working-capital eligibility test) gives the board more runway to find a deal than a stricter exchange regime might allow, and the July-August 2026 director-nomination process shows the governance machinery is still active and open to shareholder input"
+  ],
+  "bear_case": [
+    "There is no business, no revenue, and no realistic near-term prospect of either absent a completed RTO that has been 'discussed' but not delivered for multiple years running (business discontinued FY2023, renamed to RTO Limited May 2024, still a shell as of the 24 June 2026 annual report and as of this analysis on 13 August 2026)",
+    "Going-concern qualified accounts and a cash runway of well under one year at the FY2026 burn rate ($173,632 annual operating outflow against $114,903 cash) mean further dilution or shareholder bailouts are all but certain if no deal completes soon",
+    "Extreme illiquidity (average volume reported around 937 shares/day, with many sessions far lower) means the quoted market cap is not achievable in size — a large holder could not exit without materially moving the price, and the last-traded price may not reflect a price at which any real quantity could transact",
+    "Market cap trades at a large multiple of net tangible assets (~$187,000 equity versus a market cap of roughly $1.2-1.6 million at prices seen in mid-2026), with the entire premium representing pure speculative optionality on an unspecified, unscheduled, unproven future transaction — if no RTO materialises, the natural anchor for the shares is closer to book value (or lower, given the ongoing burn), implying substantial downside",
+    "Over 81% combined control by a single related-party interest group (Blackwell Global Group Limited plus its controlling individual Mr Kaw (Michael) Sing Chai) leaves minority shareholders with limited influence over deal selection, terms, valuation of the incoming asset, or the pace and structure of any dilutive capital raise — minorities are price-takers on any transaction this group agrees to"
+  ]
+};
+
+const dcfData = {
+  "ticker": "RTO.NZ",
+  "valuation_date": "2026-08-13",
+  "current_price": 0.118,
+  "price_ticker": "RTO.NZ",
+  "price_ticker_note": "RTO.NZ is the live, currently-quoted NZX Main Board instrument, last close NZ$0.118 (13 August 2026, verified via Yahoo Finance chart API: regularMarketPrice 0.118, regularMarketTime 13-Aug-2026 ~12:04 NZT, 52-week range $0.118-$0.174, volume 59 shares that session). This is the correct, current price series. See ticker_lineage_note below for why a stale NZ$0.004 BGI.NZ quote must never be substituted back in.",
+  "ticker_lineage_note": "The company was Blackwell Global Holdings Limited trading as BGI.NZ until it renamed to RTO Limited and changed its NZX ticker to RTO effective 1 May 2024, then completed a 73.6259:1 share consolidation on 30 August 2024 (673,759,059 shares reduced to 10,000,026 shares). Some data feeds (including this project's own prior research/BGI.NZ/Reports/BGI.NZ_DCF.json, dated 2026-08-09) still carry a 'BGI.NZ' quote frozen at NZ$0.004 as of 30 April 2024 - a DEAD, pre-rename, pre-consolidation price on a pre-consolidation share count that Yahoo Finance simply stopped updating. NZ$0.004 is NOT a live, tradeable, or even arithmetically comparable price today (dividing today's post-consolidation share count into a pre-consolidation price series produces nonsense). A future reader or automated refresh process must NOT 'correct' RTO.NZ's price back toward $0.004 - that figure belongs to a delisted symbol, not to a depressed valuation. The live, actively-traded instrument is RTO.NZ at NZ$0.118 (251 daily bars of real, if thin, trading history through 13-Aug-2026). research/BGI.NZ/Reports/BGI.NZ_DCF.json should itself be treated as legacy/superseded by this file for pricing purposes.",
+  "valuation_method": "asset_scenario_weighted_shell",
+  "model_note": "RTO Limited is NOT a growth-DCF candidate. It is a dormant NZX Main Board cash shell with NO operating business, NO revenue (FY2026 'total income' of $70,031 is $69,000 of one-off reimbursement income plus $1,031 of bank interest - neither is repeatable operating revenue), and NEGATIVE owner FCF in every year on record since the mortgage-lending business was discontinued in FY2023. This model instead values the equity as a probability-weighted mix of (a) shareholder-support failure / wind-up (bear), (b) continued life-support with an eventual, heavily-dilutive reverse takeover (RTO) that leaves existing holders with tangible book value plus a modest listed-shell scarcity premium (base), and (c) a prompt, favourable-terms RTO realizing the shell's option value near the top of observed NZX shell-value precedent (bull).",
+  "inputs": {
+    "shares_outstanding": 10.000026,
+    "shares_outstanding_units": "millions",
+    "net_debt": -114903,
+    "last_fcf": null,
+    "reported_fcf": -173632,
+    "sbc": 0,
+    "interest_income": 1031,
+    "shareholders_equity_fy2026": 187125,
+    "nta_fy2026": 187125,
+    "nta_per_share_fy2026_cents": 1.87,
+    "nta_per_share_fy2025_cents": 3.61,
+    "cash_fy2026": 114903,
+    "cash_fy2025": 288535,
+    "annual_cash_burn_fy2026": 173632,
+    "annual_cash_burn_fy2025": 346307,
+    "cash_runway_years_at_fy2026_burn_rate": 0.66,
+    "total_debt_fy2026": 0,
+    "shareholder_loan_pending": 200000,
+    "going_concern_qualification": "material_uncertainty",
+    "ownership_concentration_pct": 81.67,
+    "unrecognised_tax_losses": 3890000
+  },
+  "assumptions": {
+    "base": {
+      "narrative": "The shell persists on continued shareholder life-support: the $200,000 BGGL loan is advanced as planned (July 2026), buying roughly another year of runway at the current burn rate, and the majority shareholder continues its established four-year pattern of funding overheads rather than letting the company fail outright. Eventually - not on any committed timeline - an RTO completes, but on terms that heavily dilute existing minority holders. Existing shareholders' residual claim approximates current tangible book value (NTA) plus a conservative NZX-listed-shell scarcity premium.",
+      "tangible_equity_fy2026": 187125,
+      "shell_scarcity_value": 500000,
+      "shell_scarcity_value_range_considered": [300000, 800000]
+    },
+    "bull": {
+      "narrative": "A genuine, well-structured RTO completes reasonably promptly (within roughly 12-18 months) on terms favourable to existing holders. This is explicitly speculative OPTION VALUE, not a cash-flow DCF output: there is no disclosed transaction structure, exchange ratio, letter of intent, MOU, or timeline as of the FY2026 annual report (24 June 2026).",
+      "shell_value_upper_precedent": 2500000,
+      "shell_value_range_considered": [1800000, 3000000]
+    },
+    "bear": {
+      "narrative": "No RTO materialises within a survivable timeframe. The $200,000 BGGL loan is advanced as planned but merely extends the runway by roughly a year rather than solving the underlying problem; it also becomes a liability ranking AHEAD of equity. Either BGGL eventually tires of open-ended funding and support lapses, forcing wind-up, or the company survives only via a heavily dilutive rescue placement/loan-to-equity conversion that leaves today's minority holders with a small fraction of a smaller pie.",
+      "residual_equity_value": 20000
+    }
+  },
+  "valuation": {
+    "base": {
+      "tangible_equity": 187125,
+      "shell_scarcity_value": 500000,
+      "equity_value": 687125,
+      "intrinsic_value": 0.068712,
+      "upside": -41.77,
+      "implied_pnta_multiple": 3.67,
+      "methodology": "intrinsic_value = (FY2026 shareholders' equity/NTA + shell scarcity value) / shares outstanding = (187,125 + 500,000) / 10,000,026 = NZ$0.0687/share. Implies a P/NTA of 3.67x - well below the current market's 6.31x."
+    },
+    "bull": {
+      "shell_value": 2500000,
+      "equity_value": 2500000,
+      "intrinsic_value": 0.25,
+      "upside": 111.86,
+      "implied_pnta_multiple": 13.36,
+      "methodology": "intrinsic_value = upper-precedent completed-RTO shell value / shares outstanding = 2,500,000 / 10,000,026 = NZ$0.2500/share. This is the ONLY one of the three scenarios that lands above the current NZ$0.118 price. Assigned only 8% probability weight."
+    },
+    "bear": {
+      "equity_value": 20000,
+      "intrinsic_value": 0.002,
+      "upside": -98.31,
+      "implied_pnta_multiple": 0.11,
+      "methodology": "Residual equity value after the $200,000 shareholder loan (once advanced) is repaid/converted ahead of ordinary equity, wind-up or dilutive-rescue costs are applied, and no RTO materialises. intrinsic_value = 20,000 / 10,000,026 = NZ$0.0020/share."
+    }
+  },
+  "entry_price": {
+    "hurdle_rate": 0.15,
+    "recommended_entry_price": {
+      "value": 0.04319,
+      "basis": "probability_weighted_intrinsic_value",
+      "note": "For this non-cash-flowing shell, the decision-useful 'entry price' is the probability-weighted fair value - the maximum price a rational buyer should pay given the realistic scenario mix, since no IRR-hurdle cash-flow mechanics apply. This is roughly 63% below the current NZ$0.118 (RTO.NZ) market price."
+    }
+  },
+  "sensitivity": {
+    "description": "A standard WACC / terminal-growth grid is not meaningful here (no perpetuity cash-flow stream exists). Instead this matrix sensitizes the base-case intrinsic value to (rows) the haircut applied to FY2026 tangible NTA and (columns) the shell scarcity value assumption.",
+    "equity_haircut_range_pct": [0, 25, 50, 75, 100],
+    "shell_value_range": [0, 250000, 500000, 750000, 1000000],
+    "matrix_units": "NZD per share",
+    "matrix": [
+      [0.018712, 0.043712, 0.068712, 0.093712, 0.118712],
+      [0.014034, 0.039034, 0.064034, 0.089034, 0.114034],
+      [0.009356, 0.034356, 0.059356, 0.084356, 0.109356],
+      [0.004678, 0.029678, 0.054678, 0.079678, 0.104678],
+      [0.0, 0.025, 0.05, 0.075, 0.1]
+    ],
+    "matrix_read_note": "Row = NTA haircut (0% = full FY2026 book equity of NZ$187,125 credited; 100% = book equity assumed entirely unrealizable). Column = shell scarcity value from NZ$0 (pure liquidation) to NZ$1.0M (near the top of historical NZX shell-value precedent). At the live NZ$0.118 price, essentially NO cell in this matrix reaches the current price except the single top-right corner (zero haircut + NZ$1.0M shell value, NZ$0.1187/share) - an internally optimistic combination requiring BOTH crediting the full unhaircut book value AND assuming close to the maximum plausible shell premium simultaneously, not the modal outcome."
+  },
+  "probability_weighted": {
+    "weights": { "bear": 0.6, "base": 0.32, "bull": 0.08 },
+    "weighted_iv": 0.043188,
+    "weighted_upside": -63.4
+  },
+  "sanity_check": {
+    "ran": true,
+    "passed": false,
+    "current_price_pnta_multiple": 6.31,
+    "current_price_pnta_note": "At the current RTO.NZ price of NZ$0.118, market cap is 0.118 x 10,000,026 = ~NZ$1.18M against FY2026 NTA of NZ$187,125 - an implied Price/NTA of ~6.31x. For a non-operating shell with no revenue and no EBITDA, the conventional multiple sanity checks (P/E, EV/EBITDA) do not apply - P/NTA is the only meaningful cross-check, and no asset-based method can justify NZ$0.118/share purely on book value: NTA alone is only NZ$0.0187/share.",
+    "trip_reasons": [
+      "The current price (NZ$0.118, P/NTA 6.31x) exceeds the top of this model's own scenario range in TWO of three scenarios (bear NZ$0.002, base NZ$0.069) and exceeds the probability-weighted intrinsic value (NZ$0.0432, implied P/NTA 2.31x) by roughly 173%.",
+      "Only the bull scenario (NZ$0.25, implied P/NTA 13.36x, 8% probability weight) lands above the current price - i.e. the market is pricing in bull-case-or-better odds of RTO success materially higher than this model's 8% weighting, given the multi-year pattern of unconverted deal discussions.",
+      "The going-concern material uncertainty and sub-8-month pre-loan cash runway are audited, disclosed facts as of the most recent (24 June 2026) annual report - they are not speculative bear-case inputs, they are the base state of the company today.",
+      "NTA per share nearly halved in the most recent fiscal year alone (3.61c to 1.87c) with no offsetting operating improvement possible (there is no operating business), meaning the book-value anchor underlying even the base and bull cases is itself on a declining trajectory absent a transaction.",
+      "The probability-weighted intrinsic value (NZ$0.0432) implies a P/NTA of only 2.31x - a materially more conservative multiple than the 6.31x the market currently pays, meaning this model's central estimate treats the market's RTO-optionality premium as substantially overpriced given the disclosed facts, not the other way round."
+    ],
+    "diagnosis": "market pays a large premium for RTO optionality (~6.3x NTA) that this fundamentals-based scenario model does not match even after weighting a genuine (8%) chance of bull-case success; at NZ$0.118 the honest read is a large negative upside in the base and probability-weighted cases, and the gap is a judgment call on how likely a multi-year, still-undisclosed RTO search is to succeed, not a modelling error",
+    "fix_applied": "asset/scenario-weighted valuation instead of growth DCF, explicitly reporting that every scenario except the low-probability bull case falls well below the current price, and that the probability-weighted fair value is roughly 63% below market"
+  },
+  "valuation_philosophy": {
+    "no_positive_fcf_history": "There is no operating business and therefore no owner-FCF base to project. The mortgage-lending business was discontinued in FY2023; every year since has produced a net cash outflow funded by drawing down the cash balance (FY2025: -$346,307; FY2026: -$173,632), with 'income' consisting almost entirely of token bank interest and one-off reimbursements. Building a conventional DCF on this series would either extrapolate a business that no longer exists or compound a cash-burn trajectory into a nonsensical result. This is why the model uses an asset/scenario approach instead.",
+    "going_concern": "The FY2026 audited financial statements (William Buck, signed 24 June 2026) contain an explicit Material Uncertainty Relating to Going Concern paragraph. Cash of $114,903 against a $173,632 annual burn rate implies under 8 months of self-funded runway. That support is, by its nature, discretionary and can lapse or be renegotiated on terms unfavourable to existing minority holders at any time.",
+    "value_rests_on_option_and_scarcity": "To the extent this equity is worth more than its NTA, that excess value rests entirely on (a) a listed-shell scarcity premium to RTO promoters, and (b) speculative, unpriced optionality on an as-yet-undisclosed reverse takeover actually being identified, negotiated, and completed on terms that leave existing holders with meaningful retained value after the near-certain heavy dilution such a transaction would require. Neither is a claim on any existing or currently foreseeable cash-generating business - there is none.",
+    "market_pays_a_real_premium_this_model_only_partially_matches": "RTO.NZ trades freely (last 251 daily bars through 13-Aug-2026, 52-week range NZ$0.118-$0.174) and has persistently commanded a multiple of NTA (currently ~6.3x) even as NTA itself has collapsed to under NZ$0.019/share. This is genuine, if thinly-traded (59 shares on the day this price was verified), price discovery reflecting real market appetite for RTO optionality in a >81%-controlled, going-concern-qualified nano-cap shell. This model's probability-weighted intrinsic value (NZ$0.0432, implied P/NTA 2.31x) sits materially below that market-implied multiple - a deliberately conservative read that treats years of unconverted 'discussions with several potential acquisition targets' as evidence the deal is genuinely uncertain, not imminent.",
+    "uninvestable_at_current_price_conclusion": "At the current NZ$0.118 (RTO.NZ) price, this stock is priced for bull-case-or-better odds of a successful RTO that this model's fact base (a multi-year pattern of unconverted deal talk, an explicit going-concern qualification, under 8 months of pre-loan runway, and no disclosed MOU, LOI, or transaction terms) does not support assigning more than an 8% probability. The probability-weighted fair value (NZ$0.0432) is roughly 63% below the current price, and even the base case (a funded shell that eventually strikes a heavily dilutive deal) is roughly 42% below current price. A rational buyer paying today's price is making a leveraged, largely binary bet that RTO Limited succeeds where it has not in at least three consecutive annual reporting cycles - not investing in a business with a demonstrable, ongoing path to that value."
+  },
+  "ticker_lineage_note_display": "BGI.NZ is a dead Yahoo Finance symbol frozen at NZ$0.004 (last-trade timestamp 30 April 2024) - a pre-rename, pre-consolidation price on a pre-consolidation (673,759,059) share count. The live, currently-quoted instrument is RTO.NZ, trading at NZ$0.118 (13 August 2026) on the post-consolidation base of 10,000,026 shares (73.6259:1 consolidation completed 30 August 2024). The apparent ~30x jump from $0.004 to $0.118 is NOT a real return - it is an artifact of the share consolidation. Any screener or valuation referencing 'BGI.NZ' should redirect to RTO.NZ and treat the price discontinuity as a share-count artifact, not investment performance."
+};
+
+// ============ CSV PARSE ============
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => {
+            const raw = values[i] !== undefined ? values[i].trim() : '';
+            obj[h.trim()] = raw === '' ? null : raw;
+        });
+        return obj;
+    });
+}
+const data = parseCSV(csvData);
+
+function parseDate(p) {
+    const year = parseInt(p.match(/\d{4}/)?.[0] || '0');
+    const isH1 = p.includes('H1');
+    const isFY = p.startsWith('FY');
+    const subOrder = isH1 ? 3 : isFY ? 7 : 0;
+    return year * 10 + subOrder;
+}
+data.sort((a, b) => parseDate(a.Period) - parseDate(b.Period));
+
+const fyData = data.filter(d => d.Period.startsWith('FY'));
+const num = v => (v === null || v === undefined || v === '') ? null : parseFloat(v);
+
+// ============ CHART DEFAULTS ============
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } } },
+    scales: {
+        x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+function freshScales() {
+    return { x: { ...chartDefaults.scales.x }, y: { ...chartDefaults.scales.y } };
+}
+const chartRegistry = {};
+function toggleLogScale(canvasId, btn) {
+    const chart = chartRegistry[canvasId];
+    if (!chart) return;
+    const toLog = chart.options.scales.y.type !== 'logarithmic';
+    chart.options.scales.y.type = toLog ? 'logarithmic' : 'linear';
+    btn.classList.toggle('active', toLog);
+    chart.update();
+}
+const colors = { primary: '#00d4aa', secondary: '#00b894', tertiary: '#0984e3', quaternary: '#6c5ce7', warning: '#fdcb6e', danger: '#ff6b6b' };
+
+// ============ TICKER LINEAGE BANNER ============
+document.getElementById('lineageText').innerHTML =
+    '<strong>BGI.NZ is a dead Yahoo Finance symbol frozen at NZ$0.004</strong> (last-trade timestamp 30 April 2024) &mdash; a pre-rename, pre-consolidation price on a pre-consolidation (673,759,059) share count. ' +
+    'The live, currently-quoted instrument is <strong style="color:#00d4aa;">RTO.NZ, trading at NZ$0.118 (13 August 2026)</strong> on the post-consolidation base of 10,000,026 shares (73.6259:1 consolidation completed 30 August 2024). ' +
+    'The apparent ~30x jump from $0.004 to $0.118 is <strong>not a real return</strong> &mdash; it is an artifact of the share consolidation. Do not "correct" this price back toward $0.004; that figure belongs to a delisted symbol.';
+
+// ============ KPI CARDS ============
+function fmtNZD(n, decimals) {
+    if (n === null || n === undefined) return 'N/A';
+    return 'NZ$' + n.toLocaleString('en-NZ', { minimumFractionDigits: decimals ?? 0, maximumFractionDigits: decimals ?? 0 });
+}
+
+const latestFY = fyData[fyData.length - 1]; // FY2026
+const priorFY = fyData[fyData.length - 2]; // FY2025
+const ntaFY2026 = num(latestFY.ShareholdersEquity) * 1e6; // millions -> absolute
+const ntaFY2025 = num(priorFY.ShareholdersEquity) * 1e6;
+const cashFY2026 = num(latestFY.CashAndEquivalents) * 1e6;
+const cashFY2025 = num(priorFY.CashAndEquivalents) * 1e6;
+const netLossFY2026 = Math.abs(num(latestFY.NetIncome)) * 1e6;
+const netLossFY2025 = Math.abs(num(priorFY.NetIncome)) * 1e6;
+const sharesFY2026 = num(latestFY.SharesOutstanding) * 1e6;
+const burnFY2026 = 173632; // matches |OperatingCashFlow| FY2026 * 1e6
+const runwayMonths = (cashFY2026 / burnFY2026) * 12;
+const ntaPerShareCents = (ntaFY2026 / sharesFY2026) * 100;
+const CURRENT_PRICE = dcfData.current_price;
+const marketCap = CURRENT_PRICE * sharesFY2026;
+const pNta = marketCap / ntaFY2026;
+
+const kpis = [
+    { label: 'Net Tangible Assets (FY2026)', value: fmtNZD(ntaFY2026), change: ((ntaFY2026 - ntaFY2025) / ntaFY2025 * 100).toFixed(0) + '% YoY', warn: true },
+    { label: 'NTA per Share', value: ntaPerShareCents.toFixed(2) + '¢', change: 'vs 3.61¢ FY2025 (-48%)', warn: true },
+    { label: 'Cash on Hand (31 Mar 2026)', value: fmtNZD(cashFY2026), change: ((cashFY2026 - cashFY2025) / cashFY2025 * 100).toFixed(0) + '% YoY', warn: true },
+    { label: 'FY2026 Net Loss', value: fmtNZD(netLossFY2026), change: '+' + ((netLossFY2026 - netLossFY2025) / netLossFY2025 * 100).toFixed(0) + '% vs FY2025', warn: true },
+    { label: 'Annual Cash Burn (FY2026)', value: fmtNZD(burnFY2026), change: 'Operating cash outflow', warn: true },
+    { label: 'Cash Runway', value: runwayMonths.toFixed(1) + ' months', change: 'Before pending $200k loan', warn: true },
+    { label: 'Shares on Issue', value: sharesFY2026.toLocaleString('en-NZ'), change: 'Flat since Aug-2024 consolidation', warn: false },
+    { label: 'Market Cap (RTO.NZ @ $' + CURRENT_PRICE.toFixed(3) + ')', value: fmtNZD(marketCap), change: 'P/NTA ≈ ' + pNta.toFixed(2) + 'x', warn: true }
+];
+
+document.getElementById('kpiGrid').innerHTML = kpis.map(k => `
+    <div class="kpi-card ${k.warn ? 'warn' : ''}">
+        <div class="kpi-value">${k.value}</div>
+        <div class="kpi-label">${k.label}</div>
+        <div class="kpi-change">${k.change}</div>
+    </div>
+`).join('');
+
+// ============ GUIDANCE ============
+function renderGuidance() {
+    if (!analysis.guidance || !analysis.guidance.items || analysis.guidance.items.length === 0) {
+        document.getElementById('guidanceSection').style.display = 'none';
+        return;
+    }
+    const guidance = analysis.guidance;
+    document.getElementById('guidanceAsOf').textContent = guidance.as_of || '';
+    document.getElementById('guidanceFY').textContent = guidance.fiscal_year || '';
+    const grid = document.getElementById('guidanceGrid');
+    grid.innerHTML = guidance.items.map(item => {
+        const vsClass = item.vs_prior ? item.vs_prior.toLowerCase().replace(/[^a-z]/g, '') : 'new';
+        const vsLabel = item.vs_prior ? item.vs_prior.charAt(0).toUpperCase() + item.vs_prior.slice(1) : 'New';
+        return `
+            <div class="guidance-card">
+                <div class="guidance-metric">${item.metric}</div>
+                <div class="guidance-target">${item.target}</div>
+                <div class="guidance-period">${item.period}</div>
+                <span class="guidance-vs-prior ${vsClass}">${vsLabel}</span>
+                ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+    const commentary = document.getElementById('guidanceCommentary');
+    if (guidance.management_commentary) {
+        commentary.textContent = guidance.management_commentary;
+        commentary.style.display = 'block';
+    } else {
+        commentary.style.display = 'none';
+    }
+}
+renderGuidance();
+
+// ============ OVERVIEW SECTION ============
+function toggleOverview() {
+    const btn = document.querySelector('.overview-toggle');
+    const content = document.getElementById('overviewContent');
+    btn.classList.toggle('active');
+    content.classList.toggle('active');
+}
+
+function renderOverview() {
+    const grid = document.getElementById('overviewGrid');
+    const moatHtml = analysis.competitive_position.moat_factors.map(m => `<li><strong>${m.factor}</strong> (${m.strength}): ${m.description}</li>`).join('');
+    const revStreams = analysis.business_model.revenue_streams.map(r => `<li class="revenue-stream"><span>${r.name}</span><span class="percent">${r.percent}%</span></li>`).join('');
+    const growthDrivers = analysis.growth_drivers.map(g => `<li>${g}</li>`).join('');
+    const allRisks = [...analysis.risks.business, ...analysis.risks.financial, ...analysis.risks.regulatory, ...analysis.risks.macro];
+    const risksHtml = allRisks.map(r => `<li><span class="risk-${r.severity}">&#9679;</span> <strong>${r.risk}</strong> (${r.severity}): ${r.description}</li>`).join('');
+    const bullHtml = analysis.bull_case.map(b => `<li>${b}</li>`).join('');
+    const bearHtml = analysis.bear_case.map(b => `<li>${b}</li>`).join('');
+    const devHtml = analysis.recent_developments.map(d => `<li><strong>${d.date}:</strong> ${d.event}</li>`).join('');
+    const compHtml = analysis.competitive_position.main_competitors.map(c => `<li>${c}</li>`).join('');
+    const weakHtml = analysis.competitive_position.weaknesses.map(w => `<li>${w}</li>`).join('');
+
+    grid.innerHTML = `
+        <div class="overview-card">
+            <h3>Company Overview</h3>
+            <p>${analysis.overview}</p>
+            <div class="metric-highlight">${analysis.ticker_lineage_notice}</div>
+        </div>
+        <div class="overview-card">
+            <h3>Business Model</h3>
+            <p>${analysis.business_model.summary}</p>
+            <ul>${revStreams}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Competitive Position</h3>
+            <p><strong>Competitors:</strong></p>
+            <ul>${compHtml}</ul>
+            <p style="margin-top:12px;"><strong>Moat:</strong></p>
+            <ul>${moatHtml}</ul>
+            <p style="margin-top:12px;"><strong>Weaknesses:</strong></p>
+            <ul>${weakHtml}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Growth Drivers</h3>
+            <ul>${growthDrivers}</ul>
+        </div>
+        <div class="overview-card risks">
+            <h3>Key Risks</h3>
+            <ul>${risksHtml}</ul>
+        </div>
+        <div class="overview-card bull">
+            <h3>Bull Case</h3>
+            <ul>${bullHtml}</ul>
+        </div>
+        <div class="overview-card bear">
+            <h3>Bear Case</h3>
+            <ul>${bearHtml}</ul>
+        </div>
+        <div class="overview-card">
+            <h3>Recent Developments</h3>
+            <ul>${devHtml}</ul>
+        </div>
+    `;
+}
+renderOverview();
+
+// ============ CHARTS ============
+const fyLabels = fyData.map(d => d.Period);
+const ntaSeries = fyData.map(d => num(d.ShareholdersEquity)); // millions NZD
+const cashSeries = fyData.map(d => num(d.CashAndEquivalents));
+const netLossSeries = fyData.map(d => (d.NetIncome === null ? null : Math.abs(num(d.NetIncome))));
+const sharesSeries = fyData.map(d => num(d.SharesOutstanding)); // millions
+const totalLiabSeries = fyData.map(d => num(d.TotalLiabilities));
+const totalDebtSeries = fyData.map(d => (d.TotalDebt === null ? null : num(d.TotalDebt)));
+
+// NTA / Equity chart
+chartRegistry['ntaChart'] = new Chart(document.getElementById('ntaChart'), {
+    type: 'line',
+    data: {
+        labels: fyLabels,
+        datasets: [{
+            label: 'Shareholders’ Equity / NTA (NZ$m)',
+            data: ntaSeries,
+            borderColor: colors.primary,
+            backgroundColor: 'rgba(0,212,170,0.12)',
+            fill: true,
+            tension: 0.25
+        }]
+    },
+    options: { ...chartDefaults, scales: freshScales() }
+});
+
+// Cash chart
+chartRegistry['cashChart'] = new Chart(document.getElementById('cashChart'), {
+    type: 'line',
+    data: {
+        labels: fyLabels,
+        datasets: [{
+            label: 'Cash & Equivalents (NZ$m)',
+            data: cashSeries,
+            borderColor: colors.tertiary,
+            backgroundColor: 'rgba(9,132,227,0.12)',
+            fill: true,
+            tension: 0.25
+        }]
+    },
+    options: { ...chartDefaults, scales: freshScales() }
+});
+
+// Net loss chart (bar, all values are losses (magnitudes plotted positive) - no log toggle per spec)
+new Chart(document.getElementById('netLossChart'), {
+    type: 'bar',
+    data: {
+        labels: fyLabels,
+        datasets: [{
+            label: 'Net Loss (NZ$m)',
+            data: netLossSeries,
+            backgroundColor: 'rgba(255,107,107,0.55)',
+            borderColor: colors.danger,
+            borderWidth: 1
+        }]
+    },
+    options: { ...chartDefaults, scales: freshScales() }
+});
+
+// Total Liabilities & Total Debt chart - Total Debt reaches 0 from FY2025 onward, so NO log toggle
+new Chart(document.getElementById('liabChart'), {
+    type: 'bar',
+    data: {
+        labels: fyLabels,
+        datasets: [
+            { label: 'Total Liabilities (NZ$m)', data: totalLiabSeries, backgroundColor: 'rgba(253,203,110,0.55)', borderColor: colors.warning, borderWidth: 1 },
+            { label: 'Total Debt (NZ$m)', data: totalDebtSeries, backgroundColor: 'rgba(255,107,107,0.55)', borderColor: colors.danger, borderWidth: 1 }
+        ]
+    },
+    options: { ...chartDefaults, scales: freshScales() }
+});
+
+// NTA per share - restated for consolidation break.
+// Pre-consolidation periods (FY2018-FY2024) use raw share counts (439.8m-673.8m).
+// Post-consolidation (FY2025+) use 10,000,026 shares (73.6259:1 consolidation, 30-Aug-2024).
+// To make a single comparable series, restate PRE-consolidation NTA/share by dividing by
+// 73.6259 (i.e., multiply the pre-consolidation share count by 73.6259 to get a
+// consolidated-equivalent share count), so the whole series is on the SAME per-share basis.
+const CONSOLIDATION_RATIO = 73.6259;
+const ntapsLabels = [];
+const ntapsRaw = [];
+const ntapsRestated = [];
+fyData.forEach(d => {
+    const eq = num(d.ShareholdersEquity); // millions NZD
+    const shares = num(d.SharesOutstanding); // millions
+    if (eq === null || shares === null) return;
+    const isPostConsolidation = shares < 20; // 10.000026m vs 439-674m pre
+    ntapsLabels.push(d.Period);
+    const rawCents = (eq / shares) * 100; // NTA per share in cents, raw share count
+    if (isPostConsolidation) {
+        ntapsRaw.push(rawCents);
+        ntapsRestated.push(rawCents); // same basis already
+    } else {
+        ntapsRaw.push(rawCents);
+        // Restate: consolidated-equivalent shares = shares / 73.6259
+        const restatedShares = shares / CONSOLIDATION_RATIO;
+        ntapsRestated.push((eq / restatedShares) * 100);
+    }
+});
+
+new Chart(document.getElementById('ntapsChart'), {
+    type: 'line',
+    data: {
+        labels: ntapsLabels,
+        datasets: [{
+            label: 'NTA/Share, Consolidation-Restated (cents)',
+            data: ntapsRestated,
+            borderColor: colors.quaternary,
+            backgroundColor: 'rgba(108,92,231,0.12)',
+            fill: true,
+            tension: 0.25
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        scales: freshScales(),
+        plugins: {
+            legend: { labels: { color: '#e0e0e0', font: { size: 11 } } },
+            tooltip: {
+                callbacks: {
+                    afterLabel: function(ctx) {
+                        return 'Raw (unrestated): ' + ntapsRaw[ctx.dataIndex].toFixed(2) + '¢';
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Runway chart: cash on hand vs annual burn rate for recent FY periods (only where OCF exists)
+const runwayLabels = [];
+const runwayCash = [];
+const runwayBurn = [];
+fyData.forEach(d => {
+    const cash = num(d.CashAndEquivalents);
+    const ocf = d.OperatingCashFlow === null ? null : num(d.OperatingCashFlow);
+    if (cash === null) return;
+    runwayLabels.push(d.Period);
+    runwayCash.push(cash * 1000); // millions -> thousands NZD for readability
+    runwayBurn.push(ocf === null ? null : Math.abs(ocf) * 1000);
+});
+
+new Chart(document.getElementById('runwayChart'), {
+    type: 'bar',
+    data: {
+        labels: runwayLabels,
+        datasets: [
+            { label: 'Cash on Hand (NZ$000s)', data: runwayCash, backgroundColor: 'rgba(0,212,170,0.55)', borderColor: colors.primary, borderWidth: 1 },
+            { label: 'Annual Cash Burn (NZ$000s)', data: runwayBurn, backgroundColor: 'rgba(255,107,107,0.55)', borderColor: colors.danger, borderWidth: 1 }
+        ]
+    },
+    options: { ...chartDefaults, scales: freshScales() }
+});
+
+// Shares outstanding chart - with consolidation break annotation via tooltip
+new Chart(document.getElementById('sharesChart'), {
+    type: 'line',
+    data: {
+        labels: fyLabels,
+        datasets: [{
+            label: 'Shares Outstanding (millions)',
+            data: sharesSeries,
+            borderColor: colors.warning,
+            backgroundColor: 'rgba(253,203,110,0.12)',
+            fill: true,
+            stepped: true,
+            tension: 0
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        scales: (() => { const s = freshScales(); s.y.type = 'logarithmic'; return s; })(),
+        plugins: {
+            legend: { labels: { color: '#e0e0e0', font: { size: 11 } } },
+            tooltip: {
+                callbacks: {
+                    afterLabel: function() {
+                        return 'FY2025+ reflects the 73.6259:1 consolidation (30-Aug-2024)';
+                    }
+                }
+            }
+        }
+    }
+});
+
+// ============ MODEL WARNING BANNER (Step 8c-style, from DCF JSON) ============
+function renderModelWarningBanner() {
+    const sc = dcfData.sanity_check;
+    const vp = dcfData.valuation_philosophy;
+    const body = document.getElementById('modelWarningBody');
+    const cp = dcfData.current_price;
+    const pnta = sc.current_price_pnta_multiple;
+    const wUp = dcfData.probability_weighted.weighted_upside;
+    body.innerHTML = `
+        <p>${vp.no_positive_fcf_history}</p>
+        <p><strong>The market is not agreeing with this model.</strong> At NZ$${cp.toFixed(3)}, RTO.NZ trades at roughly <strong>${pnta.toFixed(2)}x FY2026 NTA</strong>, while the probability-weighted intrinsic value of NZ$${dcfData.probability_weighted.weighted_iv.toFixed(4)} implies only about <strong>2.31x NTA</strong> &mdash; a probability-weighted upside of <strong>${wUp.toFixed(1)}%</strong>. Of the three scenarios, only the low-probability (8%) bull case ($0.25) clears the current price &mdash; both bear ($0.002, 60% weight) and base ($0.0687, 32% weight) sit well below it.</p>
+        <ul>
+            ${sc.trip_reasons.map(r => `<li>${r}</li>`).join('')}
+        </ul>
+        <p><strong>Diagnosis:</strong> ${sc.diagnosis}</p>
+        <p><strong>Fix applied:</strong> ${sc.fix_applied}</p>
+    `;
+}
+renderModelWarningBanner();
+
+// ============ VALUATION / DCF SECTION ============
+const SCENARIO_IV = { bear: 0.002, base: 0.068712, bull: 0.25 };
+const weights = { bear: 0.60, base: 0.32, bull: 0.08 };
+const currentPrice = dcfData.current_price;
+
+function computeWeightedIV(w) {
+    return w.bear * SCENARIO_IV.bear + w.base * SCENARIO_IV.base + w.bull * SCENARIO_IV.bull;
+}
+
+function renderWeightState() {
+    const total = weights.bear + weights.base + weights.bull;
+    const totalPct = Math.round(total * 100);
+    const wiv = computeWeightedIV(weights);
+    const upside = ((wiv - currentPrice) / currentPrice) * 100;
+
+    document.getElementById('bearWeightLabel').textContent = Math.round(weights.bear * 100) + '%';
+    document.getElementById('baseWeightLabel').textContent = Math.round(weights.base * 100) + '%';
+    document.getElementById('bullWeightLabel').textContent = Math.round(weights.bull * 100) + '%';
+
+    const totalEl = document.getElementById('weightTotal');
+    const liveIvEl = document.getElementById('liveWeightedIV');
+    const liveUpEl = document.getElementById('liveWeightedUpside');
+    liveIvEl.textContent = '$' + wiv.toFixed(4);
+    liveUpEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(1) + '%';
+
+    // Also update the header summary cards live
+    document.getElementById('weightedIV').textContent = '$' + wiv.toFixed(4);
+    const weightedUpsideEl = document.getElementById('weightedUpside');
+    weightedUpsideEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(1) + '% vs current price';
+    weightedUpsideEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+    if (Math.abs(totalPct - 100) <= 1) {
+        totalEl.className = 'weight-total ok';
+        totalEl.innerHTML = `Total: ${totalPct}% — Recomputed Weighted IV: <strong>$${wiv.toFixed(4)}</strong> (<span>${(upside >= 0 ? '+' : '')}${upside.toFixed(1)}%</span> vs current price)`;
+    } else {
+        totalEl.className = 'weight-total bad';
+        totalEl.innerHTML = `Total: ${totalPct}% — weights must sum to 100% (currently off by ${totalPct - 100 > 0 ? '+' : ''}${totalPct - 100}pp). Adjust sliders.`;
+    }
+}
+
+window.onWeightChange = function(changedKey) {
+    const bearVal = parseInt(document.getElementById('bearWeightSlider').value) / 100;
+    const baseVal = parseInt(document.getElementById('baseWeightSlider').value) / 100;
+    const bullVal = parseInt(document.getElementById('bullWeightSlider').value) / 100;
+    weights.bear = bearVal;
+    weights.base = baseVal;
+    weights.bull = bullVal;
+    renderWeightState();
+};
+
+// Static current price cards
+document.getElementById('dcfCurrentPrice').textContent = '$' + currentPrice.toFixed(3);
+document.getElementById('dcfCurrentPriceSub').textContent = '13 Aug 2026 close — implies ~' + dcfData.sanity_check.current_price_pnta_multiple.toFixed(2) + 'x FY2026 NTA';
+
+renderWeightState();
+
+// Scenario cards + tabs
+const scenarioContent = {
+    bear: {
+        cls: 'bear', title: 'Bear Case', weight: '60% weight', price: '$0.0020',
+        sub: 'Implies 0.11x NTA · -98.3% vs current price',
+        text: dcfData.assumptions.bear.narrative
+    },
+    base: {
+        cls: 'base', title: 'Base Case', weight: '32% weight', price: '$0.0687',
+        sub: 'Implies 3.67x NTA · -41.8% vs current price',
+        text: dcfData.assumptions.base.narrative
+    },
+    bull: {
+        cls: 'bull', title: 'Bull Case', weight: '8% weight', price: '$0.2500',
+        sub: 'Implies 13.36x NTA · +111.9% vs current price',
+        text: dcfData.assumptions.bull.narrative
+    }
+};
+
+function renderScenarioCards(active) {
+    const order = ['bear', 'base', 'bull'];
+    document.getElementById('scenarioCards').innerHTML = order.map(key => {
+        const s = scenarioContent[key];
+        const isActive = key === active;
+        return `
+            <div class="scenario-card ${s.cls}" style="${isActive ? 'box-shadow:0 0 0 2px rgba(255,255,255,0.15);' : ''}">
+                <h4>${s.title} <span class="scenario-weight">${s.weight}</span></h4>
+                <div class="scenario-price">${s.price}</div>
+                <div class="scenario-pnta">${s.sub}</div>
+                <p>${s.text}</p>
+            </div>
+        `;
+    }).join('');
+}
+
+window.switchScenario = function(key) {
+    document.querySelectorAll('.scenario-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.scenario === key);
+    });
+    renderScenarioCards(key);
+};
+
+renderScenarioCards('base');
+
+// Sensitivity matrix
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const table = document.getElementById('sensitivityMatrix');
+    const cp = dcfData.current_price;
+    let html = '<tr><th>NTA Haircut \\ Shell Value</th>';
+    sens.shell_value_range.forEach(sv => {
+        html += `<th>$${(sv/1000).toFixed(0)}k</th>`;
+    });
+    html += '</tr>';
+    sens.equity_haircut_range_pct.forEach((haircut, i) => {
+        html += `<tr><th>${haircut}%</th>`;
+        sens.matrix[i].forEach((val, j) => {
+            const isHighlight = haircut === 0 && sens.shell_value_range[j] === 500000;
+            const colorClass = val >= cp ? 'above-current' : 'below-current';
+            html += `<td class="${isHighlight ? 'highlight' : colorClass}">$${val.toFixed(4)}</td>`;
+        });
+        html += '</tr>';
+    });
+    table.innerHTML = html;
+}
+renderSensitivityMatrix();
+
+// ============ MODALS ============
+const metricDescriptions = {
+    nta: {
+        title: "Net Tangible Assets (NTA) / Shareholders' Equity",
+        content: `
+            <p><strong>Net Tangible Assets</strong> is total assets minus total liabilities minus intangible assets. For a shell with no operations and no intangibles, NTA is effectively identical to shareholders' equity.</p>
+            <div class="metric-highlight"><strong>For RTO Limited:</strong> NTA is the single most important anchor for this stock because there are no earnings, no revenue, and no cash flows to value. It has fallen from $1.53m at FY2018 to just $187,125 at FY2026 &mdash; almost entirely through accumulated shell operating losses, offset periodically by shareholder capital injections (bond forgiveness, equity conversions).</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>The rate of NTA erosion &mdash; it nearly halved in FY2026 alone (3.61c to 1.87c per share)</li>
+                <li>Whether further shareholder injections (like the pending $200,000 loan) restore NTA or simply become a liability that erodes it further once drawn</li>
+                <li>NTA is a floor-value concept only in an orderly wind-up; a distressed liquidation could realize less</li>
+            </ul>
+        `
+    },
+    cash: {
+        title: "Cash Balance",
+        content: `
+            <p><strong>Cash and cash equivalents</strong> is the shell's only liquid asset of substance.</p>
+            <div class="metric-highlight"><strong>For RTO Limited:</strong> Cash fell from $288,535 (FY2025) to $114,903 (FY2026), a decline of ~60%, purely from overhead burn (directors' fees, audit, NZX fees, insurance, registry costs) with no offsetting revenue.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Whether the pending $200,000 shareholder loan (expected July 2026) is actually advanced</li>
+                <li>The pace of subsequent burn once that loan is drawn &mdash; base case assumes ~$180k-$120k/yr tapering over FY2027-31</li>
+                <li>Any further capital raises, which would likely be dilutive to existing minority holders</li>
+            </ul>
+        `
+    },
+    netloss: {
+        title: "Net Loss",
+        content: `
+            <p><strong>Net loss</strong> here has nothing to do with unprofitable operations in the conventional sense &mdash; there is no revenue to net against costs.</p>
+            <div class="metric-highlight"><strong>For RTO Limited:</strong> FY2026 net loss was $173,831 (up from $55,236 in FY2025), driven by $243,862 of shell overhead (57% directors' fees) against just $70,031 of income, almost all of which was a one-off reimbursement rather than repeatable revenue.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Whether costs can be trimmed further as a pure cost-minimization exercise while a deal is sought</li>
+                <li>Spikes in legal/accounting/consulting costs (which jump when an RTO negotiation is actually live) as a potential leading indicator of deal activity</li>
+            </ul>
+        `
+    },
+    liabilities: {
+        title: "Total Liabilities & Total Debt",
+        content: `
+            <p><strong>Total liabilities</strong> is everything the company owes (debt plus trade payables, provisions, etc.). <strong>Total debt</strong> is the interest-bearing subset (loans and bonds).</p>
+            <div class="metric-highlight"><strong>For RTO Limited:</strong> All secured bonds were extinguished during FY2024-25 ($200,000 forgiven April 2024, $250,000 converted to equity and the remaining $100,000 forgiven August 2024) &mdash; total debt has been NIL since FY2025. The small residual "total liabilities" balance is trade payables and accruals ($14,956 at FY2026), not borrowings.</p>
+            <p><strong>What to watch:</strong> The pending $200,000 shareholder loan (expected July 2026) is NOT yet reflected in the FY2026 balance sheet (it was entered into after the 31 March 2026 balance date). Once drawn, it will reintroduce debt that ranks ahead of ordinary equity &mdash; watch for it appearing in the FY2027 accounts.</p>
+        `
+    },
+    ntaps: {
+        title: "NTA per Share (Consolidation-Restated)",
+        content: `
+            <p><strong>NTA per share</strong> divides net tangible assets by shares outstanding. This measure is affected by a critical structural break: RTO Limited completed a <strong>73.6259:1 share consolidation on 30 August 2024</strong>, reducing shares on issue from 673,759,059 to 10,000,026.</p>
+            <div class="metric-highlight"><strong>Why this chart is restated:</strong> Plotting raw NTA/share across the consolidation would show a meaningless jump (e.g. from ~0.02c pre-consolidation to ~3.6c post-consolidation) that reflects the share count change, not any actual gain in value. This chart divides pre-consolidation periods by a consolidated-equivalent share count (raw shares &divide; 73.6259) so the whole series is comparable on one basis. Hover any pre-FY2025 point to see the raw (unrestated) figure too.</p>
+            <p><strong>What to watch:</strong> On this restated basis, NTA/share has been on a broadly declining trend for years, reflecting persistent shell overhead burn only periodically offset by capital injections.</p>
+        `
+    },
+    runway: {
+        title: "Cash Runway",
+        content: `
+            <p><strong>Cash runway</strong> compares cash on hand against the annual cash burn rate (operating cash outflow) to estimate how long the company can survive without additional funding.</p>
+            <div class="metric-highlight"><strong>For RTO Limited:</strong> At FY2026 year-end, cash of $114,903 against an annual burn of $173,632 implies under 8 months of self-funded runway &mdash; before accounting for the pending $200,000 shareholder loan. This is the core fact behind the auditor's going-concern material uncertainty paragraph.</p>
+            <p><strong>What to watch:</strong></p>
+            <ul>
+                <li>Whether the $200,000 loan is actually advanced as expected in July 2026</li>
+                <li>Whether burn continues to taper (FY2026's $173,632 was actually a reduction from FY2025's $346,307, driven by lower legal/consulting spend)</li>
+                <li>Any further related-party support commitments disclosed in future reports</li>
+            </ul>
+        `
+    },
+    shares: {
+        title: "Shares Outstanding & the Consolidation Break",
+        content: `
+            <p><strong>Shares outstanding</strong> for RTO Limited has two very different regimes separated by a corporate action.</p>
+            <div class="metric-highlight"><strong>The break:</strong> On 30 August 2024 the company completed a <strong>73.6259:1 share consolidation</strong>, reducing shares on issue from 673,759,059 to exactly 10,000,026. This followed a bond-to-equity conversion on 26 August 2024 that had temporarily increased the pre-consolidation count via 62,500,000 new shares issued at $0.004/share. This chart uses a logarithmic axis (stepped line) so the ~67x reduction is visible without dominating the scale.</p>
+            <p><strong>What to watch:</strong> Any further share issuance (e.g., to fund an RTO or convert another shareholder loan to equity) would dilute the current 10,000,026-share base, and given the loss-carryforward continuity rules, any large RTO-related issuance is a near-certainty if a deal completes.</p>
+        `
+    },
+    rto: {
+        title: "What is a Reverse Takeover (RTO)?",
+        content: `
+            <p>A <strong>reverse takeover (RTO)</strong> is a transaction where a private operating company becomes publicly listed by merging into (or being acquired by) an existing listed shell company, rather than going through a traditional IPO. The private company's owners typically end up controlling the combined, listed entity.</p>
+            <div class="metric-highlight"><strong>Why RTO Limited exists:</strong> After discontinuing its mortgage-lending business in FY2023, the company rebranded itself specifically as an RTO vehicle (name change to "RTO Limited" in May 2024), marketing its clean NZX Main Board listing, debt-free balance sheet, and $3.89m of loss carryforwards as attractive features to a private company seeking a faster, cheaper listing route than a traditional IPO.</p>
+            <p><strong>The catch for existing shareholders:</strong> An RTO almost always requires issuing a large number of new shares to the incoming business's owners, heavily diluting today's minority holders' percentage ownership &mdash; even if it unlocks real value in aggregate.</p>
+        `
+    },
+    pnta: {
+        title: "Price / NTA (P/NTA) &mdash; Why This is the Valuation Anchor (and Why There's No P/E or EV/EBITDA)",
+        content: `
+            <p><strong>P/NTA</strong> divides market capitalisation by net tangible assets. For companies with real earnings, P/E or EV/EBITDA multiples matter more; for a non-cash-flowing shell like RTO Limited, <strong>NTA is essentially the only fundamental anchor available</strong>, since there is no revenue, EBITDA, or free cash flow to build a conventional multiple from. P/E and EV/EBITDA are simply undefined here &mdash; there are no earnings and no EBITDA to divide into a price.</p>
+            <div class="metric-highlight"><strong>Current reading:</strong> At NZ$0.118 (RTO.NZ), market cap is ~NZ$1.18m against FY2026 NTA of $187,125 &mdash; a P/NTA of approximately <strong>6.31x</strong>. Any P/NTA above 1.0x represents the market pricing in RTO optionality/scarcity value beyond hard book value.</p>
+            <p><strong>What to watch:</strong> This stock trades freely and has commanded a real multiple of NTA even as NTA itself has shrunk &mdash; a real, if illiquid, market premium for the possibility of a successful reverse takeover. The probability-weighted model in this dashboard implies a P/NTA of only ~2.31x is "fair," meaning the market is pricing higher odds of RTO success than this model assigns.</p>
+        `
+    },
+    nodcf: {
+        title: "Why No Conventional DCF Was Run",
+        content: `
+            <p>A <strong>discounted cash flow (DCF)</strong> model projects a company's future free cash flows and discounts them back to a present value. It requires a repeatable, positive (or at least modelable) cash-flow base to project forward.</p>
+            <div class="metric-highlight"><strong>For RTO Limited:</strong> There is no operating business and therefore no owner-FCF base to project. Every year since the mortgage-lending business was discontinued in FY2023 has produced a net cash <em>outflow</em> funded by drawing down the cash balance ($346,307 in FY2025, $173,632 in FY2026), with "income" consisting almost entirely of token bank interest and one-off reimbursements.</p>
+            <p><strong>Why this matters:</strong> Building a conventional DCF on this series would either (a) extrapolate a business that no longer exists, or (b) compound an unrepeatable cash-burn trajectory into a meaningless negative valuation. Instead, this dashboard uses a <strong>probability-weighted asset/scenario model</strong> &mdash; bear (wind-up/dilution), base (continued life support + eventual dilutive RTO), and bull (prompt favourable-terms RTO) &mdash; anchored on net tangible assets plus a scenario-dependent shell scarcity premium.</p>
+        `
+    },
+    consolidation: {
+        title: "What the Share Consolidation Did",
+        content: `
+            <p>A <strong>share consolidation</strong> (also called a reverse split) reduces the number of shares on issue by a fixed ratio, proportionally increasing the value represented by each remaining share, with no change to the company's total value.</p>
+            <div class="metric-highlight"><strong>For RTO Limited:</strong> On 30 August 2024, the company completed a <strong>73.6259:1 consolidation</strong>, reducing shares on issue from 673,759,059 to exactly 10,000,026. A shareholder who held 73.6259 shares before the consolidation held exactly 1 share afterward &mdash; their proportional ownership and the underlying company value were unchanged.</p>
+            <p><strong>Why this matters for anyone comparing prices:</strong> Any pre-consolidation price (like Yahoo's frozen BGI.NZ quote of $0.004 from 30 April 2024) is <strong>not comparable</strong> to a post-consolidation price (like RTO.NZ's current $0.118) without adjusting for the ~73.6x share-count change. The apparent "30x gain" from $0.004 to $0.118 is a units artifact of the consolidation, not a real return to a continuous holder.</p>
+        `
+    },
+    goingconcern: {
+        title: "Going Concern Material Uncertainty",
+        content: `
+            <p>A <strong>going concern material uncertainty</strong> is an auditor's formal statement that, while the financial statements have been prepared assuming the company will continue operating for the foreseeable future, there is significant doubt about whether that assumption will hold &mdash; without necessarily concluding it will fail.</p>
+            <div class="metric-highlight"><strong>For RTO Limited:</strong> Auditor William Buck (signed 24 June 2026) issued an unmodified opinion but with an explicit Material Uncertainty Relating to Going Concern paragraph. The directors' stated basis for continuing rests on "ongoing financial support from the majority shareholder," including the pending $200,000 shareholder loan expected to be advanced in July 2026.</p>
+            <p><strong>What this would mean for minority holders in a reverse takeover:</strong> If a deal does complete, existing holders would almost certainly be heavily diluted by new shares issued to the incoming business's vendors &mdash; going-concern-qualified, thinly-traded shells have little negotiating leverage on deal terms. The 2024 bond-to-equity conversion (BGGL converting $250,000 of bonds into new shares using Takeovers Code "creep" provisions) is a preview of how future dilution could work.</p>
+            <p><strong>What to watch:</strong> This is one notch less severe than a full "disclaimer of opinion" (where an auditor states they cannot even form a view), but it is still an explicit, audited red flag. Discretionary related-party support can lapse or be renegotiated on unfavourable terms to minority holders at any time &mdash; there is no contractual guarantee it continues indefinitely.</p>
+        `
+    }
+};
+
+function openModal(key) {
+    const m = metricDescriptions[key];
+    if (!m) return;
+    document.getElementById('modalTitle').textContent = m.title;
+    document.getElementById('modalBody').innerHTML = m.content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,2239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASML Holding N.V. (ASML) Financial Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 24px 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+        }
+        .header h1 {
+            font-size: 2.4rem;
+            background: linear-gradient(90deg, #00d4aa, #00b894);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+        .header p { color: #888; font-size: 1rem; margin-bottom: 6px; }
+        .monopoly-badge {
+            display: inline-block;
+            background: rgba(0,212,170,0.15);
+            border: 1px solid #00d4aa;
+            border-radius: 20px;
+            padding: 6px 16px;
+            font-size: 0.85rem;
+            color: #00d4aa;
+            margin-top: 8px;
+        }
+        .warning-banner {
+            max-width: 1400px;
+            margin: 0 auto 24px;
+            background: rgba(253,203,110,0.12);
+            border: 1px solid rgba(253,203,110,0.5);
+            border-radius: 10px;
+            padding: 14px 20px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            color: #fdcb6e;
+            line-height: 1.5;
+        }
+        .warning-banner .warn-icon { font-size: 1.3rem; flex-shrink: 0; margin-top: 2px; }
+        .warning-banner strong { display: block; margin-bottom: 4px; }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .kpi-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 18px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .kpi-card:hover { transform: translateY(-4px); box-shadow: 0 10px 30px rgba(0,212,170,0.2); }
+        .kpi-value { font-size: 1.7rem; font-weight: bold; color: #00d4aa; margin-bottom: 4px; }
+        .kpi-label { font-size: 0.78rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        .kpi-change { font-size: 0.85rem; margin-top: 4px; }
+        .kpi-change.positive { color: #00d4aa; }
+        .kpi-change.negative { color: #ff6b6b; }
+        .kpi-sub { font-size: 0.75rem; color: #666; margin-top: 3px; }
+        /* Overview */
+        .overview-section { max-width: 1400px; margin: 0 auto 30px; }
+        .overview-toggle {
+            width: 100%;
+            background: rgba(0,212,170,0.1);
+            border: 1px solid rgba(0,212,170,0.3);
+            border-radius: 12px;
+            padding: 15px 22px;
+            color: #00d4aa;
+            font-size: 1.05rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+        .overview-toggle:hover { background: rgba(0,212,170,0.18); }
+        .overview-toggle .arrow { transition: transform 0.3s ease; }
+        .overview-toggle.active .arrow { transform: rotate(180deg); }
+        .overview-content {
+            display: none;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            padding: 28px;
+            margin-top: -12px;
+        }
+        .overview-content.active { display: block; }
+        .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 22px;
+        }
+        .overview-card {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 18px;
+            border: 1px solid rgba(255,255,255,0.07);
+        }
+        .overview-card h3 {
+            color: #00d4aa;
+            font-size: 1rem;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .overview-card.bull h3 { color: #00d4aa; }
+        .overview-card.bear h3 { color: #ff6b6b; }
+        .overview-card.risks h3 { color: #fdcb6e; }
+        .overview-card p { margin-bottom: 10px; line-height: 1.6; font-size: 0.9rem; }
+        .overview-card ul { list-style: none; padding: 0; margin: 0; }
+        .overview-card li { padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.05); line-height: 1.5; font-size: 0.88rem; }
+        .overview-card li:last-child { border-bottom: none; }
+        .overview-card li::before { content: "• "; color: #00d4aa; }
+        .overview-card.bear li::before { color: #ff6b6b; }
+        .overview-card.risks li::before { color: #fdcb6e; }
+        .revenue-stream { display: flex; justify-content: space-between; align-items: center; }
+        .revenue-stream .pct { color: #00d4aa; font-weight: 600; }
+        .trend-growing { color: #00d4aa; font-size: 0.75rem; }
+        .trend-declining { color: #ff6b6b; font-size: 0.75rem; }
+        .trend-stable { color: #888; font-size: 0.75rem; }
+        .risk-high { color: #ff6b6b; font-weight: 600; }
+        .risk-moderate { color: #fdcb6e; }
+        .risk-low { color: #00d4aa; }
+        /* Guidance */
+        .guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+        .guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .guidance-header h3 {
+            color: #fff;
+            font-size: 1.15rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .guidance-header h3::before {
+            content: '';
+            display: inline-block;
+            width: 4px; height: 20px;
+            background: linear-gradient(180deg, #00d4aa, #00b894);
+            border-radius: 2px;
+        }
+        .guidance-meta { font-size: 0.82rem; color: #888; }
+        .guidance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 14px;
+            margin-bottom: 18px;
+        }
+        .guidance-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .guidance-metric { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+        .guidance-target { font-size: 1.3rem; font-weight: 600; color: #00d4aa; margin-bottom: 5px; }
+        .guidance-period { font-size: 0.82rem; color: #e0e0e0; margin-bottom: 7px; }
+        .guidance-vs-prior {
+            display: inline-block;
+            font-size: 0.72rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        .guidance-vs-prior.raised { background: rgba(0,212,170,0.15); color: #00d4aa; }
+        .guidance-vs-prior.lowered { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+        .guidance-vs-prior.maintained { background: rgba(255,255,255,0.08); color: #888; }
+        .guidance-vs-prior.new { background: rgba(99,102,241,0.15); color: #818cf8; }
+        .guidance-notes { font-size: 0.75rem; color: #666; margin-top: 7px; line-height: 1.4; }
+        .guidance-commentary {
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            padding: 14px 18px;
+            border-left: 3px solid #00d4aa;
+            font-style: italic;
+            color: #b0b0b0;
+            line-height: 1.6;
+            font-size: 0.88rem;
+        }
+        /* Charts */
+        .section-title {
+            font-size: 1.4rem;
+            color: #fff;
+            margin: 36px auto 18px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid rgba(0,212,170,0.3);
+            max-width: 1400px;
+        }
+        .currency-note {
+            font-size: 0.8rem;
+            color: #888;
+            font-weight: normal;
+            margin-left: 12px;
+        }
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+            gap: 22px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .charts-container.single { grid-template-columns: 1fr; }
+        .chart-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 14px;
+            padding: 22px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .chart-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 18px;
+        }
+        .chart-header h3 {
+            color: #fff;
+            font-size: 1.05rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .chart-header h3::before {
+            content: '';
+            display: inline-block;
+            width: 4px; height: 18px;
+            background: linear-gradient(180deg, #00d4aa, #00b894);
+            border-radius: 2px;
+        }
+        .help-btn {
+            width: 24px; height: 24px;
+            border-radius: 50%;
+            background: rgba(0,212,170,0.15);
+            border: 1px solid #00d4aa;
+            color: #00d4aa;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        .help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+        .chart-wrapper { position: relative; height: 290px; }
+        /* DCF */
+        .dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+        .dcf-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 18px;
+            margin-bottom: 28px;
+        }
+        .dcf-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 22px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.3s;
+        }
+        .dcf-card:hover { transform: translateY(-3px); }
+        .dcf-card.highlight { background: rgba(0,212,170,0.1); border-color: rgba(0,212,170,0.3); }
+        .dcf-label { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 7px; }
+        .dcf-value { font-size: 2rem; font-weight: bold; color: #00d4aa; }
+        .dcf-card:not(.highlight) .dcf-value { color: #fff; }
+        .dcf-change { font-size: 0.95rem; margin-top: 7px; font-weight: 600; }
+        .dcf-change.positive { color: #00d4aa; }
+        .dcf-change.negative { color: #ff6b6b; }
+        .dcf-sublabel { font-size: 0.75rem; color: #666; margin-top: 6px; }
+        .dcf-warning {
+            background: rgba(253,203,110,0.12);
+            border: 1px solid rgba(253,203,110,0.4);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 22px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #fdcb6e;
+            font-size: 0.88rem;
+        }
+        .dcf-inputs {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 22px;
+            border: 1px solid rgba(255,255,255,0.07);
+        }
+        .dcf-inputs h4 { color: #e0e0e0; margin-bottom: 13px; font-size: 0.95rem; }
+        .dcf-inputs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 13px;
+            margin-bottom: 18px;
+        }
+        .dcf-input-card {
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .dcf-input-label { font-size: 0.72rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .dcf-input-value { font-size: 1.2rem; font-weight: 600; color: #00d4aa; }
+        .dcf-input-note { font-size: 0.68rem; color: #666; margin-top: 3px; }
+        .fcf-projections h5 { color: #b0b0b0; font-size: 0.85rem; margin-bottom: 9px; }
+        .fcf-projection-table {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 7px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 11px;
+        }
+        .fcf-projection-item { text-align: center; }
+        .fcf-projection-item.header { font-size: 0.72rem; color: #888; font-weight: 600; }
+        .fcf-projection-item .fcf-value { font-size: 0.95rem; color: #e0e0e0; font-weight: 500; }
+        .fcf-projection-item .growth-rate { font-size: 0.72rem; color: #00d4aa; margin-top: 2px; }
+        .dcf-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 22px;
+            margin-bottom: 28px;
+            padding: 22px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.07);
+        }
+        .slider-group { display: flex; flex-direction: column; gap: 9px; }
+        .slider-group label { font-size: 0.92rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+        .slider-group label span { color: #00d4aa; font-weight: 600; }
+        .slider-group input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%; height: 6px;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.1);
+            outline: none;
+        }
+        .slider-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px; height: 18px;
+            border-radius: 50%;
+            background: #00d4aa;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        .slider-hint { font-size: 0.75rem; color: #666; }
+        .scenario-tabs { display: flex; gap: 10px; margin-bottom: 18px; }
+        .scenario-tab {
+            padding: 9px 22px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: transparent;
+            color: #888;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .scenario-tab:hover { border-color: rgba(0,212,170,0.5); color: #e0e0e0; }
+        .scenario-tab.active { background: rgba(0,212,170,0.15); border-color: #00d4aa; color: #00d4aa; }
+        .scenario-details {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 28px;
+            border: 1px solid rgba(255,255,255,0.07);
+        }
+        .scenario-details h4 { color: #00d4aa; margin-bottom: 13px; }
+        .assumption-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 13px;
+        }
+        .assumption-item { text-align: center; }
+        .assumption-item .label { font-size: 0.76rem; color: #888; margin-bottom: 4px; }
+        .assumption-item .value { font-size: 1.05rem; color: #e0e0e0; font-weight: 500; }
+        /* Scenario table */
+        .scenario-table-wrap { margin-bottom: 28px; }
+        .scenario-table-wrap h4 { color: #e0e0e0; margin-bottom: 13px; font-size: 0.95rem; }
+        .scenario-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .scenario-table th, .scenario-table td {
+            padding: 11px 14px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.07);
+            font-size: 0.88rem;
+        }
+        .scenario-table th { background: rgba(0,212,170,0.1); color: #00d4aa; font-weight: 600; }
+        .scenario-table td { color: #e0e0e0; }
+        .scenario-table .bear-row td { color: #ff6b6b; }
+        .scenario-table .base-row td { color: #e0e0e0; }
+        .scenario-table .bull-row td { color: #00d4aa; }
+        .scenario-table .weighted-row td { color: #fdcb6e; font-style: italic; }
+        /* Sensitivity */
+        .sensitivity-section { margin-bottom: 28px; }
+        .sensitivity-section h4 { color: #e0e0e0; margin-bottom: 13px; font-size: 0.95rem; }
+        .sensitivity-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .sensitivity-table th, .sensitivity-table td {
+            padding: 10px 14px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.07);
+            font-size: 0.85rem;
+        }
+        .sensitivity-table th { background: rgba(0,212,170,0.1); color: #00d4aa; font-weight: 600; }
+        .sensitivity-table td { color: #ff6b6b; }
+        .sensitivity-table td.highlight { background: rgba(0,212,170,0.15); color: #00d4aa; font-weight: 600; border: 1px solid rgba(0,212,170,0.3); }
+        .sensitivity-note { font-size: 0.78rem; color: #666; margin-top: 8px; }
+        /* Historical growth */
+        .historical-growth { margin-bottom: 28px; }
+        .historical-growth h4 { color: #e0e0e0; margin-bottom: 13px; font-size: 0.95rem; }
+        .growth-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 13px;
+        }
+        .growth-item {
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            padding: 13px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.07);
+        }
+        .growth-item.selected { border-color: #00d4aa; background: rgba(0,212,170,0.1); }
+        .growth-item .metric { font-size: 0.76rem; color: #888; margin-bottom: 5px; }
+        .growth-item .rate { font-size: 1.1rem; font-weight: 600; }
+        .growth-item .rate.positive { color: #00d4aa; }
+        .growth-item .rate.negative { color: #ff6b6b; }
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%);
+            border-radius: 16px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid rgba(0,212,170,0.3);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .modal-header {
+            padding: 18px 22px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h3 { color: #00d4aa; font-size: 1.2rem; margin: 0; }
+        .modal-close {
+            width: 30px; height: 30px;
+            border-radius: 50%;
+            background: rgba(255,107,107,0.15);
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-close:hover { background: #ff6b6b; color: #fff; }
+        .modal-body { padding: 22px; line-height: 1.7; font-size: 0.9rem; }
+        .modal-body p { margin-bottom: 12px; }
+        .modal-body strong { color: #00d4aa; }
+        .modal-body ul { margin: 12px 0; padding-left: 18px; }
+        .modal-body li { margin-bottom: 7px; }
+        .metric-highlight {
+            background: rgba(0,212,170,0.1);
+            border-left: 3px solid #00d4aa;
+            padding: 10px 14px;
+            margin: 12px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .fx-note {
+            max-width: 1400px;
+            margin: 0 auto 20px;
+            background: rgba(99,102,241,0.1);
+            border: 1px solid rgba(99,102,241,0.3);
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-size: 0.82rem;
+            color: #818cf8;
+        }
+        @media (max-width: 768px) {
+            .charts-container { grid-template-columns: 1fr; }
+            .overview-grid { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.7rem; }
+            .fcf-projection-table { grid-template-columns: repeat(3, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>ASML Holding N.V. (ASML)</h1>
+    <p>Semiconductor Lithography Equipment &mdash; Nasdaq: ASML (USD) / Euronext: ASML.AS (EUR)</p>
+    <p style="color:#666; font-size:0.85rem;">Financials in EUR millions &bull; Stock price in USD &bull; Data through Q1 2026</p>
+    <div class="monopoly-badge">World's Only EUV Lithography Supplier &mdash; 100% Monopoly</div>
+</div>
+
+<div class="warning-banner" id="valuationWarning">
+    <span class="warn-icon">&#9888;</span>
+    <div>
+        <strong>Valuation Warning: Stock Trades Above All DCF Scenarios</strong>
+        Current price ($1,795 / &euro;1,576) is 61.7% above the base-case DCF intrinsic value ($687 / &euro;603) and above every cell in the sensitivity matrix. The stock trades at 55x forward P/E vs. a DCF-implied 24x. ASML's EUV monopoly and AI cycle positioning may justify a structural premium &mdash; but the margin of safety is negative across all scenarios. All Bull/Base/Bear cases show negative upside on a pure DCF basis.
+    </div>
+</div>
+
+<div class="fx-note">
+    FX Note: Financial statements are in EUR (millions). ASML trades on Nasdaq in USD (ticker: ASML). DCF intrinsic values are shown in both EUR and USD. FX rate used: 1 EUR = 1.139 USD (as of 2026-06-27, Yahoo Finance EURUSD=X).
+</div>
+
+<!-- KPI Cards -->
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<!-- Investment Overview -->
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview(this)">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid" id="overviewGrid"></div>
+    </div>
+</div>
+
+<!-- Management Guidance -->
+<div class="guidance-section">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of Q1 2026 Earnings (April 2026) &nbsp;|&nbsp; FY2026 and FY2030</span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<!-- Revenue & Margin Charts -->
+<h2 class="section-title">Revenue &amp; Profitability <span class="currency-note">(EUR millions, unless noted)</span></h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Annual Revenue &amp; Net Income</h3>
+            <button class="help-btn" onclick="openModal('revenue')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="revenueChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Gross &amp; Operating Margin %</h3>
+            <button class="help-btn" onclick="openModal('margins')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="marginsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>EPS (Diluted) &amp; Free Cash Flow</h3>
+            <button class="help-btn" onclick="openModal('eps')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="epsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Quarterly Revenue (trailing 8Q)</h3>
+            <button class="help-btn" onclick="openModal('quarterly')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="quarterlyChart"></canvas></div>
+    </div>
+</div>
+
+<!-- Bookings & System Mix -->
+<h2 class="section-title">Orders, Systems &amp; Product Mix <span class="currency-note">(EUR millions)</span></h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Bookings vs Revenue (Annual)</h3>
+            <button class="help-btn" onclick="openModal('bookings')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="bookingsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>EUV vs DUV System Sales (Annual)</h3>
+            <button class="help-btn" onclick="openModal('euvduv')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="euvDuvChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Installed Base (IBM) Revenue</h3>
+            <button class="help-btn" onclick="openModal('ibm')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="ibmChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Systems Sold (Annual Units)</h3>
+            <button class="help-btn" onclick="openModal('systems')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="systemsChart"></canvas></div>
+    </div>
+</div>
+
+<!-- Quarterly Orders Detail -->
+<h2 class="section-title">Quarterly Net Bookings <span class="currency-note">(EUR millions)</span></h2>
+<div class="charts-container single">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Quarterly Net Bookings (all available quarters)</h3>
+            <button class="help-btn" onclick="openModal('qbookings')">?</button>
+        </div>
+        <div class="chart-wrapper" style="height:320px"><canvas id="qBookingsChart"></canvas></div>
+    </div>
+</div>
+
+<!-- DCF Section -->
+<h2 class="section-title">DCF Valuation <span class="currency-note">(USD / EUR)</span></h2>
+
+<div class="dcf-section">
+    <div class="dcf-summary">
+        <div class="dcf-card highlight">
+            <div class="dcf-label">Base Case IV (USD)</div>
+            <div class="dcf-value" id="dcfIV_USD">$687</div>
+            <div class="dcf-change negative" id="dcfUpside">-61.7% vs current</div>
+        </div>
+        <div class="dcf-card highlight">
+            <div class="dcf-label">Base Case IV (EUR)</div>
+            <div class="dcf-value" id="dcfIV_EUR">&euro;603</div>
+            <div class="dcf-sublabel">@ 1 EUR = 1.139 USD</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Current Price</div>
+            <div class="dcf-value" id="dcfCurrent">$1,795</div>
+            <div class="dcf-sublabel">&euro;1,576 (Euronext)</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Prob-Weighted IV</div>
+            <div class="dcf-value" id="dcfWeighted">$729</div>
+            <div class="dcf-sublabel">25% Bull / 50% Base / 25% Bear</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Entry (15% CAGR)</div>
+            <div class="dcf-value" id="dcfEntry">$397</div>
+            <div class="dcf-sublabel">Base case</div>
+        </div>
+    </div>
+
+    <!-- Scenario Table -->
+    <div class="scenario-table-wrap">
+        <h4>Scenario Intrinsic Values &mdash; Bear / Base / Bull</h4>
+        <table class="scenario-table">
+            <thead>
+                <tr>
+                    <th>Scenario</th>
+                    <th>Growth Y1</th>
+                    <th>FCF Margin</th>
+                    <th>WACC</th>
+                    <th>Terminal G</th>
+                    <th>IV (EUR)</th>
+                    <th>IV (USD)</th>
+                    <th>Upside vs $1,795</th>
+                    <th>Entry Price (USD)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="bear-row">
+                    <td><strong>Bear</strong></td>
+                    <td>6.0%</td>
+                    <td>26%</td>
+                    <td>12.0%</td>
+                    <td>2.0%</td>
+                    <td>&euro;252</td>
+                    <td>$287</td>
+                    <td>-84.0%</td>
+                    <td>$149</td>
+                </tr>
+                <tr class="base-row">
+                    <td><strong>Base</strong></td>
+                    <td>16.4%</td>
+                    <td>34%</td>
+                    <td>10.0%</td>
+                    <td>3.0%</td>
+                    <td>&euro;603</td>
+                    <td>$687</td>
+                    <td>-61.7%</td>
+                    <td>$397</td>
+                </tr>
+                <tr class="bull-row">
+                    <td><strong>Bull</strong></td>
+                    <td>22.0%</td>
+                    <td>38%</td>
+                    <td>9.0%</td>
+                    <td>4.0%</td>
+                    <td>&euro;1,102</td>
+                    <td>$1,255</td>
+                    <td>-30.1%</td>
+                    <td>$773</td>
+                </tr>
+                <tr class="weighted-row">
+                    <td><strong>Prob-Weighted</strong></td>
+                    <td colspan="4">25% Bull / 50% Base / 25% Bear</td>
+                    <td>&euro;640</td>
+                    <td>$729</td>
+                    <td>-59.4%</td>
+                    <td>&mdash;</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="dcf-warning">
+        <span>&#9888;</span>
+        <span>Equity 3yr CAGR (30.6%) diverges materially from 5yr (7.2%) due to volatile buyback activity and capital structure changes. Equity CAGR not used as primary anchor. Revenue and FCF CAGRs (15-18%) are used as the blended base. FY2026 management guidance midpoint ~&euro;38B (16.4% growth) anchors Year 1.</span>
+    </div>
+
+    <div class="dcf-inputs">
+        <h4>DCF Model Inputs (FCF in EUR millions)</h4>
+        <div class="dcf-inputs-grid">
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Base Year FCF</div>
+                <div class="dcf-input-value">&euro;11,027M</div>
+                <div class="dcf-input-note">FY2025 actual</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Shares Outstanding</div>
+                <div class="dcf-input-value">385.7M</div>
+                <div class="dcf-input-note">Q1 2026</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Net Cash Position</div>
+                <div class="dcf-input-value" style="color:#00d4aa">&euro;5,265M</div>
+                <div class="dcf-input-note">Net cash (negative net debt)</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">FX Rate</div>
+                <div class="dcf-input-value">1.139</div>
+                <div class="dcf-input-note">EUR/USD 2026-06-27</div>
+            </div>
+        </div>
+        <div class="fcf-projections">
+            <h5>Base Case Projected FCF (5-Year, EUR millions)</h5>
+            <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+        </div>
+    </div>
+
+    <div class="dcf-controls">
+        <div class="slider-group">
+            <label>Year 1 Growth Rate: <span id="growthValue">16.4%</span></label>
+            <input type="range" id="growthSlider" min="0" max="30" value="16.4" step="0.5">
+            <div class="slider-hint">Based on blended revenue/FCF CAGR + FY2026 guidance anchor</div>
+        </div>
+        <div class="slider-group">
+            <label>WACC: <span id="waccValue">10.0%</span></label>
+            <input type="range" id="waccSlider" min="6" max="18" value="10" step="0.5">
+        </div>
+        <div class="slider-group">
+            <label>Terminal Growth: <span id="terminalValue">3.0%</span></label>
+            <input type="range" id="terminalSlider" min="0" max="5" value="3" step="0.5">
+        </div>
+    </div>
+
+    <div class="scenario-tabs">
+        <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+        <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+        <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+    </div>
+    <div class="scenario-details">
+        <h4>Scenario Assumptions</h4>
+        <div class="assumption-grid" id="assumptionGrid"></div>
+    </div>
+
+    <div class="sensitivity-section">
+        <h4>Sensitivity Matrix: Base-Case IV (USD) by WACC &times; Terminal Growth &mdash; all cells below current price $1,795</h4>
+        <table class="sensitivity-table" id="sensitivityMatrix"></table>
+        <p class="sensitivity-note">All cells below current market price of $1,795 / &euro;1,576. Red text = below current price (entire matrix). Highlighted cell = base-case assumptions (WACC 10%, TGR 3%).</p>
+    </div>
+
+    <div class="historical-growth">
+        <h4>Historical Growth Rates (CAGR) &mdash; Selected anchor highlighted</h4>
+        <div class="growth-grid" id="growthGrid"></div>
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&#x2715;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// =============================================
+// EMBEDDED CSV DATA
+// =============================================
+const csvData = `Period,Revenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,NetIncome,NetMargin,EPSBasic,EPSDiluted,FreeCashFlow,ShareholdersEquity,TotalDebt,CashAndEquivalents,SharesOutstanding,SystemsSold,NetBookings,InstalledBaseSales,EUVSales,DUVSales
+Q1 2021,4364.0,2352.0,53.9,1561.0,35.8,1331.0,30.5,3.21,3.20,-1139.0,13629.0,,4656.0,414.6,76,4740,1235.0,,
+Q2 2021,4020.0,2045.0,50.9,1239.0,30.8,1038.0,25.8,2.52,2.52,3322.0,12093.0,,5374.0,411.8,72,8271,,,
+Q3 2021,5241.0,2711.0,51.7,1919.0,36.6,1740.0,33.2,4.27,4.26,1597.0,11502.0,,4456.0,408.0,79,6179,,,
+Q4 2021,4986.0,2701.0,54.2,2031.0,40.7,1774.0,35.6,4.39,4.38,6126.0,10141.0,,7590.0,404.1,82,7050,,,
+Q1 2022,3534.0,1731.0,49.0,784.0,22.2,695.0,19.7,1.73,1.73,-838.0,8810.0,,4723.0,401.7,62,6977,1247.0,,
+Q2 2022,5431.0,2665.0,49.1,1653.0,30.4,1411.0,26.0,3.54,3.54,2315.0,7649.0,,4402.0,398.6,91,8461,1290.0,,
+Q3 2022,5778.0,2994.0,51.8,1939.0,33.5,1701.0,29.4,4.29,4.29,805.0,7955.0,,3363.0,396.5,86,8920,1523.0,,
+Q4 2022,6430.0,3311.0,51.5,2125.0,33.0,1817.0,28.2,4.60,4.60,4885.0,8811.0,,7376.0,395.2,106,6316,1682.0,,
+Q1 2023,6746.0,3413.0,50.6,2205.0,32.7,1956.0,29.0,4.96,4.95,194.0,9787.0,,6653.0,393.8,100,3752,1404.0,,
+Q2 2023,6902.0,3544.0,51.3,2263.0,32.8,1942.0,28.1,4.93,4.93,-161.0,10605.0,,6346.0,393.9,113,4500,1358.0,,
+Q3 2023,6673.0,3462.0,51.9,2182.0,32.7,1893.0,28.4,4.81,4.81,618.0,11995.0,,4981.0,393.3,112,2602,1365.0,,
+Q4 2023,7237.0,3717.0,51.4,2392.0,33.1,2048.0,28.3,5.21,5.20,2595.0,13452.0,4631.5,7010.0,393.1,124,9186,1554.0,,
+Q1 2024,5290.0,2697.0,51.0,1392.0,26.3,1224.0,23.1,3.11,3.11,-676.0,13794.0,,5406.0,393.5,70,3611,1324.0,,
+Q2 2024,6243.0,3212.0,51.5,1834.0,29.4,1578.0,25.3,4.01,4.01,386.0,14711.0,,5019.0,393.5,100,5567,1482.0,,
+Q3 2024,7467.0,3793.0,50.8,2441.0,32.7,2077.0,27.8,5.28,5.28,534.0,16151.0,,4985.0,393.4,116,2633,1541.0,,
+Q4 2024,9263.0,4790.0,51.7,3356.0,36.2,2693.0,29.1,6.85,6.84,8839.0,18477.0,3677.3,12741.0,393.0,132,7088,2116.0,,
+Q1 2025,7742.0,4180.0,54.0,2738.0,35.4,2355.0,30.4,6.00,6.00,-475.0,17501.0,3681.0,9098.0,392.5,77,3936,2001.0,,
+Q2 2025,7691.7,4129.5,53.7,2664.1,34.6,2290.3,29.8,5.90,5.90,318.8,17618.2,3698.9,7243.5,388.4,76,5541,2095.6,,
+Q3 2025,7516.0,3880.3,51.6,2468.4,32.8,2124.5,28.3,5.49,5.48,243.7,18993.5,2704.7,5126.5,387.6,72,5399,1962.2,,
+Q4 2025,9718.1,5068.6,52.2,3431.1,35.3,2839.6,29.2,7.35,7.34,10939.9,19612.2,2709.0,12916.0,387.0,102,13158,2134.1,,
+Q1 2026,8766.9,4645.0,53.0,3157.8,36.0,2756.7,31.4,7.15,7.15,-2607.9,20829.5,2705.6,7970.4,385.7,79,,2487.5,,
+FY2015,6287.0,2896.0,46.1,,,1387.0,22.1,3.22,3.21,,,,,430.0,,,,
+FY2016,6795.0,3044.0,44.8,,,1472.0,21.7,3.46,3.45,,,,,425.0,,,,
+FY2017,9053.0,4077.0,45.0,,,2119.0,23.4,4.93,4.92,,,,3288.0,430.0,,,,
+FY2018,10944.0,5029.0,46.0,2965.0,27.1,2592.0,23.7,6.10,6.08,2463.0,11641.0,,4034.0,424.9,224,8181,2685.0,,
+FY2019,11820.0,5280.0,44.7,2791.0,23.6,2592.0,21.9,6.16,6.15,2391.0,12592.0,,4718.0,420.8,229,11740,2824.0,,
+FY2020,13979.0,6798.0,48.6,4051.0,29.0,3554.0,25.4,8.49,8.48,3627.0,13865.0,,7352.0,418.9,258,11292,3662.0,,
+FY2021,18611.0,9809.0,52.7,6750.0,36.3,5883.0,31.6,14.36,14.34,9906.0,10141.0,,7590.0,410.1,309,26240,4958.0,6252.0,7401.0
+FY2022,21173.0,10700.0,50.5,6501.0,30.7,5624.0,26.6,14.14,14.13,7168.0,8811.0,,7376.0,397.8,345,30674,5743.0,7017.0,7753.0
+FY2023,27559.0,14136.0,51.3,9042.0,32.8,7839.0,28.4,19.91,19.89,3247.0,13452.0,4631.5,7010.0,393.8,449,20040,5620.0,9125.0,12278.0
+FY2024,28263.0,14492.0,51.3,9022.0,31.9,7572.0,26.8,19.25,19.24,9083.0,18477.0,3677.3,12741.0,393.0,418,18899,6494.0,8322.0,12801.0
+FY2025,32667.3,17258.0,52.8,11301.4,34.6,9609.4,29.4,24.73,24.71,11027.3,19612.2,2709.0,12916.0,388.9,327,28035,8193.0,11602.7,12047.0`;
+
+// =============================================
+// EMBEDDED ANALYSIS JSON
+// =============================================
+const analysis = {
+  "ticker": "ASML",
+  "company_name": "ASML Holding N.V.",
+  "sector": "Semiconductor Equipment",
+  "overview": "ASML Holding N.V. is a Dutch semiconductor equipment company and the world's sole supplier of extreme ultraviolet (EUV) lithography systems, which are indispensable for manufacturing advanced chips at 7nm and below. Listed on both Nasdaq (ASML, USD) and Euronext Amsterdam (ASML.AS, EUR), the company reports financials in euros and holds a 100% monopoly in EUV lithography alongside dominant share in deep ultraviolet (DUV) systems. ASML's primary customers are TSMC, Samsung, and Intel, who collectively depend on ASML to manufacture chips powering the global AI infrastructure buildout.",
+  "business_model": {
+    "summary": "ASML generates revenue through two primary streams: net system sales (~72% of FY2025 revenue at €24.5B) and Installed Base Management or IBM (~28% at €8.2B), covering service contracts, upgrades, spare parts, and field options. The business features high barriers to entry, extreme customer lock-in through proprietary technology, and a growing recurring-revenue service base driven by an expanding installed machine fleet.",
+    "revenue_streams": [
+      { "name": "EUV Systems", "percent": 47, "trend": "growing", "description": "Extreme ultraviolet lithography for advanced chip production at 7nm and below. Low-NA EUV (~€200M ASP) and High-NA EUV (~€380-400M ASP)." },
+      { "name": "DUV Systems", "percent": 25, "trend": "declining", "description": "Deep ultraviolet systems for mature and some advanced nodes. China accounted for ~33% of FY2025 revenue but expected to fall to ~20% in 2026 as export controls tighten." },
+      { "name": "Installed Base Management (IBM)", "percent": 28, "trend": "growing", "description": "High-margin recurring revenue from service, upgrades, spare parts, and field options. IBM grew 26% YoY to €8.2B in FY2025." }
+    ]
+  },
+  "competitive_position": {
+    "main_competitors": ["Canon (DUV only)", "Nikon (DUV only)", "xLight (US startup, pre-commercial)", "China state-backed EUV (10-15 years behind)"],
+    "market_position": "100% monopoly in EUV lithography; 80%+ share in advanced DUV immersion lithography",
+    "moat_factors": [
+      { "factor": "Technological monopoly in EUV", "strength": "very strong", "description": "30+ years and $9B+ cumulative R&D. No competitor has achieved EUV commercialization." },
+      { "factor": "Controlled supply chain ecosystem", "strength": "very strong", "description": "ASML controls Zeiss SMT optics (25% equity stake) and Cymer laser sources (wholly owned). Not available to competitors." },
+      { "factor": "Customer switching costs", "strength": "very strong", "description": "Chip fabs have invested billions in ASML-compatible processes. Migrating is commercially and technically prohibitive." },
+      { "factor": "Backlog and long lead times", "strength": "strong", "description": "Order backlog of €38.8B at end of FY2025. 12-18 month delivery lead times and ~100,000 components per system." },
+      { "factor": "High-NA EUV technology compounding", "strength": "strong", "description": "First commercial EXE:5200B systems shipping at ~€380-400M vs ~€200M for Low-NA. Required for sub-2nm nodes." }
+    ],
+    "weaknesses": [
+      "Customer concentration: TSMC ~33% of revenue; top 3 customers likely exceed 70%",
+      "Geopolitical exposure: Dutch company at center of US-China semiconductor technology war",
+      "China revenue declining from 33% (FY2025) to ~20% (FY2026) as export controls bite",
+      "Cyclicality: Revenue tied to semiconductor capex cycles that can swing 20-30% annually",
+      "Single-product category: All revenue tied to lithography equipment only"
+    ]
+  },
+  "growth_drivers": [
+    "AI infrastructure supercycle: Hyperscalers committed $300B+ in AI capex for 2025-2026, driving sustained demand for leading-edge semiconductor capacity",
+    "TSMC capacity expansion: TSMC raised 2026 capex to $38-42B+ for AI chip demand; all major expansions require ASML EUV tools",
+    "High-NA EUV ramp: EXE:5200B systems now shipping at ~€380-400M vs ~€200M for Low-NA, driving ASP and margin expansion",
+    "Memory upgrade cycle: Advanced DRAM and HBM for AI accelerators require EUV layers; HBM demand from NVIDIA/AMD driving memory capex",
+    "Installed Base Management growth: IBM grew 26% YoY to €8.2B in FY2025; expanding fleet drives recurring revenue",
+    "Low-NA EUV volume increase: Targeting at least 60 Low-NA units in FY2026 (up from 44 in FY2025); potential 80 in FY2027",
+    "2030 market opportunity: ASML targeting €44-60B revenue by 2030 from €32.7B in FY2025"
+  ],
+  "risks": {
+    "regulatory": [
+      { "risk": "MATCH Act - US DUV export ban proposal", "severity": "high", "description": "Bipartisan US legislation would ban DUV lithography exports to China. Cleared House Foreign Affairs Committee in April 2026. Could eliminate ~5% of total ASML revenue." },
+      { "risk": "US EUV diversion allegation (June 2026)", "severity": "high", "description": "US Commerce Secretary accused ASML of allowing EUV components to reach China. ASML formally denied, documenting all 314 EUV systems. If BIS enforcement or FDPR applied, could restrict ASML from selling to any global customer using US-origin technology — existential tail risk." },
+      { "risk": "Escalating export control regime", "severity": "high", "description": "Netherlands joined 'Pax Silica' alliance. Regulatory trajectory is toward tighter restrictions. Further restrictions could expand beyond China or cover additional tool types." }
+    ],
+    "business": [
+      { "risk": "Customer concentration", "severity": "high", "description": "TSMC alone ~33% of revenue. Top 3 customers likely exceed 70%. Any major capex reduction or demand shock at a key customer would materially impact results." },
+      { "risk": "Semiconductor cyclicality", "severity": "high", "description": "Revenue tied to capex cycles. 2023 saw ~14% EUV revenue decline. Post-2027 visibility beyond committed orders is limited." },
+      { "risk": "DUV China demand loss", "severity": "moderate", "description": "China revenue falling from 33% to ~20% in 2026. Remaining DUV revenue faces further risk from MATCH Act proposals." }
+    ],
+    "macro": [
+      { "risk": "AI capex cycle sustainability", "severity": "moderate", "description": "Current growth thesis predicated on AI infrastructure spending being durable. If AI monetization disappoints, hyperscaler capex could be cut abruptly." },
+      { "risk": "Tariff uncertainty", "severity": "moderate", "description": "ASML noted 'potential outcomes of ongoing discussions around export controls' and tariff uncertainties in Q1 2026 guidance." }
+    ]
+  },
+  "bull_case": [
+    "Irreplaceable technological monopoly: 100% market share in EUV with 30+ year lead, $9B+ R&D, €38.8B backlog. No credible commercial EUV alternative within the decade.",
+    "AI semiconductor supercycle: TSMC, Samsung, SK hynix, Micron all accelerating capex; hyperscalers committing $300B+ in AI capex. ASML is the sole critical bottleneck in advanced chip manufacturing.",
+    "High-NA EUV inflection: First commercial EXE:5200B systems now shipping at €380-400M/unit vs €200M for Low-NA. As High-NA becomes standard for sub-2nm nodes, revenue per unit of capacity will compound materially.",
+    "Installed Base Management: IBM grew 26% YoY to €8.2B, structurally recurring, higher-margin than systems, and insulated from order cycle volatility.",
+    "China risk partially priced: Guidance explicitly factors in export control scenarios. Non-China customers growing fast enough to more than absorb the China decline."
+  ],
+  "bear_case": [
+    "EUV diversion allegation: June 2026 US accusation — if escalated to BIS enforcement or FDPR — could restrict ASML globally, representing an existential scenario.",
+    "MATCH Act: Could eliminate ~5% of total revenue in permitted DUV sales plus additional IBM revenues from Chinese installed-base servicing.",
+    "Gross margin expansion at risk: Q3 2025 gross margin dipped to 51.6%. Path from ~52-53% to 56-60% by 2030 depends on High-NA success, sustained ASPs, and learning curve — all with execution risk.",
+    "Capex cycle reversal post-2027: Current backlog provides visibility through 2026-2027 only. Any AI ROI disappointment could trigger sharp capex cuts cascading through TSMC and Samsung to ASML.",
+    "Customer concentration: TSMC alone ~33% of revenue. Intel Foundry struggles could reduce High-NA customers. Any Taiwan geopolitical event is a direct shock to ASML revenue."
+  ],
+  "recent_developments": [
+    { "date": "2026-06", "event": "US EUV diversion allegation: Commerce Secretary Lutnick accused ASML in private meetings of allowing EUV components to reach China. ASML formally denied, documenting all 314 EUV systems worldwide — none in China. BIS enforcement action flagged as potential outcome.", "impact": "Introduced high-severity existential regulatory risk; created stock volatility" },
+    { "date": "2026-04", "event": "MATCH Act introduced: Would ban DUV exports to China, cleared House Foreign Affairs Committee April 22 — described as largest export control markup in congressional history.", "impact": "Threatens remaining DUV China revenue (~5% of sales) plus IBM revenues from installed Chinese DUV systems" },
+    { "date": "2026-04", "event": "Q1 2026 earnings beat: Revenue €8.8B (+13% YoY), gross margin 53.0%, EPS €7.15 (+19% YoY). FY2026 guidance raised to €36-40B from €34-39B.", "impact": "Positive earnings beat reinforced bull thesis; guidance raise offset by China export control commentary" },
+    { "date": "2026-01", "event": "FY2025 record results: Revenue €32.7B (+15.6% YoY), gross margin 52.8%, net income €9.6B. Q4 2025 net bookings a record €13.2B. New €12B buyback program (2026-2028) announced.", "impact": "Record bookings validated strong demand pipeline" },
+    { "date": "2025-Q4", "event": "First commercial High-NA EUV shipment: EXE:5200B shipped to Intel for 14A node development. 500,000+ wafers processed at 80%+ availability, ahead of Low-NA at comparable stage.", "impact": "De-risked High-NA technology transition; supports ASP expansion" },
+    { "date": "2025", "event": "AI hyperscaler capex: Microsoft, Meta, Amazon, Alphabet committed $300B+ in AI infrastructure capex for 2025-2026. ASML order backlog reached €38.8B at year-end 2025.", "impact": "Provides multi-year demand visibility through 2027 and beyond" }
+  ]
+};
+
+// =============================================
+// EMBEDDED DCF JSON
+// =============================================
+const dcfData = {
+  "ticker": "ASML",
+  "company_name": "ASML Holding N.V.",
+  "valuation_date": "2026-06-27",
+  "current_price": 1799.38,
+  "currency": "USD",
+  "note": "Financial data in EUR millions; stock price in USD (NASDAQ: ASML). Intrinsic values reported in both EUR and USD. FX rate: 1 EUR = 1.139 USD as of 2026-06-27. All model cash flows are in EUR. USD intrinsic values are EUR values multiplied by the spot FX rate.",
+  "fx": {
+    "eur_usd": 1.139,
+    "as_of": "2026-06-27",
+    "source": "Yahoo Finance EURUSD=X"
+  },
+  "inputs": {
+    "shares_outstanding": 385.7,
+    "total_debt": 2705.6,
+    "cash_and_equivalents": 7970.4,
+    "net_debt": -5264.8,
+    "last_fcf": 11027.3,
+    "last_fcf_period": "FY2025",
+    "currency": "EUR",
+    "units": "millions",
+    "data_as_of": "Q1 2026 (balance sheet); FY2025 (income / FCF)"
+  },
+  "historical_growth": {
+    "revenue_3yr_cagr": 15.55,
+    "revenue_5yr_cagr": 18.5,
+    "eps_3yr_cagr": 20.48,
+    "eps_5yr_cagr": 23.84,
+    "equity_3yr_cagr": 30.57,
+    "equity_5yr_cagr": 7.18,
+    "fcf_3yr_cagr": 15.44,
+    "fcf_5yr_cagr": 24.91,
+    "selected_growth_rate": 16.4,
+    "growth_rate_source": "blended_revenue_fcf_cagr_with_guidance_anchor",
+    "base_years": {
+      "3yr": "FY2022 to FY2025",
+      "5yr": "FY2020 to FY2025"
+    },
+    "growth_divergence_warning": "Equity 3yr CAGR (30.6%) diverges materially from 5yr (7.2%) due to volatile buyback activity and capital structure changes. Equity CAGR not used as primary anchor. Revenue and FCF CAGRs are consistent (15-18% range) and are used as the blended base. FY2026 management guidance midpoint of ~\u20ac38B (16.4% growth) used as Year 1 anchor."
+  },
+  "valuation_philosophy": "This model uses a conservative FCF-based DCF anchored to ASML's confirmed FY2026 guidance and 2030 management targets. ASML's monopoly position in EUV lithography justifies a premium multiple, but the model deliberately does not embed current market sentiment (55x forward P/E) into the terminal value assumptions. Terminal growth of 3% base reflects a normalised long-run rate for a technology infrastructure leader. The gap between intrinsic value and market price is explicitly noted as a sanity check output for the user.",
+  "assumptions": {
+    "base": {
+      "description": "FY2026 guidance midpoint ~\u20ac38B achieved, growth decelerates toward 2030 target midpoint ~\u20ac52B, FCF margin stable near FY2025 levels",
+      "growth_rates": [
+        16.4,
+        13.0,
+        10.0,
+        8.0,
+        6.0
+      ],
+      "fcf_margin": 34.0,
+      "wacc": 10.0,
+      "terminal_growth": 3.0,
+      "rationale": "Year 1 growth 16.4% anchored to management guidance midpoint \u20ac38B (from \u20ac32.7B FY2025). Decelerates 13%/10%/8%/6% as the China headwind is absorbed and capital intensity stabilises. FCF margin 34% reflects FY2025 actual of 33.8% and assumes modest improvement from IBM mix. WACC 10% = rf 4.2% + beta 1.25 * ERP 4.6% + 0.05 country risk, rounded. Terminal growth 3% = nominal global semiconductor long-run growth."
+    },
+    "bull": {
+      "description": "AI supercycle sustains, High-NA EUV ramp accelerates, revenue reaches top of 2030 target range (~\u20ac60B), FCF margins expand as High-NA mix improves",
+      "growth_rates": [
+        22.0,
+        18.0,
+        15.0,
+        12.0,
+        10.0
+      ],
+      "fcf_margin": 38.0,
+      "wacc": 9.0,
+      "terminal_growth": 4.0,
+      "rationale": "Revenue hits top of FY2026 guidance (\u20ac40B) in Year 1 then compounds at 18%/15%/12%/10% toward the \u20ac60B 2030 ceiling. FCF margin 38% reflects High-NA ASP tailwind (~\u20ac400M vs \u20ac200M for Low-NA), expanded IBM contribution, and 56-60% gross margin trajectory by 2030. WACC 9% reflects de-risked technology lead; 4% terminal growth accounts for semiconductor TAM expansion from AI-intensive chip architectures."
+    },
+    "bear": {
+      "description": "MATCH Act passes eliminating remaining China DUV revenue, export control allegation lingers, capex cycle peaks in 2026, margin pressured by High-NA ramp costs",
+      "growth_rates": [
+        6.0,
+        4.0,
+        3.0,
+        2.0,
+        1.0
+      ],
+      "fcf_margin": 26.0,
+      "wacc": 12.0,
+      "terminal_growth": 2.0,
+      "rationale": "Only 6% growth in Year 1 \u2014 China revenue drops from 33% to ~15% rather than guided 20%, MATCH Act passes eliminating remaining DUV China sales, service revenues impacted. FCF margin compressed to 26% as High-NA ramp costs dominate and operational leverage fails to materialise. WACC 12% reflects elevated geopolitical risk premium (EUV diversion allegation, FDPR threat). Terminal growth 2% = pessimistic long-run assumption if EUV competitive disruption occurs beyond 2030."
+    }
+  },
+  "projections": {
+    "base": {
+      "years": [
+        "Y1",
+        "Y2",
+        "Y3",
+        "Y4",
+        "Y5"
+      ],
+      "revenue": [
+        38025.0,
+        42968.3,
+        47265.1,
+        51046.3,
+        54109.0
+      ],
+      "fcf": [
+        12928.5,
+        14609.2,
+        16070.1,
+        17355.7,
+        18397.1
+      ],
+      "discount_factors": [
+        0.9091,
+        0.8264,
+        0.7513,
+        0.683,
+        0.6209
+      ],
+      "pv_fcf": [
+        11753.2,
+        12073.6,
+        12073.8,
+        11853.9,
+        11422.7
+      ]
+    },
+    "bull": {
+      "years": [
+        "Y1",
+        "Y2",
+        "Y3",
+        "Y4",
+        "Y5"
+      ],
+      "revenue": [
+        39853.9,
+        47027.6,
+        54081.7,
+        60571.5,
+        66628.7
+      ],
+      "fcf": [
+        15144.5,
+        17870.5,
+        20551.1,
+        23017.2,
+        25319.0
+      ],
+      "discount_factors": [
+        0.9174,
+        0.8417,
+        0.7722,
+        0.7084,
+        0.6499
+      ],
+      "pv_fcf": [
+        13894.0,
+        15040.6,
+        15868.9,
+        16306.4,
+        16455.8
+      ]
+    },
+    "bear": {
+      "years": [
+        "Y1",
+        "Y2",
+        "Y3",
+        "Y4",
+        "Y5"
+      ],
+      "revenue": [
+        34627.3,
+        36012.4,
+        37092.8,
+        37834.6,
+        38213.0
+      ],
+      "fcf": [
+        9003.1,
+        9363.2,
+        9644.1,
+        9836.9,
+        9935.4
+      ],
+      "discount_factors": [
+        0.8929,
+        0.7972,
+        0.7118,
+        0.6355,
+        0.5674
+      ],
+      "pv_fcf": [
+        8038.4,
+        7463.7,
+        6864.0,
+        6251.7,
+        5638.4
+      ]
+    }
+  },
+  "valuation": {
+    "base": {
+      "sum_pv_fcf": 59177.0,
+      "terminal_fcf": 18948.9,
+      "terminal_value": 270699.0,
+      "pv_terminal": 168077.0,
+      "enterprise_value": 227254.0,
+      "less_net_debt": -5264.8,
+      "equity_value": 232519.0,
+      "intrinsic_value_eur": 602.85,
+      "intrinsic_value_usd": 686.65,
+      "upside": -61.7,
+      "fx_rate_eur_usd": 1.139
+    },
+    "bull": {
+      "sum_pv_fcf": 77566.0,
+      "terminal_fcf": 26332.4,
+      "terminal_value": 526635.0,
+      "pv_terminal": 342260.0,
+      "enterprise_value": 419827.0,
+      "less_net_debt": -5264.8,
+      "equity_value": 425091.0,
+      "intrinsic_value_eur": 1102.13,
+      "intrinsic_value_usd": 1255.33,
+      "upside": -30.1,
+      "fx_rate_eur_usd": 1.139
+    },
+    "bear": {
+      "sum_pv_fcf": 34256.0,
+      "terminal_fcf": 10133.6,
+      "terminal_value": 101341.0,
+      "pv_terminal": 57501.0,
+      "enterprise_value": 91757.0,
+      "less_net_debt": -5264.8,
+      "equity_value": 97022.0,
+      "intrinsic_value_eur": 251.55,
+      "intrinsic_value_usd": 286.51,
+      "upside": -84.0,
+      "fx_rate_eur_usd": 1.139
+    }
+  },
+  "entry_price": {
+    "base": {
+      "terminal_value_per_share_eur": 701.84,
+      "terminal_value_per_share_usd": 799.39,
+      "years_to_terminal": 5,
+      "target_cagr": 15.0,
+      "entry_price_eur": 348.94,
+      "entry_price_usd": 397.44,
+      "entry_discount_from_current": -77.9
+    },
+    "bull": {
+      "terminal_value_per_share_eur": 1365.4,
+      "terminal_value_per_share_usd": 1555.19,
+      "years_to_terminal": 5,
+      "target_cagr": 15.0,
+      "entry_price_eur": 678.85,
+      "entry_price_usd": 773.2,
+      "entry_discount_from_current": -56.9
+    },
+    "bear": {
+      "terminal_value_per_share_eur": 262.75,
+      "terminal_value_per_share_usd": 299.27,
+      "years_to_terminal": 5,
+      "target_cagr": 15.0,
+      "entry_price_eur": 130.63,
+      "entry_price_usd": 148.79,
+      "entry_discount_from_current": -91.7
+    }
+  },
+  "sensitivity": {
+    "wacc_range": [
+      8.0,
+      9.0,
+      10.0,
+      11.0,
+      12.0
+    ],
+    "terminal_growth_range": [
+      2.0,
+      2.5,
+      3.0,
+      3.5,
+      4.0
+    ],
+    "matrix_eur": [
+      [
+        728.0,
+        781.0,
+        844.0,
+        922.0,
+        1020.0
+      ],
+      [
+        623.0,
+        660.0,
+        704.0,
+        755.0,
+        816.0
+      ],
+      [
+        545.0,
+        572.0,
+        603.0,
+        639.0,
+        680.0
+      ],
+      [
+        484.0,
+        504.0,
+        527.0,
+        554.0,
+        584.0
+      ],
+      [
+        435.0,
+        451.0,
+        469.0,
+        489.0,
+        511.0
+      ]
+    ],
+    "matrix_usd": [
+      [
+        829.3,
+        889.6,
+        961.4,
+        1050.2,
+        1161.8
+      ],
+      [
+        709.6,
+        751.7,
+        801.9,
+        859.8,
+        929.4
+      ],
+      [
+        620.8,
+        651.5,
+        686.8,
+        728.0,
+        774.7
+      ],
+      [
+        551.3,
+        574.1,
+        600.3,
+        631.1,
+        665.4
+      ],
+      [
+        495.5,
+        513.7,
+        534.3,
+        557.2,
+        582.0
+      ]
+    ],
+    "note": "Matrix shows base-case FCF trajectory intrinsic value per share across WACC (rows, 8-12%) and terminal growth rate (columns, 2-4%). All EUR values; USD = EUR x 1.139. Current price \u20ac1,576 ($1,795) is above every cell in this matrix."
+  },
+  "probability_weighted": {
+    "weights": {
+      "bull": 0.25,
+      "base": 0.5,
+      "bear": 0.25
+    },
+    "weighted_iv_eur": 639.85,
+    "weighted_iv_usd": 728.78,
+    "weighted_upside": -59.4,
+    "rationale": "Equal 25/50/25 split given elevated June 2026 uncertainty: EUV diversion allegation unresolved, MATCH Act pending, but AI capex supercycle remains structurally supportive. Bull weighting not raised above 25% given the binary regulatory risk. Bear weighting at 25% reflects genuine tail risk from potential FDPR application (existential scenario for ASML's US-technology-dependent supply chain)."
+  },
+  "key_metrics": {
+    "current_market_cap_usd": 607713.0,
+    "current_market_cap_eur": 607713.0,
+    "current_ev_eur": 602448.0,
+    "current_price_eur": 1575.61,
+    "trailing_pe": 64.7,
+    "forward_pe_fy2026_est": 55.2,
+    "ev_to_fcf_trailing": 54.6,
+    "fcf_yield_pct": 1.8,
+    "price_to_book": 29.2,
+    "base_iv_pe_implied": 24.4,
+    "base_iv_ev_to_fcf_implied": 20.6,
+    "note": "Forward P/E based on est. FY2026 EPS ~\u20ac28.55 (\u20ac38B revenue at 29% net margin / 386M shares). Trailing P/E uses FY2025 EPS \u20ac24.73. Market cap computed as 385.7M shares x $1,794.62 / 1.139."
+  },
+  "sanity_check": {
+    "passed": true,
+    "base_iv_pe": 24.4,
+    "base_iv_ev_to_fcf": 20.6,
+    "current_forward_pe": 55.2,
+    "current_ev_to_fcf": 54.6,
+    "historical_pe_range": "20-50x (2018-2025 average ~30-35x)",
+    "historical_ev_fcf_range": "25-60x",
+    "reason": "Base case intrinsic value (\u20ac603 / $687) implies 24.4x trailing P/E and 20.6x EV/FCF \u2014 both within ASML's historical range. The model's assumptions are internally consistent. However, the current market price implies 55x forward P/E and 54.6x EV/FCF, which embeds significant growth and multiple expansion that a standard DCF at normalised discount rates does not support. The large gap between IV and market price reflects the market pricing a structural monopoly premium and AI-cycle optionality not captured by a conservative FCF model.",
+    "warning_banner": {
+      "show": true,
+      "level": "info",
+      "message": "Current price ($1,795 / \u20ac1,576) is 61.7% above base-case DCF intrinsic value ($687) and above every cell in the sensitivity matrix. The stock trades at 55x forward P/E vs. a DCF-implied 24x. ASML's monopoly premium and AI cycle positioning may justify a structural valuation above DCF fair value \u2014 but the margin of safety is negative at current levels. All scenarios show negative upside on a pure DCF basis."
+    }
+  },
+  "summary": {
+    "investment_thesis": "ASML is the world's only supplier of EUV lithography with a monopoly backed by 30+ years and $9B+ in cumulative R&D. FY2025 delivered record results (\u20ac32.7B revenue, \u20ac9.6B net income, \u20ac11.0B FCF). FY2026 guidance raised to \u20ac36-40B. High-NA EUV ramp is commercially validated. The AI semiconductor supercycle is the primary demand driver through 2030.",
+    "valuation_assessment": "At $1,794.62 (\u20ac1,576), ASML trades at 55x forward P/E and 54.6x EV/FCF \u2014 materially above the DCF-derived base case of $687 (\u20ac603). The probability-weighted intrinsic value is $729 (\u20ac640), implying -59% downside on a pure fundamental basis. The stock's premium reflects monopoly positioning, structural AI demand, and a 30+ year technology lead that markets are willing to pay a significant premium to own. For investors targeting a 15% CAGR to terminal value, the entry price in the bull case is $773, with the base case entry at $397.",
+    "primary_risks": "June 2026 EUV diversion allegation by US Commerce (ASML denies; FDPR tail risk). MATCH Act pending (could eliminate ~5% of revenue). China revenue declining from 33% to ~20% in FY2026. Semiconductor capex cycle risk post-2027. High-NA EUV ramp execution risk on gross margin path to 56-60% by 2030.",
+    "recommendation": "OVERVALUED vs. DCF intrinsic value across all scenarios and all sensitivity matrix cells. Current levels price in a combination of monopoly premium, AI cycle optionality, and continued High-NA margin expansion not captured by normalised FCF discounting. Investors who believe in the structural monopoly case and are comfortable with 55x earnings valuations may hold \u2014 but no margin of safety exists. New positions at current prices require a very high conviction on both AI capex sustainability and regulatory resolution."
+  },
+  "price_refresh": {
+    "refreshed_at": "2026-08-12T10:44:58Z",
+    "price_source": "yahoo:regularMarketPrice",
+    "previous_price": 1794.62,
+    "current_price": 1799.38,
+    "drift_pct": 0.3,
+    "valuation_date": "2026-06-27",
+    "fields_updated": [
+      "current_price"
+    ],
+    "prose_is_stale": true,
+    "prose_paths_quoting_previous_price": [
+      "key_metrics.note",
+      "summary.valuation_assessment"
+    ],
+    "dashboard_stale": false
+  }
+};
+
+// =============================================
+// PARSE CSV
+// =============================================
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => obj[h.trim()] = values[i] ? values[i].trim() : '');
+        return obj;
+    });
+}
+
+const allData = parseCSV(csvData);
+
+// Sort helper
+function periodSort(p) {
+    const yr = parseInt(p.match(/\d{4}/)?.[0] || '0');
+    const sub = p.startsWith('FY') ? 8 :
+        p.includes('Q1') ? 1 : p.includes('Q2') ? 2 :
+        p.includes('Q3') ? 3 : p.includes('Q4') ? 4 : 0;
+    return yr * 10 + sub;
+}
+allData.sort((a,b) => periodSort(a.Period) - periodSort(b.Period));
+
+const fyData = allData.filter(d => d.Period.startsWith('FY'));
+const qData  = allData.filter(d => !d.Period.startsWith('FY'));
+
+function v(d, key) { return parseFloat(d[key]) || 0; }
+function fmt(n, dec=1) {
+    if (n === 0 || isNaN(n)) return 'N/A';
+    if (Math.abs(n) >= 1000) return '€' + (n/1000).toFixed(dec) + 'B';
+    return '€' + n.toFixed(dec) + 'M';
+}
+function pct(n) { return isNaN(n) || n === 0 ? 'N/A' : n.toFixed(1) + '%'; }
+function yoy(cur, prev) {
+    if (!prev || prev === 0) return null;
+    return ((cur - prev) / Math.abs(prev) * 100).toFixed(1);
+}
+
+// =============================================
+// KPI CARDS
+// =============================================
+const latestFY = fyData[fyData.length - 1]; // FY2025
+const prevFY   = fyData[fyData.length - 2]; // FY2024
+const latestQ  = qData[qData.length - 1];   // Q1 2026
+
+const kpis = [
+    {
+        label: 'FY2025 Revenue',
+        value: fmt(v(latestFY,'Revenue')/1000*1000, 1),
+        change: yoy(v(latestFY,'Revenue'), v(prevFY,'Revenue')),
+        sub: 'vs FY2024'
+    },
+    {
+        label: 'FY2025 Gross Margin',
+        value: pct(v(latestFY,'GrossMargin')),
+        change: (v(latestFY,'GrossMargin') - v(prevFY,'GrossMargin')).toFixed(1),
+        isPoints: true,
+        sub: 'vs FY2024 51.3%'
+    },
+    {
+        label: 'FY2025 Net Income',
+        value: fmt(v(latestFY,'NetIncome')),
+        change: yoy(v(latestFY,'NetIncome'), v(prevFY,'NetIncome')),
+        sub: 'vs FY2024'
+    },
+    {
+        label: 'FY2025 EPS (Diluted)',
+        value: '€' + v(latestFY,'EPSDiluted').toFixed(2),
+        change: yoy(v(latestFY,'EPSDiluted'), v(prevFY,'EPSDiluted')),
+        sub: 'vs FY2024 €19.24'
+    },
+    {
+        label: 'FY2025 FCF',
+        value: fmt(v(latestFY,'FreeCashFlow')),
+        change: yoy(v(latestFY,'FreeCashFlow'), v(prevFY,'FreeCashFlow')),
+        sub: 'vs FY2024 €9.1B'
+    },
+    {
+        label: 'FY2025 Net Bookings',
+        value: fmt(v(latestFY,'NetBookings')),
+        change: yoy(v(latestFY,'NetBookings'), v(prevFY,'NetBookings')),
+        sub: 'vs FY2024 €18.9B'
+    },
+    {
+        label: 'Q1 2026 Revenue',
+        value: fmt(v(latestQ,'Revenue')),
+        change: yoy(v(latestQ,'Revenue'), v(qData.find(d=>d.Period==='Q1 2025'),'Revenue')),
+        sub: 'vs Q1 2025'
+    },
+    {
+        label: 'Q1 2026 EPS (Diluted)',
+        value: '€' + v(latestQ,'EPSDiluted').toFixed(2),
+        change: yoy(v(latestQ,'EPSDiluted'), v(qData.find(d=>d.Period==='Q1 2025'),'EPSDiluted')),
+        sub: 'vs Q1 2025'
+    },
+    {
+        label: 'FY2025 IBM Revenue',
+        value: fmt(v(latestFY,'InstalledBaseSales')),
+        change: yoy(v(latestFY,'InstalledBaseSales'), v(prevFY,'InstalledBaseSales')),
+        sub: 'vs FY2024 €6.5B'
+    },
+    {
+        label: 'Order Backlog',
+        value: '€38.8B',
+        change: null,
+        sub: 'End of FY2025'
+    }
+];
+
+const kpiGrid = document.getElementById('kpiGrid');
+kpis.forEach(k => {
+    const chgNum = parseFloat(k.change);
+    const isPos = chgNum >= 0;
+    const chgClass = isPos ? 'positive' : 'negative';
+    const chgText = k.change === null ? '' :
+        (k.isPoints
+            ? `${chgNum >= 0 ? '+' : ''}${k.change} pp YoY`
+            : `${chgNum >= 0 ? '+' : ''}${k.change}% YoY`);
+    kpiGrid.innerHTML += `
+        <div class="kpi-card">
+            <div class="kpi-value">${k.value}</div>
+            <div class="kpi-label">${k.label}</div>
+            ${k.change !== null ? `<div class="kpi-change ${chgClass}">${chgText}</div>` : ''}
+            <div class="kpi-sub">${k.sub}</div>
+        </div>`;
+});
+
+// =============================================
+// OVERVIEW
+// =============================================
+function toggleOverview(btn) {
+    btn.classList.toggle('active');
+    document.getElementById('overviewContent').classList.toggle('active');
+}
+
+function buildOverview() {
+    const grid = document.getElementById('overviewGrid');
+    const a = analysis;
+
+    // Company Overview
+    let html = `<div class="overview-card">
+        <h3>Company Overview</h3>
+        <p>${a.overview}</p>
+    </div>`;
+
+    // Business Model
+    html += `<div class="overview-card">
+        <h3>Business Model</h3>
+        <p>${a.business_model.summary}</p>
+        <ul>`;
+    a.business_model.revenue_streams.forEach(s => {
+        const cls = s.trend === 'growing' ? 'trend-growing' : s.trend === 'declining' ? 'trend-declining' : 'trend-stable';
+        html += `<li><div class="revenue-stream"><span><strong>${s.name}</strong> &mdash; ${s.description}</span><span class="pct">${s.percent}% <span class="${cls}">(${s.trend})</span></span></div></li>`;
+    });
+    html += `</ul></div>`;
+
+    // Competitive Position
+    html += `<div class="overview-card">
+        <h3>Competitive Position</h3>
+        <p><strong>Market Position:</strong> ${a.competitive_position.market_position}</p>
+        <p><strong>Competitors:</strong> ${a.competitive_position.main_competitors.join(', ')}</p>
+        <p><strong>Moat Factors:</strong></p>
+        <ul>`;
+    a.competitive_position.moat_factors.forEach(m => {
+        html += `<li><strong>${m.factor}</strong> (${m.strength}): ${m.description}</li>`;
+    });
+    html += `</ul>
+        <p style="margin-top:12px"><strong>Weaknesses:</strong></p>
+        <ul>`;
+    a.competitive_position.weaknesses.forEach(w => { html += `<li>${w}</li>`; });
+    html += `</ul></div>`;
+
+    // Growth Drivers
+    html += `<div class="overview-card">
+        <h3>Growth Drivers</h3>
+        <ul>`;
+    a.growth_drivers.forEach(g => { html += `<li>${g}</li>`; });
+    html += `</ul></div>`;
+
+    // Risks
+    html += `<div class="overview-card risks">
+        <h3>Key Risks</h3>
+        <ul>`;
+    const allRisks = [...(a.risks.regulatory||[]), ...(a.risks.business||[]), ...(a.risks.macro||[])];
+    allRisks.forEach(r => {
+        const sev = r.severity === 'high' ? 'risk-high' : r.severity === 'moderate' ? 'risk-moderate' : 'risk-low';
+        html += `<li><span class="${sev}">[${r.severity.toUpperCase()}]</span> <strong>${r.risk}</strong>: ${r.description}</li>`;
+    });
+    html += `</ul></div>`;
+
+    // Bull Case
+    html += `<div class="overview-card bull">
+        <h3>Bull Case</h3>
+        <ul>`;
+    a.bull_case.forEach(b => { html += `<li>${b}</li>`; });
+    html += `</ul></div>`;
+
+    // Bear Case
+    html += `<div class="overview-card bear">
+        <h3>Bear Case</h3>
+        <ul>`;
+    a.bear_case.forEach(b => { html += `<li>${b}</li>`; });
+    html += `</ul></div>`;
+
+    // Recent Developments
+    html += `<div class="overview-card">
+        <h3>Recent Developments</h3>
+        <ul>`;
+    a.recent_developments.forEach(r => {
+        html += `<li><strong>${r.date}:</strong> ${r.event} <em style="color:#888">(${r.impact})</em></li>`;
+    });
+    html += `</ul></div>`;
+
+    grid.innerHTML = html;
+}
+buildOverview();
+
+// =============================================
+// GUIDANCE
+// =============================================
+function buildGuidance() {
+    const guidance = [
+        { metric: 'Q2 2026 Revenue', target: '€8.4-9.0B', period: 'Q2 2026', vs_prior: 'new', notes: 'Gross margin guided at 51-52% for Q2; continued strong EUV demand' },
+        { metric: 'FY2026 Revenue', target: '€36-40B', period: 'FY2026', vs_prior: 'raised', notes: 'Raised from €34-39B at Q4 2025. Midpoint ~€38B implies ~16% growth vs FY2025. China ~20% of 2026 revenue, down from 33%.' },
+        { metric: 'FY2026 Gross Margin', target: '51-53%', period: 'FY2026', vs_prior: 'maintained', notes: 'Reflects High-NA ramp costs and China revenue normalization. Q1 2026 came in at 53.0%.' },
+        { metric: 'FY2026 IBM Revenue', target: 'Growth vs FY2025', period: 'FY2026', vs_prior: 'maintained', notes: 'IBM was €8.2B in FY2025. Q1 2026 IBM reached €2.49B alone.' },
+        { metric: 'FY2026 EUV Systems', target: 'At least 60 Low-NA units', period: 'FY2026', vs_prior: 'raised', notes: 'Up from 44 units in FY2025. Potential 80 units in FY2027 if demand supports.' },
+        { metric: 'Buyback Program', target: '€12B total', period: 'FY2026-FY2028', vs_prior: 'new', notes: 'New program replacing 2022-2025 program. €1.0B purchased in Q1 2026. Dividend raised 17% to €7.50/share.' },
+        { metric: 'FY2030 Revenue', target: '€44-60B', period: 'FY2030', vs_prior: 'maintained', notes: 'Long-term target from 2024 Investor Day, reaffirmed. Represents 35-84% growth from FY2025.' },
+        { metric: 'FY2030 Gross Margin', target: '56-60%', period: 'FY2030', vs_prior: 'maintained', notes: '400-800 bps expansion from FY2025 driven by High-NA mix, operational leverage, and IBM scale.' }
+    ];
+
+    const grid = document.getElementById('guidanceGrid');
+    grid.innerHTML = guidance.map(g => {
+        const vsClass = g.vs_prior === 'raised' ? 'raised' : g.vs_prior === 'lowered' ? 'lowered' : g.vs_prior === 'maintained' ? 'maintained' : 'new';
+        const vsLabel = g.vs_prior.charAt(0).toUpperCase() + g.vs_prior.slice(1);
+        return `<div class="guidance-card">
+            <div class="guidance-metric">${g.metric}</div>
+            <div class="guidance-target">${g.target}</div>
+            <div class="guidance-period">${g.period}</div>
+            <span class="guidance-vs-prior ${vsClass}">${vsLabel}</span>
+            <div class="guidance-notes">${g.notes}</div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('guidanceCommentary').textContent =
+        'CEO Christophe Fouquet (Q1 2026): "The semiconductor industry\'s growth outlook continues to solidify, driven by ongoing AI-related infrastructure investments. Both Memory and Logic customers are responding to unprecedented demand by increasing capital expenditures and accelerating capacity expansion." Management raised FY2026 guidance citing "stronger immersion demand and incremental EUV upside concentrated in non-China customers." High-NA EUV described as having processed 500,000+ wafers at 80%+ availability, ahead of Low-NA at comparable stage, de-risking the technology transition.';
+}
+buildGuidance();
+
+// =============================================
+// CHART DEFAULTS
+// =============================================
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: { labels: { color: '#e0e0e0', font: { size: 11 } } },
+        tooltip: { callbacks: {} }
+    },
+    scales: {
+        x: { ticks: { color: '#888', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+const C = {
+    primary:   '#00d4aa',
+    secondary: '#00b894',
+    blue:      '#0984e3',
+    purple:    '#6c5ce7',
+    warning:   '#fdcb6e',
+    danger:    '#ff6b6b',
+    teal:      '#55efc4'
+};
+
+// =============================================
+// CHART 1: Annual Revenue & Net Income
+// =============================================
+new Chart(document.getElementById('revenueChart'), {
+    type: 'bar',
+    data: {
+        labels: fyData.map(d => d.Period),
+        datasets: [
+            {
+                label: 'Revenue (€M)',
+                data: fyData.map(d => v(d,'Revenue')),
+                backgroundColor: C.primary + '99',
+                borderColor: C.primary,
+                borderWidth: 1,
+                yAxisID: 'y'
+            },
+            {
+                label: 'Net Income (€M)',
+                data: fyData.map(d => v(d,'NetIncome')),
+                backgroundColor: C.blue + '99',
+                borderColor: C.blue,
+                borderWidth: 1,
+                yAxisID: 'y'
+            }
+        ]
+    },
+    options: {
+        ...chartDefaults,
+        scales: {
+            x: chartDefaults.scales.x,
+            y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => '€' + (v/1000).toFixed(0) + 'B' } }
+        }
+    }
+});
+
+// =============================================
+// CHART 2: Gross & Operating Margin %
+// =============================================
+const fyWithOp = fyData.filter(d => v(d,'GrossMargin') > 0);
+new Chart(document.getElementById('marginsChart'), {
+    type: 'line',
+    data: {
+        labels: fyWithOp.map(d => d.Period),
+        datasets: [
+            {
+                label: 'Gross Margin %',
+                data: fyWithOp.map(d => v(d,'GrossMargin')),
+                borderColor: C.primary,
+                backgroundColor: C.primary + '22',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 4
+            },
+            {
+                label: 'Operating Margin %',
+                data: fyWithOp.map(d => v(d,'OperatingMargin')),
+                borderColor: C.warning,
+                backgroundColor: C.warning + '22',
+                fill: false,
+                tension: 0.3,
+                pointRadius: 4
+            },
+            {
+                label: 'Net Margin %',
+                data: fyWithOp.map(d => v(d,'NetMargin')),
+                borderColor: C.blue,
+                backgroundColor: C.blue + '22',
+                fill: false,
+                tension: 0.3,
+                pointRadius: 4
+            }
+        ]
+    },
+    options: {
+        ...chartDefaults,
+        scales: {
+            x: chartDefaults.scales.x,
+            y: {
+                ...chartDefaults.scales.y,
+                min: 20,
+                ticks: { ...chartDefaults.scales.y.ticks, callback: v => v + '%' }
+            }
+        }
+    }
+});
+
+// =============================================
+// CHART 3: EPS & FCF
+// =============================================
+const fyWithFCF = fyData.filter(d => v(d,'EPSDiluted') > 0);
+new Chart(document.getElementById('epsChart'), {
+    type: 'line',
+    data: {
+        labels: fyWithFCF.map(d => d.Period),
+        datasets: [
+            {
+                label: 'EPS Diluted (€)',
+                data: fyWithFCF.map(d => v(d,'EPSDiluted')),
+                borderColor: C.primary,
+                backgroundColor: C.primary + '22',
+                fill: false,
+                tension: 0.3,
+                pointRadius: 4,
+                yAxisID: 'y'
+            },
+            {
+                label: 'FCF (€B)',
+                data: fyWithFCF.map(d => v(d,'FreeCashFlow')/1000),
+                borderColor: C.purple,
+                backgroundColor: C.purple + '22',
+                fill: false,
+                tension: 0.3,
+                pointRadius: 4,
+                yAxisID: 'y2'
+            }
+        ]
+    },
+    options: {
+        ...chartDefaults,
+        scales: {
+            x: chartDefaults.scales.x,
+            y: { ...chartDefaults.scales.y, position: 'left', ticks: { ...chartDefaults.scales.y.ticks, callback: v => '€' + v.toFixed(0) } },
+            y2: { ...chartDefaults.scales.y, position: 'right', ticks: { ...chartDefaults.scales.y.ticks, callback: v => '€' + v.toFixed(1) + 'B' }, grid: { display: false } }
+        }
+    }
+});
+
+// =============================================
+// CHART 4: Quarterly Revenue (trailing 8Q)
+// =============================================
+const trailing8Q = qData.slice(-8);
+new Chart(document.getElementById('quarterlyChart'), {
+    type: 'bar',
+    data: {
+        labels: trailing8Q.map(d => d.Period),
+        datasets: [
+            {
+                label: 'Revenue (€M)',
+                data: trailing8Q.map(d => v(d,'Revenue')),
+                backgroundColor: trailing8Q.map((d,i) => i === trailing8Q.length-1 ? C.warning + 'cc' : C.primary + '99'),
+                borderColor: trailing8Q.map((d,i) => i === trailing8Q.length-1 ? C.warning : C.primary),
+                borderWidth: 1
+            }
+        ]
+    },
+    options: {
+        ...chartDefaults,
+        plugins: {
+            ...chartDefaults.plugins,
+            legend: { display: false },
+            annotation: {}
+        },
+        scales: {
+            x: chartDefaults.scales.x,
+            y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => '€' + (v/1000).toFixed(1) + 'B' } }
+        }
+    }
+});
+
+// =============================================
+// CHART 5: Net Bookings vs Revenue
+// =============================================
+const fyBookings = fyData.filter(d => v(d,'NetBookings') > 0);
+new Chart(document.getElementById('bookingsChart'), {
+    type: 'bar',
+    data: {
+        labels: fyBookings.map(d => d.Period),
+        datasets: [
+            {
+                label: 'Revenue (€M)',
+                data: fyBookings.map(d => v(d,'Revenue')),
+                backgroundColor: C.primary + '99',
+                borderColor: C.primary,
+                borderWidth: 1
+            },
+            {
+                label: 'Net Bookings (€M)',
+                data: fyBookings.map(d => v(d,'NetBookings')),
+                backgroundColor: C.warning + '99',
+                borderColor: C.warning,
+                borderWidth: 1
+            }
+        ]
+    },
+    options: {
+        ...chartDefaults,
+        scales: {
+            x: chartDefaults.scales.x,
+            y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => '€' + (v/1000).toFixed(0) + 'B' } }
+        }
+    }
+});
+
+// =============================================
+// CHART 6: EUV vs DUV
+// =============================================
+const fyEUV = fyData.filter(d => v(d,'EUVSales') > 0 || v(d,'DUVSales') > 0);
+new Chart(document.getElementById('euvDuvChart'), {
+    type: 'bar',
+    data: {
+        labels: fyEUV.map(d => d.Period),
+        datasets: [
+            {
+                label: 'EUV Sales (€M)',
+                data: fyEUV.map(d => v(d,'EUVSales')),
+                backgroundColor: C.primary + '99',
+                borderColor: C.primary,
+                borderWidth: 1,
+                stack: 'stack'
+            },
+            {
+                label: 'DUV Sales (€M)',
+                data: fyEUV.map(d => v(d,'DUVSales')),
+                backgroundColor: C.blue + '99',
+                borderColor: C.blue,
+                borderWidth: 1,
+                stack: 'stack'
+            },
+            {
+                label: 'IBM Revenue (€M)',
+                data: fyEUV.map(d => v(d,'InstalledBaseSales')),
+                backgroundColor: C.warning + '99',
+                borderColor: C.warning,
+                borderWidth: 1,
+                stack: 'stack'
+            }
+        ]
+    },
+    options: {
+        ...chartDefaults,
+        scales: {
+            x: chartDefaults.scales.x,
+            y: { ...chartDefaults.scales.y, stacked: true, ticks: { ...chartDefaults.scales.y.ticks, callback: v => '€' + (v/1000).toFixed(0) + 'B' } }
+        }
+    }
+});
+
+// =============================================
+// CHART 7: IBM Revenue (annual)
+// =============================================
+const fyIBM = fyData.filter(d => v(d,'InstalledBaseSales') > 0);
+new Chart(document.getElementById('ibmChart'), {
+    type: 'bar',
+    data: {
+        labels: fyIBM.map(d => d.Period),
+        datasets: [{
+            label: 'IBM Revenue (€M)',
+            data: fyIBM.map(d => v(d,'InstalledBaseSales')),
+            backgroundColor: C.warning + '99',
+            borderColor: C.warning,
+            borderWidth: 1
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: chartDefaults.scales.x,
+            y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => '€' + (v/1000).toFixed(1) + 'B' } }
+        }
+    }
+});
+
+// =============================================
+// CHART 8: Systems Sold
+// =============================================
+const fySys = fyData.filter(d => v(d,'SystemsSold') > 0);
+new Chart(document.getElementById('systemsChart'), {
+    type: 'bar',
+    data: {
+        labels: fySys.map(d => d.Period),
+        datasets: [{
+            label: 'Systems Sold (units)',
+            data: fySys.map(d => v(d,'SystemsSold')),
+            backgroundColor: C.purple + '99',
+            borderColor: C.purple,
+            borderWidth: 1
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: chartDefaults.scales.x,
+            y: { ...chartDefaults.scales.y }
+        }
+    }
+});
+
+// =============================================
+// CHART 9: Quarterly Net Bookings
+// =============================================
+const qBookings = qData.filter(d => v(d,'NetBookings') > 0);
+new Chart(document.getElementById('qBookingsChart'), {
+    type: 'bar',
+    data: {
+        labels: qBookings.map(d => d.Period),
+        datasets: [{
+            label: 'Net Bookings (€M)',
+            data: qBookings.map(d => v(d,'NetBookings')),
+            backgroundColor: qBookings.map(d => v(d,'NetBookings') >= 10000 ? C.primary + 'dd' : C.blue + '99'),
+            borderColor: qBookings.map(d => v(d,'NetBookings') >= 10000 ? C.primary : C.blue),
+            borderWidth: 1
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { ...chartDefaults.scales.x, ticks: { color: '#888', font: { size: 10 }, maxRotation: 45 } },
+            y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => '€' + (v/1000).toFixed(1) + 'B' } }
+        }
+    }
+});
+
+// =============================================
+// DCF SECTION
+// =============================================
+function renderFCFProjections(growth, wacc) {
+    const baseFCF = dcfData.inputs.last_fcf;
+    const endGrowth = 10;
+    const rates = [];
+    for (let i = 0; i < 5; i++) {
+        rates.push(growth > endGrowth
+            ? growth - (growth - endGrowth) * (i / 4)
+            : growth);
+    }
+    let fcf = baseFCF;
+    const fcfVals = [baseFCF];
+    for (let i = 0; i < 5; i++) { fcf = fcf * (1 + rates[i]/100); fcfVals.push(fcf); }
+
+    const fmt2 = n => n >= 1000 ? '€' + (n/1000).toFixed(1) + 'B' : '€' + n.toFixed(0) + 'M';
+
+    let html = `<div class="fcf-projection-item header">Base</div>`;
+    for (let i = 1; i <= 5; i++) html += `<div class="fcf-projection-item header">Year ${i}</div>`;
+    html += `<div class="fcf-projection-item"><div class="fcf-value">${fmt2(fcfVals[0])}</div><div class="growth-rate">-</div></div>`;
+    for (let i = 1; i <= 5; i++) {
+        html += `<div class="fcf-projection-item"><div class="fcf-value">${fmt2(fcfVals[i])}</div><div class="growth-rate">+${rates[i-1].toFixed(0)}%</div></div>`;
+    }
+    document.getElementById('fcfProjectionTable').innerHTML = html;
+}
+
+function calcDCF(startGrowth, wacc, termGrowth) {
+    const endGrowth = 10;
+    let fcf = dcfData.inputs.last_fcf;
+    let pvFCF = 0;
+    for (let i = 0; i < 5; i++) {
+        const rate = startGrowth > endGrowth
+            ? startGrowth - (startGrowth - endGrowth) * (i/4)
+            : startGrowth;
+        fcf *= (1 + rate/100);
+        pvFCF += fcf / Math.pow(1 + wacc/100, i+1);
+    }
+    const tv = fcf * (1 + termGrowth/100) / (wacc/100 - termGrowth/100);
+    const pvTV = tv / Math.pow(1 + wacc/100, 5);
+    const ev = pvFCF + pvTV;
+    const equity = ev - dcfData.inputs.net_debt;
+    const iv_eur = equity / dcfData.inputs.shares_outstanding;
+    const iv_usd = iv_eur * dcfData.fx.eur_usd;
+    const entry_usd = (tv / dcfData.inputs.shares_outstanding * dcfData.fx.eur_usd) / Math.pow(1.15, 5);
+    return { iv_eur, iv_usd, entry_usd };
+}
+
+window.updateDCFDisplay = function() {
+    const growth = parseFloat(document.getElementById('growthSlider').value);
+    const wacc   = parseFloat(document.getElementById('waccSlider').value);
+    const term   = parseFloat(document.getElementById('terminalSlider').value);
+
+    document.getElementById('growthValue').textContent  = growth.toFixed(1) + '%';
+    document.getElementById('waccValue').textContent    = wacc.toFixed(1) + '%';
+    document.getElementById('terminalValue').textContent = term.toFixed(1) + '%';
+
+    renderFCFProjections(growth, wacc);
+
+    const r = calcDCF(growth, wacc, term);
+    document.getElementById('dcfIV_USD').textContent = '$' + r.iv_usd.toFixed(0);
+    document.getElementById('dcfIV_EUR').textContent = '€' + r.iv_eur.toFixed(0);
+    document.getElementById('dcfEntry').textContent  = '$' + r.entry_usd.toFixed(0);
+
+    const upside = ((r.iv_usd - dcfData.current_price) / dcfData.current_price * 100);
+    const uEl = document.getElementById('dcfUpside');
+    uEl.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(1) + '% vs current';
+    uEl.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+    // Update assumption grid
+    const ag = document.getElementById('assumptionGrid');
+    if (ag) ag.innerHTML = `
+        <div class="assumption-item"><div class="label">Growth Y1</div><div class="value">${growth.toFixed(1)}%</div></div>
+        <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc.toFixed(1)}%</div></div>
+        <div class="assumption-item"><div class="label">Terminal G</div><div class="value">${term.toFixed(1)}%</div></div>
+        <div class="assumption-item"><div class="label">IV (USD)</div><div class="value" style="color:#00d4aa">$${r.iv_usd.toFixed(0)}</div></div>
+        <div class="assumption-item"><div class="label">IV (EUR)</div><div class="value" style="color:#00d4aa">€${r.iv_eur.toFixed(0)}</div></div>
+        <div class="assumption-item"><div class="label">Entry (USD)</div><div class="value" style="color:#00d4aa">$${r.entry_usd.toFixed(0)}</div></div>
+    `;
+};
+
+window.switchScenario = function(scenario) {
+    document.querySelectorAll('.scenario-tab').forEach(t => t.classList.toggle('active', t.dataset.scenario === scenario));
+    const a = dcfData.assumptions[scenario];
+    document.getElementById('growthSlider').value = a.growth_rates[0];
+    document.getElementById('waccSlider').value   = a.wacc;
+    document.getElementById('terminalSlider').value = a.terminal_growth;
+    window.updateDCFDisplay();
+};
+
+function renderSensitivity() {
+    const sens = dcfData.sensitivity;
+    const curUSD = dcfData.current_price;
+    let html = '<tr><th>WACC \\ Term G</th>';
+    sens.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+    html += '</tr>';
+    sens.wacc_range.forEach((wacc, i) => {
+        html += '<tr>';
+        html += `<th>${wacc}%</th>`;
+        sens.matrix_usd[i].forEach((val, j) => {
+            const isHL = wacc === 10.0 && sens.terminal_growth_range[j] === 3.0;
+            html += `<td class="${isHL ? 'highlight' : ''}">$${val}</td>`;
+        });
+        html += '</tr>';
+    });
+    document.getElementById('sensitivityMatrix').innerHTML = html;
+}
+
+function renderHistoricalGrowth() {
+    const g = dcfData.historical_growth;
+    const selected = g.growth_rate_source;
+    const metrics = [
+        { key: 'revenue_3yr_cagr', label: 'Revenue 3Y' },
+        { key: 'revenue_5yr_cagr', label: 'Revenue 5Y' },
+        { key: 'eps_3yr_cagr',     label: 'EPS 3Y' },
+        { key: 'eps_5yr_cagr',     label: 'EPS 5Y' },
+        { key: 'equity_3yr_cagr',  label: 'Equity 3Y' },
+        { key: 'equity_5yr_cagr',  label: 'Equity 5Y' },
+        { key: 'fcf_3yr_cagr',     label: 'FCF 3Y' },
+        { key: 'fcf_5yr_cagr',     label: 'FCF 5Y' }
+    ];
+    document.getElementById('growthGrid').innerHTML = metrics.map(m => {
+        const rate = g[m.key];
+        const isSelected = selected.includes(m.key.replace('_cagr','').replace('_','')) && false; // none highlighted exactly, show blended note
+        return `<div class="growth-item">
+            <div class="metric">${m.label}</div>
+            <div class="rate ${rate >= 0 ? 'positive' : 'negative'}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div>
+        </div>`;
+    }).join('') + `<div class="growth-item selected">
+        <div class="metric">Selected Anchor</div>
+        <div class="rate positive">+${g.selected_growth_rate}%</div>
+    </div>`;
+}
+
+// Initialise DCF
+renderSensitivity();
+renderHistoricalGrowth();
+renderFCFProjections(16.4, 10.0);
+window.switchScenario('base');
+
+// Bind sliders
+['growthSlider','waccSlider','terminalSlider'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.oninput = window.updateDCFDisplay; el.onchange = window.updateDCFDisplay; }
+});
+
+// =============================================
+// MODALS
+// =============================================
+const metricDescriptions = {
+    revenue: {
+        title: 'Annual Revenue',
+        content: `<p><strong>Revenue</strong> is ASML's total net sales from lithography system deliveries plus Installed Base Management services.</p>
+            <div class="metric-highlight"><strong>For ASML:</strong> Revenue is recognized on shipment/installation milestones. Q1 is typically weak due to fewer system deliveries; Q4 is the strongest quarter. Revenue is reported in EUR millions.</div>
+            <p><strong>What to watch:</strong></p><ul>
+                <li>YoY growth acceleration/deceleration vs. management guidance</li>
+                <li>Mix between system sales (lumpy) and IBM (recurring, growing)</li>
+                <li>China revenue as a % of total — declining from 33% to ~20% in FY2026</li>
+                <li>ASML targets €36-40B for FY2026 and €44-60B by FY2030</li>
+            </ul>`
+    },
+    margins: {
+        title: 'Gross & Operating Margins',
+        content: `<p><strong>Gross margin</strong> = (Revenue - COGS) / Revenue. For ASML, reflects system mix (High-NA vs Low-NA vs DUV) and IBM contribution.</p>
+            <div class="metric-highlight"><strong>For ASML:</strong> Management targets gross margin of 56-60% by FY2030, up from ~52-53% today. The path requires High-NA EUV becoming a greater share of the mix (each system ~€400M vs €200M for Low-NA), while maintaining pricing power and controlling ramp costs.</div>
+            <p><strong>What to watch:</strong></p><ul>
+                <li>Quarterly gross margin vs. 51-53% FY2026 guidance range</li>
+                <li>High-NA ramp costs temporarily pressuring margins (Q3 2025 dipped to 51.6%)</li>
+                <li>IBM mix improving margins as recurring services carry higher margins than systems</li>
+                <li>Long-run target: 56-60% gross margin by 2030</li>
+            </ul>`
+    },
+    eps: {
+        title: 'EPS & Free Cash Flow',
+        content: `<p><strong>EPS (Diluted)</strong> is net income attributable to shareholders divided by diluted share count. <strong>FCF</strong> is operating cash flow minus capex.</p>
+            <div class="metric-highlight"><strong>For ASML:</strong> FCF is a key valuation metric given the capital-light recurring IBM revenue stream. FCF can be volatile quarter-to-quarter due to working capital swings (advance payments from customers), but on a full-year basis is highly correlated with net income. FY2025 FCF of €11.0B was exceptional.</div>
+            <p><strong>What to watch:</strong></p><ul>
+                <li>EPS growth trajectory toward FY2026 consensus ~€28-30</li>
+                <li>FCF conversion rate (FCF/Net Income) — currently above 100%</li>
+                <li>Annual dividend (raised 17% to €7.50/share for FY2025) and €12B buyback 2026-2028</li>
+                <li>Share count declining steadily through buybacks (~385M today vs ~425M in 2017)</li>
+            </ul>`
+    },
+    quarterly: {
+        title: 'Quarterly Revenue',
+        content: `<p>Trailing 8 quarters of revenue showing seasonal patterns and recent acceleration. The Q1 2026 bar (highlighted in gold) is the most recent reported quarter.</p>
+            <div class="metric-highlight"><strong>For ASML:</strong> Q4 is typically the strongest quarter due to customer delivery schedules. Q1 often sees a revenue dip due to fewer systems accepted. Q1 2026 at €8.8B was a record Q1 and +13% YoY, significantly beating Q1 2025 of €7.7B.</div>`
+    },
+    bookings: {
+        title: 'Net Bookings vs Revenue',
+        content: `<p><strong>Net Bookings</strong> is the value of new orders received in the period, net of cancellations. It is the leading indicator for future revenue.</p>
+            <div class="metric-highlight"><strong>For ASML:</strong> Bookings lead revenue by 12-18 months due to delivery lead times. A book-to-bill ratio above 1.0 (bookings > revenue) indicates a growing backlog. FY2025 bookings of €28.0B vs revenue of €32.7B (below 1.0) reflects consumption of backlog — the €38.8B backlog remains very healthy. Q4 2025 alone saw record €13.2B in bookings.</div>
+            <p><strong>What to watch:</strong></p><ul>
+                <li>Quarterly booking momentum and composition (EUV vs DUV)</li>
+                <li>Book-to-bill ratio trending above or below 1.0</li>
+                <li>Total backlog level (€38.8B at end FY2025) providing revenue visibility</li>
+            </ul>`
+    },
+    euvduv: {
+        title: 'EUV vs DUV System Sales',
+        content: `<p>ASML's system sales are split between EUV (extreme ultraviolet) and DUV (deep ultraviolet) lithography, plus Installed Base Management (IBM) service revenue.</p>
+            <div class="metric-highlight"><strong>For ASML:</strong> EUV systems are the critical strategic product — 100% monopoly, ~€200M/unit for Low-NA, ~€380-400M/unit for High-NA. DUV faces competition from Canon/Nikon at lower nodes and is subject to China export controls. IBM is the growing recurring service stream.</div>
+            <p><strong>What to watch:</strong></p><ul>
+                <li>EUV as % of total revenue — expanding as High-NA ramp begins</li>
+                <li>DUV trajectory — China export controls reducing DUV addressable market</li>
+                <li>IBM absolute growth — management guides for continued strong IBM growth in FY2026</li>
+                <li>EUV unit count: FY2025 shipped 44 Low-NA EUV units; FY2026 target at least 60</li>
+            </ul>`
+    },
+    ibm: {
+        title: 'Installed Base Management (IBM) Revenue',
+        content: `<p><strong>IBM revenue</strong> covers service contracts, upgrades, spare parts, field options, and software licenses for ASML's installed machine fleet.</p>
+            <div class="metric-highlight"><strong>For ASML:</strong> IBM is the highest-quality revenue stream — recurring, growing at 20-30% YoY, and largely insulated from new order cycle volatility. As the installed EUV fleet grows and systems require more maintenance and upgrades, IBM grows structurally. IBM revenue of €8.2B in FY2025 (26% YoY growth) now represents ~25% of total revenue but is likely higher-margin than system sales.</div>
+            <p><strong>What to watch:</strong></p><ul>
+                <li>IBM YoY growth rate — management guides for continued strong growth in FY2026</li>
+                <li>IBM as % of total revenue — increasing mix improves earnings quality</li>
+                <li>Q1 2026 IBM alone: €2.49B, annualizes to ~€10B run rate</li>
+            </ul>`
+    },
+    systems: {
+        title: 'Annual Systems Sold',
+        content: `<p>Total lithography systems (EUV + DUV) shipped per year.</p>
+            <div class="metric-highlight"><strong>For ASML:</strong> Unit volume is a less informative metric than system revenue because EUV and DUV systems have 4-10x ASP differences, and High-NA vs Low-NA EUV also differs significantly. FY2023 peaked at 449 units; FY2025 was 327 units — but revenue was higher in FY2025 due to EUV mix improvement.</div>
+            <p><strong>What to watch:</strong></p><ul>
+                <li>EUV unit count specifically — the high-value strategic product</li>
+                <li>Low-NA EUV target: at least 60 units in FY2026 (up from 44 in FY2025)</li>
+                <li>High-NA units are separate from this count and have ~2x the ASP</li>
+            </ul>`
+    },
+    qbookings: {
+        title: 'Quarterly Net Bookings',
+        content: `<p>New orders received each quarter, net of cancellations. The leading indicator for future revenue.</p>
+            <div class="metric-highlight"><strong>For ASML:</strong> Q4 2025 bookings of €13.2B (of which €7.4B EUV) were a record and validated the AI-driven demand super-cycle. Bookings can be lumpy quarter-to-quarter based on customer ordering timing. The trend over 4-8 quarters is more meaningful than any single quarter.</div>
+            <p><strong>What to watch:</strong></p><ul>
+                <li>EUV composition within total bookings — high EUV share = high-value future revenue</li>
+                <li>Any cancellations or order pushouts — early warning of demand softening</li>
+                <li>China orders absence in future periods as export controls tighten</li>
+                <li>Q2 2025 through Q1 2026 trend showing post-record moderation</li>
+            </ul>`
+    }
+};
+
+function openModal(key) {
+    const m = metricDescriptions[key];
+    if (!m) return;
+    document.getElementById('modalTitle').textContent = m.title;
+    document.getElementById('modalBody').innerHTML = m.content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+</script>
+</body>
+</html>

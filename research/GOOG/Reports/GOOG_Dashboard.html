@@ -1,0 +1,1518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alphabet Inc. (GOOG) Financial Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#e0e0e0;min-height:100vh;padding:20px}
+.header{text-align:center;margin-bottom:30px;padding:24px;background:rgba(255,255,255,0.05);border-radius:15px;backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.08)}
+.header h1{font-size:2.4rem;background:linear-gradient(90deg,#00d4aa,#00b894);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:8px}
+.header-meta{display:flex;justify-content:center;gap:30px;flex-wrap:wrap;margin-top:12px}
+.header-meta span{font-size:0.9rem;color:#888}
+.header-meta strong{color:#e0e0e0}
+.header-price{font-size:1.5rem;font-weight:700;color:#00d4aa}
+.header-moat{display:inline-block;padding:4px 12px;background:rgba(0,212,170,0.15);border:1px solid rgba(0,212,170,0.4);border-radius:20px;font-size:0.85rem;color:#00d4aa}
+
+/* Investment Overview */
+.overview-section{max-width:1400px;margin:0 auto 30px}
+.overview-toggle{width:100%;background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.3);border-radius:12px;padding:16px 24px;color:#00d4aa;font-size:1.05rem;font-weight:600;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:all .2s}
+.overview-toggle:hover{background:rgba(0,212,170,0.18)}
+.overview-toggle .arrow{transition:transform .3s}
+.overview-toggle.active .arrow{transform:rotate(180deg)}
+.overview-content{display:none;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-top:none;border-radius:0 0 12px 12px;padding:28px;margin-top:-10px}
+.overview-content.active{display:block}
+.overview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:20px}
+.overview-card{background:rgba(255,255,255,0.03);border-radius:12px;padding:20px;border:1px solid rgba(255,255,255,0.08)}
+.overview-card h3{color:#00d4aa;font-size:1rem;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.1)}
+.overview-card.bull h3{color:#00d4aa}
+.overview-card.bear h3{color:#ff6b6b}
+.overview-card.risks h3{color:#fdcb6e}
+.overview-card p{margin-bottom:10px;line-height:1.6;font-size:0.9rem}
+.overview-card ul{list-style:none;padding:0}
+.overview-card li{padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:0.88rem;line-height:1.5}
+.overview-card li:last-child{border-bottom:none}
+.overview-card li::before{content:"›";color:#00d4aa;margin-right:8px;font-weight:700}
+.overview-card.bear li::before{color:#ff6b6b}
+.overview-card.risks li::before{color:#fdcb6e}
+.risk-high{color:#ff6b6b;font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-left:6px}
+.risk-moderate{color:#fdcb6e;font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-left:6px}
+.revenue-stream{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.revenue-stream .pct{color:#00d4aa;font-weight:700;white-space:nowrap;font-size:1rem}
+.moat-factor{margin-bottom:10px;padding:8px 10px;background:rgba(0,212,170,0.05);border-radius:6px;border-left:3px solid rgba(0,212,170,0.4)}
+.moat-factor .mf-name{font-weight:600;font-size:0.87rem;color:#e0e0e0}
+.moat-factor .mf-strength{font-size:0.75rem;color:#00d4aa;text-transform:uppercase;letter-spacing:.5px}
+.iv-cards-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:15px;margin-top:16px}
+.iv-card{background:rgba(255,255,255,0.04);border-radius:10px;padding:16px;text-align:center;border:1px solid rgba(255,255,255,0.1)}
+.iv-card.bull{border-color:rgba(0,212,170,0.3)}
+.iv-card.bear{border-color:rgba(255,107,107,0.3)}
+.iv-card.weighted{border-color:rgba(253,203,110,0.3)}
+.iv-label{font-size:0.75rem;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.iv-value{font-size:1.5rem;font-weight:700;color:#00d4aa}
+.iv-card.bear .iv-value{color:#ff6b6b}
+.iv-card.weighted .iv-value{color:#fdcb6e}
+.iv-upside{font-size:0.8rem;margin-top:4px}
+.positive{color:#00d4aa}
+.negative{color:#ff6b6b}
+
+/* KPI Cards */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px;margin-bottom:30px;max-width:1400px;margin-left:auto;margin-right:auto}
+.kpi-card{background:rgba(255,255,255,0.05);border-radius:12px;padding:20px;text-align:center;border:1px solid rgba(255,255,255,0.1);transition:transform .3s,box-shadow .3s}
+.kpi-card:hover{transform:translateY(-4px);box-shadow:0 10px 30px rgba(0,212,170,0.15)}
+.kpi-value{font-size:1.8rem;font-weight:700;color:#00d4aa;margin-bottom:4px}
+.kpi-label{font-size:0.8rem;color:#888;text-transform:uppercase;letter-spacing:1px}
+.kpi-change{font-size:0.88rem;margin-top:5px}
+.kpi-sub{font-size:0.78rem;color:#666;margin-top:3px}
+
+/* Guidance */
+.guidance-section{max-width:1400px;margin:0 auto 30px}
+.guidance-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
+.guidance-header h3{color:#fff;font-size:1.15rem;display:flex;align-items:center;gap:10px}
+.guidance-header h3::before{content:'';display:inline-block;width:4px;height:20px;background:linear-gradient(180deg,#00d4aa,#00b894);border-radius:2px}
+.guidance-meta{font-size:0.85rem;color:#888}
+.guidance-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:15px;margin-bottom:16px}
+.guidance-card{background:rgba(255,255,255,0.05);border-radius:12px;padding:18px;border:1px solid rgba(255,255,255,0.1)}
+.guidance-metric{font-size:0.78rem;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.guidance-target{font-size:1.3rem;font-weight:600;color:#00d4aa;margin-bottom:6px}
+.guidance-period{font-size:0.85rem;color:#e0e0e0;margin-bottom:8px}
+.guidance-vs-prior{display:inline-block;font-size:0.72rem;padding:3px 8px;border-radius:4px;font-weight:500}
+.guidance-vs-prior.raised{background:rgba(0,212,170,0.15);color:#00d4aa}
+.guidance-vs-prior.lowered{background:rgba(255,107,107,0.15);color:#ff6b6b}
+.guidance-vs-prior.maintained{background:rgba(255,255,255,0.08);color:#888}
+.guidance-vs-prior.new{background:rgba(99,102,241,0.15);color:#818cf8}
+.guidance-notes{font-size:0.78rem;color:#666;margin-top:8px;line-height:1.4}
+.guidance-commentary{background:rgba(255,255,255,0.03);border-radius:10px;padding:16px 20px;border-left:3px solid #00d4aa;font-style:italic;color:#b0b0b0;line-height:1.6;font-size:0.9rem}
+.guidance-commentary::before{content:'"';font-size:1.4rem;color:#00d4aa;margin-right:4px}
+
+/* Charts */
+.section-title{font-size:1.4rem;color:#fff;margin:40px auto 20px;padding-bottom:10px;border-bottom:2px solid rgba(0,212,170,0.3);max-width:1400px;display:flex;align-items:center;gap:12px}
+.section-title::before{content:'';display:inline-block;width:5px;height:24px;background:linear-gradient(180deg,#00d4aa,#00b894);border-radius:3px}
+.charts-container{display:grid;grid-template-columns:repeat(auto-fit,minmax(500px,1fr));gap:25px;max-width:1400px;margin:0 auto}
+.charts-container.single{grid-template-columns:1fr}
+.charts-container.three{grid-template-columns:repeat(auto-fit,minmax(420px,1fr))}
+.chart-card{background:rgba(255,255,255,0.05);border-radius:15px;padding:25px;border:1px solid rgba(255,255,255,0.1)}
+.chart-card.wide{grid-column:1/-1}
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.chart-header h3{color:#fff;font-size:1.1rem;display:flex;align-items:center;gap:10px}
+.chart-header h3::before{content:'';display:inline-block;width:4px;height:18px;background:linear-gradient(180deg,#00d4aa,#00b894);border-radius:2px}
+.help-btn{width:24px;height:24px;border-radius:50%;background:rgba(0,212,170,0.2);border:1px solid #00d4aa;color:#00d4aa;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0}
+.help-btn:hover{background:#00d4aa;color:#1a1a2e}
+.chart-wrapper{position:relative;height:300px}
+.chart-wrapper.tall{height:360px}
+
+/* Capex highlight note */
+.capex-note{background:rgba(253,203,110,0.07);border:1px solid rgba(253,203,110,0.25);border-radius:8px;padding:10px 14px;margin-top:14px;font-size:0.8rem;color:#c8a84b;line-height:1.5}
+
+/* Modal */
+.modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:1000;justify-content:center;align-items:center;padding:20px}
+.modal-overlay.active{display:flex}
+.modal{background:linear-gradient(135deg,#1e2a4a 0%,#16213e 100%);border-radius:16px;max-width:600px;width:100%;max-height:82vh;overflow-y:auto;border:1px solid rgba(0,212,170,0.3);box-shadow:0 20px 60px rgba(0,0,0,0.6)}
+.modal-header{padding:20px 25px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#1e2a4a;border-radius:16px 16px 0 0;z-index:1}
+.modal-header h3{color:#00d4aa;font-size:1.3rem;margin:0}
+.modal-close{width:32px;height:32px;border-radius:50%;background:rgba(255,107,107,0.2);border:1px solid #ff6b6b;color:#ff6b6b;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.modal-close:hover{background:#ff6b6b;color:#fff}
+.modal-body{padding:25px;line-height:1.75;font-size:0.92rem}
+.modal-body p{margin-bottom:14px}
+.modal-body strong{color:#00d4aa}
+.modal-body ul{margin:12px 0;padding-left:20px}
+.modal-body li{margin-bottom:8px}
+.metric-highlight{background:rgba(0,212,170,0.08);border-left:3px solid #00d4aa;padding:12px 15px;margin:14px 0;border-radius:0 8px 8px 0;font-size:0.88rem}
+
+/* DCF Section */
+.dcf-warning-banner{max-width:1400px;margin:0 auto 20px;padding:16px 20px;background:rgba(253,203,110,0.08);border:1px solid rgba(253,203,110,0.3);border-radius:10px;font-size:0.9rem;line-height:1.6;color:#d0d0d0}
+.dcf-section{max-width:1400px;margin:0 auto 40px}
+.dcf-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px;margin-bottom:28px}
+.dcf-card{background:rgba(255,255,255,0.05);border-radius:12px;padding:24px;text-align:center;border:1px solid rgba(255,255,255,0.1);transition:transform .3s}
+.dcf-card:hover{transform:translateY(-3px)}
+.dcf-card.highlight{background:rgba(0,212,170,0.1);border-color:rgba(0,212,170,0.35)}
+.dcf-label{font-size:0.82rem;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.dcf-value{font-size:2.1rem;font-weight:700;color:#00d4aa}
+.dcf-card:not(.highlight) .dcf-value{color:#fff}
+.dcf-change{font-size:.95rem;margin-top:8px;font-weight:600}
+.dcf-sublabel{font-size:0.78rem;color:#666;margin-top:8px;line-height:1.4}
+.dcf-inputs{background:rgba(255,255,255,0.03);border-radius:12px;padding:20px;margin-bottom:24px;border:1px solid rgba(255,255,255,0.08)}
+.dcf-inputs h4{color:#e0e0e0;margin-bottom:14px;font-size:0.95rem}
+.dcf-inputs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px}
+.dcf-input-card{background:rgba(255,255,255,0.03);border-radius:8px;padding:12px;text-align:center;border:1px solid rgba(255,255,255,0.06)}
+.dcf-input-label{font-size:0.73rem;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.dcf-input-value{font-size:1.25rem;font-weight:600;color:#00d4aa}
+.dcf-input-note{font-size:0.7rem;color:#666;margin-top:4px;line-height:1.3}
+.fcf-projections h5{color:#b0b0b0;font-size:0.88rem;margin-bottom:10px}
+.fcf-projection-table{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;background:rgba(0,0,0,0.2);border-radius:8px;padding:12px}
+.fcf-projection-item{text-align:center}
+.fcf-projection-item.header{font-size:0.72rem;color:#888;font-weight:600}
+.fcf-projection-item .fcf-value{font-size:.95rem;color:#e0e0e0;font-weight:500}
+.fcf-projection-item .growth-rate{font-size:.72rem;color:#00d4aa;margin-top:2px}
+.fcf-projection-item .fcf-neg{font-size:.95rem;color:#ff6b6b;font-weight:500}
+.dcf-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;margin-bottom:28px;padding:24px;background:rgba(255,255,255,0.03);border-radius:12px;border:1px solid rgba(255,255,255,0.08)}
+.slider-group{display:flex;flex-direction:column;gap:10px}
+.slider-group label{font-size:.92rem;color:#e0e0e0;display:flex;justify-content:space-between}
+.slider-group label span{color:#00d4aa;font-weight:600}
+.slider-group input[type=range]{-webkit-appearance:none;width:100%;height:6px;border-radius:3px;background:rgba(255,255,255,0.1);outline:none}
+.slider-group input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#00d4aa;cursor:pointer;transition:transform .2s}
+.slider-group input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.2)}
+.slider-hint{font-size:.78rem;color:#666}
+.scenario-tabs{display:flex;gap:10px;margin-bottom:18px}
+.scenario-tab{padding:10px 24px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:#888;border-radius:8px;cursor:pointer;font-size:.93rem;transition:all .2s}
+.scenario-tab:hover{border-color:rgba(0,212,170,0.5);color:#e0e0e0}
+.scenario-tab.active{background:rgba(0,212,170,0.15);border-color:#00d4aa;color:#00d4aa}
+.scenario-details{background:rgba(255,255,255,0.03);border-radius:12px;padding:20px;margin-bottom:28px;border:1px solid rgba(255,255,255,0.08)}
+.scenario-details h4{color:#00d4aa;margin-bottom:14px;font-size:.95rem}
+.assumption-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px}
+.assumption-item .label{font-size:.78rem;color:#888;margin-bottom:4px}
+.assumption-item .value{font-size:1.1rem;color:#e0e0e0;font-weight:500}
+.sensitivity-section{margin-bottom:28px}
+.sensitivity-section h4{color:#e0e0e0;margin-bottom:14px;font-size:.95rem}
+.sensitivity-table{width:100%;border-collapse:collapse;background:rgba(255,255,255,0.03);border-radius:8px;overflow:hidden;font-size:.88rem}
+.sensitivity-table th,.sensitivity-table td{padding:11px 14px;text-align:center;border:1px solid rgba(255,255,255,0.07)}
+.sensitivity-table th{background:rgba(0,212,170,0.1);color:#00d4aa;font-weight:600}
+.sensitivity-table td{color:#e0e0e0}
+.sensitivity-table td.cell-highlight{background:rgba(0,212,170,0.15);color:#00d4aa;font-weight:700}
+.sensitivity-table td.above-price{color:#00d4aa}
+.sensitivity-table td.below-price{color:#ff6b6b}
+.historical-growth{margin-bottom:28px}
+.historical-growth h4{color:#e0e0e0;margin-bottom:14px;font-size:.95rem}
+.growth-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px}
+.growth-item{background:rgba(255,255,255,0.03);border-radius:8px;padding:14px;text-align:center;border:1px solid rgba(255,255,255,0.07)}
+.growth-item.selected{border-color:#00d4aa;background:rgba(0,212,170,0.08)}
+.growth-item .metric{font-size:.78rem;color:#888;margin-bottom:5px}
+.growth-item .rate{font-size:1.15rem;font-weight:600}
+.rate.pos{color:#00d4aa}
+.rate.neg{color:#ff6b6b}
+.dcf-download{text-align:center;margin-top:28px}
+.download-btn{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;background:rgba(0,212,170,0.12);border:1px solid #00d4aa;border-radius:8px;color:#00d4aa;text-decoration:none;font-weight:600;font-size:.95rem;transition:all .2s}
+.download-btn:hover{background:#00d4aa;color:#1a1a2e}
+.fcf-cycle-table{width:100%;border-collapse:collapse;font-size:.84rem;margin-top:14px}
+.fcf-cycle-table th,.fcf-cycle-table td{padding:8px 12px;border:1px solid rgba(255,255,255,0.08);text-align:right}
+.fcf-cycle-table th{background:rgba(0,212,170,0.08);color:#00d4aa;text-align:center}
+.fcf-cycle-table td:first-child{text-align:left;color:#888}
+.fcf-cycle-table td.neg{color:#ff6b6b}
+.fcf-cycle-table td.pos{color:#00d4aa}
+
+@media(max-width:768px){
+.charts-container{grid-template-columns:1fr}
+.overview-grid{grid-template-columns:1fr}
+.header h1{font-size:1.7rem}
+.dcf-summary{grid-template-columns:1fr 1fr}
+.fcf-projection-table{grid-template-columns:repeat(3,1fr)}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Alphabet Inc. (GOOG)</h1>
+  <p>Communication Services / Internet &nbsp;|&nbsp; <span class="header-moat">Wide Moat</span></p>
+  <div class="header-meta">
+    <span>Current Price: <strong class="header-price">$346.08</strong></span>
+    <span>Base IV: <strong>$267.46</strong></span>
+    <span>Upside: <strong class="negative">-22.7%</strong></span>
+    <span>FY2025 Revenue: <strong>$402.8B</strong></span>
+    <span>As of: <strong>June 24, 2026</strong></span>
+  </div>
+</div>
+
+<!-- Investment Overview -->
+<div class="overview-section">
+  <button class="overview-toggle" onclick="toggleOverview()">
+    <span>Investment Overview &amp; Analysis</span>
+    <span class="arrow">&#9660;</span>
+  </button>
+  <div class="overview-content" id="overviewContent">
+    <div class="overview-grid">
+
+      <div class="overview-card">
+        <h3>Company Overview</h3>
+        <p>Alphabet Inc. is the parent company of Google, the world's dominant search engine, and a diversified technology conglomerate operating across digital advertising, cloud computing, hardware, and autonomous vehicles. Its Google Services segment generated $342.7B of FY2025 revenue (85% of total), while Google Cloud contributed $58.7B (15%) and is accelerating rapidly. Alphabet crossed $400B in annual revenue for the first time in FY2025 ($402.8B), with FY2025 operating income of $129.0B (32% margin).</p>
+        <p>Q1 2026 revenue was $109.9B (+22% YoY) with a 36.1% operating margin, demonstrating continued operating leverage even as AI infrastructure capex ramps dramatically toward the guided $180-190B in FY2026.</p>
+        <div class="iv-cards-row">
+          <div class="iv-card bull">
+            <div class="iv-label">Bull IV</div>
+            <div class="iv-value">$433</div>
+            <div class="iv-upside positive">+25.1% upside</div>
+          </div>
+          <div class="iv-card">
+            <div class="iv-label">Base IV</div>
+            <div class="iv-value" style="color:#e0e0e0">$267</div>
+            <div class="iv-upside negative">-22.7% downside</div>
+          </div>
+          <div class="iv-card bear">
+            <div class="iv-label">Bear IV</div>
+            <div class="iv-value">$38</div>
+            <div class="iv-upside negative">-89.1% downside</div>
+          </div>
+          <div class="iv-card weighted">
+            <div class="iv-label">Prob-Weighted</div>
+            <div class="iv-value">$251</div>
+            <div class="iv-upside negative">-27.3% downside</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="overview-card">
+        <h3>Revenue Streams</h3>
+        <ul>
+          <li><div class="revenue-stream"><span>Google Search &amp; Other (ads)</span><span class="pct">~56%</span></div><div style="font-size:0.78rem;color:#888;margin-top:3px">World's largest ad auction; ~90% global search market share</div></li>
+          <li><div class="revenue-stream"><span>Google Cloud (GCP + Workspace)</span><span class="pct">~15%</span></div><div style="font-size:0.78rem;color:#888;margin-top:3px">FY2025 $58.7B, +29% YoY; Q1 2026 $20.0B, +63% YoY; $240B backlog</div></li>
+          <li><div class="revenue-stream"><span>Google Subscriptions, Platforms &amp; Devices</span><span class="pct">~12%</span></div><div style="font-size:0.78rem;color:#888;margin-top:3px">Google One, YouTube Premium, Pixel, Nest; 350M paid subscribers</div></li>
+          <li><div class="revenue-stream"><span>YouTube Ads</span><span class="pct">~10%</span></div><div style="font-size:0.78rem;color:#888;margin-top:3px">FY2025 ~$40.4B ad revenue; total YouTube revenue exceeded $60B</div></li>
+          <li><div class="revenue-stream"><span>Google Network (AdSense/AdX)</span><span class="pct">~7%</span></div><div style="font-size:0.78rem;color:#888;margin-top:3px">Declining; antitrust remedy risk (Ad Tech case)</div></li>
+          <li><div class="revenue-stream"><span>Other Bets (Waymo, Verily, Wing)</span><span class="pct">&lt;1%</span></div><div style="font-size:0.78rem;color:#888;margin-top:3px">FY2025 $1.5B revenue, -$3.6B op loss; Waymo valued ~$110B standalone</div></li>
+        </ul>
+      </div>
+
+      <div class="overview-card">
+        <h3>Competitive Position</h3>
+        <p><strong>Key Competitors:</strong> Microsoft (Bing/Azure), Meta, Amazon (AWS/retail media), Apple, OpenAI (ChatGPT), Anthropic, Perplexity, ByteDance/TikTok</p>
+        <p><strong>Market Position:</strong> ~90% global search share; #3 cloud behind AWS (31%) and Azure (24%) with fastest hyperscaler growth; world's largest video platform (YouTube); Gemini chatbot grew from 15% to 25% U.S. daily share Jan 2025 to Jan 2026.</p>
+        <div class="moat-factor"><div class="mf-name">Search Distribution &amp; Data Flywheel</div><div class="mf-strength">Strong — 2.5B monthly AI Overviews users</div></div>
+        <div class="moat-factor"><div class="mf-name">Advertising Network Effects</div><div class="mf-strength">Strong — largest ad auction globally</div></div>
+        <div class="moat-factor"><div class="mf-name">Android / Chrome Ecosystem</div><div class="mf-strength">Strong — 72% global smartphone OS share</div></div>
+        <div class="moat-factor"><div class="mf-name">AI Infrastructure (TPUs / DeepMind)</div><div class="mf-strength">Moderate-Strong — $91B FY2025 capex</div></div>
+      </div>
+
+      <div class="overview-card risks">
+        <h3>Key Risks</h3>
+        <ul>
+          <li>Search monopoly remedies: 10-year ban on exclusive default agreements; DOJ &amp; 35 states appealing for stronger remedies. MS estimates $15-25B annual ad revenue risk.<span class="risk-high">HIGH</span></li>
+          <li>Ad Tech antitrust: Judge Brinkema found illegal monopoly in ad server/exchange; DOJ seeks AdX divestiture; ruling pending 2026.<span class="risk-high">HIGH</span></li>
+          <li>AI disruption to Search: ChatGPT (900M WAU), Perplexity training users to bypass Google; AI Overviews reduced publisher click-through 58%.<span class="risk-high">HIGH</span></li>
+          <li>AI capex super-cycle risk: $180-190B FY2026 capex (44% of revenue) suppresses FCF for 2-3 years; FY2027 capex guided even higher.<span class="risk-high">HIGH</span></li>
+          <li>AI talent attrition: Gemini co-lead Noam Shazeer departed to OpenAI (June 2026); DeepMind Nobel laureate John Jumper joined Anthropic (June 2026).<span class="risk-moderate">MODERATE</span></li>
+          <li>Advertising cyclicality: 84% revenue from ads; recessions compress Search/YouTube CPMs rapidly.<span class="risk-moderate">MODERATE</span></li>
+          <li>EU DMA / global regulation: Ongoing enforcement reducing default placement advantages internationally.<span class="risk-moderate">MODERATE</span></li>
+        </ul>
+      </div>
+
+      <div class="overview-card bull">
+        <h3>Bull Case</h3>
+        <ul>
+          <li>Google Cloud at inflection: Q1 2026 +63% YoY, $240B contracted backlog, Vertex AI/TPU differentiation — Cloud is the most visible growth catalyst and is barely in its third year of profitability.</li>
+          <li>AI Overviews proving bear case wrong: Search grew 19% YoY in Q1 2026 despite ChatGPT's rise; AI Mode monetizes at parity with traditional Search; 2.5B monthly users expand the market.</li>
+          <li>$180-190B capex builds an infrastructure moat that benefits Search, Cloud, YouTube, and Gemini simultaneously — competitors face a multi-year lag to match compute scale.</li>
+          <li>Antitrust outcomes were less severe than feared: Chrome and Android not ordered divested; no structural Search breakup.</li>
+          <li>Waymo optionality: ~$110B standalone valuation, 400K weekly rides, global expansion underway — not in the DCF, ~$9/share embedded option value.</li>
+        </ul>
+      </div>
+
+      <div class="overview-card bear">
+        <h3>Bear Case</h3>
+        <ul>
+          <li>$180-190B FY2026 capex is historically unprecedented for Alphabet (44%+ of revenue); if AI demand disappoints, the capital cycle will take years to unwind and will suppress FCF and ROIC.</li>
+          <li>AI is structurally disintermediating the link-based web: AI Overviews reduced click-through rates to publishers 58%; OpenAI and Perplexity are training the next generation to bypass Google.</li>
+          <li>Antitrust overhang remains: Search remedy under appeal; Ad Tech remedy pending; EU DMA enforcement ongoing; private publisher litigation escalating.</li>
+          <li>AI talent attrition (Shazeer to OpenAI, Jumper to Anthropic) signals frontier labs increasingly outcompete Alphabet for the best researchers.</li>
+          <li>Advertising concentration: 84% of revenue; Amazon retail media ($50B+/year) now directly competes for performance advertising dollars.</li>
+        </ul>
+      </div>
+
+      <div class="overview-card">
+        <h3>Recent Developments</h3>
+        <ul>
+          <li><strong>Jun 2026:</strong> Gemini co-lead Noam Shazeer departed to OpenAI; DeepMind VP John Jumper (Nobel laureate) joined Anthropic. Shares -6%. Google hired 20+ Contextual AI researchers in response.</li>
+          <li><strong>May 2026 (Google I/O):</strong> Biggest Search redesign in 25 years — AI Mode (Gemini 3.5 Flash) becomes default globally; exceeded 1B monthly users. New agentic Search, multi-modal input announced.</li>
+          <li><strong>Apr 2026 (Q1 Earnings):</strong> Revenue $109.9B (+22%), operating margin 36.1%, Cloud +63% to $20.0B, net income $62.6B (+81% including $8B equity gains). FY2026 capex raised to $180-190B.</li>
+          <li><strong>Feb 2026 (Q4/FY2025 Earnings):</strong> First year exceeding $400B revenue. FY2025 capex $91.4B. Initial FY2026 capex guidance $175-185B. DOJ appealed Search remedy.</li>
+          <li><strong>Feb 2026:</strong> Waymo raised $16B at ~$110B valuation; expansion to London, Tokyo, 20+ new cities.</li>
+          <li><strong>Sep 2025:</strong> Judge Mehta issued Search remedies — exclusive default agreements banned 10 years; Chrome/Android divestiture rejected.</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="kpi-grid" style="margin-bottom:30px;margin-top:0">
+  <div class="kpi-card">
+    <div class="kpi-value" id="kpiRevenue">$402.8B</div>
+    <div class="kpi-label">FY2025 Revenue</div>
+    <div class="kpi-change positive" id="kpiRevenueChg">+15.1% YoY</div>
+    <div class="kpi-sub">vs $350.0B in FY2024</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">$129.0B</div>
+    <div class="kpi-label">Operating Income</div>
+    <div class="kpi-change positive">+14.8% YoY</div>
+    <div class="kpi-sub">32.0% operating margin</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">$132.2B</div>
+    <div class="kpi-label">Net Income</div>
+    <div class="kpi-change positive">+32.0% YoY</div>
+    <div class="kpi-sub">32.8% net margin</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">$73.3B</div>
+    <div class="kpi-label">Free Cash Flow</div>
+    <div class="kpi-change positive">+0.7% YoY</div>
+    <div class="kpi-sub">FCF compressed by $91B capex</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">59.7%</div>
+    <div class="kpi-label">Gross Margin</div>
+    <div class="kpi-change positive">+1.5pp YoY</div>
+    <div class="kpi-sub">vs 58.2% in FY2024</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">$10.93</div>
+    <div class="kpi-label">EPS (FY2025)</div>
+    <div class="kpi-change positive">+33.3% YoY</div>
+    <div class="kpi-sub">vs $8.20 in FY2024</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">$91.4B</div>
+    <div class="kpi-label">CapEx (FY2025)</div>
+    <div class="kpi-change negative">+74.1% YoY</div>
+    <div class="kpi-sub">$180-190B guided FY2026</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-value">22.7%</div>
+    <div class="kpi-label">CapEx / Revenue</div>
+    <div class="kpi-change negative">vs 15.0% in FY2024</div>
+    <div class="kpi-sub">~44% est. in FY2026</div>
+  </div>
+</div>
+
+<!-- Guidance -->
+<div class="guidance-section">
+  <div class="guidance-header">
+    <h3>Management Guidance</h3>
+    <span class="guidance-meta">As of Q1 2026 Earnings (April 2026) | FY2026</span>
+  </div>
+  <div class="guidance-grid">
+    <div class="guidance-card">
+      <div class="guidance-metric">Capital Expenditures</div>
+      <div class="guidance-target">$180B – $190B</div>
+      <div class="guidance-period">FY2026</div>
+      <span class="guidance-vs-prior raised">Raised</span>
+      <div class="guidance-notes">Raised from initial $175-185B. ~100% increase vs. FY2025 actual of $91.4B. Predominantly AI servers, data centers, and networking. FY2027 capex expected to increase further.</div>
+    </div>
+    <div class="guidance-card">
+      <div class="guidance-metric">Google Cloud Growth</div>
+      <div class="guidance-target">Accelerating (no explicit FY target)</div>
+      <div class="guidance-period">FY2026</div>
+      <span class="guidance-vs-prior raised">Raised</span>
+      <div class="guidance-notes">Q1 2026 Cloud grew 63% YoY to $20.0B, accelerating from FY2025's ~29%. $240B contracted backlog cited as visibility into sustained growth.</div>
+    </div>
+    <div class="guidance-card">
+      <div class="guidance-metric">Operating Margin</div>
+      <div class="guidance-target">~34-35% analyst consensus (no explicit guide)</div>
+      <div class="guidance-period">FY2026</div>
+      <span class="guidance-vs-prior maintained">Not Guided</span>
+      <div class="guidance-notes">Q1 2026 margin was 36.1% (+200bps YoY). As capex depreciation ramps, margin pressure expected H2 2026. No explicit full-year target provided.</div>
+    </div>
+    <div class="guidance-card">
+      <div class="guidance-metric">Search Revenue</div>
+      <div class="guidance-target">No explicit guidance</div>
+      <div class="guidance-period">FY2026</div>
+      <span class="guidance-vs-prior maintained">Not Guided</span>
+      <div class="guidance-notes">Q1 2026 Search grew 19% YoY. Management expressed confidence AI Overviews monetize at parity with traditional Search and returns users more frequently.</div>
+    </div>
+  </div>
+  <div class="guidance-commentary">CEO Sundar Pichai (Q1 2026 call): "We have never been more excited about the opportunities we see ahead. Our AI investments continue to drive strong returns across Search, Cloud, and YouTube." CFO Anat Ashkenazi noted the $180-190B capex range reflects "significant customer demand in Cloud and strategic investment in our AI infrastructure," with the company confident in long-term ROI.</div>
+</div>
+
+<!-- ============ CHARTS ============ -->
+
+<h2 class="section-title">Revenue &amp; Growth</h2>
+<div class="charts-container">
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>Annual Revenue (FY2015 – FY2025)</h3>
+      <button class="help-btn" onclick="openModal('revenue')">?</button>
+    </div>
+    <div class="chart-wrapper"><canvas id="chartRevenue"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>Quarterly Revenue Trend</h3>
+      <button class="help-btn" onclick="openModal('qrevenue')">?</button>
+    </div>
+    <div class="chart-wrapper"><canvas id="chartQRevenue"></canvas></div>
+  </div>
+</div>
+
+<h2 class="section-title">Profitability</h2>
+<div class="charts-container">
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>Operating Income &amp; Margin</h3>
+      <button class="help-btn" onclick="openModal('opIncome')">?</button>
+    </div>
+    <div class="chart-wrapper"><canvas id="chartOpIncome"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>Net Income &amp; Net Margin</h3>
+      <button class="help-btn" onclick="openModal('netIncome')">?</button>
+    </div>
+    <div class="chart-wrapper"><canvas id="chartNetIncome"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>Gross Margin Trend</h3>
+      <button class="help-btn" onclick="openModal('grossMargin')">?</button>
+    </div>
+    <div class="chart-wrapper"><canvas id="chartGrossMargin"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>EPS (Annual)</h3>
+      <button class="help-btn" onclick="openModal('eps')">?</button>
+    </div>
+    <div class="chart-wrapper"><canvas id="chartEPS"></canvas></div>
+  </div>
+</div>
+
+<h2 class="section-title">The AI CapEx Super-Cycle — Central Investment Thesis</h2>
+<div class="charts-container">
+  <div class="chart-card wide">
+    <div class="chart-header">
+      <h3>CapEx vs. Operating Cash Flow vs. Free Cash Flow</h3>
+      <button class="help-btn" onclick="openModal('capex')">?</button>
+    </div>
+    <div class="chart-wrapper tall"><canvas id="chartCapex"></canvas></div>
+    <div class="capex-note">
+      <strong style="color:#fdcb6e">AI CapEx Super-Cycle:</strong> CapEx jumped from $32B (FY2023) to $52B (FY2024) to $91B (FY2025), with $180-190B guided for FY2026 and FY2027 expected higher still. Operating Cash Flow continues to grow strongly (+62% from FY2023 to FY2025), but FCF is compressed as CapEx outpaces OCF growth. FCF is expected to trough in FY2026-27 before recovering as AI infrastructure begins monetizing across Search, Cloud, and Gemini.
+    </div>
+  </div>
+</div>
+<div class="charts-container three" style="margin-top:25px">
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>CapEx / Revenue Ratio</h3>
+      <button class="help-btn" onclick="openModal('capexRatio')">?</button>
+    </div>
+    <div class="chart-wrapper"><canvas id="chartCapexRatio"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>FCF vs. Net Income</h3>
+      <button class="help-btn" onclick="openModal('fcfVsNI')">?</button>
+    </div>
+    <div class="chart-wrapper"><canvas id="chartFcfNI"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3>YoY Revenue Growth Rate</h3>
+      <button class="help-btn" onclick="openModal('revenueGrowth')">?</button>
+    </div>
+    <div class="chart-wrapper"><canvas id="chartRevenueGrowth"></canvas></div>
+  </div>
+</div>
+
+<!-- DCF WARNING BANNER -->
+<div class="dcf-warning-banner">
+  <strong style="color:#fdcb6e">Model approach &amp; sanity-check correction:</strong> The initial DCF (pre-fix) produced a base intrinsic value of $193.85/share implying a P/E of 17.7x — below Alphabet's 10-year trough P/E of 19.0x (the 2022 ad-recession low). No plausible non-catastrophic scenario justifies a sub-trough multiple for a business growing revenue 10-14% with a net-cash balance sheet. The sanity check tripped on two compounding errors: (1) the FCF path front-loaded full $185-200B capex with insufficient OCF growth, yielding Year 1 FCF of only $8B — mathematically inconsistent with Q1 2026 OCF of $45.8B already annualizing to ~$183B; (2) WACC of 9.5% was too punitive for a net-cash mega-cap with ~1.0 beta. The corrected model smooths the FCF trough (Year 1 FCF $29B, grounded in the Q1 2026 OCF run-rate), lowers WACC to 8.5% (retaining a 0.5% antitrust/execution risk premium), and adds an 18x EV/EBITDA exit-multiple cap anchored to the 10-year historical average. The corrected base IV of $267/share implies P/E 24.5x and EV/EBITDA 19.2x — squarely within Alphabet's historical range and appropriate for a wide-moat franchise. The model still shows ~23% downside from the current $346 price, with the gap attributable to the market pricing in faster AI monetization (Cloud, AI Mode ads, Gemini subscriptions) and option value in Waymo (~$9/share at $110B standalone valuation) and Gemini as a platform not yet captured in near-term FCF.
+</div>
+
+<!-- DCF SECTION -->
+<h2 class="section-title">DCF Valuation</h2>
+<div class="dcf-section">
+
+  <div class="dcf-summary">
+    <div class="dcf-card highlight">
+      <div class="dcf-label">Base Intrinsic Value</div>
+      <div class="dcf-value" id="dcfIV">$267</div>
+      <div class="dcf-change negative" id="dcfUpside">-22.7% vs current</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Entry Price (15% CAGR)</div>
+      <div class="dcf-value" id="dcfEntry">$170</div>
+      <div class="dcf-sublabel">Buy below for 15% annual return</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Current Price</div>
+      <div class="dcf-value">$346</div>
+      <div class="dcf-sublabel">As of June 24, 2026</div>
+    </div>
+    <div class="dcf-card">
+      <div class="dcf-label">Prob-Weighted IV</div>
+      <div class="dcf-value">$251</div>
+      <div class="dcf-sublabel">25% Bull / 50% Base / 25% Bear</div>
+    </div>
+  </div>
+
+  <!-- Scenario IV summary -->
+  <div class="dcf-summary" style="grid-template-columns:repeat(3,1fr);margin-bottom:24px">
+    <div class="dcf-card" style="border-color:rgba(0,212,170,0.3)">
+      <div class="dcf-label">Bull Case IV</div>
+      <div class="dcf-value" style="color:#00d4aa">$433</div>
+      <div class="dcf-sublabel positive">+25.1% upside &bull; OCF +35% Y1 &bull; WACC 8.0%</div>
+    </div>
+    <div class="dcf-card" style="border-color:rgba(255,255,255,0.2)">
+      <div class="dcf-label">Base Case IV</div>
+      <div class="dcf-value" style="color:#e0e0e0">$267</div>
+      <div class="dcf-sublabel" style="color:#888">-22.7% downside &bull; OCF +30% Y1 &bull; WACC 8.5%</div>
+    </div>
+    <div class="dcf-card" style="border-color:rgba(255,107,107,0.3)">
+      <div class="dcf-label">Bear Case IV</div>
+      <div class="dcf-value" style="color:#ff6b6b">$38</div>
+      <div class="dcf-sublabel negative">-89.1% downside &bull; OCF +8% Y1 &bull; WACC 11.0%</div>
+    </div>
+  </div>
+
+  <!-- DCF Inputs -->
+  <div class="dcf-inputs">
+    <h4>Model Inputs (Base Case — OCF minus Absolute CapEx Methodology)</h4>
+    <div class="dcf-inputs-grid">
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Base Year OCF</div>
+        <div class="dcf-input-value">$164.7B</div>
+        <div class="dcf-input-note">FY2025 actual; Q1 2026 annualizes to ~$183B</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Base Year FCF</div>
+        <div class="dcf-input-value">$73.3B</div>
+        <div class="dcf-input-note">Temporarily compressed by AI capex cycle</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Net Cash</div>
+        <div class="dcf-input-value" style="color:#00d4aa">+$70B</div>
+        <div class="dcf-input-note">Cash $30.7B + securities $64.3B – debt $25B</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">Shares Outstanding</div>
+        <div class="dcf-input-value">12.1B</div>
+        <div class="dcf-input-note">Declining ~1% annually via buybacks</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">FY2026 CapEx Guide</div>
+        <div class="dcf-input-value" style="color:#fdcb6e">$180-190B</div>
+        <div class="dcf-input-note">~100% increase vs FY2025; FY2027 higher still</div>
+      </div>
+      <div class="dcf-input-card">
+        <div class="dcf-input-label">WACC</div>
+        <div class="dcf-input-value">8.5%</div>
+        <div class="dcf-input-note">Net-cash mega-cap + 0.5% antitrust premium</div>
+      </div>
+    </div>
+
+    <!-- Base FCF projections table -->
+    <div class="fcf-projections">
+      <h5>Base Case FCF Projections — OCF grows at declining rates; absolute CapEx peaks FY2026-27 then normalizes</h5>
+      <table class="fcf-cycle-table">
+        <thead>
+          <tr><th>Year</th><th>Y1 (FY26)</th><th>Y2 (FY27)</th><th>Y3 (FY28)</th><th>Y4 (FY29)</th><th>Y5 (FY30)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>OCF Growth</td><td>+30%</td><td>+15%</td><td>+12%</td><td>+10%</td><td>+8%</td></tr>
+          <tr><td>OCF ($B)</td><td class="pos">$214B</td><td class="pos">$246B</td><td class="pos">$276B</td><td class="pos">$303B</td><td class="pos">$328B</td></tr>
+          <tr><td>CapEx ($B)</td><td class="neg">-$185B</td><td class="neg">-$195B</td><td class="neg">-$168B</td><td class="neg">-$138B</td><td class="neg">-$107B</td></tr>
+          <tr><td>FCF ($B)</td><td class="neg">$29B</td><td class="neg">$51B</td><td class="pos">$108B</td><td class="pos">$165B</td><td class="pos">$220B</td></tr>
+          <tr><td>FCF Margin</td><td class="neg">6.2%</td><td class="neg">9.5%</td><td class="pos">17.9%</td><td class="pos">25.0%</td><td class="pos">30.8%</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Interactive Sliders -->
+  <div class="dcf-controls">
+    <div class="slider-group">
+      <label>OCF Growth Rate (Y1): <span id="growthValue">30%</span></label>
+      <input type="range" id="growthSlider" min="5" max="40" value="30" step="1">
+      <div class="slider-hint">Based on Q1 2026 OCF run-rate (+30% YoY). Revenue 3yr CAGR is 12.5%.</div>
+    </div>
+    <div class="slider-group">
+      <label>WACC: <span id="waccValue">8.5%</span></label>
+      <input type="range" id="waccSlider" min="6" max="14" value="8.5" step="0.5">
+      <div class="slider-hint">Net-cash mega-cap baseline. 8.5% retains 0.5% antitrust/AI risk premium.</div>
+    </div>
+    <div class="slider-group">
+      <label>Terminal Growth Rate: <span id="terminalValue">3.0%</span></label>
+      <input type="range" id="terminalSlider" min="1" max="5" value="3" step="0.5">
+      <div class="slider-hint">Long-run nominal GDP growth. Above 3% requires persistent above-market growth.</div>
+    </div>
+  </div>
+
+  <!-- Scenario Tabs -->
+  <div class="scenario-tabs">
+    <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+    <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+    <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+  </div>
+
+  <div class="scenario-details">
+    <h4 id="scenarioTitle">Base Case Assumptions</h4>
+    <div class="assumption-grid" id="assumptionGrid"></div>
+    <p style="font-size:0.82rem;color:#888;margin-top:14px" id="scenarioDesc"></p>
+  </div>
+
+  <!-- Sensitivity Matrix -->
+  <div class="sensitivity-section">
+    <h4>Sensitivity Analysis: Intrinsic Value per Share by WACC &amp; Terminal Growth (Base FCF Path)</h4>
+    <p style="font-size:0.8rem;color:#888;margin-bottom:12px">Current price $346.08 is exceeded only in the most optimistic corner (WACC 7-8%, TG 3.5-4%). Green = above current price. Red = below current price.</p>
+    <div style="overflow-x:auto">
+      <table class="sensitivity-table" id="sensitivityMatrix"></table>
+    </div>
+  </div>
+
+  <!-- Historical Growth -->
+  <div class="historical-growth">
+    <h4>Historical Growth Rates (CAGR) — Divergence Warning</h4>
+    <p style="font-size:0.82rem;color:#fdcb6e;margin-bottom:12px">EPS 3yr CAGR (32.8%) diverges materially from Revenue CAGR (12.5%) due to buybacks and margin expansion. FCF CAGR is artificially suppressed by the AI capex ramp. Revenue 3yr CAGR best represents core business trajectory and is used as the selected growth rate.</p>
+    <div class="growth-grid" id="growthGrid"></div>
+  </div>
+
+  <div class="dcf-download">
+    <a href="GOOG_DCF_Model.xlsx" class="download-btn" download>
+      <span style="font-size:1.2rem">&#8681;</span> Download Excel Model
+    </a>
+  </div>
+</div>
+
+<!-- Modal overlay -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modalTitle">Metric</h3>
+      <button class="modal-close" onclick="closeModal()">&#x2715;</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+// ===================== EMBEDDED DATA =====================
+const csvData = `Period,Revenue,CostOfRevenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,NetIncome,NetMargin,EPS,FreeCashFlow,OperatingCashFlow,CapEx,ShareholdersEquity,TotalDebt,CashAndEquivalents,SharesOutstanding
+FY2015,74989,28164,46825,62.4,19360,25.8,16348,21.8,1.19,16109,26024,9915,120331,1995,16549,13746
+FY2016,90272,35138,55134,61.1,23716,26.3,19478,21.6,1.41,25824,36036,10212,139036,3935,12918,13826
+FY2017,110855,45583,65272,58.9,26146,23.6,12662,11.4,0.91,23907,37091,13184,152502,3943,10715,13896
+FY2018,136819,59549,77270,56.5,26321,19.2,30736,22.5,2.21,22832,47971,25139,177628,3950,16701,13912
+FY2019,161857,71896,89961,55.6,34231,21.1,34343,21.2,2.49,30972,54520,23548,201442,3958,18498,13766
+FY2020,182527,84732,97795,53.6,41224,22.6,40269,22.1,2.98,42843,65124,22281,222544,13932,26465,13504
+FY2021,257637,110939,146698,56.9,78714,30.6,76033,29.5,5.74,67012,91652,24640,251635,14817,20945,13242
+FY2022,282836,126203,156633,55.4,74842,26.5,59972,21.2,4.67,60010,91495,31485,256144,14701,21879,12849
+FY2023,307394,133332,174062,56.6,84293,27.4,73795,24.0,5.92,69495,101746,32251,283379,11870,24048,12460
+FY2024,350018,146306,203712,58.2,112390,32.1,100118,28.6,8.20,72764,125299,52535,325084,10883,23466,12211
+FY2025,402836,162535,240301,59.7,129039,32.0,132170,32.8,10.93,73266,164713,91447,415265,25000,30708,12088
+Q1 2023,69787,30612,39175,56.1,17415,25.0,15051,21.6,1.17,17220,23509,6289,260894,,25924,12722
+Q2 2023,74604,31916,42688,57.2,21838,29.3,18368,24.6,1.44,,,,267141,,25929,12629
+Q3 2023,76693,33229,43464,56.7,21343,27.8,19689,25.7,1.55,,,,273202,,30702,12541
+Q4 2023,86310,35575,50735,58.8,23697,27.5,20687,24.0,1.64,,,,283379,11870,24048,12460
+Q1 2024,80539,33712,46827,58.1,25472,31.6,23662,29.4,1.89,16836,28848,12012,292844,,24493,12381
+Q2 2024,84742,35507,49235,58.1,27425,32.4,23619,27.9,1.89,,,,300753,,27225,12322
+Q3 2024,88268,36474,51794,58.7,28521,32.3,26301,29.8,2.12,,,,314119,,19959,12264
+Q4 2024,96469,40613,55856,57.9,30972,32.1,26536,27.5,2.15,,,,325084,10883,23466,12211
+Q1 2025,90234,36361,53873,59.7,30606,33.9,34540,38.3,2.81,18953,36150,17197,345267,10886,23264,12155
+Q2 2025,96428,39039,57389,59.5,31271,32.4,28196,29.2,2.31,,,,362916,23607,21036,12104
+Q3 2025,102346,41369,60977,59.6,31228,30.5,34979,34.2,2.87,,,,386867,21607,23090,12077
+Q4 2025,113828,45766,68062,59.8,35934,31.6,34455,30.3,2.82,,,,415265,25000,30708,12088
+Q1 2026,109896,41271,68625,62.4,39696,36.1,62578,56.9,5.11,10116,45790,35674,478746,25000,38063,12116`;
+
+const analysisData = {
+  ticker: "GOOG",
+  company_name: "Alphabet Inc.",
+  moat_rating: "Wide",
+  guidance: {
+    as_of: "Q1 2026 Earnings (April 2026)",
+    fiscal_year: "FY2026"
+  }
+};
+
+const dcfData = {
+  ticker: "GOOG",
+  current_price: 346.08,
+  inputs: {
+    shares_outstanding: 12100,
+    net_debt: -70000,
+    last_fcf: 73266,
+    last_ocf: 164713,
+    last_capex: 91447,
+    currency: "USD",
+    units: "millions"
+  },
+  historical_growth: {
+    revenue_3yr_cagr: 12.5,
+    revenue_5yr_cagr: 17.2,
+    eps_3yr_cagr: 32.8,
+    eps_5yr_cagr: 29.7,
+    equity_3yr_cagr: 17.5,
+    equity_5yr_cagr: 13.3,
+    fcf_3yr_cagr: 6.9,
+    fcf_4yr_cagr: 2.3,
+    selected_growth_rate: 12.5,
+    growth_rate_source: "revenue_3yr_cagr",
+    growth_divergence_warning: "EPS 3yr CAGR (32.8%) diverges materially from Revenue CAGR (12.5%) due to buybacks and margin expansion. FCF CAGR understated due to AI capex ramp. Revenue CAGR is most representative of underlying business trajectory."
+  },
+  assumptions: {
+    base: { description: "Alphabet executes on AI infrastructure investment with OCF growing ~30% in Y1 (consistent with Q1 2026 run-rate), decelerating to +8% by Y5. CapEx peaks at $185B in Y1 and $195B in Y2, then declines toward 15% of revenue by Y5 as the buildout completes.", ocf_growth_rates: [30, 15, 12, 10, 8], capex_absolute: [185000, 195000, 168000, 138000, 107200], wacc: 8.5, terminal_growth: 3.0, fcf_margin: 30.8 },
+    bull: { description: "Cloud/Gemini monetization accelerates sharply. OCF grows 35% in Y1. CapEx moderates faster as AI ROI clarity increases. Revenue grows 22% in Y1, decelerating to 10% by Y5.", ocf_growth_rates: [35, 20, 16, 13, 11], capex_absolute: [185000, 190000, 162000, 128000, 95000], wacc: 8.0, terminal_growth: 3.5, fcf_margin: 35.4 },
+    bear: { description: "AI disintermediates Search traffic materially. Antitrust remedies bite revenue. OCF grows only 8% in Y1. CapEx remains elevated as infrastructure commitment cannot be reversed quickly. FCF negative in Y1-Y2.", ocf_growth_rates: [8, 5, 4, 3, 3], capex_absolute: [185000, 195000, 185000, 170000, 155000], wacc: 11.0, terminal_growth: 2.0, fcf_margin: 9.2 }
+  },
+  projections: {
+    base: { fcf: [29127, 51246, 107795, 165375, 220445] },
+    bull: { fcf: [37363, 76835, 147529, 221767, 293242] },
+    bear: { fcf: [-7110, -8215, 9256, 30084, 51086] }
+  },
+  valuation: {
+    base: { intrinsic_value: 267.46, upside: -22.7 },
+    bull: { intrinsic_value: 433.09, upside: 25.1 },
+    bear: { intrinsic_value: 37.80, upside: -89.1 }
+  },
+  entry_price: { base: { entry_price: 169.63 } },
+  sensitivity: {
+    wacc_range: [7.0, 8.0, 9.0, 10.0, 11.0],
+    terminal_growth_range: [2.0, 2.5, 3.0, 3.5, 4.0],
+    matrix: [
+      [307.41, 338.30, 376.90, 426.54, 492.73],
+      [251.95, 272.24, 296.59, 326.35, 363.54],
+      [212.50, 226.68, 243.23, 262.78, 286.25],
+      [183.05, 193.42, 205.27, 218.94, 234.89],
+      [160.25, 168.10, 176.92, 186.92, 198.35]
+    ]
+  },
+  probability_weighted: { weighted_iv: 251.45, weighted_upside: -27.3 },
+  sanity_check: { passed: false }
+};
+
+// ===================== PARSE CSV =====================
+function parseCSV(csv) {
+  const lines = csv.trim().split('\n');
+  const headers = lines[0].split(',');
+  return lines.slice(1).map(line => {
+    const values = line.split(',');
+    const obj = {};
+    headers.forEach((h, i) => { obj[h.trim()] = values[i] ? values[i].trim() : ''; });
+    return obj;
+  });
+}
+
+const allData = parseCSV(csvData);
+const fyData = allData.filter(d => d.Period.startsWith('FY')).sort((a,b) => parseInt(a.Period.slice(2)) - parseInt(b.Period.slice(2)));
+const qData = allData.filter(d => !d.Period.startsWith('FY')).sort((a,b) => {
+  const ya = parseInt(a.Period.match(/\d{4}/)[0]), yb = parseInt(b.Period.match(/\d{4}/)[0]);
+  const qa = parseInt(a.Period.match(/Q(\d)/)?.[1]||0), qb = parseInt(b.Period.match(/Q(\d)/)?.[1]||0);
+  return ya !== yb ? ya - yb : qa - qb;
+});
+
+const fyLabels = fyData.map(d => d.Period);
+const qLabels = qData.map(d => d.Period);
+
+function v(d, key) { return parseFloat(d[key]) || 0; }
+function vArr(arr, key) { return arr.map(d => v(d, key)); }
+function pct(val, total) { return total ? ((val/total)*100).toFixed(1) : null; }
+
+// Chart defaults
+Chart.defaults.color = '#888';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+
+const colors = {
+  primary: '#00d4aa',
+  secondary: '#00b894',
+  blue: '#0984e3',
+  purple: '#6c5ce7',
+  yellow: '#fdcb6e',
+  red: '#ff6b6b',
+  teal: '#00cec9',
+  pink: '#fd79a8'
+};
+
+function makeGradient(ctx, color, alpha1=0.35, alpha2=0.02) {
+  const g = ctx.createLinearGradient(0,0,0,300);
+  const hex = color.replace('#','');
+  const r = parseInt(hex.slice(0,2),16), g2 = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
+  g.addColorStop(0, `rgba(${r},${g2},${b},${alpha1})`);
+  g.addColorStop(1, `rgba(${r},${g2},${b},${alpha2})`);
+  return g;
+}
+
+const baseScales = {
+  x: { ticks: { color:'#888', font:{size:11} }, grid: { color:'rgba(255,255,255,0.05)' } },
+  y: { ticks: { color:'#888', font:{size:11} }, grid: { color:'rgba(255,255,255,0.05)' } }
+};
+
+const basePlugin = {
+  legend: { labels: { color:'#e0e0e0', font:{size:11}, usePointStyle:true } },
+  tooltip: { backgroundColor:'rgba(20,30,50,0.95)', titleColor:'#00d4aa', bodyColor:'#e0e0e0', borderColor:'rgba(0,212,170,0.3)', borderWidth:1 }
+};
+
+// ===================== CHARTS =====================
+
+// 1. Annual Revenue
+(function(){
+  const ctx = document.getElementById('chartRevenue').getContext('2d');
+  const revs = vArr(fyData, 'Revenue').map(v => v/1000);
+  new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: fyLabels,
+      datasets:[{
+        label:'Revenue ($B)',
+        data: revs,
+        backgroundColor: fyData.map((_,i) => i === fyData.length-1 ? colors.primary : 'rgba(0,212,170,0.45)'),
+        borderColor: colors.primary,
+        borderWidth:1,
+        borderRadius:4
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ ...basePlugin, legend:{display:false}, tooltip:{
+        callbacks:{ label: ctx => `$${ctx.parsed.y.toFixed(1)}B` }
+      }},
+      scales:{ ...baseScales,
+        y:{ ...baseScales.y, ticks:{ ...baseScales.y.ticks, callback: v => `$${v}B` } }
+      }
+    }
+  });
+})();
+
+// 2. Quarterly Revenue
+(function(){
+  const ctx = document.getElementById('chartQRevenue').getContext('2d');
+  new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: qLabels,
+      datasets:[{
+        label:'Quarterly Revenue ($B)',
+        data: vArr(qData,'Revenue').map(v=>v/1000),
+        borderColor: colors.primary,
+        backgroundColor: makeGradient(ctx, '#00d4aa'),
+        fill:true,
+        tension:0.3,
+        pointRadius:4,
+        pointBackgroundColor: colors.primary
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ ...basePlugin, legend:{display:false},
+        tooltip:{ callbacks:{ label: ctx=>`$${ctx.parsed.y.toFixed(1)}B` } }
+      },
+      scales:{ ...baseScales,
+        y:{ ...baseScales.y, ticks:{...baseScales.y.ticks, callback:v=>`$${v}B`} }
+      }
+    }
+  });
+})();
+
+// 3. Operating Income & Margin
+(function(){
+  const ctx = document.getElementById('chartOpIncome').getContext('2d');
+  new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: fyLabels,
+      datasets:[
+        {
+          label:'Operating Income ($B)',
+          data: vArr(fyData,'OperatingIncome').map(v=>v/1000),
+          backgroundColor:'rgba(0,212,170,0.5)',
+          borderColor: colors.primary,
+          borderWidth:1,
+          borderRadius:4,
+          yAxisID:'y'
+        },
+        {
+          label:'Operating Margin (%)',
+          data: vArr(fyData,'OperatingMargin'),
+          borderColor: colors.yellow,
+          backgroundColor:'transparent',
+          type:'line',
+          tension:0.3,
+          pointRadius:4,
+          pointBackgroundColor: colors.yellow,
+          yAxisID:'y1'
+        }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ ...basePlugin, tooltip:{
+        callbacks:{ label: ctx => ctx.datasetIndex===0 ? `$${ctx.parsed.y.toFixed(1)}B` : `${ctx.parsed.y.toFixed(1)}%` }
+      }},
+      scales:{
+        ...baseScales,
+        y:{ ...baseScales.y, ticks:{...baseScales.y.ticks, callback:v=>`$${v}B`}, title:{display:true,text:'$B',color:'#888'} },
+        y1:{ position:'right', ticks:{color:'#fdcb6e', callback:v=>`${v}%`}, grid:{display:false}, title:{display:true,text:'Margin',color:'#fdcb6e'} }
+      }
+    }
+  });
+})();
+
+// 4. Net Income & Margin
+(function(){
+  const ctx = document.getElementById('chartNetIncome').getContext('2d');
+  new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: fyLabels,
+      datasets:[
+        {
+          label:'Net Income ($B)',
+          data: vArr(fyData,'NetIncome').map(v=>v/1000),
+          backgroundColor:'rgba(108,92,231,0.5)',
+          borderColor: colors.purple,
+          borderWidth:1,
+          borderRadius:4,
+          yAxisID:'y'
+        },
+        {
+          label:'Net Margin (%)',
+          data: vArr(fyData,'NetMargin'),
+          borderColor: colors.pink,
+          backgroundColor:'transparent',
+          type:'line',
+          tension:0.3,
+          pointRadius:4,
+          pointBackgroundColor: colors.pink,
+          yAxisID:'y1'
+        }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ ...basePlugin, tooltip:{
+        callbacks:{ label: ctx => ctx.datasetIndex===0 ? `$${ctx.parsed.y.toFixed(1)}B` : `${ctx.parsed.y.toFixed(1)}%` }
+      }},
+      scales:{
+        ...baseScales,
+        y:{ ...baseScales.y, ticks:{...baseScales.y.ticks, callback:v=>`$${v}B`} },
+        y1:{ position:'right', ticks:{color:colors.pink, callback:v=>`${v}%`}, grid:{display:false} }
+      }
+    }
+  });
+})();
+
+// 5. Gross Margin
+(function(){
+  const ctx = document.getElementById('chartGrossMargin').getContext('2d');
+  new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: fyLabels,
+      datasets:[{
+        label:'Gross Margin (%)',
+        data: vArr(fyData,'GrossMargin'),
+        borderColor: colors.teal,
+        backgroundColor: makeGradient(ctx, '#00cec9'),
+        fill:true,
+        tension:0.3,
+        pointRadius:5,
+        pointBackgroundColor: colors.teal
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ ...basePlugin, legend:{display:false},
+        tooltip:{ callbacks:{ label: ctx=>`${ctx.parsed.y.toFixed(1)}%` } }
+      },
+      scales:{
+        ...baseScales,
+        y:{ ...baseScales.y, min:48, max:66, ticks:{...baseScales.y.ticks, callback:v=>`${v}%`} }
+      }
+    }
+  });
+})();
+
+// 6. EPS
+(function(){
+  const ctx = document.getElementById('chartEPS').getContext('2d');
+  new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: fyLabels,
+      datasets:[{
+        label:'EPS (diluted)',
+        data: vArr(fyData,'EPS'),
+        backgroundColor: fyData.map((_,i) => i >= fyData.length-2 ? 'rgba(253,121,168,0.6)' : 'rgba(253,121,168,0.35)'),
+        borderColor: colors.pink,
+        borderWidth:1,
+        borderRadius:4
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ ...basePlugin, legend:{display:false},
+        tooltip:{ callbacks:{ label:ctx=>`$${ctx.parsed.y.toFixed(2)}` } }
+      },
+      scales:{ ...baseScales,
+        y:{ ...baseScales.y, ticks:{...baseScales.y.ticks, callback:v=>`$${v}`} }
+      }
+    }
+  });
+})();
+
+// 7. CapEx vs OCF vs FCF (THE BIG CHART)
+(function(){
+  const ctx = document.getElementById('chartCapex').getContext('2d');
+  // Include FY2026 guidance midpoint for CapEx
+  const extLabels = [...fyLabels, 'FY2026E'];
+  const ocfVals = [...vArr(fyData,'OperatingCashFlow').map(v=>v/1000), null];
+  const capexVals = [...vArr(fyData,'CapEx').map(v=>v/1000), 185];
+  const fcfVals = [...vArr(fyData,'FreeCashFlow').map(v=>v/1000), null];
+
+  new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: extLabels,
+      datasets:[
+        {
+          label:'Operating Cash Flow ($B)',
+          data: ocfVals,
+          backgroundColor:'rgba(9,132,227,0.5)',
+          borderColor: colors.blue,
+          borderWidth:1,
+          borderRadius:4,
+          yAxisID:'y'
+        },
+        {
+          label:'CapEx ($B)',
+          data: capexVals,
+          backgroundColor: capexVals.map((v,i) => i===extLabels.length-1 ? 'rgba(253,203,110,0.7)' : 'rgba(255,107,107,0.5)'),
+          borderColor: capexVals.map((v,i) => i===extLabels.length-1 ? colors.yellow : colors.red),
+          borderWidth:1,
+          borderRadius:4,
+          yAxisID:'y'
+        },
+        {
+          label:'Free Cash Flow ($B)',
+          data: fcfVals,
+          borderColor: colors.primary,
+          backgroundColor:'transparent',
+          type:'line',
+          tension:0.3,
+          pointRadius:5,
+          pointBackgroundColor: colors.primary,
+          borderWidth:2.5,
+          yAxisID:'y'
+        }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ ...basePlugin,
+        tooltip:{ callbacks:{ label: ctx => ctx.parsed.y != null ? `$${ctx.parsed.y.toFixed(1)}B` : 'N/A' } }
+      },
+      scales:{
+        ...baseScales,
+        y:{ ...baseScales.y, ticks:{...baseScales.y.ticks, callback:v=>`$${v}B`} }
+      }
+    }
+  });
+})();
+
+// 8. CapEx / Revenue Ratio
+(function(){
+  const ctx = document.getElementById('chartCapexRatio').getContext('2d');
+  const ratios = fyData.map(d => {
+    const rev = v(d,'Revenue'), cap = v(d,'CapEx');
+    return rev ? parseFloat(((cap/rev)*100).toFixed(1)) : null;
+  });
+  new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: fyLabels,
+      datasets:[{
+        label:'CapEx / Revenue (%)',
+        data: ratios,
+        borderColor: colors.yellow,
+        backgroundColor: makeGradient(ctx, '#fdcb6e', 0.3, 0.02),
+        fill:true,
+        tension:0.3,
+        pointRadius:5,
+        pointBackgroundColor: ratios.map((v,i) => i>=fyData.length-2 ? colors.red : colors.yellow)
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ ...basePlugin, legend:{display:false},
+        tooltip:{ callbacks:{ label:ctx=>`${ctx.parsed.y.toFixed(1)}%` } }
+      },
+      scales:{
+        ...baseScales,
+        y:{ ...baseScales.y, ticks:{...baseScales.y.ticks, callback:v=>`${v}%`} }
+      }
+    }
+  });
+})();
+
+// 9. FCF vs Net Income
+(function(){
+  const ctx = document.getElementById('chartFcfNI').getContext('2d');
+  new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: fyLabels,
+      datasets:[
+        {
+          label:'Net Income ($B)',
+          data: vArr(fyData,'NetIncome').map(v=>v/1000),
+          borderColor: colors.purple,
+          backgroundColor:'transparent',
+          tension:0.3,
+          pointRadius:4,
+          pointBackgroundColor: colors.purple,
+          borderDash:[4,2]
+        },
+        {
+          label:'Free Cash Flow ($B)',
+          data: vArr(fyData,'FreeCashFlow').map(v=>v/1000),
+          borderColor: colors.primary,
+          backgroundColor:'transparent',
+          tension:0.3,
+          pointRadius:4,
+          pointBackgroundColor: colors.primary
+        }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ ...basePlugin,
+        tooltip:{ callbacks:{ label:ctx=>`$${ctx.parsed.y.toFixed(1)}B` } }
+      },
+      scales:{ ...baseScales,
+        y:{ ...baseScales.y, ticks:{...baseScales.y.ticks, callback:v=>`$${v}B`} }
+      }
+    }
+  });
+})();
+
+// 10. YoY Revenue Growth
+(function(){
+  const ctx = document.getElementById('chartRevenueGrowth').getContext('2d');
+  const growths = fyData.map((d,i) => {
+    if(i===0) return null;
+    const curr = v(d,'Revenue'), prev = v(fyData[i-1],'Revenue');
+    return prev ? parseFloat(((curr-prev)/prev*100).toFixed(1)) : null;
+  });
+  new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: fyLabels,
+      datasets:[{
+        label:'YoY Revenue Growth (%)',
+        data: growths,
+        backgroundColor: growths.map(g => g==null ? 'transparent' : g>=20 ? 'rgba(0,212,170,0.6)' : g>=10 ? 'rgba(0,212,170,0.4)' : 'rgba(253,203,110,0.5)'),
+        borderColor: growths.map(g => g==null ? 'transparent' : g>=20 ? colors.primary : g>=10 ? 'rgba(0,212,170,0.7)' : colors.yellow),
+        borderWidth:1,
+        borderRadius:4
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ ...basePlugin, legend:{display:false},
+        tooltip:{ callbacks:{ label:ctx=>ctx.parsed.y!=null?`${ctx.parsed.y.toFixed(1)}%`:'N/A' } }
+      },
+      scales:{ ...baseScales,
+        y:{ ...baseScales.y, ticks:{...baseScales.y.ticks, callback:v=>`${v}%`} }
+      }
+    }
+  });
+})();
+
+// ===================== MODAL CONTENT =====================
+const metricDescriptions = {
+  revenue: {
+    title: 'Annual Revenue',
+    content: `<p><strong>Revenue</strong> is Alphabet's total income from all segments across a fiscal year (January–December).</p>
+    <div class="metric-highlight"><strong>For Alphabet:</strong> Revenue grew from $75B (FY2015) to $403B (FY2025) — a 10-year CAGR of ~18%. Google Search & Other (~56%) plus YouTube Ads (~10%) plus Google Network (~7%) comprise roughly 73% of revenue, meaning advertising dominates. Google Cloud is the fastest-growing segment at ~15% of revenue, expanding at 29% YoY in FY2025 and 63% YoY in Q1 2026.</div>
+    <p><strong>What to watch:</strong></p>
+    <ul>
+      <li>Search revenue growth: resilience against AI-native search competitors (ChatGPT, Perplexity)</li>
+      <li>Cloud revenue growth rate and margin progression</li>
+      <li>Revenue mix shift: Cloud growing to 20%+ of total is a valuation re-rating catalyst</li>
+      <li>The 2022 deceleration (growth fell from 41% in 2021 to 10% in 2022) shows how cyclical the ad business is</li>
+    </ul>`
+  },
+  qrevenue: {
+    title: 'Quarterly Revenue Trend',
+    content: `<p><strong>Quarterly revenue</strong> tracks Alphabet's seasonal patterns and near-term growth trajectory.</p>
+    <div class="metric-highlight"><strong>For Alphabet:</strong> Q4 is consistently the strongest quarter due to holiday advertising spend. Q1 2026 revenue was $109.9B (+22% YoY), significantly above analyst consensus of $106.8B, signaling continued strong demand for Search, YouTube, and Cloud.</div>
+    <p><strong>What to watch:</strong></p>
+    <ul>
+      <li>Quarter-over-quarter acceleration or deceleration in Cloud (fastest-growing segment)</li>
+      <li>Search revenue in Q1 and Q3 (softer seasonally) vs. Q4 (strong holiday season)</li>
+      <li>Impact of AI Mode and AI Overviews on Search monetization going forward</li>
+    </ul>`
+  },
+  opIncome: {
+    title: 'Operating Income & Operating Margin',
+    content: `<p><strong>Operating income</strong> is revenue minus cost of revenue and operating expenses (R&D, S&M, G&A). <strong>Operating margin</strong> is operating income as a percentage of revenue.</p>
+    <div class="metric-highlight"><strong>For Alphabet:</strong> FY2025 operating margin was 32.0%, up from 27.4% in FY2023 — demonstrating significant operating leverage as revenue grew faster than costs. The 2022 trough (26.5% margin) reflects ad recession headwinds. Q1 2026 margin expanded further to 36.1%, despite the capex ramp, because depreciation on new AI assets lags capex spend by 1-3 years.</div>
+    <p><strong>What to watch:</strong></p>
+    <ul>
+      <li>Margin trajectory in H2 2026 as $185B+ capex begins depreciating into P&L</li>
+      <li>Cloud segment margin: turned profitable in 2025, currently ~17% — expansion toward 25-30% is a key catalyst</li>
+      <li>Other Bets losses: Waymo SBC charges inflated losses to $3.6B in FY2025</li>
+    </ul>`
+  },
+  netIncome: {
+    title: 'Net Income & Net Margin',
+    content: `<p><strong>Net income</strong> is the bottom-line profit after all expenses, interest, and taxes. <strong>Net margin</strong> is net income as a percentage of revenue.</p>
+    <div class="metric-highlight"><strong>For Alphabet:</strong> FY2025 net income of $132.2B was significantly above FY2024's $100.1B (+32% YoY), partly due to equity investment gains. FY2017 had an anomalous dip (net margin 11.4%) due to the $3B EU antitrust fine. Q1 2026 net income of $62.6B (+81% YoY) included an ~$8B gain from equity investments — elevated and non-recurring.</div>
+    <p><strong>What to watch:</strong></p>
+    <ul>
+      <li>Exclude one-time equity investment gains to assess underlying earnings power</li>
+      <li>Effective tax rate: Alphabet benefits from significant R&D tax credits</li>
+      <li>Impact of antitrust fines (EU has levied $8B+ cumulatively over the past decade)</li>
+    </ul>`
+  },
+  grossMargin: {
+    title: 'Gross Margin Trend',
+    content: `<p><strong>Gross margin</strong> is revenue minus cost of revenue, expressed as a percentage of revenue.</p>
+    <div class="metric-highlight"><strong>For Alphabet:</strong> Gross margin declined from 62% in FY2015 to a trough of 53.6% in FY2020, primarily as Google Cloud (lower margin) grew as a share of revenue. Since FY2022 the trend reversed — gross margin expanded to 59.7% in FY2025 and 62.4% in Q1 2026, reflecting Cloud margin improvement, Search AI efficiency, and favorable revenue mix.</div>
+    <p><strong>What to watch:</strong></p>
+    <ul>
+      <li>Continued gross margin expansion as Cloud reaches scale profitability</li>
+      <li>TPU cost efficiency vs. third-party GPU procurement — Alphabet's custom silicon is a gross margin lever</li>
+      <li>YouTube's content acquisition costs and revenue share with creators</li>
+    </ul>`
+  },
+  eps: {
+    title: 'Earnings Per Share (EPS)',
+    content: `<p><strong>EPS</strong> is net income divided by diluted shares outstanding.</p>
+    <div class="metric-highlight"><strong>For Alphabet:</strong> EPS appears to have jumped dramatically in FY2021 ($5.74) and again post-split. In July 2022, Alphabet completed a 20-for-1 stock split. Pre-split EPS figures are retroactively adjusted in most databases. The apparent EPS CAGR of 32.8% (3yr) is inflated by buybacks (~1% share count reduction/year), margin expansion, and Q1 2026 equity investment gains — not simply revenue growth of 12.5%.</div>
+    <p><strong>What to watch:</strong></p>
+    <ul>
+      <li>Separate buyback impact from operating EPS growth</li>
+      <li>Exclude one-time equity gains from Q1 2026 ($8B gain inflated EPS to $5.11)</li>
+      <li>EPS growth should roughly track operating income growth (~15%) once buyback effects normalize</li>
+    </ul>`
+  },
+  capex: {
+    title: 'CapEx vs. OCF vs. FCF — The AI Capex Super-Cycle',
+    content: `<p><strong>Operating Cash Flow (OCF)</strong> is cash generated from operations before investing activities. <strong>Capital Expenditures (CapEx)</strong> are investments in property, plant, and equipment. <strong>Free Cash Flow (FCF)</strong> = OCF minus CapEx.</p>
+    <div class="metric-highlight"><strong>The critical story for Alphabet:</strong> CapEx jumped from $32B (FY2023) to $52B (FY2024) to $91B (FY2025), with $180-190B guided for FY2026 and management guiding FY2027 will be higher still. This is an unprecedented level of capital intensity for a company Alphabet's size — FY2026 capex represents ~44% of FY2025 revenue. OCF continues to grow strongly ($102B FY2023 → $165B FY2025), but FCF is compressed as capex outpaces OCF growth. FCF has been essentially flat ($69-73B) for three years despite revenue growing $95B. FCF trough is expected in FY2026-27 before recovering as AI assets begin monetizing.</div>
+    <p><strong>What to watch:</strong></p>
+    <ul>
+      <li>Whether OCF continues growing at 25-30%+ rates (Q1 2026 OCF annualizes to ~$183B, on track)</li>
+      <li>Any signals of capex peak or moderation — management has not provided this yet</li>
+      <li>FCF recovery trajectory: base-case projects $108B FCF by FY2028 as capex begins normalizing</li>
+      <li>Return on incremental capital from AI infrastructure — Cloud backlog ($240B) is the key forward indicator</li>
+    </ul>`
+  },
+  capexRatio: {
+    title: 'CapEx / Revenue Ratio',
+    content: `<p>This ratio shows how much of Alphabet's revenue is being reinvested in physical capital (servers, data centers, networking).</p>
+    <div class="metric-highlight"><strong>For Alphabet:</strong> Historically 6-12% of revenue. In FY2025 this jumped to 22.7% ($91B on $403B revenue). At the $185B midpoint of FY2026 guidance on estimated revenue of ~$471B, the ratio reaches ~39-44% — historically unprecedented for a software/internet company. For comparison, semiconductor fabs typically run 15-25% capex/revenue. Alphabet is temporarily operating like a capital-intensive infrastructure business.</div>
+    <p><strong>What to watch:</strong></p>
+    <ul>
+      <li>When this ratio peaks and begins declining — a return toward 14-15% is the base-case model assumption by FY2030</li>
+      <li>Compare to AWS (Amazon segments out capex) and Azure (Microsoft total capex) for competitive context</li>
+      <li>Depreciation will follow capex by 1-2 years, pressuring operating margins in FY2027-28</li>
+    </ul>`
+  },
+  fcfVsNI: {
+    title: 'FCF vs. Net Income',
+    content: `<p>Comparing <strong>Free Cash Flow</strong> to <strong>Net Income</strong> reveals the quality of Alphabet's earnings.</p>
+    <div class="metric-highlight"><strong>For Alphabet:</strong> Historically, FCF tracked net income closely or exceeded it (FCF/NI ratio >1.0 in most years), reflecting strong cash conversion — a hallmark of wide-moat software businesses. In FY2025, FCF ($73B) significantly undershot net income ($132B) for the first time, due to: (1) $91B capex depressing FCF while (2) net income includes non-cash items and equity gains that don't consume cash. This divergence is expected to widen further in FY2026 as capex hits $185B+.</div>
+    <p><strong>What to watch:</strong></p>
+    <ul>
+      <li>FCF recovery relative to net income as the capex cycle matures (base-case FCF $220B by FY2030 vs. estimated NI ~$180B)</li>
+      <li>Stock-based compensation ($22B+ annually) is a real cost that reduces economic earnings relative to GAAP net income</li>
+    </ul>`
+  },
+  revenueGrowth: {
+    title: 'Year-over-Year Revenue Growth Rate',
+    content: `<p><strong>YoY revenue growth</strong> is the annual percentage change in total revenue.</p>
+    <div class="metric-highlight"><strong>For Alphabet:</strong> Growth has been cyclical — spiking in FY2021 (+41% COVID rebound), decelerating sharply in FY2022 (+10% ad recession), recovering to +14% in FY2025. The 3-year revenue CAGR of 12.5% is the DCF model's selected growth rate as the most stable indicator of underlying business momentum. Q1 2026 growth of +22% YoY may signal re-acceleration if Cloud (63% YoY) is pulling up the blended rate.</div>
+    <p><strong>What to watch:</strong></p>
+    <ul>
+      <li>Whether the Q1 2026 acceleration to 22% is sustained or a one-quarter event driven by Cloud</li>
+      <li>Search revenue growth rate specifically — any meaningful deceleration to &lt;10% would signal AI competitive pressure</li>
+      <li>Impact of antitrust search remedies on FY2026+ growth (choice screens could cost 5-8% of search traffic)</li>
+    </ul>`
+  }
+};
+
+function openModal(key) {
+  const d = metricDescriptions[key];
+  if(!d) return;
+  document.getElementById('modalTitle').textContent = d.title;
+  document.getElementById('modalBody').innerHTML = d.content;
+  document.getElementById('modalOverlay').classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+  if(event && event.target !== document.getElementById('modalOverlay')) return;
+  document.getElementById('modalOverlay').classList.remove('active');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if(e.key==='Escape') { document.getElementById('modalOverlay').classList.remove('active'); document.body.style.overflow=''; } });
+
+// ===================== OVERVIEW TOGGLE =====================
+function toggleOverview() {
+  const btn = document.querySelector('.overview-toggle');
+  const content = document.getElementById('overviewContent');
+  btn.classList.toggle('active');
+  content.classList.toggle('active');
+}
+
+// ===================== DCF LOGIC =====================
+
+// Render sensitivity matrix
+(function(){
+  const sens = dcfData.sensitivity;
+  const table = document.getElementById('sensitivityMatrix');
+  const currentPrice = dcfData.current_price;
+  const baseWacc = 8.5, baseTG = 3.0;
+
+  let html = '<thead><tr><th>WACC \\ Term G</th>';
+  sens.terminal_growth_range.forEach(tg => { html += `<th>${tg.toFixed(1)}%</th>`; });
+  html += '</tr></thead><tbody>';
+
+  sens.wacc_range.forEach((wacc, i) => {
+    html += `<tr><th>${wacc.toFixed(1)}%</th>`;
+    sens.matrix[i].forEach((val, j) => {
+      const isHighlight = Math.abs(wacc - baseWacc) < 0.01 && Math.abs(sens.terminal_growth_range[j] - baseTG) < 0.01;
+      const cls = isHighlight ? 'cell-highlight' : val >= currentPrice ? 'above-price' : 'below-price';
+      html += `<td class="${cls}">$${val}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  table.innerHTML = html;
+})();
+
+// Render historical growth rates
+(function(){
+  const growth = dcfData.historical_growth;
+  const grid = document.getElementById('growthGrid');
+  const selected = growth.growth_rate_source;
+  const metrics = [
+    {key:'revenue_3yr_cagr', label:'Revenue 3Y'},
+    {key:'revenue_5yr_cagr', label:'Revenue 5Y'},
+    {key:'eps_3yr_cagr', label:'EPS 3Y'},
+    {key:'eps_5yr_cagr', label:'EPS 5Y'},
+    {key:'equity_3yr_cagr', label:'Equity 3Y'},
+    {key:'equity_5yr_cagr', label:'Equity 5Y'},
+    {key:'fcf_3yr_cagr', label:'FCF 3Y'},
+    {key:'fcf_4yr_cagr', label:'FCF 4Y'}
+  ];
+  grid.innerHTML = metrics.map(m => {
+    const rate = growth[m.key];
+    const isSelected = m.key === selected;
+    const cls = rate >= 0 ? 'pos' : 'neg';
+    return `<div class="growth-item${isSelected?' selected':''}">
+      <div class="metric">${m.label}</div>
+      <div class="rate ${cls}">${rate>=0?'+':''}${rate.toFixed(1)}%</div>
+    </div>`;
+  }).join('');
+})();
+
+// DCF slider calculation (OCF minus absolute capex approach)
+function calculateDCF(ocfGrowthY1, wacc, terminalGrowth) {
+  const baseOCF = dcfData.inputs.last_ocf; // 164713
+  const capexPath = [185000, 195000, 168000, 138000, 107200]; // base case capex
+  const years = 5;
+
+  // OCF growth declines linearly from Y1 rate toward 8% by Y5
+  const endGrowth = 8;
+  const ocfGrowths = [];
+  for(let i=0; i<years; i++) {
+    ocfGrowths.push(ocfGrowthY1 > endGrowth
+      ? ocfGrowthY1 - (ocfGrowthY1 - endGrowth) * (i/(years-1))
+      : ocfGrowthY1);
+  }
+
+  let ocf = baseOCF;
+  let pvSum = 0;
+  let lastFCF = 0;
+  for(let i=0; i<years; i++) {
+    ocf = ocf * (1 + ocfGrowths[i]/100);
+    const fcf = ocf - capexPath[i];
+    const df = 1 / Math.pow(1 + wacc/100, i+1);
+    pvSum += fcf * df;
+    if(i===years-1) lastFCF = fcf;
+  }
+
+  const terminalFCF = lastFCF * (1 + terminalGrowth/100);
+  const tv = terminalFCF / (wacc/100 - terminalGrowth/100);
+  const pvTV = tv / Math.pow(1 + wacc/100, years);
+
+  const ev = pvSum + pvTV;
+  const equity = ev - dcfData.inputs.net_debt; // net_debt is -70000 so this adds 70000
+  const iv = equity / dcfData.inputs.shares_outstanding;
+
+  // Entry price for 15% CAGR
+  const tvPerShare = pvTV / dcfData.inputs.shares_outstanding;
+  const entryPrice = tvPerShare / Math.pow(1.15, years);
+
+  return { iv, entryPrice };
+}
+
+function updateDCFDisplay() {
+  const growth = parseFloat(document.getElementById('growthSlider').value);
+  const wacc = parseFloat(document.getElementById('waccSlider').value);
+  const terminal = parseFloat(document.getElementById('terminalSlider').value);
+
+  document.getElementById('growthValue').textContent = growth + '%';
+  document.getElementById('waccValue').textContent = wacc + '%';
+  document.getElementById('terminalValue').textContent = terminal.toFixed(1) + '%';
+
+  const result = calculateDCF(growth, wacc, terminal);
+  document.getElementById('dcfIV').textContent = '$' + Math.max(0, result.iv).toFixed(0);
+  document.getElementById('dcfEntry').textContent = '$' + Math.max(0, result.entryPrice).toFixed(0);
+
+  const upside = ((result.iv - dcfData.current_price) / dcfData.current_price * 100);
+  const el = document.getElementById('dcfUpside');
+  el.textContent = (upside>=0?'+':'') + upside.toFixed(1) + '% vs current';
+  el.className = 'dcf-change ' + (upside>=0?'positive':'negative');
+
+  // Update assumptions grid
+  updateAssumptionGrid(growth, wacc, terminal, result.iv, result.entryPrice);
+}
+
+function updateAssumptionGrid(growth, wacc, terminal, iv, entry) {
+  const grid = document.getElementById('assumptionGrid');
+  grid.innerHTML = `
+    <div class="assumption-item"><div class="label">OCF Growth Y1</div><div class="value">${growth}%</div></div>
+    <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc}%</div></div>
+    <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${terminal.toFixed(1)}%</div></div>
+    <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa">$${Math.max(0,iv).toFixed(0)}</div></div>
+    <div class="assumption-item"><div class="label">Entry Price</div><div class="value" style="color:#00d4aa">$${Math.max(0,entry).toFixed(0)}</div></div>
+  `;
+}
+
+function switchScenario(scenario) {
+  document.querySelectorAll('.scenario-tab').forEach(t => t.classList.toggle('active', t.dataset.scenario===scenario));
+  const a = dcfData.assumptions[scenario];
+  const v = dcfData.valuation[scenario];
+
+  document.getElementById('scenarioTitle').textContent =
+    scenario.charAt(0).toUpperCase()+scenario.slice(1) + ' Case Assumptions';
+  document.getElementById('scenarioDesc').textContent = a.description;
+
+  document.getElementById('growthSlider').value = a.ocf_growth_rates[0];
+  document.getElementById('waccSlider').value = a.wacc;
+  document.getElementById('terminalSlider').value = a.terminal_growth;
+
+  document.getElementById('growthValue').textContent = a.ocf_growth_rates[0] + '%';
+  document.getElementById('waccValue').textContent = a.wacc + '%';
+  document.getElementById('terminalValue').textContent = a.terminal_growth.toFixed(1) + '%';
+
+  document.getElementById('dcfIV').textContent = '$' + v.intrinsic_value.toFixed(0);
+  document.getElementById('dcfEntry').textContent = '$' + dcfData.entry_price.base.entry_price.toFixed(0);
+
+  const upside = v.upside;
+  const el = document.getElementById('dcfUpside');
+  el.textContent = (upside>=0?'+':'') + upside.toFixed(1) + '% vs current';
+  el.className = 'dcf-change ' + (upside>=0?'positive':'negative');
+
+  const grid = document.getElementById('assumptionGrid');
+  grid.innerHTML = `
+    <div class="assumption-item"><div class="label">OCF Growth Y1</div><div class="value">${a.ocf_growth_rates[0]}%</div></div>
+    <div class="assumption-item"><div class="label">OCF Growth Y5</div><div class="value">${a.ocf_growth_rates[4]}%</div></div>
+    <div class="assumption-item"><div class="label">FCF Margin Y5</div><div class="value">${a.fcf_margin}%</div></div>
+    <div class="assumption-item"><div class="label">WACC</div><div class="value">${a.wacc}%</div></div>
+    <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${a.terminal_growth.toFixed(1)}%</div></div>
+    <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa">$${v.intrinsic_value.toFixed(0)}</div></div>
+  `;
+}
+
+// Bind sliders
+document.getElementById('growthSlider').addEventListener('input', updateDCFDisplay);
+document.getElementById('waccSlider').addEventListener('input', updateDCFDisplay);
+document.getElementById('terminalSlider').addEventListener('input', updateDCFDisplay);
+
+// Initialize
+switchScenario('base');
+</script>
+</body>
+</html>
