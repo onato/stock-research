@@ -1,0 +1,1600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MercadoLibre (MELI) Financial Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0; min-height: 100vh; padding: 20px;
+        }
+        .header {
+            text-align: center; margin-bottom: 30px; padding: 20px;
+            background: rgba(255,255,255,0.05); border-radius: 15px; backdrop-filter: blur(10px);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4aa, #00b894);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+            margin-bottom: 10px;
+        }
+        .header p { color: #888; font-size: 1.1rem; }
+        .overview-section { max-width: 1400px; margin: 0 auto 30px; }
+        .overview-toggle {
+            width: 100%; background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.3);
+            border-radius: 12px; padding: 16px 24px; color: #00d4aa; font-size: 1.1rem; font-weight: 600;
+            cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+            transition: all 0.2s ease;
+        }
+        .overview-toggle:hover { background: rgba(0,212,170,0.2); }
+        .overview-toggle .arrow { transition: transform 0.3s ease; }
+        .overview-toggle.active .arrow { transform: rotate(180deg); }
+        .overview-content {
+            display: none; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);
+            border-top: none; border-radius: 0 0 12px 12px; padding: 30px; margin-top: -12px;
+        }
+        .overview-content.active { display: block; }
+        .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; }
+        .overview-card {
+            background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .overview-card h3 {
+            color: #00d4aa; font-size: 1.1rem; margin-bottom: 15px;
+            padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .overview-card p { margin-bottom: 12px; line-height: 1.6; }
+        .overview-card ul { list-style: none; padding: 0; margin: 0; }
+        .overview-card li { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); line-height: 1.5; }
+        .overview-card li:last-child { border-bottom: none; }
+        .overview-card.bull h3 { color: #00d4aa; }
+        .overview-card.bear h3 { color: #ff6b6b; }
+        .overview-card.risks h3 { color: #fdcb6e; }
+        .risk-high { color: #ff6b6b; }
+        .risk-moderate { color: #fdcb6e; }
+        .risk-low { color: #00d4aa; }
+        .revenue-stream { display: flex; justify-content: space-between; align-items: center; }
+        .revenue-stream .percent { color: #00d4aa; font-weight: 600; }
+        .trend-growing { color: #00d4aa; }
+        .trend-stable { color: #888; }
+        .trend-declining { color: #ff6b6b; }
+        .kpi-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px; margin-bottom: 30px; max-width: 1400px; margin-left: auto; margin-right: auto;
+        }
+        .kpi-card {
+            background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; text-align: center;
+            border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(0,212,170,0.2); }
+        .kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+        .kpi-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        .kpi-change { font-size: 0.9rem; margin-top: 5px; }
+        .kpi-change.positive { color: #00d4aa; }
+        .kpi-change.negative { color: #ff6b6b; }
+        .kpi-sub { font-size: 0.78rem; color: #666; margin-top: 3px; }
+        .guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+        .guidance-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .guidance-header h3 {
+            color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px;
+        }
+        .guidance-header h3::before {
+            content: ''; display: inline-block; width: 4px; height: 20px;
+            background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px;
+        }
+        .guidance-meta { font-size: 0.85rem; color: #888; }
+        .guidance-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px; margin-bottom: 20px;
+        }
+        .guidance-card {
+            background: rgba(255,255,255,0.05); border-radius: 12px; padding: 18px;
+            border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s ease;
+        }
+        .guidance-card:hover { transform: translateY(-2px); }
+        .guidance-metric { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+        .guidance-target { font-size: 1.1rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; line-height: 1.4; }
+        .guidance-period { font-size: 0.85rem; color: #e0e0e0; margin-bottom: 8px; }
+        .guidance-vs-prior {
+            display: inline-block; font-size: 0.75rem; padding: 3px 8px;
+            border-radius: 4px; font-weight: 500;
+        }
+        .guidance-vs-prior.raised { background: rgba(0,212,170,0.15); color: #00d4aa; }
+        .guidance-vs-prior.lowered { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+        .guidance-vs-prior.maintained { background: rgba(255,255,255,0.1); color: #888; }
+        .guidance-vs-prior.new { background: rgba(99,102,241,0.15); color: #818cf8; }
+        .guidance-notes { font-size: 0.8rem; color: #666; margin-top: 8px; line-height: 1.4; }
+        .guidance-commentary {
+            background: rgba(255,255,255,0.03); border-radius: 10px; padding: 16px 20px;
+            border-left: 3px solid #00d4aa; font-style: italic; color: #b0b0b0; line-height: 1.6;
+        }
+        .guidance-commentary::before { content: '"'; font-size: 1.5rem; color: #00d4aa; margin-right: 4px; }
+        .section-title {
+            font-size: 1.5rem; color: #fff; margin: 40px auto 20px;
+            padding-bottom: 10px; border-bottom: 2px solid rgba(0,212,170,0.3); max-width: 1400px;
+        }
+        .charts-container {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 25px; max-width: 1400px; margin: 0 auto;
+        }
+        .chart-card {
+            background: rgba(255,255,255,0.05); border-radius: 15px; padding: 25px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+        .chart-header h3 { color: #fff; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+        .chart-header h3::before {
+            content: ''; display: inline-block; width: 4px; height: 20px;
+            background: linear-gradient(180deg, #00d4aa, #00b894); border-radius: 2px;
+        }
+        .help-btn {
+            width: 24px; height: 24px; border-radius: 50%; background: rgba(0,212,170,0.2);
+            border: 1px solid #00d4aa; color: #00d4aa; font-size: 14px; font-weight: bold;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;
+        }
+        .help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+        .chart-wrapper { position: relative; height: 300px; }
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center;
+            align-items: center; padding: 20px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%); border-radius: 16px;
+            max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto;
+            border: 1px solid rgba(0,212,170,0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .modal-header {
+            padding: 20px 25px; border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .modal-header h3 { color: #00d4aa; font-size: 1.4rem; margin: 0; }
+        .modal-close {
+            width: 32px; height: 32px; border-radius: 50%; background: rgba(255,107,107,0.2);
+            border: 1px solid #ff6b6b; color: #ff6b6b; font-size: 20px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .modal-close:hover { background: #ff6b6b; color: #fff; }
+        .modal-body { padding: 25px; line-height: 1.7; }
+        .modal-body p { margin-bottom: 15px; }
+        .modal-body strong { color: #00d4aa; }
+        .modal-body ul { margin: 15px 0; padding-left: 20px; }
+        .modal-body li { margin-bottom: 8px; }
+        .metric-highlight {
+            background: rgba(0,212,170,0.1); border-left: 3px solid #00d4aa;
+            padding: 12px 15px; margin: 15px 0; border-radius: 0 8px 8px 0;
+        }
+        /* DCF */
+        .dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+        .dcf-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .dcf-card {
+            background: rgba(255,255,255,0.05); border-radius: 12px; padding: 24px; text-align: center;
+            border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s ease;
+        }
+        .dcf-card:hover { transform: translateY(-3px); }
+        .dcf-card.highlight { background: rgba(0,212,170,0.1); border-color: rgba(0,212,170,0.3); }
+        .dcf-label { font-size: 0.85rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .dcf-value { font-size: 2.2rem; font-weight: bold; color: #00d4aa; }
+        .dcf-card:not(.highlight) .dcf-value { color: #fff; }
+        .dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+        .dcf-change.positive { color: #00d4aa; }
+        .dcf-change.negative { color: #ff6b6b; }
+        .dcf-sublabel { font-size: 0.8rem; color: #666; margin-top: 8px; }
+        .dcf-warning {
+            background: rgba(253,203,110,0.15); border: 1px solid rgba(253,203,110,0.4);
+            border-radius: 8px; padding: 12px 16px; margin-bottom: 25px;
+            display: flex; align-items: center; gap: 10px; color: #fdcb6e;
+        }
+        .warning-icon { font-size: 1.2rem; }
+        .dcf-inputs {
+            background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px;
+            margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.08);
+        }
+        .dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+        .dcf-inputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .dcf-input-card {
+            background: rgba(255,255,255,0.03); border-radius: 8px; padding: 12px;
+            text-align: center; border: 1px solid rgba(255,255,255,0.05);
+        }
+        .dcf-input-label { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .dcf-input-value { font-size: 1.3rem; font-weight: 600; color: #00d4aa; }
+        .dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
+        .fcf-projections h5 { color: #b0b0b0; font-size: 0.9rem; margin-bottom: 10px; }
+        .fcf-projection-table {
+            display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px;
+            background: rgba(0,0,0,0.2); border-radius: 8px; padding: 12px;
+        }
+        .fcf-projection-item { text-align: center; }
+        .fcf-projection-item.header { font-size: 0.75rem; color: #888; font-weight: 600; }
+        .fcf-projection-item .fcf-value { font-size: 1rem; color: #e0e0e0; font-weight: 500; }
+        .fcf-projection-item .growth-rate { font-size: 0.75rem; color: #00d4aa; margin-top: 2px; }
+        .dcf-controls {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px; margin-bottom: 30px; padding: 25px;
+            background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);
+        }
+        .slider-group { display: flex; flex-direction: column; gap: 10px; }
+        .slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+        .slider-group label span { color: #00d4aa; font-weight: 600; }
+        .slider-group input[type="range"] {
+            -webkit-appearance: none; width: 100%; height: 6px;
+            border-radius: 3px; background: rgba(255,255,255,0.1); outline: none;
+        }
+        .slider-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
+            background: #00d4aa; cursor: pointer; transition: transform 0.2s;
+        }
+        .slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        .slider-hint { font-size: 0.8rem; color: #666; }
+        .scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .scenario-tab {
+            padding: 10px 24px; border: 1px solid rgba(255,255,255,0.2);
+            background: transparent; color: #888; border-radius: 8px; cursor: pointer;
+            font-size: 0.95rem; transition: all 0.2s;
+        }
+        .scenario-tab:hover { border-color: rgba(0,212,170,0.5); color: #e0e0e0; }
+        .scenario-tab.active { background: rgba(0,212,170,0.15); border-color: #00d4aa; color: #00d4aa; }
+        .scenario-details {
+            background: rgba(255,255,255,0.03); border-radius: 12px; padding: 20px;
+            margin-bottom: 30px; border: 1px solid rgba(255,255,255,0.08);
+        }
+        .scenario-details h4 { color: #00d4aa; margin-bottom: 15px; }
+        .assumption-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+        .assumption-item { text-align: center; }
+        .assumption-item .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+        .assumption-item .value { font-size: 1.1rem; color: #e0e0e0; font-weight: 500; }
+        .sensitivity-section { margin-bottom: 30px; }
+        .sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; }
+        .sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.03); border-radius: 8px; overflow: hidden; }
+        .sensitivity-table th, .sensitivity-table td { padding: 12px 16px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+        .sensitivity-table th { background: rgba(0,212,170,0.1); color: #00d4aa; font-weight: 600; }
+        .sensitivity-table td { color: #e0e0e0; }
+        .sensitivity-table td.highlight { background: rgba(0,212,170,0.15); color: #00d4aa; font-weight: 600; }
+        .sensitivity-table td.below-current { color: #ff6b6b; }
+        .sensitivity-table td.above-current { color: #00d4aa; }
+        .historical-growth { margin-bottom: 30px; }
+        .historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; }
+        .growth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
+        .growth-item {
+            background: rgba(255,255,255,0.03); border-radius: 8px; padding: 15px;
+            text-align: center; border: 1px solid rgba(255,255,255,0.08);
+        }
+        .growth-item .metric { font-size: 0.8rem; color: #888; margin-bottom: 6px; }
+        .growth-item .rate { font-size: 1.2rem; font-weight: 600; }
+        .growth-item .rate.positive { color: #00d4aa; }
+        .growth-item .rate.negative { color: #ff6b6b; }
+        .growth-item.selected { border-color: #00d4aa; background: rgba(0,212,170,0.1); }
+        .dcf-download { text-align: center; margin-top: 30px; }
+        .download-btn {
+            display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px;
+            background: rgba(0,212,170,0.15); border: 1px solid #00d4aa; border-radius: 8px;
+            color: #00d4aa; text-decoration: none; font-weight: 600; transition: all 0.2s;
+        }
+        .download-btn:hover { background: #00d4aa; color: #1a1a2e; }
+        .download-icon { font-size: 1.2rem; }
+        @media (max-width: 768px) {
+            .charts-container { grid-template-columns: 1fr; }
+            .overview-grid { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.8rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>MercadoLibre, Inc. (MELI)</h1>
+    <p>Latin America's Dominant E-Commerce & Fintech Ecosystem | Dashboard updated June 30, 2026</p>
+</div>
+
+<!-- Investment Overview -->
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview &amp; Analysis</span>
+        <span class="arrow">&#9660;</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid">
+            <div class="overview-card">
+                <h3>Company Overview</h3>
+                <p>MercadoLibre is Latin America's dominant e-commerce and fintech ecosystem, operating a marketplace, integrated logistics network (Mercado Envios), payments and digital banking (Mercado Pago), and credit services across 18 countries. Core markets: Brazil (~50% of revenue), Mexico (~25%), and Argentina (~20%). FY2025 revenue reached $28.9B (+39% YoY). Q1 2026 revenue surged 49% YoY to $8.85B while operating margin compressed to 6.9% as aggressive credit and free-shipping investment accelerated.</p>
+                <p><strong>Sector:</strong> E-Commerce &amp; Fintech (Latin America)</p>
+            </div>
+            <div class="overview-card">
+                <h3>Business Model</h3>
+                <p>Dual-engine model combining Commerce and Fintech — mutually reinforcing: commerce generates payment volume and credit data; fintech drives buyer loyalty, higher GMV per user, and financial inclusion.</p>
+                <ul>
+                    <li><div class="revenue-stream"><span>Commerce Services (marketplace, shipping, ads)</span><span class="percent trend-growing">43% &#8593;</span></div></li>
+                    <li><div class="revenue-stream"><span>Fintech Credit Revenues</span><span class="percent trend-growing">23% &#8593;&#8593;</span></div></li>
+                    <li><div class="revenue-stream"><span>Fintech Financial Services &amp; Acquiring</span><span class="percent trend-growing">22% &#8593;</span></div></li>
+                    <li><div class="revenue-stream"><span>Commerce Product Sales (1P retail)</span><span class="percent trend-growing">12% &#8593;</span></div></li>
+                </ul>
+                <p style="margin-top:10px; font-size:0.85rem; color:#888;">Geographic: Brazil ~50% | Mexico ~25% | Argentina ~20% | Other ~5%</p>
+            </div>
+            <div class="overview-card">
+                <h3>Competitive Position</h3>
+                <p><strong>Competitors:</strong> Amazon, Shopee (Sea Limited), Temu (PDD Holdings), Nubank, local traditional banks, Brazil PIX system</p>
+                <p><strong>Market Position:</strong> Dominant e-commerce leader in LatAm with 21-30% share; 83M fintech MAUs; 55%+ LatAm retail media ad share</p>
+                <p><strong>Moat Factors:</strong></p>
+                <ul>
+                    <li><span class="risk-low">Strong</span> — Integrated ecosystem flywheel (commerce + fintech lock-in)</li>
+                    <li><span class="risk-low">Strong</span> — Logistics infrastructure (Mercado Envios, 95% items shipped)</li>
+                    <li><span class="risk-low">Strong</span> — First-party data moat powering credit underwriting</li>
+                    <li><span class="risk-low">Strong</span> — Network effects: 121M annual buyers, 83M fintech MAUs</li>
+                    <li><span class="risk-low">Strong</span> — Brand leadership and NPS (30pt advantage vs traditional banks)</li>
+                </ul>
+            </div>
+            <div class="overview-card">
+                <h3>Growth Drivers</h3>
+                <ul>
+                    <li>E-commerce penetration doubling opportunity: LatAm at mid-teens vs 20%+ in developed markets; Brazil unique buyers +32% YoY in Q1'26 (fastest pace in 5 years), items sold +56% YoY</li>
+                    <li>Credit portfolio massive runway: $14.6B portfolio (+87% YoY); CEO describes credit card opportunity as "30-40-50x larger than current size"; 2.7M new cards/quarter</li>
+                    <li>Mexico acceleration: $4.6B investment in 2026 (+35% YoY), largest annual commitment ever; GMV growing 28-35% YoY; new mega logistics hub (80,000 sqm, ~1M packages/day)</li>
+                    <li>Advertising platform: Mercado Ads growing 63% FX-neutral; 55.6% LatAm retail media share vs Amazon 17.7%; still &lt;2% of GMV vs 5%+ at mature platforms</li>
+                    <li>MELI+ loyalty flywheel: Disney+, Netflix, HBO Max, Apple TV+ mega-bundle; driving principality and competitive differentiation</li>
+                    <li>Fintech principality: 83M MAUs (+29% YoY); principal user share up 11ppts in Brazil; AUM +77% YoY</li>
+                </ul>
+            </div>
+            <div class="overview-card risks">
+                <h3>Key Risks</h3>
+                <ul>
+                    <li><span class="risk-high">High</span> — Multi-front competition: Shopee surpassed MELI in Brazil order volume; Amazon escalating; Temu flooding LatAm</li>
+                    <li><span class="risk-high">High</span> — Provision for doubtful accounts doubled YoY to $1,244M in Q1'26 while net income fell 16%</li>
+                    <li><span class="risk-high">High</span> — Argentina hyperinflation (~20% revenue): FX losses in P&L, elevated effective tax rates, macro instability</li>
+                    <li><span class="risk-moderate">Moderate-High</span> — NIMAL compressed to 17.8% in Q1'26 (from 22.7% Q1'25); credit portfolio ($14.6B) largely unseasoned</li>
+                    <li><span class="risk-moderate">Moderate-High</span> — Brazil free shipping subsidies (R$19 threshold): management guided margins "will not materially change near-term"</li>
+                    <li><span class="risk-moderate">Moderate</span> — Rising leverage: net debt/EBITDA rose from 0.44x to 1.05x; $4.6B Mexico capex cycle ongoing</li>
+                </ul>
+            </div>
+            <div class="overview-card bull">
+                <h3>Bull Case</h3>
+                <ul>
+                    <li>49% revenue growth on a $28.9B base (Q1'26) is extraordinary structural share gain, not a recovery bounce</li>
+                    <li>Credit opportunity is multi-decade: $14.6B portfolio is a fraction of TAM in a region where majority of adults are underbanked</li>
+                    <li>Logistics moat deepening: unit shipping costs -17% YoY in Brazil even as volume surges; scale advantages compound</li>
+                    <li>Advertising highly undermonetized at &lt;2% of GMV vs 5%+ at mature platforms; 63% FX-neutral growth with near triple-digit Display &amp; Video</li>
+                    <li>Analyst consensus: 24 analysts with avg target ~$2,230 (~37% upside); Buy consensus. Stock down 38% from ATH — margin compression risk arguably priced in</li>
+                </ul>
+            </div>
+            <div class="overview-card bear">
+                <h3>Bear Case</h3>
+                <ul>
+                    <li>Provision growth broke from revenue growth: +106% YoY vs +49% revenue; net income fell 16% despite revenue surge. No near-term margin recovery catalyst</li>
+                    <li>Competition permanently raises cost of market share: Shopee at $7 ASP vs MELI $21; Amazon with 15-min grocery in Brazil; operating margin compressed from 13.5% to 6.9% in one year</li>
+                    <li>Stock down 38% from $2,614 ATH; Zacks downgraded to Strong Sell (Jun'26) citing 15.7% projected YoY EPS decline next quarter</li>
+                    <li>Argentina structural overhang unresolvable: ~20% revenue with hyperinflation FX losses in P&L — cannot be hedged away</li>
+                    <li>$14.6B credit portfolio unseasoned at scale: a LatAm recession could spike delinquencies across a portfolio never tested in a downturn at this size</li>
+                </ul>
+            </div>
+            <div class="overview-card">
+                <h3>Recent Developments</h3>
+                <ul>
+                    <li><strong>Q1 2026:</strong> Revenue $8.845B (+49% YoY, strongest since Q2'22); EPS $8.23 missed consensus $9.37 by 12%; provision $1,244M doubled YoY; stock -12.7% on earnings day</li>
+                    <li><strong>Q1 2026:</strong> Credit portfolio $14.6B (+87% YoY); NIMAL 17.8%; 2.7M new credit cards issued; 83M fintech MAUs (+29%)</li>
+                    <li><strong>Q1 2026:</strong> Brazil items sold +56% YoY; unique buyers +32% (fastest in 5 years); unit shipping cost -17% YoY. Free shipping at R$19 "here to stay"</li>
+                    <li><strong>2026:</strong> $4.6B Mexico investment commitment; XEM3 mega-hub opened (80,000 sqm); 8,500 new jobs</li>
+                    <li><strong>FY2025:</strong> Revenue $28.9B (+39%); net income $1.997B; EPS $39.40; operating margin 11.1% (vs 12.7% in FY2024)</li>
+                    <li><strong>Jun 2026:</strong> Stock ~$1,630, down ~17% YTD and ~38% from Jun'25 ATH of ~$2,614; analyst avg target ~$2,230</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div class="kpi-value">$8.85B</div>
+        <div class="kpi-label">Q1 2026 Revenue</div>
+        <div class="kpi-change positive">+49.0% YoY</div>
+        <div class="kpi-sub">Strongest growth since Q2 2022</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">$28.9B</div>
+        <div class="kpi-label">FY2025 Revenue</div>
+        <div class="kpi-change positive">+39.2% YoY</div>
+        <div class="kpi-sub">27+ consecutive quarters &gt;30% growth</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">6.9%</div>
+        <div class="kpi-label">Q1 2026 Op. Margin</div>
+        <div class="kpi-change negative">-400bps YoY</div>
+        <div class="kpi-sub">vs 10.9% in Q1 2025</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">$14.6B</div>
+        <div class="kpi-label">Credit Portfolio (Q1'26)</div>
+        <div class="kpi-change positive">+87% YoY</div>
+        <div class="kpi-sub">NIMAL 17.8% (vs 22.7% Q1'25)</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">83M</div>
+        <div class="kpi-label">Fintech MAUs (Q1'26)</div>
+        <div class="kpi-change positive">+29% YoY</div>
+        <div class="kpi-sub">Principal user share +11ppts in Brazil</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">121M</div>
+        <div class="kpi-label">Annual Unique Buyers</div>
+        <div class="kpi-change positive">+24% YoY (FY2025)</div>
+        <div class="kpi-sub">+32% YoY in Q1'26 (fastest in 5 yrs)</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">$1.33B</div>
+        <div class="kpi-label">FY2025 Free Cash Flow</div>
+        <div class="kpi-change positive">+0.9% vs FY2024</div>
+        <div class="kpi-sub">FCF margin 4.6% (compressed)</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-value">$39.40</div>
+        <div class="kpi-label">FY2025 Diluted EPS</div>
+        <div class="kpi-change positive">+4.5% vs FY2024</div>
+        <div class="kpi-sub">Q1'26 EPS $8.23 (missed est. $9.37)</div>
+    </div>
+</div>
+
+<!-- Guidance -->
+<div class="guidance-section" id="guidanceSection">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of Q1 2026 Earnings (May 7, 2026) | FY2026</span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<!-- Commerce Charts -->
+<h2 class="section-title">Commerce Performance</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Revenue (Quarterly)</h3>
+            <button class="help-btn" onclick="openModal('revenue')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="revenueChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Revenue (Annual)</h3>
+            <button class="help-btn" onclick="openModal('revenueAnnual')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="revenueAnnualChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>GMV (Quarterly, $B)</h3>
+            <button class="help-btn" onclick="openModal('gmv')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="gmvChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Items Sold (Quarterly, M)</h3>
+            <button class="help-btn" onclick="openModal('items')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="itemsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Unique Buyers (Quarterly, M)</h3>
+            <button class="help-btn" onclick="openModal('buyers')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="buyersChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Total Payment Volume (Quarterly, $B)</h3>
+            <button class="help-btn" onclick="openModal('tpv')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="tpvChart"></canvas></div>
+    </div>
+</div>
+
+<!-- Margins & Profitability -->
+<h2 class="section-title">Margins &amp; Profitability</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Operating &amp; Net Margin (Quarterly, %)</h3>
+            <button class="help-btn" onclick="openModal('margins')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="marginsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Gross Margin (Quarterly, %)</h3>
+            <button class="help-btn" onclick="openModal('grossMargin')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="grossMarginChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Operating Income (Quarterly, $M)</h3>
+            <button class="help-btn" onclick="openModal('opIncome')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="opIncomeChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Net Income &amp; EPS (Quarterly)</h3>
+            <button class="help-btn" onclick="openModal('netIncome')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="netIncomeChart"></canvas></div>
+    </div>
+</div>
+
+<!-- Fintech -->
+<h2 class="section-title">Fintech &amp; Credit</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Fintech MAUs (Quarterly, M)</h3>
+            <button class="help-btn" onclick="openModal('fintechMAUs')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="fintechMAUsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Credit Portfolio &amp; NIMAL (Quarterly)</h3>
+            <button class="help-btn" onclick="openModal('credit')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="creditChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Annual FCF &amp; CapEx ($M)</h3>
+            <button class="help-btn" onclick="openModal('fcf')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="fcfChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header">
+            <h3>Shareholders' Equity (Quarterly, $M)</h3>
+            <button class="help-btn" onclick="openModal('equity')">?</button>
+        </div>
+        <div class="chart-wrapper"><canvas id="equityChart"></canvas></div>
+    </div>
+</div>
+
+<!-- DCF -->
+<h2 class="section-title">DCF Valuation</h2>
+<div class="dcf-section">
+    <div class="dcf-summary">
+        <div class="dcf-card highlight">
+            <div class="dcf-label">Base Intrinsic Value</div>
+            <div class="dcf-value" id="dcfIV">$820</div>
+            <div class="dcf-change negative" id="dcfUpside">-51% vs current</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Current Price</div>
+            <div class="dcf-value" id="dcfCurrent">$1,683</div>
+            <div class="dcf-sublabel">Down 38% from Jun'25 ATH $2,614</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Prob-Weighted IV</div>
+            <div class="dcf-value" id="dcfWeighted">$947</div>
+            <div class="dcf-sublabel">25% Bull / 50% Base / 25% Bear</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Entry Price (15% CAGR)</div>
+            <div class="dcf-value" id="dcfEntry">$641</div>
+            <div class="dcf-sublabel">Base case; buy below for 15% annual return</div>
+        </div>
+    </div>
+
+    <div class="dcf-warning" id="growthWarning">
+        <span class="warning-icon">&#9888;</span>
+        <span id="warningText"></span>
+    </div>
+
+    <div class="dcf-inputs">
+        <h4>DCF Model Inputs (FY2025 Base Year)</h4>
+        <div class="dcf-inputs-grid">
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Base Year FCF</div>
+                <div class="dcf-input-value" id="baseFCF">$1,327M</div>
+                <div class="dcf-input-note">FY2025 reported FCF</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Base Year Revenue</div>
+                <div class="dcf-input-value">$28.9B</div>
+                <div class="dcf-input-note">FY2025</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Shares Outstanding</div>
+                <div class="dcf-input-value" id="sharesOut">50.7M</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Net Debt</div>
+                <div class="dcf-input-value" id="netDebt">$8,668M</div>
+                <div class="dcf-input-note">Q1 2026 balance sheet</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">FCF Margin (FY2025)</div>
+                <div class="dcf-input-value">4.6%</div>
+                <div class="dcf-input-note">Trough — compressed by provisioning</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Market Cap</div>
+                <div class="dcf-input-value">$85.3B</div>
+                <div class="dcf-input-note">At $1,683.13</div>
+            </div>
+        </div>
+        <div class="fcf-projections">
+            <h5>Projected FCF — Base Scenario (Revenue-based model with FCF margin recovery)</h5>
+            <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+        </div>
+    </div>
+
+    <div class="dcf-controls">
+        <div class="slider-group">
+            <label>Y1 Growth Rate: <span id="growthValue">30%</span></label>
+            <input type="range" id="growthSlider" min="5" max="55" value="30" step="1">
+            <div class="slider-hint" id="growthHint">Base: 30% | Bull: 40% | Bear: 18% | Q1'26 actual: 49%</div>
+        </div>
+        <div class="slider-group">
+            <label>WACC: <span id="waccValue">11%</span></label>
+            <input type="range" id="waccSlider" min="8" max="16" value="11" step="0.5">
+            <div class="slider-hint">Base: 11% (EM risk + credit portfolio) | Bull: 10% | Bear: 13%</div>
+        </div>
+        <div class="slider-group">
+            <label>Terminal Growth: <span id="terminalValue">3.5%</span></label>
+            <input type="range" id="terminalSlider" min="1" max="5" value="3.5" step="0.5">
+            <div class="slider-hint">Base: 3.5% (LatAm structural tailwinds) | Bull: 4% | Bear: 2.5%</div>
+        </div>
+        <div class="slider-group">
+            <label>Y5 FCF Margin: <span id="fcfMarginValue">6.0%</span></label>
+            <input type="range" id="fcfMarginSlider" min="2" max="12" value="6" step="0.5">
+            <div class="slider-hint">Base: 6.0% | Bull: 8.5% | Bear: 4.2% | FY2025 trough: 4.6%</div>
+        </div>
+    </div>
+
+    <div class="scenario-tabs">
+        <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+        <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+        <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+    </div>
+    <div class="scenario-details">
+        <h4>Scenario Assumptions</h4>
+        <div class="assumption-grid" id="assumptionGrid"></div>
+    </div>
+
+    <div class="sensitivity-section">
+        <h4>Sensitivity Analysis: Intrinsic Value by WACC &amp; Terminal Growth Rate</h4>
+        <table class="sensitivity-table" id="sensitivityMatrix"></table>
+    </div>
+
+    <div class="historical-growth">
+        <h4>Historical Growth Rates (CAGR)</h4>
+        <div class="growth-grid" id="growthGrid"></div>
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">&#x2715;</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ── EMBEDDED DATA ────────────────────────────────────────────────────────────
+
+const csvData = `Period,Revenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,EBITDA,NetIncome,NetMargin,EPS,GMV,TPV,ItemsSold,FintechMAUs,UniqueBuyers,CreditPortfolio,NIMAL,CapEx,FreeCashFlow,ShareholdersEquity,TotalDebt,CashAndEquivalents,SharesOutstanding
+Q1 2022,2248,1073,47.7,139,6.2,,65,2.9,1.30,7.7,25.3,267,,81,,,,,1827,5414,1329,50.4
+Q2 2022,2597,1284,49.4,250,9.6,,123,4.7,2.43,8.6,30.2,275,,84,,,,,1580,4440,1329,50.4
+Q3 2022,2690,1384,51.4,296,11.0,,129,4.8,2.56,8.6,32.2,284,,88,,,,,,,1910,50.3
+Q4 2022,3010,1349,44.8,349,11.6,,165,5.5,3.28,9.6,36.0,321,,97,,,,,1827,5414,1910,50.3
+FY2022,10545,5090,48.3,1012,9.6,,482,4.6,9.60,34.4,123.6,1147,,148,,,,,,5414,1910,50.3
+Q1 2023,3037,1536,50.6,340,11.2,,201,6.6,4.01,9.4,37.0,309,,101,,,,,2040,4832,2143,50.2
+Q2 2023,3415,1831,53.6,558,16.3,,262,7.7,5.22,10.5,42.1,325,,109,,,,,,,2171,50.2
+Q3 2023,3760,1995,53.1,685,18.2,,359,9.5,7.18,11.4,47.3,357,,120,,,,,2741,5240,2171,50.7
+Q4 2023,4409,2050,46.5,335,7.6,470,165,3.7,3.26,13.5,44.5,413,46,141,,,180,,3071,5333,2556,50.697
+FY2023,15107,7590,50.2,2207,14.6,,987,6.5,19.64,44.7,146.7,1404,46,167,,36.2,509,,3071,5333,2556,50.697
+Q1 2024,4333,2024,46.7,528,12.2,682,344,7.9,6.78,11.4,40.7,385,49,147,,31.5,148,160,3390,5286,2579,50.697
+Q2 2024,5073,2365,46.6,726,14.3,880,531,10.5,10.48,12.6,46.3,421,52,157,,31.1,184,,3656,5403,2818,50.697
+Q3 2024,5312,2439,45.9,557,10.5,714,397,7.5,7.83,12.9,50.7,456,56,171,,24.2,223,,4002,6324,2162,50.697
+Q4 2024,6059,2749,45.4,820,13.5,972,639,10.5,12.61,14.5,58.9,525,61,189,6.6,27.6,305,680,4351,6850,2635,50.697
+FY2024,20777,9577,46.1,2631,12.7,,1911,9.2,37.69,51.5,196.7,1787,61,189,6.6,28.2,860,1315,4351,6850,2635,50.697
+Q1 2025,5935,2771,46.7,763,12.9,935,494,8.3,9.74,13.3,58.3,492,64,199,7.8,22.7,256,-10,5004,7726,2977,50.697
+Q2 2025,6790,3094,45.6,825,12.2,1024,523,7.7,10.31,15.3,64.6,550,68,211,9.3,23.0,287,454,5713,8979,3008,50.697
+Q3 2025,7409,3209,43.3,724,9.8,933,421,5.7,8.32,16.5,71.2,635,72,220,11.0,21.0,357,206,6218,9877,2582,50.697
+Q4 2025,8759,3784,43.2,889,10.1,,559,6.4,11.03,,,,,,,,,427,,6748,11392,3670,50.697
+FY2025,28893,12858,44.5,3201,11.1,,1997,6.9,39.40,,,,,,,,,1327,,6748,11392,3670,50.697
+Q1 2026,8845,3862,43.7,611,6.9,,417,4.7,8.23,,,,,,,,,271,,7281,12345,3677,50.697`;
+
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',').map(h => h.trim());
+    return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => obj[h] = values[i] ? values[i].trim() : '');
+        return obj;
+    });
+}
+
+const allData = parseCSV(csvData);
+
+function periodOrder(p) {
+    const y = parseInt(p.match(/\d{4}/)?.[0] || '0');
+    const sub = p.includes('Q1') ? 1 : p.includes('Q2') ? 2 : p.includes('H1') ? 3 :
+                p.includes('Q3') ? 4 : p.includes('Q4') ? 5 : p.includes('H2') ? 6 :
+                p.startsWith('FY') ? 7 : 0;
+    return y * 10 + sub;
+}
+allData.sort((a, b) => periodOrder(a.Period) - periodOrder(b.Period));
+
+const qData = allData.filter(d => /^Q\d \d{4}/.test(d.Period));
+const fyData = allData.filter(d => d.Period.startsWith('FY'));
+
+const n = (v) => (v === '' || v === undefined || v === null) ? null : parseFloat(v);
+const fmt = (v, dec=1) => v == null ? 'N/A' : v.toFixed(dec);
+
+// ── ANALYSIS DATA ─────────────────────────────────────────────────────────────
+
+const analysis = {
+    guidance: {
+        as_of: "Q1 2026 Earnings (May 7, 2026)",
+        fiscal_year: "2026",
+        items: [
+            {
+                metric: "Near-term Operating Margins",
+                target: "Will not materially change in the near term",
+                period: "Q2-Q3 2026",
+                vs_prior: "lowered",
+                notes: "Margins remain compressed as investments in credit cards, free shipping subsidies, fulfillment, and 1P retail continue. Q1'26 operating margin 6.9% vs 10.9% in Q1'25. CFO stated 'we are not optimizing for short-term margin.'"
+            },
+            {
+                metric: "Revenue Growth Trajectory",
+                target: "Sustain 30%+ YoY; Q1'26 at 49%",
+                period: "FY2026",
+                vs_prior: "raised",
+                notes: "49% revenue growth in Q1'26 exceeded expectations (+6.76% revenue beat). Driven by free shipping strategy, credit penetration, and fintech MAU growth. Consensus Q2'26 revenue ~$9.16B."
+            },
+            {
+                metric: "Credit Portfolio Growth",
+                target: "$14.6B at Q1'26 (+87% YoY); rapid expansion continues",
+                period: "FY2026",
+                vs_prior: "maintained",
+                notes: "CEO views credit opportunity as 30-40-50x larger than current penetration. 2.7M new credit cards/quarter. NPL 15-90 days at 8.0%, described as broadly stable."
+            },
+            {
+                metric: "NIMAL",
+                target: "17.8% in Q1'26 (compressed from 22.7% Q1'25)",
+                period: "Ongoing",
+                vs_prior: "lowered",
+                notes: "Compression driven by higher credit card mix (lower spread) and higher provisions from longer loan durations. No explicit NIMAL floor provided. Key credit profitability signal investors are watching."
+            },
+            {
+                metric: "Mexico Investment",
+                target: "$4.6B capital commitment in 2026 (+35% YoY)",
+                period: "FY2026",
+                vs_prior: "raised",
+                notes: "Largest annual commitment to Mexico ever. Includes logistics, Mercado Pago expansion, and technology. XEM3 mega-hub inaugurated Feb 2026 (80,000 sqm, ~1M packages/day capacity)."
+            },
+            {
+                metric: "Free Shipping Strategy",
+                target: "R$19 threshold in Brazil is 'here to stay'",
+                period: "Long-term",
+                vs_prior: "new",
+                notes: "Management explicitly confirmed the R$19 threshold is a permanent strategic decision. Unit shipping cost declining (-17% YoY in Q1'26 in Brazil) as volume provides leverage."
+            },
+            {
+                metric: "LatAm E-Commerce TAM",
+                target: "Mid-teens penetration has potential to double; MELI to grow ahead of market",
+                period: "Multi-year",
+                vs_prior: "maintained",
+                notes: "Structural growth narrative unchanged. Management: 'still in early stages.' Long-term conviction underpins willingness to absorb short-term margin pressure."
+            }
+        ],
+        management_commentary: "CEO Marcos Galperin: credit card opportunity is '30, 40, 50 times larger than current size.' CFO Martin de los Santos: 'We are not optimizing for short-term margin' and margins will 'not materially change in the near term' as the company deliberately invests in credit cards, free shipping, fulfillment, and 1P retail. Management framed Q1 2026 margin compression as two-thirds driven by credit portfolio mix/provisioning and one-third by Brazil consumer credit being 'less profitable than a year ago' due to duration extension and broader reach."
+    }
+};
+
+// ── DCF DATA ──────────────────────────────────────────────────────────────────
+
+const dcfData = {
+    ticker: "MELI",
+    company_name: "MercadoLibre, Inc.",
+    valuation_date: "2026-06-30",
+    current_price: 1683.13,
+    inputs: {
+        shares_outstanding: 50.697,
+        total_debt: 12345,
+        cash: 3677,
+        net_debt: 8668,
+        last_fcf: 1327,
+        last_revenue: 28893,
+        currency: "USD",
+        units: "millions"
+    },
+    historical_growth: {
+        revenue_3yr_cagr: 39.9,
+        revenue_2yr_cagr: 38.3,
+        eps_3yr_cagr: 60.1,
+        eps_2yr_cagr: 41.6,
+        equity_3yr_cagr: 54.6,
+        equity_2yr_cagr: 48.2,
+        fcf_1yr_cagr: 0.9,
+        selected_growth_rate: 39.9,
+        growth_rate_source: "revenue_3yr_cagr",
+        growth_divergence_warning: "All historical metrics show hyper-growth: Revenue 3yr CAGR 39.9%, Equity 3yr CAGR 54.6%, EPS 3yr CAGR 60.1%. No single CAGR is applied directly; each scenario models explicit annual revenue growth rates with gradual deceleration. FCF margin is modeled separately (currently trough-depressed at 4.6% by credit provisioning surge and investment cycle intensity)."
+    },
+    assumptions: {
+        base: { growth_rates: [30, 27, 22, 18, 15], fcf_margins: [4.8, 5.2, 5.5, 5.8, 6.0], wacc: 11.0, terminal_growth: 3.5 },
+        bull: { growth_rates: [40, 33, 28, 22, 18], fcf_margins: [5.5, 6.5, 7.5, 8.0, 8.5], wacc: 10.0, terminal_growth: 4.0 },
+        bear: { growth_rates: [18, 15, 12, 8, 6],  fcf_margins: [3.5, 3.8, 4.0, 4.0, 4.2], wacc: 13.0, terminal_growth: 2.5 }
+    },
+    valuation: {
+        base: { intrinsic_value: 819.61, upside: -51.3 },
+        bull: { intrinsic_value: 1984.93, upside: 17.9 },
+        bear: { intrinsic_value: 163.09, upside: -90.3 }
+    },
+    entry_price: {
+        base: { entry_price: 641.24 },
+        bull: { entry_price: 1432.29 },
+        bear: { entry_price: 202.12 }
+    },
+    sensitivity: {
+        wacc_range: [9.0, 10.0, 11.0, 12.0, 13.0],
+        terminal_growth_range: [2.5, 3.0, 3.5, 4.0, 4.5],
+        base_case_matrix: [
+            [1025.72, 1110.64, 1211.04, 1331.48, 1478.41],
+            [853.88,  914.71,  984.91,  1066.81, 1163.38],
+            [722.94,  768.27,  819.61,  878.30,  945.84],
+            [619.76,  654.54,  693.39,  737.10,  786.50],
+            [536.66,  564.00,  594.20,  627.77,  665.13]
+        ]
+    },
+    probability_weighted: {
+        weights: { bull: 0.25, base: 0.50, bear: 0.25 },
+        weighted_iv: 946.81,
+        upside_to_current: -43.7
+    }
+};
+
+// ── CHART DEFAULTS ────────────────────────────────────────────────────────────
+
+Chart.defaults.color = '#888';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.05)';
+
+const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: { labels: { color: '#e0e0e0', font: { size: 11 }, boxWidth: 12 } },
+        tooltip: { mode: 'index', intersect: false }
+    },
+    scales: {
+        x: { ticks: { color: '#888', maxRotation: 45, font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+    }
+};
+
+const C = {
+    teal:   '#00d4aa',
+    green:  '#00b894',
+    blue:   '#0984e3',
+    purple: '#6c5ce7',
+    yellow: '#fdcb6e',
+    red:    '#ff6b6b',
+    indigo: '#818cf8'
+};
+
+// ── RENDER GUIDANCE ────────────────────────────────────────────────────────────
+
+function renderGuidance() {
+    const g = analysis.guidance;
+    const grid = document.getElementById('guidanceGrid');
+    grid.innerHTML = g.items.map(item => {
+        const cls = (item.vs_prior || 'new').toLowerCase();
+        const lbl = cls.charAt(0).toUpperCase() + cls.slice(1);
+        return `<div class="guidance-card">
+            <div class="guidance-metric">${item.metric}</div>
+            <div class="guidance-target">${item.target}</div>
+            <div class="guidance-period">${item.period}</div>
+            <span class="guidance-vs-prior ${cls}">${lbl}</span>
+            ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+        </div>`;
+    }).join('');
+    const comm = document.getElementById('guidanceCommentary');
+    if (g.management_commentary) {
+        comm.textContent = g.management_commentary;
+        comm.style.display = 'block';
+    }
+}
+renderGuidance();
+
+// ── TOGGLE OVERVIEW ───────────────────────────────────────────────────────────
+
+function toggleOverview() {
+    document.querySelector('.overview-toggle').classList.toggle('active');
+    document.getElementById('overviewContent').classList.toggle('active');
+}
+
+// ── MODAL ─────────────────────────────────────────────────────────────────────
+
+const metricDescriptions = {
+    revenue: {
+        title: "Quarterly Revenue",
+        content: `<p><strong>Revenue</strong> is MercadoLibre's total net revenue each quarter from all segments — Commerce (marketplace commissions, shipping fees, advertising, 1P product sales) and Fintech (acquiring fees, digital banking, credit interest income).</p>
+        <div class="metric-highlight"><strong>MELI context:</strong> Revenue has grown 30%+ YoY for 27+ consecutive quarters. Q1 2026 reached $8.85B (+49% YoY), the strongest growth rate since Q2 2022, driven by Brazil's free-shipping-fueled buyer surge and credit portfolio expansion.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>Continuation of 30%+ YoY growth — the defining execution benchmark</li>
+        <li>Mix shift: credit revenue growing faster than commerce signals fintech maturation</li>
+        <li>FX-neutral vs reported divergence — BRL/MXN/ARS depreciation compresses reported USD revenue</li></ul>`
+    },
+    revenueAnnual: {
+        title: "Annual Revenue",
+        content: `<p><strong>Annual revenue</strong> shows the compounding scale trajectory of MercadoLibre's dual-engine business model.</p>
+        <div class="metric-highlight"><strong>MELI context:</strong> From $10.5B in FY2022 to $28.9B in FY2025, a 3-year CAGR of 39.9%. The business has nearly tripled in three years while expanding across e-commerce, logistics, payments, credit, and advertising simultaneously.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>Whether the deceleration from 39% (FY2025) to projections of 30%+ (FY2026) is gradual or sharper</li>
+        <li>Margin recovery alongside revenue scale — the key unresolved question for the bull case</li></ul>`
+    },
+    gmv: {
+        title: "Gross Merchandise Volume (GMV)",
+        content: `<p><strong>GMV</strong> is the total dollar value of all merchandise sold through MercadoLibre's marketplace. It is the primary volume metric for the Commerce segment.</p>
+        <div class="metric-highlight"><strong>MELI context:</strong> GMV reached $16.5B in Q3 2025. Quarterly GMV data begins Q1 2023 in the reported metrics; FY2024 total GMV was $51.5B (+15% YoY), with management guiding continued growth driven by Brazil's free shipping strategy. GMV growth is deliberately subsidized (R$19 free shipping threshold) to drive market share vs Shopee and Amazon.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>GMV growth vs TPV growth — higher TPV/GMV ratio indicates Mercado Pago monetization within the ecosystem</li>
+        <li>Brazil GMV growth rate (largest market) as a signal of competitive dynamics with Shopee</li>
+        <li>Average order value trends — Shopee's $7 ASP vs MELI's $21 is the competitive battleground</li></ul>`
+    },
+    items: {
+        title: "Items Sold",
+        content: `<p><strong>Items sold</strong> is the total number of products transacted through the marketplace each quarter, measuring the physical volume of commerce activity.</p>
+        <div class="metric-highlight"><strong>MELI context:</strong> Items sold surged to 635M in Q3 2025 and 492M in Q1 2025, with Q1 2026 likely above 700M (not yet reported). Brazil items sold grew 56% YoY in Q1 2026 — more than double the prior run rate — driven by the aggressive R$19 free shipping threshold.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>Whether 50%+ YoY items growth is sustained now that the free shipping threshold is permanent</li>
+        <li>Revenue per item — shipping subsidies compress this metric but volume leverage eventually restores unit economics</li>
+        <li>Cross-category expansion: everyday items (groceries, beauty) vs discretionary mix</li></ul>`
+    },
+    buyers: {
+        title: "Unique Buyers",
+        content: `<p><strong>Unique buyers</strong> is the number of distinct users who made at least one purchase on the MercadoLibre platform in the trailing twelve months. It measures the active buyer base and user engagement health.</p>
+        <div class="metric-highlight"><strong>MELI context:</strong> FY2024 unique buyers reached 189M quarterly active; annual unique buyers reached 121M in FY2025 (+24% YoY). Q1 2026 unique buyers grew 32% YoY — the fastest pace in five years — as the R$19 free shipping threshold attracted new buyers who previously couldn't afford shipping.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>Buyer retention and repeat purchase rates — new buyers attracted by subsidies need to convert to loyal customers</li>
+        <li>Fintech conversion from buyer to Mercado Pago user — the ecosystem flywheel driver</li>
+        <li>MELI+ subscription penetration among buyers — loyalty signal</li></ul>`
+    },
+    tpv: {
+        title: "Total Payment Volume (TPV)",
+        content: `<p><strong>TPV</strong> is the total dollar value processed through Mercado Pago — including on-marketplace payments, off-marketplace merchant acquiring, P2P transfers, and QR code payments.</p>
+        <div class="metric-highlight"><strong>MELI context:</strong> Q3 2025 TPV reached $71.2B; FY2024 full-year TPV was $196.7B. TPV grows faster than GMV because Mercado Pago is expanding in off-ecosystem acquiring (physical stores, online merchants outside MELI marketplace). Mexico acquiring TPV grew 53% FX-neutral in Q3'25.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>Off-ecosystem TPV as a % of total — signals Mercado Pago's standalone fintech position beyond the marketplace</li>
+        <li>TPV take rate trends — net revenue divided by TPV reveals monetization efficiency vs competition from PIX (Brazil) and low-cost acquirers</li>
+        <li>Credit card TPV — Q1'26 credit card TPV +90% YoY, a key fintech monetization engine</li></ul>`
+    },
+    margins: {
+        title: "Operating & Net Margins",
+        content: `<p><strong>Operating margin</strong> (EBIT/Revenue) and <strong>net margin</strong> (net income/revenue) measure profitability after all operating expenses. These are the most watched metrics given the current investment cycle.</p>
+        <div class="metric-highlight"><strong>MELI context:</strong> Operating margin compressed from 13.5% in Q4 2024 to 6.9% in Q1 2026 as MercadoLibre subsidized free shipping (R$19 threshold), accelerated credit card provisioning, and invested in Mexico infrastructure. Management guided margins "will not materially change in the near term."</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>Whether operating margin stabilizes at 7-10% or declines further — the key bear case risk</li>
+        <li>Net margin vs operating margin gap — FX losses from Argentina (US GAAP hyperinflation treatment) and high effective tax rate are persistent net income drags</li>
+        <li>Quarterly EBITDA margin as a cleaner metric (excludes FX losses, D&amp;A)</li></ul>`
+    },
+    grossMargin: {
+        title: "Gross Margin",
+        content: `<p><strong>Gross margin</strong> is (Revenue - Cost of Revenue) / Revenue. For MELI, cost of revenue includes logistics costs, payment processing costs, and cost of 1P products sold.</p>
+        <div class="metric-highlight"><strong>MELI context:</strong> Gross margin peaked at ~53% in Q2-Q3 2023 and has since compressed to 43-47% range as: (1) logistics subsidies increased (free shipping cost), (2) 1P product sales (lower margin) grew, (3) fintech credit mix shifted. Q1 2026 gross margin 43.7% is near the recent floor.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>Whether gross margin stabilizes at ~43-44% or compresses further as free shipping volumes increase</li>
+        <li>Logistics unit cost trends: Brazil -17% YoY in Q1'26 is the positive offset to subsidy cost</li>
+        <li>Advertising mix uplift: high-margin ad revenue growing 63% FX-neutral would support gross margin recovery over time</li></ul>`
+    },
+    opIncome: {
+        title: "Operating Income",
+        content: `<p><strong>Operating income</strong> (EBIT) is revenue minus all operating expenses including COGS, sales &amp; marketing, technology, and G&amp;A. It excludes interest, FX, and taxes.</p>
+        <div class="metric-highlight"><strong>MELI context:</strong> Q1 2026 operating income was $611M (6.9% margin) vs $763M in Q1 2025 (12.9% margin) — a $152M absolute decline despite $3B more revenue. The primary drivers: sharply higher logistics/shipping costs from R$19 free threshold, and increased provisioning costs flowing through cost of revenue.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>Operating income trend by quarter: management needs to show a stabilization before investors can price a recovery</li>
+        <li>Operating leverage: the bull case requires that revenue growth eventually outpaces the fixed cost of free shipping and credit provisioning</li></ul>`
+    },
+    netIncome: {
+        title: "Net Income & EPS",
+        content: `<p><strong>Net income</strong> is the bottom-line profit after interest expense, FX gains/losses, and income taxes. <strong>Diluted EPS</strong> divides net income by diluted share count (~50.7M shares).</p>
+        <div class="metric-highlight"><strong>MELI context:</strong> Q1 2026 EPS was $8.23 — missing consensus of $9.37 by 12%, triggering a -12.7% stock decline on earnings day. Despite 49% revenue growth, net income fell 16% YoY to $417M as provision for doubtful accounts surged 106% to $1,244M. Argentina FX losses and a higher effective tax rate are structural headwinds below the operating income line.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>Q2 2026 EPS: consensus ~$10.85 implies a recovery from Q1 2026's trough</li>
+        <li>Provision for doubtful accounts as a % of revenue — must decelerate for EPS to grow</li>
+        <li>Effective tax rate: Argentina hyperinflation creates non-deductible FX losses that permanently inflate the tax rate</li></ul>`
+    },
+    fintechMAUs: {
+        title: "Fintech Monthly Active Users (MAUs)",
+        content: `<p><strong>Fintech MAUs</strong> are the monthly active users of Mercado Pago's digital financial services — including digital wallet, payments, savings/investment accounts, and credit products.</p>
+        <div class="metric-highlight"><strong>MELI context:</strong> Q1 2026 fintech MAUs reached 83M (+29% YoY). The "principal user" metric — users who choose Mercado Pago as their primary financial institution — has grown 11 percentage points YoY in Brazil, a critical indicator of financial product depth and wallet share over traditional banks.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>Principal user share: the key quality metric distinguishing casual payment users from engaged digital bank customers</li>
+        <li>AUM growth: $X billion in assets under management (+77% YoY) signals deepening engagement beyond transactions</li>
+        <li>MAU growth accelerating or decelerating relative to credit card issuance rate</li></ul>`
+    },
+    credit: {
+        title: "Credit Portfolio & NIMAL",
+        content: `<p><strong>Credit portfolio</strong> is the total outstanding balance of MELI's consumer loans, merchant loans, and credit card receivables. <strong>NIMAL</strong> (Net Interest Margin After Losses) is the net yield after default costs on the credit portfolio.</p>
+        <div class="metric-highlight"><strong>MELI context:</strong> Credit portfolio reached $14.6B in Q1 2026 (+87% YoY). NIMAL compressed to 17.8% (from 22.7% Q1'25) due to (1) higher credit card mix (lower spread than consumer loans), (2) longer loan durations (5 to 8 months average), and (3) broader personal loan reach to previously declined applicants. NPL 15-90 days at 8.0%, described as "broadly stable."</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>NIMAL floor: investors need to see 17-18% hold or recover before pricing credit profitability</li>
+        <li>NPL trend: 8.0% is manageable; above 10% would signal underwriting deterioration</li>
+        <li>Portfolio mix: credit card share growing (lower margin but CEO views as "30-40-50x" larger opportunity than current size)</li>
+        <li>Provision growth rate vs portfolio growth rate: if provisions grow faster, credit is diluting overall returns</li></ul>`
+    },
+    fcf: {
+        title: "Free Cash Flow & CapEx (Annual)",
+        content: `<p><strong>Free cash flow</strong> is operating cash flow minus capital expenditures. For MercadoLibre, this is after fintech-related working capital (credit portfolio growth absorbs significant cash). <strong>CapEx</strong> includes logistics infrastructure, data centers, and fulfillment network buildout.</p>
+        <div class="metric-highlight"><strong>MELI context:</strong> FY2025 FCF was $1,327M (4.6% of revenue), barely above FY2024's $1,315M. FCF margin has compressed dramatically from 6.3% in FY2024 to 4.6% in FY2025 as: credit portfolio provisions accelerated, CapEx remained elevated ($860M in FY2024), and free shipping subsidies increased. The $4.6B Mexico commitment signals continued heavy CapEx in 2026.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>FCF margin recovery from the 4.6% trough: bull case assumes recovery to 6-8.5% over 5 years</li>
+        <li>CapEx as % of revenue: needs to dilute as logistics infrastructure matures</li>
+        <li>Quarterly FCF volatility: extreme swing from -$10M (Q1'25) to +$680M (Q4'24) makes quarterly FCF unreliable; annual is the relevant metric</li></ul>`
+    },
+    equity: {
+        title: "Shareholders' Equity",
+        content: `<p><strong>Shareholders' equity</strong> is total assets minus total liabilities — the book value of the company attributable to equity holders. For MELI, it has grown as retained earnings accumulate from profitable operations.</p>
+        <div class="metric-highlight"><strong>MELI context:</strong> Equity grew from $1,827M in Q1 2022 to $7,281M in Q1 2026 — a 3-year CAGR of ~54%. However, this metric is somewhat distorted by the fintech credit portfolio: growing total debt ($12.3B in Q1'26) funds credit receivables but also increases gross leverage. Net debt/EBITDA rose from 0.44x to ~1.05x during 2024-2025.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>Equity growth as retained earnings build: signals underlying profitability compounding</li>
+        <li>Leverage ratio (net debt/EBITDA): rising from fintech funding needs; watch for credit rating implications</li>
+        <li>Book value per share (~$144 at Q1 2026): current P/B of ~11.7x reflects substantial growth premium embedded in the stock price</li></ul>`
+    }
+};
+
+function openModal(key) {
+    const d = metricDescriptions[key];
+    if (!d) return;
+    document.getElementById('modalTitle').textContent = d.title;
+    document.getElementById('modalBody').innerHTML = d.content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay') && event.type === 'click') {
+        if (event.currentTarget === document.getElementById('modalOverlay')) {
+            // clicked on overlay background
+        } else { return; }
+    }
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.getElementById('modalOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ── CHARTS ────────────────────────────────────────────────────────────────────
+
+// Revenue quarterly
+new Chart(document.getElementById('revenueChart'), {
+    type: 'bar',
+    data: {
+        labels: qData.map(d => d.Period),
+        datasets: [{
+            label: 'Revenue ($M)',
+            data: qData.map(d => n(d.Revenue)),
+            backgroundColor: C.teal + '99',
+            borderColor: C.teal,
+            borderWidth: 1
+        }]
+    },
+    options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } },
+        scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, ticks: { color: '#888', callback: v => '$' + (v/1000).toFixed(1) + 'B' } } }
+    }
+});
+
+// Revenue annual
+new Chart(document.getElementById('revenueAnnualChart'), {
+    type: 'bar',
+    data: {
+        labels: fyData.map(d => d.Period),
+        datasets: [{
+            label: 'Annual Revenue ($M)',
+            data: fyData.map(d => n(d.Revenue)),
+            backgroundColor: [C.teal + '99', C.teal + '99', C.teal + '99', C.teal, C.blue + '99'],
+            borderColor: C.teal,
+            borderWidth: 1
+        }, {
+            label: 'YoY Growth %',
+            data: fyData.map((d, i) => {
+                if (i === 0) return null;
+                const prev = n(fyData[i-1].Revenue), cur = n(d.Revenue);
+                return prev && cur ? +((cur - prev)/prev*100).toFixed(1) : null;
+            }),
+            type: 'line',
+            yAxisID: 'y2',
+            borderColor: C.yellow,
+            backgroundColor: 'transparent',
+            pointBackgroundColor: C.yellow,
+            tension: 0.3,
+            borderWidth: 2
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        scales: {
+            x: chartDefaults.scales.x,
+            y: { ...chartDefaults.scales.y, ticks: { color: '#888', callback: v => '$' + (v/1000).toFixed(0) + 'B' } },
+            y2: { position: 'right', ticks: { color: C.yellow, callback: v => v + '%' }, grid: { display: false } }
+        }
+    }
+});
+
+// GMV quarterly
+const gmvQ = qData.filter(d => n(d.GMV) !== null);
+new Chart(document.getElementById('gmvChart'), {
+    type: 'line',
+    data: {
+        labels: gmvQ.map(d => d.Period),
+        datasets: [{
+            label: 'GMV ($B)',
+            data: gmvQ.map(d => n(d.GMV)),
+            borderColor: C.teal,
+            backgroundColor: C.teal + '20',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 4,
+            pointBackgroundColor: C.teal
+        }]
+    },
+    options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } } }
+});
+
+// Items Sold quarterly
+const itemsQ = qData.filter(d => n(d.ItemsSold) !== null);
+new Chart(document.getElementById('itemsChart'), {
+    type: 'bar',
+    data: {
+        labels: itemsQ.map(d => d.Period),
+        datasets: [{
+            label: 'Items Sold (M)',
+            data: itemsQ.map(d => n(d.ItemsSold)),
+            backgroundColor: C.blue + '99',
+            borderColor: C.blue,
+            borderWidth: 1
+        }]
+    },
+    options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } } }
+});
+
+// Unique Buyers quarterly
+const buyersQ = qData.filter(d => n(d.UniqueBuyers) !== null);
+new Chart(document.getElementById('buyersChart'), {
+    type: 'line',
+    data: {
+        labels: buyersQ.map(d => d.Period),
+        datasets: [{
+            label: 'Unique Buyers (M)',
+            data: buyersQ.map(d => n(d.UniqueBuyers)),
+            borderColor: C.purple,
+            backgroundColor: C.purple + '20',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 4,
+            pointBackgroundColor: C.purple
+        }]
+    },
+    options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } } }
+});
+
+// TPV quarterly
+const tpvQ = qData.filter(d => n(d.TPV) !== null);
+new Chart(document.getElementById('tpvChart'), {
+    type: 'bar',
+    data: {
+        labels: tpvQ.map(d => d.Period),
+        datasets: [{
+            label: 'TPV ($B)',
+            data: tpvQ.map(d => n(d.TPV)),
+            backgroundColor: C.green + '99',
+            borderColor: C.green,
+            borderWidth: 1
+        }]
+    },
+    options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } },
+        scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, ticks: { color: '#888', callback: v => '$' + v + 'B' } } }
+    }
+});
+
+// Margins quarterly
+new Chart(document.getElementById('marginsChart'), {
+    type: 'line',
+    data: {
+        labels: qData.map(d => d.Period),
+        datasets: [{
+            label: 'Operating Margin %',
+            data: qData.map(d => n(d.OperatingMargin)),
+            borderColor: C.teal,
+            backgroundColor: 'transparent',
+            tension: 0.3,
+            pointRadius: 4,
+            pointBackgroundColor: C.teal,
+            borderWidth: 2
+        }, {
+            label: 'Net Margin %',
+            data: qData.map(d => n(d.NetMargin)),
+            borderColor: C.blue,
+            backgroundColor: 'transparent',
+            tension: 0.3,
+            pointRadius: 4,
+            pointBackgroundColor: C.blue,
+            borderWidth: 2,
+            borderDash: [5, 3]
+        }]
+    },
+    options: { ...chartDefaults,
+        scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, ticks: { color: '#888', callback: v => v + '%' } } }
+    }
+});
+
+// Gross Margin quarterly
+new Chart(document.getElementById('grossMarginChart'), {
+    type: 'line',
+    data: {
+        labels: qData.map(d => d.Period),
+        datasets: [{
+            label: 'Gross Margin %',
+            data: qData.map(d => n(d.GrossMargin)),
+            borderColor: C.yellow,
+            backgroundColor: C.yellow + '20',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 4,
+            pointBackgroundColor: C.yellow,
+            borderWidth: 2
+        }]
+    },
+    options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } },
+        scales: { ...chartDefaults.scales,
+            y: { ...chartDefaults.scales.y, min: 35, ticks: { color: '#888', callback: v => v + '%' } }
+        }
+    }
+});
+
+// Operating Income quarterly
+new Chart(document.getElementById('opIncomeChart'), {
+    type: 'bar',
+    data: {
+        labels: qData.map(d => d.Period),
+        datasets: [{
+            label: 'Operating Income ($M)',
+            data: qData.map(d => n(d.OperatingIncome)),
+            backgroundColor: qData.map(d => {
+                const v = n(d.OperatingMargin);
+                return v !== null && v >= 12 ? C.teal + 'cc' : v !== null && v >= 8 ? C.yellow + 'cc' : C.red + 'cc';
+            }),
+            borderColor: 'transparent',
+            borderWidth: 1
+        }]
+    },
+    options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } } }
+});
+
+// Net Income & EPS quarterly
+new Chart(document.getElementById('netIncomeChart'), {
+    type: 'bar',
+    data: {
+        labels: qData.map(d => d.Period),
+        datasets: [{
+            label: 'Net Income ($M)',
+            data: qData.map(d => n(d.NetIncome)),
+            backgroundColor: C.purple + '99',
+            borderColor: C.purple,
+            borderWidth: 1,
+            yAxisID: 'y'
+        }, {
+            label: 'EPS ($)',
+            data: qData.map(d => n(d.EPS)),
+            type: 'line',
+            borderColor: C.yellow,
+            backgroundColor: 'transparent',
+            pointBackgroundColor: C.yellow,
+            tension: 0.3,
+            borderWidth: 2,
+            yAxisID: 'y2'
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        scales: {
+            x: chartDefaults.scales.x,
+            y: { ...chartDefaults.scales.y, ticks: { color: '#888', callback: v => '$' + v + 'M' } },
+            y2: { position: 'right', ticks: { color: C.yellow, callback: v => '$' + v }, grid: { display: false } }
+        }
+    }
+});
+
+// Fintech MAUs quarterly
+const mauQ = qData.filter(d => n(d.FintechMAUs) !== null);
+new Chart(document.getElementById('fintechMAUsChart'), {
+    type: 'line',
+    data: {
+        labels: mauQ.map(d => d.Period),
+        datasets: [{
+            label: 'Fintech MAUs (M)',
+            data: mauQ.map(d => n(d.FintechMAUs)),
+            borderColor: C.teal,
+            backgroundColor: C.teal + '20',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 5,
+            pointBackgroundColor: C.teal,
+            borderWidth: 2
+        }]
+    },
+    options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } },
+        scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, min: 40, ticks: { color: '#888', callback: v => v + 'M' } } }
+    }
+});
+
+// Credit Portfolio & NIMAL
+const creditQ = qData.filter(d => n(d.CreditPortfolio) !== null);
+new Chart(document.getElementById('creditChart'), {
+    type: 'bar',
+    data: {
+        labels: creditQ.map(d => d.Period),
+        datasets: [{
+            label: 'Credit Portfolio ($B)',
+            data: creditQ.map(d => n(d.CreditPortfolio)),
+            backgroundColor: C.blue + '99',
+            borderColor: C.blue,
+            borderWidth: 1,
+            yAxisID: 'y'
+        }, {
+            label: 'NIMAL %',
+            data: creditQ.map(d => n(d.NIMAL)),
+            type: 'line',
+            borderColor: C.red,
+            backgroundColor: 'transparent',
+            pointBackgroundColor: C.red,
+            tension: 0.3,
+            borderWidth: 2,
+            yAxisID: 'y2'
+        }]
+    },
+    options: {
+        ...chartDefaults,
+        scales: {
+            x: chartDefaults.scales.x,
+            y: { ...chartDefaults.scales.y, ticks: { color: '#888', callback: v => '$' + v + 'B' } },
+            y2: { position: 'right', min: 15, max: 40, ticks: { color: C.red, callback: v => v + '%' }, grid: { display: false } }
+        }
+    }
+});
+
+// Annual FCF & CapEx
+const fcfFY = fyData.filter(d => n(d.FreeCashFlow) !== null || n(d.CapEx) !== null);
+new Chart(document.getElementById('fcfChart'), {
+    type: 'bar',
+    data: {
+        labels: fcfFY.map(d => d.Period),
+        datasets: [{
+            label: 'FCF ($M)',
+            data: fcfFY.map(d => n(d.FreeCashFlow)),
+            backgroundColor: C.teal + '99',
+            borderColor: C.teal,
+            borderWidth: 1
+        }, {
+            label: 'CapEx ($M)',
+            data: fcfFY.map(d => { const v = n(d.CapEx); return v !== null ? -v : null; }),
+            backgroundColor: C.red + '99',
+            borderColor: C.red,
+            borderWidth: 1
+        }]
+    },
+    options: { ...chartDefaults,
+        scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, ticks: { color: '#888', callback: v => '$' + v + 'M' } } }
+    }
+});
+
+// Shareholders' Equity quarterly
+const eqQ = qData.filter(d => n(d.ShareholdersEquity) !== null);
+new Chart(document.getElementById('equityChart'), {
+    type: 'line',
+    data: {
+        labels: eqQ.map(d => d.Period),
+        datasets: [{
+            label: "Shareholders' Equity ($M)",
+            data: eqQ.map(d => n(d.ShareholdersEquity)),
+            borderColor: C.indigo,
+            backgroundColor: C.indigo + '20',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 4,
+            pointBackgroundColor: C.indigo,
+            borderWidth: 2
+        }]
+    },
+    options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } },
+        scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, ticks: { color: '#888', callback: v => '$' + (v/1000).toFixed(1) + 'B' } } }
+    }
+});
+
+// ── DCF ───────────────────────────────────────────────────────────────────────
+
+let currentScenario = 'base';
+
+function initDCF() {
+    document.getElementById('dcfCurrent').textContent = '$' + dcfData.current_price.toLocaleString('en-US', {maximumFractionDigits: 0});
+    document.getElementById('dcfWeighted').textContent = '$' + dcfData.probability_weighted.weighted_iv.toFixed(0);
+    if (dcfData.historical_growth.growth_divergence_warning) {
+        document.getElementById('growthWarning').style.display = 'flex';
+        document.getElementById('warningText').textContent = dcfData.historical_growth.growth_divergence_warning;
+    } else {
+        document.getElementById('growthWarning').style.display = 'none';
+    }
+    renderHistoricalGrowth();
+    renderSensitivityMatrix();
+    switchScenario('base');
+}
+
+function renderFCFProjections(startGrowth, y5fcfMargin) {
+    const baseFCF = dcfData.inputs.last_fcf;
+    const baseRev = dcfData.inputs.last_revenue;
+    const endGrowth = Math.max(10, startGrowth * 0.5);
+    const growthRates = [];
+    for (let i = 0; i < 5; i++) {
+        growthRates.push(startGrowth - (startGrowth - endGrowth) * (i / 4));
+    }
+    const startMargin = 4.6;
+    const fcfMargins = [];
+    for (let i = 0; i < 5; i++) {
+        fcfMargins.push(startMargin + (y5fcfMargin - startMargin) * ((i + 1) / 5));
+    }
+    let rev = baseRev;
+    const fcfValues = [];
+    for (let i = 0; i < 5; i++) {
+        rev = rev * (1 + growthRates[i] / 100);
+        fcfValues.push(rev * fcfMargins[i] / 100);
+    }
+
+    let html = `<div class="fcf-projection-item header">Year</div>
+        <div class="fcf-projection-item header">Y1</div>
+        <div class="fcf-projection-item header">Y2</div>
+        <div class="fcf-projection-item header">Y3</div>
+        <div class="fcf-projection-item header">Y4</div>
+        <div class="fcf-projection-item header">Y5</div>
+        <div class="fcf-projection-item header" style="font-size:0.7rem">Growth</div>`;
+    for (let i = 0; i < 5; i++) {
+        html += `<div class="fcf-projection-item"><div class="growth-rate">+${growthRates[i].toFixed(0)}%</div></div>`;
+    }
+    html += `<div class="fcf-projection-item header" style="font-size:0.7rem">FCF Mgn</div>`;
+    for (let i = 0; i < 5; i++) {
+        html += `<div class="fcf-projection-item"><div class="growth-rate">${fcfMargins[i].toFixed(1)}%</div></div>`;
+    }
+    html += `<div class="fcf-projection-item header" style="font-size:0.7rem">FCF</div>`;
+    for (let i = 0; i < 5; i++) {
+        const v = fcfValues[i];
+        html += `<div class="fcf-projection-item"><div class="fcf-value">$${(v/1000).toFixed(1)}B</div></div>`;
+    }
+    document.getElementById('fcfProjectionTable').innerHTML = html;
+    return { growthRates, fcfMargins, fcfValues };
+}
+
+function calculateDCF(startGrowth, wacc, terminalGrowth, y5fcfMargin) {
+    const { fcfValues } = renderFCFProjections(startGrowth, y5fcfMargin);
+    let pvFCF = 0;
+    for (let i = 0; i < 5; i++) {
+        pvFCF += fcfValues[i] / Math.pow(1 + wacc/100, i + 1);
+    }
+    const terminalFCF = fcfValues[4] * (1 + terminalGrowth/100);
+    const terminalValue = terminalFCF / (wacc/100 - terminalGrowth/100);
+    const pvTerminal = terminalValue / Math.pow(1 + wacc/100, 5);
+    const ev = pvFCF + pvTerminal;
+    const equity = ev - dcfData.inputs.net_debt;
+    const iv = equity / dcfData.inputs.shares_outstanding;
+    const entryPrice = (pvTerminal / dcfData.inputs.shares_outstanding) / Math.pow(1.15, 5);
+    return { iv, entryPrice, pvFCF, pvTerminal, ev };
+}
+
+window.updateDCFDisplay = function() {
+    const growth = parseFloat(document.getElementById('growthSlider').value);
+    const wacc = parseFloat(document.getElementById('waccSlider').value);
+    const terminal = parseFloat(document.getElementById('terminalSlider').value);
+    const fcfMgn = parseFloat(document.getElementById('fcfMarginSlider').value);
+
+    document.getElementById('growthValue').textContent = growth + '%';
+    document.getElementById('waccValue').textContent = wacc + '%';
+    document.getElementById('terminalValue').textContent = terminal + '%';
+    document.getElementById('fcfMarginValue').textContent = fcfMgn + '%';
+
+    const result = calculateDCF(growth, wacc, terminal, fcfMgn);
+
+    document.getElementById('dcfIV').textContent = '$' + result.iv.toFixed(0);
+    document.getElementById('dcfEntry').textContent = '$' + result.entryPrice.toFixed(0);
+
+    const upside = (result.iv - dcfData.current_price) / dcfData.current_price * 100;
+    const el = document.getElementById('dcfUpside');
+    el.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(0) + '% vs current';
+    el.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+
+    document.getElementById('assumptionGrid').innerHTML = `
+        <div class="assumption-item"><div class="label">Y1 Growth</div><div class="value">${growth}%</div></div>
+        <div class="assumption-item"><div class="label">WACC</div><div class="value">${wacc}%</div></div>
+        <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${terminal}%</div></div>
+        <div class="assumption-item"><div class="label">Y5 FCF Margin</div><div class="value">${fcfMgn}%</div></div>
+        <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa">$${result.iv.toFixed(0)}</div></div>
+        <div class="assumption-item"><div class="label">Entry (15% CAGR)</div><div class="value" style="color:#00d4aa">$${result.entryPrice.toFixed(0)}</div></div>
+    `;
+};
+
+window.switchScenario = function(scenario) {
+    currentScenario = scenario;
+    document.querySelectorAll('.scenario-tab').forEach(t => t.classList.toggle('active', t.dataset.scenario === scenario));
+    const a = dcfData.assumptions[scenario];
+    const v = dcfData.valuation[scenario];
+    const ep = dcfData.entry_price[scenario];
+    document.getElementById('growthSlider').value = a.growth_rates[0];
+    document.getElementById('waccSlider').value = a.wacc;
+    document.getElementById('terminalSlider').value = a.terminal_growth;
+    document.getElementById('fcfMarginSlider').value = a.fcf_margins[4];
+    updateDCFDisplay();
+    document.getElementById('dcfIV').textContent = '$' + v.intrinsic_value.toFixed(0);
+    document.getElementById('dcfEntry').textContent = '$' + ep.entry_price.toFixed(0);
+    const upside = v.upside;
+    const el = document.getElementById('dcfUpside');
+    el.textContent = (upside >= 0 ? '+' : '') + upside.toFixed(1) + '% vs current';
+    el.className = 'dcf-change ' + (upside >= 0 ? 'positive' : 'negative');
+};
+
+function renderHistoricalGrowth() {
+    const hg = dcfData.historical_growth;
+    const metrics = [
+        { key: 'revenue_3yr_cagr', label: 'Revenue 3Y' },
+        { key: 'revenue_2yr_cagr', label: 'Revenue 2Y' },
+        { key: 'eps_3yr_cagr', label: 'EPS 3Y' },
+        { key: 'eps_2yr_cagr', label: 'EPS 2Y' },
+        { key: 'equity_3yr_cagr', label: 'Equity 3Y' },
+        { key: 'equity_2yr_cagr', label: 'Equity 2Y' },
+        { key: 'fcf_1yr_cagr', label: 'FCF 1Y' }
+    ];
+    document.getElementById('growthGrid').innerHTML = metrics.map(m => {
+        const rate = hg[m.key];
+        if (rate == null) return '';
+        const selected = m.key === hg.growth_rate_source;
+        const cls = rate >= 0 ? 'positive' : 'negative';
+        return `<div class="growth-item ${selected ? 'selected' : ''}">
+            <div class="metric">${m.label}${selected ? ' *' : ''}</div>
+            <div class="rate ${cls}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div>
+        </div>`;
+    }).join('');
+}
+
+function renderSensitivityMatrix() {
+    const s = dcfData.sensitivity;
+    const cp = dcfData.current_price;
+    let html = '<tr><th>WACC \\ Term G</th>';
+    s.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+    html += '</tr>';
+    s.wacc_range.forEach((wacc, i) => {
+        html += `<tr><th>${wacc}%</th>`;
+        s.base_case_matrix[i].forEach((val, j) => {
+            const isHL = wacc === dcfData.assumptions.base.wacc && s.terminal_growth_range[j] === dcfData.assumptions.base.terminal_growth;
+            const colorCls = isHL ? 'highlight' : val >= cp ? 'above-current' : 'below-current';
+            html += `<td class="${colorCls}">$${val.toFixed(0)}</td>`;
+        });
+        html += '</tr>';
+    });
+    document.getElementById('sensitivityMatrix').innerHTML = html;
+}
+
+// Bind sliders
+['growthSlider','waccSlider','terminalSlider','fcfMarginSlider'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.oninput = window.updateDCFDisplay; el.onchange = window.updateDCFDisplay; }
+});
+
+initDCF();
+</script>
+</body>
+</html>

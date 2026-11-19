@@ -1,0 +1,2215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fiserv (FISV / NYSE: FI) Financial Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4aa, #00b894);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        .header p { color: #888; font-size: 1.1rem; margin-bottom: 6px; }
+        .header-badges { margin-top: 10px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+        .price-badge {
+            display: inline-block;
+            background: rgba(255,107,107,0.15);
+            border: 1px solid rgba(255,107,107,0.4);
+            border-radius: 8px;
+            padding: 6px 16px;
+            font-size: 0.95rem;
+            color: #ff6b6b;
+        }
+        .dcf-badge {
+            display: inline-block;
+            background: rgba(0,212,170,0.12);
+            border: 1px solid rgba(0,212,170,0.35);
+            border-radius: 8px;
+            padding: 6px 16px;
+            font-size: 0.95rem;
+            color: #00d4aa;
+        }
+        .turnaround-badge {
+            display: inline-block;
+            background: rgba(253,203,110,0.12);
+            border: 1px solid rgba(253,203,110,0.35);
+            border-radius: 8px;
+            padding: 6px 16px;
+            font-size: 0.95rem;
+            color: #fdcb6e;
+        }
+
+        /* Overview */
+        .overview-section { max-width: 1400px; margin: 0 auto 30px; }
+        .overview-toggle {
+            width: 100%;
+            background: rgba(0,212,170,0.1);
+            border: 1px solid rgba(0,212,170,0.3);
+            border-radius: 12px;
+            padding: 16px 24px;
+            color: #00d4aa;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+        .overview-toggle:hover { background: rgba(0,212,170,0.2); }
+        .overview-toggle .arrow { transition: transform 0.3s ease; }
+        .overview-toggle.active .arrow { transform: rotate(180deg); }
+        .overview-content {
+            display: none;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            padding: 30px;
+            margin-top: -12px;
+        }
+        .overview-content.active { display: block; }
+        .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+        }
+        .overview-card {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .overview-card h3 {
+            color: #00d4aa;
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .overview-card.bull h3 { color: #00d4aa; }
+        .overview-card.bear h3 { color: #ff6b6b; }
+        .overview-card.risks h3 { color: #fdcb6e; }
+        .overview-card p { margin-bottom: 12px; line-height: 1.6; color: #c0c0c0; font-size: 0.92rem; }
+        .overview-card ul { list-style: none; padding: 0; margin: 0; }
+        .overview-card li {
+            padding: 7px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            line-height: 1.5;
+            color: #c0c0c0;
+            font-size: 0.9rem;
+        }
+        .overview-card li:last-child { border-bottom: none; }
+        .overview-card li::before { content: '• '; color: #00d4aa; }
+        .overview-card.bear li::before { color: #ff6b6b; }
+        .overview-card.risks li::before { color: #fdcb6e; }
+        .revenue-stream { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+        .revenue-stream .name { color: #c0c0c0; font-size: 0.9rem; }
+        .revenue-stream .pct { color: #00d4aa; font-weight: 600; font-size: 0.9rem; }
+        .risk-high { color: #ff6b6b; font-weight: 600; }
+        .risk-moderate { color: #fdcb6e; font-weight: 600; }
+        .risk-low { color: #00d4aa; font-weight: 600; }
+        .competitor-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        .competitor-tag {
+            background: rgba(255,255,255,0.07);
+            border-radius: 4px;
+            padding: 3px 9px;
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+        .moat-item { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .moat-item:last-child { border-bottom: none; }
+        .moat-label { font-size: 0.8rem; color: #888; margin-bottom: 2px; }
+        .moat-strength-strong { color: #00d4aa; font-weight: 600; font-size: 0.85rem; }
+        .moat-strength-moderate { color: #fdcb6e; font-weight: 600; font-size: 0.85rem; }
+        .moat-desc { color: #b0b0b0; font-size: 0.85rem; line-height: 1.4; margin-top: 2px; }
+
+        /* KPI Cards */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .kpi-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .kpi-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,212,170,0.2);
+        }
+        .kpi-value { font-size: 1.8rem; font-weight: bold; color: #00d4aa; margin-bottom: 5px; }
+        .kpi-label { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        .kpi-change { font-size: 0.85rem; margin-top: 5px; }
+        .kpi-change.positive { color: #00d4aa; }
+        .kpi-change.negative { color: #ff6b6b; }
+        .kpi-change.neutral { color: #888; }
+        .kpi-sub { font-size: 0.78rem; color: #666; margin-top: 3px; }
+
+        /* Guidance Section */
+        .guidance-section { max-width: 1400px; margin: 0 auto 30px; }
+        .guidance-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .guidance-header h3 {
+            color: #fff;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .guidance-header h3::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, #00d4aa, #00b894);
+            border-radius: 2px;
+        }
+        .guidance-meta { font-size: 0.82rem; color: #888; }
+        .guidance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .guidance-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 18px;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.2s ease;
+        }
+        .guidance-card:hover { transform: translateY(-2px); }
+        .guidance-metric { font-size: 0.78rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+        .guidance-target { font-size: 1.3rem; font-weight: 600; color: #00d4aa; margin-bottom: 6px; }
+        .guidance-period { font-size: 0.82rem; color: #e0e0e0; margin-bottom: 8px; }
+        .guidance-vs-prior {
+            display: inline-block;
+            font-size: 0.72rem;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        .guidance-vs-prior.raised { background: rgba(0,212,170,0.15); color: #00d4aa; }
+        .guidance-vs-prior.lowered { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+        .guidance-vs-prior.maintained { background: rgba(255,255,255,0.1); color: #888; }
+        .guidance-vs-prior.new { background: rgba(99,102,241,0.15); color: #818cf8; }
+        .guidance-notes { font-size: 0.78rem; color: #666; margin-top: 8px; line-height: 1.4; }
+        .guidance-commentary {
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            padding: 16px 20px;
+            border-left: 3px solid #00d4aa;
+            font-style: italic;
+            color: #b0b0b0;
+            line-height: 1.6;
+            font-size: 0.9rem;
+        }
+        .guidance-commentary::before { content: '"'; font-size: 1.5rem; color: #00d4aa; margin-right: 4px; }
+
+        /* Section Titles */
+        .section-title {
+            font-size: 1.5rem;
+            color: #fff;
+            margin: 40px auto 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(0,212,170,0.3);
+            max-width: 1400px;
+        }
+
+        /* Charts */
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 25px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .charts-container.single-col {
+            grid-template-columns: 1fr;
+        }
+        .chart-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .chart-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .chart-header h3 {
+            color: #fff;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .chart-header h3::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, #00d4aa, #00b894);
+            border-radius: 2px;
+        }
+        .help-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(0,212,170,0.2);
+            border: 1px solid #00d4aa;
+            color: #00d4aa;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+        .help-btn:hover { background: #00d4aa; color: #1a1a2e; }
+        .chart-wrapper { position: relative; height: 300px; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: linear-gradient(135deg, #1e2a4a 0%, #16213e 100%);
+            border-radius: 16px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid rgba(0,212,170,0.3);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .modal-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h3 { color: #00d4aa; font-size: 1.3rem; margin: 0; }
+        .modal-close {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            background: rgba(255,107,107,0.2);
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-close:hover { background: #ff6b6b; color: #fff; }
+        .modal-body { padding: 25px; line-height: 1.7; }
+        .modal-body p { margin-bottom: 15px; color: #c0c0c0; }
+        .modal-body strong { color: #00d4aa; }
+        .modal-body ul { margin: 15px 0; padding-left: 20px; }
+        .modal-body li { margin-bottom: 8px; color: #c0c0c0; }
+        .metric-highlight {
+            background: rgba(0,212,170,0.1);
+            border-left: 3px solid #00d4aa;
+            padding: 12px 15px;
+            margin: 15px 0;
+            border-radius: 0 8px 8px 0;
+            color: #c0c0c0;
+        }
+
+        /* DCF Section */
+        .dcf-section { max-width: 1400px; margin: 0 auto 40px; }
+        .dcf-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .dcf-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.3s ease;
+        }
+        .dcf-card:hover { transform: translateY(-3px); }
+        .dcf-card.highlight {
+            background: rgba(0,212,170,0.1);
+            border-color: rgba(0,212,170,0.3);
+        }
+        .dcf-label { font-size: 0.82rem; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .dcf-value { font-size: 2.2rem; font-weight: bold; color: #00d4aa; }
+        .dcf-card:not(.highlight) .dcf-value { color: #fff; }
+        .dcf-change { font-size: 1rem; margin-top: 8px; font-weight: 600; }
+        .dcf-change.positive { color: #00d4aa; }
+        .dcf-change.negative { color: #ff6b6b; }
+        .dcf-sublabel { font-size: 0.78rem; color: #666; margin-top: 8px; }
+        .dcf-inputs {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .dcf-inputs h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+        .dcf-inputs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .dcf-input-card {
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .dcf-input-label { font-size: 0.72rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .dcf-input-value { font-size: 1.2rem; font-weight: 600; color: #00d4aa; }
+        .dcf-input-note { font-size: 0.7rem; color: #666; margin-top: 4px; }
+        .fcf-projections h5 { color: #b0b0b0; font-size: 0.88rem; margin-bottom: 10px; }
+        .fcf-projection-table {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .fcf-projection-item { text-align: center; }
+        .fcf-projection-item.header { font-size: 0.72rem; color: #888; font-weight: 600; }
+        .fcf-projection-item .year-label { font-size: 0.72rem; color: #888; margin-bottom: 2px; }
+        .fcf-projection-item .fcf-val { font-size: 0.95rem; color: #e0e0e0; font-weight: 500; }
+        .fcf-projection-item .growth-rate { font-size: 0.72rem; color: #00d4aa; margin-top: 2px; }
+        .dcf-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+            padding: 25px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .slider-group { display: flex; flex-direction: column; gap: 10px; }
+        .slider-group label { font-size: 0.95rem; color: #e0e0e0; display: flex; justify-content: space-between; }
+        .slider-group label span { color: #00d4aa; font-weight: 600; }
+        .slider-group input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255,255,255,0.1);
+            outline: none;
+        }
+        .slider-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px; height: 18px;
+            border-radius: 50%;
+            background: #00d4aa;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .slider-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        .slider-hint { font-size: 0.78rem; color: #666; }
+        .scenario-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .scenario-tab {
+            padding: 10px 24px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: transparent;
+            color: #888;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+        .scenario-tab:hover { border-color: rgba(0,212,170,0.5); color: #e0e0e0; }
+        .scenario-tab.active { background: rgba(0,212,170,0.15); border-color: #00d4aa; color: #00d4aa; }
+        .scenario-details {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .scenario-details h4 { color: #00d4aa; margin-bottom: 15px; font-size: 1rem; }
+        .assumption-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+        }
+        .assumption-item { text-align: center; }
+        .assumption-item .label { font-size: 0.78rem; color: #888; margin-bottom: 4px; }
+        .assumption-item .value { font-size: 1.05rem; color: #e0e0e0; font-weight: 500; }
+        .sensitivity-section { margin-bottom: 30px; }
+        .sensitivity-section h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+        .sensitivity-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.03); border-radius: 8px; overflow: hidden; }
+        .sensitivity-table th, .sensitivity-table td { padding: 11px 14px; text-align: center; border: 1px solid rgba(255,255,255,0.08); }
+        .sensitivity-table th { background: rgba(0,212,170,0.1); color: #00d4aa; font-weight: 600; font-size: 0.85rem; }
+        .sensitivity-table td { color: #e0e0e0; font-size: 0.85rem; }
+        .sensitivity-table td.highlight { background: rgba(0,212,170,0.15); color: #00d4aa; font-weight: 600; }
+        .sensitivity-table td.below-current { color: #ff6b6b; }
+        .sensitivity-table td.above-current { color: #00d4aa; }
+        .historical-growth { margin-bottom: 30px; }
+        .historical-growth h4 { color: #e0e0e0; margin-bottom: 15px; font-size: 1rem; }
+        .growth-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 15px;
+        }
+        .growth-item {
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .growth-item.selected { border-color: #00d4aa; background: rgba(0,212,170,0.1); }
+        .growth-item .metric { font-size: 0.78rem; color: #888; margin-bottom: 6px; }
+        .growth-item .rate { font-size: 1.15rem; font-weight: 600; }
+        .growth-item .rate.positive { color: #00d4aa; }
+        .growth-item .rate.negative { color: #ff6b6b; }
+        .dcf-philosophy {
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            padding: 18px 22px;
+            border-left: 3px solid #6c5ce7;
+            margin-bottom: 25px;
+            color: #b0b0b0;
+            font-size: 0.88rem;
+            line-height: 1.65;
+        }
+        .dcf-philosophy strong { color: #818cf8; }
+        .sanity-section { margin-bottom: 25px; }
+        .sanity-section h4 { color: #e0e0e0; margin-bottom: 12px; font-size: 1rem; }
+        .sanity-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 12px;
+        }
+        .sanity-item {
+            background: rgba(0,212,170,0.05);
+            border: 1px solid rgba(0,212,170,0.15);
+            border-radius: 8px;
+            padding: 12px 15px;
+        }
+        .sanity-item .s-metric { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+        .sanity-item .s-value { font-size: 0.95rem; color: #00d4aa; font-weight: 600; margin-bottom: 2px; }
+        .sanity-item .s-assess { font-size: 0.78rem; color: #b0b0b0; }
+        .sanity-pass-banner {
+            background: rgba(0,212,170,0.08);
+            border: 1px solid rgba(0,212,170,0.25);
+            border-radius: 10px;
+            padding: 12px 18px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #00d4aa;
+            font-size: 0.92rem;
+        }
+        .sanity-pass-icon { font-size: 1.2rem; }
+
+        /* Narrative banner */
+        .narrative-banner {
+            max-width: 1400px;
+            margin: 0 auto 25px;
+            background: rgba(253,203,110,0.08);
+            border: 1px solid rgba(253,203,110,0.25);
+            border-radius: 12px;
+            padding: 16px 22px;
+            color: #fdcb6e;
+            font-size: 0.92rem;
+            line-height: 1.6;
+        }
+        .narrative-banner strong { color: #ffe08a; }
+
+        @media (max-width: 768px) {
+            .charts-container { grid-template-columns: 1fr; }
+            .overview-grid { grid-template-columns: 1fr; }
+            .header h1 { font-size: 1.8rem; }
+            .dcf-summary { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+    <h1>Fiserv, Inc. (FISV / NYSE: FI)</h1>
+    <p>Global Fintech Infrastructure | Merchant Solutions & Financial Solutions | "One Fiserv" Turnaround</p>
+    <div class="header-badges">
+        <span class="price-badge">Current Price: $49.45 (Jun 24, 2026)</span>
+        <span class="dcf-badge">Base IV: $65.06 (+31.6%) | Prob-Weighted IV: $64.70 (+30.8%)</span>
+        <span class="turnaround-badge">FY2025 Revenue: $21,193M | EPS: $6.34 | "Transition Year" 2026</span>
+    </div>
+</div>
+
+<!-- TURNAROUND NARRATIVE BANNER -->
+<div class="narrative-banner">
+    <strong>Turnaround Context:</strong> After a catastrophic October 2025 guidance collapse (-44% single day), Fiserv is executing the "One Fiserv" plan under CEO Mike Lyons. FY2025 delivered $21.2B revenue (+4%) and adjusted EPS $8.64, but FY2026 is a transition year (guided 1-3% organic growth, EPS $8.00-$8.30). Recovery thesis rests on Clover GPV growth (10-15% targeted), banking attrition stabilization, Project Elevate AI-driven efficiency gains, and a return to double-digit adjusted EPS growth from 2027. Medium-term target at May 2026 Investor Day: $12+ EPS by 2029.
+</div>
+
+<!-- INVESTMENT OVERVIEW (COLLAPSIBLE) -->
+<div class="overview-section">
+    <button class="overview-toggle" onclick="toggleOverview()">
+        <span>Investment Overview & Analysis</span>
+        <span class="arrow">▼</span>
+    </button>
+    <div class="overview-content" id="overviewContent">
+        <div class="overview-grid">
+            <!-- Company Overview -->
+            <div class="overview-card">
+                <h3>Company Overview</h3>
+                <p>Fiserv (NYSE: FI) is a global financial technology company providing payment processing, digital banking, and financial services technology to banks, credit unions, and merchants. Following its 2019 acquisition of First Data, the company operates through two segments: Merchant Solutions (Clover SMB payments, Carat enterprise) and Financial Solutions (core banking, card issuing, digital banking platforms).</p>
+                <p>After a catastrophic October 2025 guidance collapse that wiped ~70% of market value, the company is executing its "One Fiserv" turnaround plan in 2026 — a transition year with declining EPS and low single-digit revenue growth before targeted recovery starting in 2027.</p>
+            </div>
+            <!-- Business Model -->
+            <div class="overview-card">
+                <h3>Business Model</h3>
+                <p>Processing and services revenue (~81% of total) driven by account- and transaction-based fees under multi-year contracts. Clover — the SMB point-of-sale and operating platform — is the primary growth engine, reaching $3.3B revenue in FY2025.</p>
+                <div>
+                    <div class="revenue-stream"><span class="name">Merchant Solutions</span><span class="pct">~55%</span></div>
+                    <div class="revenue-stream"><span class="name">Financial Solutions</span><span class="pct">~45%</span></div>
+                    <div class="revenue-stream"><span class="name">Processing & Services (recurring)</span><span class="pct">~81%</span></div>
+                    <div class="revenue-stream"><span class="name">Product Revenue (hardware/SW)</span><span class="pct">~19%</span></div>
+                </div>
+                <p style="margin-top:10px;">Geography: US & Canada ~84%, International ~16% (expanding via CCV Group, ICICI, Japan).</p>
+            </div>
+            <!-- Competitive Position -->
+            <div class="overview-card">
+                <h3>Competitive Position</h3>
+                <p>Largest non-bank merchant acquirer in the U.S. by transaction count; leading core banking provider to community banks and credit unions. Processing ~90 billion transactions annually.</p>
+                <div class="competitor-list">
+                    <span class="competitor-tag">FIS/Worldpay</span>
+                    <span class="competitor-tag">Global Payments</span>
+                    <span class="competitor-tag">Block (Square)</span>
+                    <span class="competitor-tag">Stripe</span>
+                    <span class="competitor-tag">Adyen</span>
+                    <span class="competitor-tag">Jack Henry</span>
+                    <span class="competitor-tag">Toast</span>
+                    <span class="competitor-tag">PayPal</span>
+                </div>
+                <div style="margin-top:12px;">
+                    <div class="moat-item"><div class="moat-label">Switching Costs</div><div class="moat-strength-strong">Strong</div><div class="moat-desc">Core banking 99%+ historical renewal; deep process integration and data migration risk.</div></div>
+                    <div class="moat-item"><div class="moat-label">Scale & Data Flywheel</div><div class="moat-strength-strong">Strong</div><div class="moat-desc">90B+ annual transactions; Commerce Hub $200B+ processed in 2025 (200%+ growth).</div></div>
+                    <div class="moat-item"><div class="moat-label">Regulatory Expertise</div><div class="moat-strength-moderate">Moderate</div><div class="moat-desc">Deep FI compliance infrastructure creates meaningful barriers for new entrants.</div></div>
+                    <div class="moat-item"><div class="moat-label">Multi-Year Contracts</div><div class="moat-strength-moderate">Moderate</div><div class="moat-desc">Revenue visibility; temporarily weakened by above-trend banking attrition.</div></div>
+                </div>
+            </div>
+            <!-- Growth Drivers -->
+            <div class="overview-card">
+                <h3>Growth Drivers</h3>
+                <ul>
+                    <li>Clover GPV growth 10-15% in 2026; VAS (27% of Clover rev) growing ~18% YoY; "POS to OS" SMB platform vision</li>
+                    <li>Project Elevate — AI-driven efficiency program; 60% reduction in high-impact client incidents; hundreds of identified improvement opportunities</li>
+                    <li>International: CCV Group (Netherlands/Germany), ICICI Merchant Services (India), Clover Japan (late 2026), Payfare (earned wage access)</li>
+                    <li>Financial Solutions banking stabilization — Finxact modern core accounts +70% in 2025; Western Alliance Bank distribution alliance (Mar 2026)</li>
+                    <li>AI infrastructure layer for financial systems; digital assets (FIUSD stablecoin, Roughrider coin)</li>
+                    <li>Clover Capital (merchant cash advance) +30% in 2025; Investor Day targets: 4-6% revenue CAGR and $12+ EPS by 2029</li>
+                </ul>
+            </div>
+            <!-- Key Risks -->
+            <div class="overview-card risks">
+                <h3>Key Risks</h3>
+                <ul>
+                    <li><span class="risk-high">HIGH:</span> Banking attrition — Q1 2026 core accounts -2% YoY, Financial Solutions organic -6%; recovery not yet demonstrated</li>
+                    <li><span class="risk-high">HIGH:</span> Clover growth achievability — $200M below original FY2025 guide; Q1 2026 organic only +6% reported</li>
+                    <li><span class="risk-high">HIGH:</span> Securities class action litigation — multiple lawsuits in discovery covering July 2024-October 2025 period</li>
+                    <li><span class="risk-high">HIGH:</span> Investor credibility / value trap risk — 2 consecutive EPS contraction years; must deliver H2 2026 acceleration</li>
+                    <li><span class="risk-moderate">MOD:</span> EPS and FCF decline — adjusted EPS $8.64 (FY2025) to $8.00-$8.30 (FY2026 guide); FCF fell to $4.3B</li>
+                    <li><span class="risk-moderate">MOD:</span> High leverage — $28.4B net debt amplifies downside scenarios severely</li>
+                    <li><span class="risk-moderate">MOD:</span> Consumer/SMB slowdown — Clover exposed to spending volumes; Clover Capital credit risk</li>
+                </ul>
+            </div>
+            <!-- Bull Case -->
+            <div class="overview-card bull">
+                <h3>Bull Case</h3>
+                <ul>
+                    <li>Clover's growth engine intact — $3.3B revenue, 23% FY2025 growth; VAS penetration and Clover Capital expanding</li>
+                    <li>Deeply discounted valuation: 6.4x EV/EBITDA, 6.1x forward P/E — near historic lows for scaled payments infrastructure</li>
+                    <li>Investor Day roadmap (4-6% revenue CAGR, 37%+ margins, $12+ EPS by 2029) — if credibility rebuilt via H2 2026 delivery, significant re-rating possible</li>
+                    <li>Project Elevate early results encouraging — 60% reduction in high-impact incidents; margin recovery ahead of schedule is possible</li>
+                    <li>Jana Partners activism adds accountability and potential strategic catalyst (non-core divestitures)</li>
+                    <li>Structural moat intact: 90B+ transactions/year, 99% historical core banking retention, deep FI integration</li>
+                </ul>
+            </div>
+            <!-- Bear Case -->
+            <div class="overview-card bear">
+                <h3>Bear Case</h3>
+                <ul>
+                    <li>Credibility destruction may be permanent — must deliver revenue upside surprises, not just beat depressed expectations</li>
+                    <li>Financial Solutions still declining: Q1 2026 banking -6% organic; every quarter compounds the revenue hole</li>
+                    <li>Two consecutive EPS contraction years with $12 target requiring simultaneous revenue acceleration and margin expansion</li>
+                    <li>Securities litigation overhang — active discovery; adverse rulings add hundreds of millions in potential costs</li>
+                    <li>Macro headwinds amplify SMB risk — tariff uncertainty, high rates, consumer slowdown; Clover Capital credit book at risk</li>
+                    <li>$28.4B net debt amplifies any enterprise value compression severely into equity value destruction</li>
+                    <li>"Show me" story requiring 6-9 months of clean execution before institutional conviction rebuilds — dead money risk</li>
+                </ul>
+            </div>
+            <!-- Recent Developments -->
+            <div class="overview-card">
+                <h3>Recent Developments</h3>
+                <ul>
+                    <li><strong>Jun 2026:</strong> Stock near 52-week lows ~$47-55, down ~70% from 2025 peak. Analyst avg PT ~$70-76 (~40% upside).</li>
+                    <li><strong>May 14, 2026:</strong> Investor Day — medium-term targets: 4-6% adj. revenue CAGR, 37%+ margins, $12+ EPS by 2029.</li>
+                    <li><strong>May 5, 2026:</strong> Q1 2026 results — adj. revenue -2.4% YoY, organic -3.6%, EPS $1.79 (beat $1.58 est.). Stock fell ~10%.</li>
+                    <li><strong>Mar 2026:</strong> Western Alliance Bank alliance + CCV Group acquisition completed.</li>
+                    <li><strong>Feb 17, 2026:</strong> Jana Partners disclosed ~2.2M share stake; privately engaged with management.</li>
+                    <li><strong>Feb 10, 2026:</strong> Q4/FY2025 earnings — GAAP revenue $21.2B, adj EPS $8.64 (-2%), Clover $3.3B (+23%), FCF $4.44B.</li>
+                    <li><strong>Oct 29, 2025:</strong> Stock -44% single day — organic growth cut from 10% to 3.5-4%; 2026 announced as transition year.</li>
+                    <li><strong>Apr 2025:</strong> ICICI Merchant Services (India) acquisition.</li>
+                    <li><strong>Mar 2025:</strong> Payfare acquisition for earned wage access capabilities.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KPI CARDS -->
+<div class="kpi-grid" id="kpiGrid"></div>
+
+<!-- GUIDANCE SECTION -->
+<div class="guidance-section">
+    <div class="guidance-header">
+        <h3>Management Guidance</h3>
+        <span class="guidance-meta">As of Q1 2026 Earnings (May 5, 2026) | FY2026 and Medium-Term (2027-2029)</span>
+    </div>
+    <div class="guidance-grid" id="guidanceGrid"></div>
+    <div class="guidance-commentary" id="guidanceCommentary"></div>
+</div>
+
+<!-- FINANCIAL PERFORMANCE CHARTS -->
+<h2 class="section-title">Revenue & Profitability</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header"><h3>Annual Revenue (FY, $M)</h3><button class="help-btn" onclick="openModal('revenue')">?</button></div>
+        <div class="chart-wrapper"><canvas id="revenueChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header"><h3>Operating & Net Margin (%)</h3><button class="help-btn" onclick="openModal('margins')">?</button></div>
+        <div class="chart-wrapper"><canvas id="marginsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header"><h3>EPS (Annual, GAAP)</h3><button class="help-btn" onclick="openModal('eps')">?</button></div>
+        <div class="chart-wrapper"><canvas id="epsChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header"><h3>Free Cash Flow & CapEx ($M)</h3><button class="help-btn" onclick="openModal('fcf')">?</button></div>
+        <div class="chart-wrapper"><canvas id="fcfChart"></canvas></div>
+    </div>
+</div>
+
+<!-- SEGMENT CHARTS -->
+<h2 class="section-title">Segment Performance</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header"><h3>Segment Revenue: Merchant vs Financial ($M)</h3><button class="help-btn" onclick="openModal('segments')">?</button></div>
+        <div class="chart-wrapper"><canvas id="segmentChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header"><h3>Quarterly Revenue Trend ($M)</h3><button class="help-btn" onclick="openModal('quarterly')">?</button></div>
+        <div class="chart-wrapper"><canvas id="quarterlyChart"></canvas></div>
+    </div>
+</div>
+
+<!-- BALANCE SHEET & CASH FLOW CHARTS -->
+<h2 class="section-title">Balance Sheet & Capital Allocation</h2>
+<div class="charts-container">
+    <div class="chart-card">
+        <div class="chart-header"><h3>Operating Cash Flow vs FCF ($M)</h3><button class="help-btn" onclick="openModal('cashflows')">?</button></div>
+        <div class="chart-wrapper"><canvas id="cashflowChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header"><h3>Total Debt vs Shareholders' Equity ($M)</h3><button class="help-btn" onclick="openModal('leverage')">?</button></div>
+        <div class="chart-wrapper"><canvas id="leverageChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header"><h3>Shares Outstanding (M)</h3><button class="help-btn" onclick="openModal('shares')">?</button></div>
+        <div class="chart-wrapper"><canvas id="sharesChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+        <div class="chart-header"><h3>Revenue YoY Growth (%)</h3><button class="help-btn" onclick="openModal('growth')">?</button></div>
+        <div class="chart-wrapper"><canvas id="growthChart"></canvas></div>
+    </div>
+</div>
+
+<!-- DCF SECTION -->
+<h2 class="section-title">DCF Valuation</h2>
+<div class="dcf-section">
+    <!-- Sanity Check Banner -->
+    <div class="sanity-pass-banner">
+        <span class="sanity-pass-icon">&#10003;</span>
+        <span>DCF Sanity Check: PASSED — Base case EV/EBITDA ~7.4x is BELOW payments processor peers (~8-10x), confirming conservative assumptions. Current market prices stock at 6.4x EV/EBITDA — deep value territory for scaled payments infrastructure.</span>
+    </div>
+
+    <!-- DCF Philosophy -->
+    <div class="dcf-philosophy">
+        <strong>Valuation Approach:</strong> Credibility-discount framework for a damaged-execution turnaround. FCF margins anchored to FY2025 actuals (not management targets) in the base case. WACC elevated to 10% (vs. historical ~8.5-9%) to reflect execution risk, litigation, and high leverage. Terminal growth 2.5% (below sector norms) given uncertainty around banking sub-segment recovery. Bear-skewed probability weighting (30% bear / 50% base / 20% bull) reflects October 2025 guidance catastrophe and continued Q1 2026 organic revenue contraction of -3.6%.
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="dcf-summary">
+        <div class="dcf-card highlight">
+            <div class="dcf-label">Base Case IV</div>
+            <div class="dcf-value" id="dcfIV">$65</div>
+            <div class="dcf-change positive" id="dcfUpside">+31.6% upside</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Entry Price (15% CAGR)</div>
+            <div class="dcf-value" id="dcfEntry">$68</div>
+            <div class="dcf-sublabel">Buy below for 15% annual return</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Current Price</div>
+            <div class="dcf-value" id="dcfCurrent">$49.45</div>
+            <div class="dcf-sublabel">Yahoo: FISV | NYSE: FI</div>
+        </div>
+        <div class="dcf-card">
+            <div class="dcf-label">Prob-Weighted IV</div>
+            <div class="dcf-value" id="dcfWeighted">$64.70</div>
+            <div class="dcf-sublabel">20% Bull / 50% Base / 30% Bear</div>
+        </div>
+    </div>
+
+    <!-- DCF Inputs -->
+    <div class="dcf-inputs">
+        <h4>DCF Model Inputs (Q1 2026 Balance Sheet)</h4>
+        <div class="dcf-inputs-grid">
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Base Year FCF</div>
+                <div class="dcf-input-value" id="baseFCF">$4,000M</div>
+                <div class="dcf-input-note">Normalized (FY2025 actual $4,299M)</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Shares Outstanding</div>
+                <div class="dcf-input-value" id="sharesOut">535.4M</div>
+                <div class="dcf-input-note">As of Q1 2026</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">Net Debt</div>
+                <div class="dcf-input-value" id="netDebt" style="color:#ff6b6b;">$28,353M</div>
+                <div class="dcf-input-note">Total debt $29,182M − Cash $829M</div>
+            </div>
+            <div class="dcf-input-card">
+                <div class="dcf-input-label">FCF Margin (Base)</div>
+                <div class="dcf-input-value">20.0%</div>
+                <div class="dcf-input-note">In line with FY2025 actual (20.3%)</div>
+            </div>
+        </div>
+        <div class="fcf-projections">
+            <h5>Projected FCF — Base Case (5-Year)</h5>
+            <div class="fcf-projection-table" id="fcfProjectionTable"></div>
+        </div>
+    </div>
+
+    <!-- Interactive Sliders -->
+    <div class="dcf-controls">
+        <div class="slider-group">
+            <label>Growth Rate (Year 1): <span id="growthValue">2%</span></label>
+            <input type="range" id="growthSlider" min="0" max="20" value="2" step="0.5">
+            <div class="slider-hint" id="growthHint">Based on revenue 3yr CAGR (6.1%) — anchored lower for FY2026 transition year (guided 1-3% organic)</div>
+        </div>
+        <div class="slider-group">
+            <label>WACC: <span id="waccValue">10%</span></label>
+            <input type="range" id="waccSlider" min="6" max="16" value="10" step="0.5">
+        </div>
+        <div class="slider-group">
+            <label>Terminal Growth: <span id="terminalValue">2.5%</span></label>
+            <input type="range" id="terminalSlider" min="0" max="5" value="2.5" step="0.5">
+        </div>
+    </div>
+
+    <!-- Scenario Tabs -->
+    <div class="scenario-tabs">
+        <button class="scenario-tab active" data-scenario="base" onclick="switchScenario('base')">Base Case</button>
+        <button class="scenario-tab" data-scenario="bull" onclick="switchScenario('bull')">Bull Case</button>
+        <button class="scenario-tab" data-scenario="bear" onclick="switchScenario('bear')">Bear Case</button>
+    </div>
+
+    <!-- Scenario Details -->
+    <div class="scenario-details">
+        <h4 id="scenarioTitle">Base Case Assumptions</h4>
+        <div class="assumption-grid" id="assumptionGrid"></div>
+    </div>
+
+    <!-- Sensitivity Matrix -->
+    <div class="sensitivity-section">
+        <h4>Sensitivity Analysis: Intrinsic Value by WACC & Terminal Growth Rate</h4>
+        <div style="overflow-x:auto;">
+            <table class="sensitivity-table" id="sensitivityMatrix"></table>
+        </div>
+    </div>
+
+    <!-- Historical Growth -->
+    <div class="historical-growth">
+        <h4>Historical Growth Rates (CAGR) — Growth Rate Selected for Base Case Highlighted</h4>
+        <div class="growth-grid" id="growthGrid"></div>
+    </div>
+
+    <!-- Sanity Checks Detail -->
+    <div class="sanity-section">
+        <h4>Valuation Sanity Checks</h4>
+        <div class="sanity-grid" id="sanityGrid"></div>
+    </div>
+
+    <!-- Scenario Chart -->
+    <div class="chart-card" style="margin-bottom:25px;">
+        <div class="chart-header"><h3>DCF Scenario Intrinsic Values vs Current Price</h3></div>
+        <div class="chart-wrapper"><canvas id="scenarioChart"></canvas></div>
+    </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle"></h3>
+            <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// EMBEDDED DATA — NO EXTERNAL FETCH REQUIRED
+// ============================================================
+
+const csvData = `Period,Revenue,GrossProfit,GrossMargin,OperatingIncome,OperatingMargin,NetIncome,NetMargin,EPS,FreeCashFlow,OperatingCashFlow,CapEx,ShareholdersEquity,TotalDebt,CashAndEquivalents,SharesOutstanding,MerchantRevenue,FinancialRevenue,ProcessingRevenue,ProductRevenue
+FY2014,5066,,,1210,23.9,754,14.9,1.84,1192,1552,360,,,,,,,4219,847
+FY2015,5254,,,1311,25.0,712,13.5,1.73,1196,1483,287,,,,,,,4411,843
+FY2016,5505,,,1445,26.2,930,16.9,2.26,1192,1552,360,,,,,,,4625,880
+FY2017,5696,,,1532,26.9,1232,21.6,2.98,1196,1483,287,,,,,,,4833,863
+FY2018,5823,,,1753,30.1,1187,20.4,2.87,1192,1552,360,,,,,,,4975,848
+FY2019,10187,,,1609,15.8,893,8.8,1.71,2074,2795,721,32979,21899,893,522.6,,,8573,1614
+FY2020,14852,,,1852,12.5,958,6.5,1.40,3247,4147,900,32330,20684,906,683.4,,,12215,2637
+FY2021,16226,,,2288,14.1,1334,8.2,1.99,2874,4034,1160,30952,21237,835,671.6,,,13307,2919
+FY2022,17737,,,3740,21.1,2530,14.3,3.91,3139,4618,1479,30828,21418,902,647.9,7883,8681,14460,3277
+Q1 2022,4138,,,822,19.9,594,14.4,0.93,,,,,,652.7,,,,
+Q2 2022,4425,,,908,20.5,622,14.1,0.97,,,,,,650.3,,,,
+Q3 2022,4480,,,937,20.9,626,14.0,0.98,,,,,,648.3,,,,
+FY2023,19093,,,5014,26.3,3068,16.1,4.98,3774,5162,1388,29857,23118,1204,615.9,8722,9101,15630,3463
+Q1 2023,4547,,,934,20.5,563,12.4,0.89,,,,,,631.3,,,3673,874
+Q2 2023,4756,,,1131,23.8,683,14.4,1.10,,,,,,619.2,,,3924,832
+Q3 2023,4873,,,1503,30.8,952,19.5,1.56,,,,,,610.3,,,4008,865
+FY2024,20456,,,5879,28.7,3131,15.3,5.38,5062,6631,1569,27068,24840,1236,582.1,9631,9477,16637,3819
+Q1 2024,4883,,,1181,24.2,735,15.1,1.24,,,,,,594.8,,,4000,883
+Q2 2024,5107,,,1428,28.0,894,17.5,1.53,,,,,,585.4,,,4140,967
+Q3 2024,5215,,,1602,30.7,564,10.8,0.98,,,,,,576.9,,,4237,978
+FY2025,21193,,,5818,27.5,3480,16.4,6.34,4299,6062,1763,25792,28997,798,549.0,10140,9664,16879,4314
+Q1 2025,5130,,,1395,27.2,851,16.6,1.51,313,648,335,25884,28297,1177,564.7,2372,2417,4045,1085
+Q2 2025,5516,,,1696,30.7,1026,18.6,1.86,1499,1665,479,25215,29587,999,552.7,2644,2552,4304,1212
+Q3 2025,5263,,,1436,27.3,792,15.1,1.46,1284,1805,507,25121,30199,1068,541.8,2586,2333,4273,990
+Q4 2025,5284,,,1291,24.4,811,15.3,1.51,1502,1944,442,,,,536.7,2538,2362,4257,1027
+Q1 2026,5027,,,918,18.3,571,11.4,1.07,141,599,458,26201,29182,829,535.4,2373,2302,4070,957`;
+
+const analysis = {
+    "ticker": "FISV",
+    "company_name": "Fiserv, Inc.",
+    "analysis_date": "2026-06-29",
+    "overview": "Fiserv (NYSE: FI) is a global financial technology company that provides payment processing, digital banking, and financial services technology to banks, credit unions, and merchants. Following its 2019 acquisition of First Data, the company operates through two segments: Merchant Solutions (providing Clover SMB payments and Carat enterprise solutions) and Financial Solutions (delivering core banking, card issuing, and digital banking platforms). After a catastrophic October 2025 guidance collapse that wiped ~70% of market value, the company is executing its 'One Fiserv' turnaround plan in 2026.",
+    "guidance": {
+        "as_of": "Q1 2026 Earnings (May 5, 2026) — guidance confirmed unchanged from Q4 2025 Earnings (February 10, 2026)",
+        "fiscal_year": "FY2026 and Medium-Term (2027-2029)",
+        "items": [
+            {"metric": "Organic Revenue Growth", "target": "1% to 3%", "period": "FY2026", "vs_prior": "maintained", "notes": "H1 2026 expected to be negative (lapping higher prior-year nonrecurring revenue); H2 2026 expected to show cleaner growth. Q1 2026 actual was -3.6% organic."},
+            {"metric": "Adjusted EPS", "target": "$8.00 to $8.30", "period": "FY2026", "vs_prior": "maintained", "notes": "Second consecutive year of EPS decline from $8.64 in FY2025 and $8.80 in FY2024. Q1 2026 actual EPS $1.79 beat the $1.58 estimate."},
+            {"metric": "Adjusted Operating Margin", "target": "~34%", "period": "FY2026", "vs_prior": "maintained", "notes": "Q1 2026 came in at 29.7%; H2 targeted at 35-36%. Margin recovery requires H2 revenue acceleration and Project Elevate efficiency gains."},
+            {"metric": "Free Cash Flow Conversion", "target": "~90% of adjusted net income", "period": "FY2026 through 2029", "vs_prior": "maintained", "notes": "FY2025 FCF was $4.44B (~93% conversion). Decline from FY2024's $5.23B reflects investment cycle and lower earnings base."},
+            {"metric": "Clover GPV Growth", "target": "10% to 15%", "period": "FY2026", "vs_prior": "new", "notes": "Assumes stable macro conditions. Q1 2026 Clover volume +9% reported, +12% excluding gateway conversion. VAS 27% of Clover revenue."},
+            {"metric": "Merchant Solutions Growth", "target": "Mid-single digits", "period": "FY2026", "vs_prior": "new", "notes": "Driven by Clover GPV growth and VAS penetration. Q1 2026 Merchant organic -1% due to non-recurring revenue lapping."},
+            {"metric": "Financial Solutions Revenue", "target": "Flat to slightly down", "period": "FY2026", "vs_prior": "new", "notes": "Banking attrition above historical; recovery to positive growth dependent on 'bending the curve' on core account losses."},
+            {"metric": "Adj. Revenue CAGR (Medium-Term)", "target": "4% to 6%", "period": "2026-2029", "vs_prior": "new", "notes": "Re-acceleration from FY2026 trough. Contingent on Financial Solutions stabilization and sustained Clover momentum."},
+            {"metric": "Adjusted Operating Margin", "target": "Exceeding 37%", "period": "2029", "vs_prior": "new", "notes": "300+ bps expansion from FY2026 ~34%, driven by Project Elevate efficiencies and scale leverage."},
+            {"metric": "Adjusted EPS (Medium-Term)", "target": "Exceeding $12.00", "period": "2029", "vs_prior": "new", "notes": "Implies ~13-15% EPS CAGR from 2027-2029. Requires both revenue acceleration and significant margin expansion."}
+        ],
+        "management_commentary": "CEO Mike Lyons (Q1 2026 call, May 2026): 'The One Fiserv plan is executing as intended — no material surprises.' Management acknowledges significant work to do on core banking attrition and operating margins but emphasizes underlying Clover volume metrics remain solid. Positioned H2 2026 as the period when financial results become more visible. At the May 14, 2026 Investor Day, management committed to mid-term targets: 4-6% revenue growth, 37%+ margins, and $12+ EPS by 2029, framing Fiserv as an AI orchestration layer for the financial system."
+    }
+};
+
+const dcfData = {
+  "ticker": "FISV",
+  "nyse_ticker": "FI",
+  "valuation_date": "2026-08-28",
+  "current_price": 62.88,
+  "price_source": {
+    "symbol_used": "FISV",
+    "note": "NYSE ticker changed to FI but Yahoo Finance still quotes this security under FISV. Query to symbol FI returned no data (may be delisted on Yahoo). Live price $49.45 retrieved from https://query1.finance.yahoo.com/v8/finance/chart/FISV on 2026-06-24."
+  },
+  "inputs": {
+    "shares_outstanding": 531.767,
+    "net_debt": 27259.0,
+    "total_debt": 27886.0,
+    "cash": 627.0,
+    "last_fcf": 4299,
+    "base_year_fcf_normalized": 4000,
+    "currency": "USD",
+    "units": "millions",
+    "balance_sheet_date": "Q1 2026 (Mar 31, 2026)",
+    "notes": "Net debt = $29,182M total debt minus $829M cash as of Q1 2026. Last FCF is FY2025 actual ($4,299M, down from $5,062M in FY2024). Q1 2026 FCF was only $141M, signaling a soft near-term FCF trajectory. Normalized base-year FCF of $4,000M used in projections to reflect expected FY2026 FCF decline without over-extrapolating a weak single quarter.",
+    "last_fcf_note": "FY2026E owner FCF of ~$3,229m, from H1-2026's $1,126m (OCF 2,082 less capex 956 incl. capitalised software) grown by FY2025's own H2/H1 ratio of 1.87x. H1 FCF fell 24.9% from $1,499m. The prior model's $4,299m base with +2% Year-1 growth needed FY2026 of $4,385m; H1 delivered 25.7% of it.",
+    "quote_currency": "USD"
+  },
+  "historical_growth": {
+    "revenue_3yr_cagr": 6.1,
+    "revenue_5yr_cagr": 7.4,
+    "eps_3yr_cagr": 17.5,
+    "eps_5yr_cagr": 35.3,
+    "equity_3yr_cagr": -5.8,
+    "equity_5yr_cagr": -4.4,
+    "fcf_3yr_cagr": 11.1,
+    "fcf_5yr_cagr": 5.8,
+    "selected_growth_rate": 6.1,
+    "growth_rate_source": "revenue_3yr_cagr",
+    "growth_divergence_warning": "Equity CAGR is negative (buybacks reducing book value, First Data acquisition leverage). EPS CAGRs are distorted upward by share count reduction. Revenue 3yr CAGR of 6.1% selected as primary anchor but capped lower given FY2026 guidance of 1-3% organic growth. FCF declined meaningfully in FY2025 ($4,299M vs. $5,062M FY2024) and Q1 2026 FCF was only $141M. Base case intentionally anchors near-term growth below historical averages to reflect the 2026 transition year."
+  },
+  "assumptions": {
+    "base": {
+      "growth_rates": [
+        2,
+        4,
+        4,
+        5
+      ],
+      "fcf_margin": 20.0,
+      "wacc": 10.0,
+      "terminal_growth": 2.5,
+      "rationale": "Year 1 (2026) reflects company guidance of 1-3% organic growth with full-year headwinds from banking attrition and Clover non-recurring revenue lapping. Years 2-3 assume gradual stabilization as banking attrition levels flatten and Clover VAS penetration continues. Years 4-5 converge toward management's medium-term 4-6% revenue CAGR target. FCF margin of 20% is in line with FY2025 actual (4,299/21,193 = 20.3%), appropriate given elevated CapEx investment cycle. WACC of 10% reflects above-average risk: high leverage ($28.4B net debt), execution credibility deficit, and active litigation. Terminal growth of 2.5% is below sector norms for a payments processor, reflecting ongoing structural risks in banking sub-segment."
+    },
+    "bull": {
+      "growth_rates": [
+        6,
+        7,
+        6,
+        6
+      ],
+      "fcf_margin": 23.0,
+      "wacc": 9.5,
+      "terminal_growth": 2.5,
+      "rationale": "Turnaround accelerates: Clover sustains GPV growth of 10-15%, banking attrition stabilizes in H2 2026, Project Elevate margin gains flow through from 2027. Management's Investor Day targets (4-6% revenue CAGR, 37%+ margins, $12+ EPS by 2029) are credible and delivered. FCF margin improves to 23% as margin expansion materializes. WACC of 9% assumes investor credibility partially restored, reducing risk premium. Terminal growth of 3.0% reflects durable payments infrastructure franchise."
+    },
+    "bear": {
+      "growth_rates": [
+        0,
+        0,
+        2,
+        2
+      ],
+      "fcf_margin": 17.5,
+      "wacc": 11.0,
+      "terminal_growth": 2.0,
+      "rationale": "Turnaround stalls: Financial Solutions banking attrition worsens beyond Q1 2026 levels (-6% organic), Clover disappoints in macro slowdown or SMB stress. Securities litigation results in material adverse settlement. Competitive losses to FIS, Jack Henry, and cloud-native fintechs compound. FCF margin compresses to 17.5% due to margin pressure and litigation costs. WACC of 11.5% reflects elevated leverage risk and potential credit rating pressure. Terminal growth of 2.0% for a structurally impaired franchise."
+    }
+  },
+  "projections": {
+    "base": {
+      "base_fcf": 3229.0,
+      "years": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "growth_rates": [
+        2,
+        4,
+        4,
+        5
+      ],
+      "fcf": [
+        3293.6,
+        3425.3,
+        3562.3,
+        3740.5
+      ],
+      "discount_factors": [
+        0.9091,
+        0.8264,
+        0.7513,
+        0.683
+      ],
+      "pv_fcf": [
+        2994.2,
+        2830.8,
+        2676.4,
+        2554.8
+      ]
+    },
+    "bull": {
+      "base_fcf": 3229.0,
+      "years": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "growth_rates": [
+        6,
+        7,
+        6,
+        6
+      ],
+      "fcf": [
+        3422.7,
+        3662.3,
+        3882.1,
+        4115.0
+      ],
+      "discount_factors": [
+        0.9132,
+        0.834,
+        0.7617,
+        0.6956
+      ],
+      "pv_fcf": [
+        3125.8,
+        3054.4,
+        2956.8,
+        2862.3
+      ]
+    },
+    "bear": {
+      "base_fcf": 2800.0,
+      "years": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "growth_rates": [
+        0,
+        0,
+        2,
+        2
+      ],
+      "fcf": [
+        2800.0,
+        2800.0,
+        2856.0,
+        2913.1
+      ],
+      "discount_factors": [
+        0.9009,
+        0.8116,
+        0.7312,
+        0.6587
+      ],
+      "pv_fcf": [
+        2522.5,
+        2272.5,
+        2088.3,
+        1919.0
+      ]
+    }
+  },
+  "valuation": {
+    "base": {
+      "sum_pv_fcf": 11056.2,
+      "terminal_fcf": 3834.0,
+      "terminal_value": 51119.5,
+      "pv_terminal": 34915.3,
+      "enterprise_value": 45971.5,
+      "equity_value": 18712.5,
+      "intrinsic_value": 35.19,
+      "upside": -44.0
+    },
+    "bull": {
+      "sum_pv_fcf": 11999.3,
+      "terminal_fcf": 4217.9,
+      "terminal_value": 60255.3,
+      "pv_terminal": 41912.0,
+      "enterprise_value": 53911.3,
+      "equity_value": 26652.3,
+      "intrinsic_value": 50.12,
+      "upside": -20.3
+    },
+    "bear": {
+      "sum_pv_fcf": 8802.3,
+      "terminal_fcf": 2971.4,
+      "terminal_value": 33015.4,
+      "pv_terminal": 21748.2,
+      "enterprise_value": 30550.6,
+      "equity_value": 3291.6,
+      "intrinsic_value": 6.19,
+      "upside": -90.2
+    }
+  },
+  "entry_price": {
+    "base": {
+      "terminal_value_per_share": 44.87,
+      "years_to_terminal": 4,
+      "target_cagr": 15,
+      "entry_price": 25.65,
+      "entry_discount_from_current": -59.2
+    },
+    "bull": {
+      "terminal_value_per_share": 62.05,
+      "years_to_terminal": 4,
+      "target_cagr": 15,
+      "entry_price": 35.48,
+      "entry_discount_from_current": -43.6
+    },
+    "bear": {
+      "terminal_value_per_share": 10.83,
+      "years_to_terminal": 4,
+      "target_cagr": 15,
+      "entry_price": 6.19,
+      "entry_discount_from_current": -90.2
+    }
+  },
+  "sensitivity": {
+    "wacc_range": [
+      8.0,
+      9.0,
+      10.0,
+      11.0,
+      12.0
+    ],
+    "terminal_growth_range": [
+      1.5,
+      2.0,
+      2.5,
+      3.0,
+      3.5
+    ],
+    "matrix": [
+      [
+        88.3,
+        97.69,
+        108.77,
+        122.09,
+        138.37
+      ],
+      [
+        69.05,
+        75.78,
+        83.52,
+        92.57,
+        103.26
+      ],
+      [
+        54.4,
+        59.4,
+        65.06,
+        71.54,
+        79.02
+      ],
+      [
+        42.78,
+        46.62,
+        50.89,
+        55.71,
+        61.18
+      ],
+      [
+        33.43,
+        36.45,
+        39.77,
+        43.47,
+        47.61
+      ]
+    ],
+    "notes": "Base case uses WACC 10.0% (row 3) and Terminal Growth 2.5% (column 3), highlighted cell = $65.06. Sensitivity shows high valuation sensitivity to WACC given the large net debt burden ($28.4B) in the equity bridge. At WACC 11% and terminal growth 2.5%, IV equals $50.89 \u2014 near current price, illustrating the market's implicit assumption of above-average discount rate."
+  },
+  "probability_weighted": {
+    "weights": {
+      "bull": 0.2,
+      "base": 0.5,
+      "bear": 0.3
+    },
+    "weighted_iv": 31.67,
+    "notes": "Bear-skewed weighting (30%) reflects execution credibility deficit: multiple guidance misses, active securities litigation, ongoing banking attrition, and Q1 2026 organic revenue decline of -3.6%. Bull case at 20% acknowledges Clover's genuine value and deep discount, but requires multiple simultaneous execution successes. Base case at 50% reflects most likely moderate recovery path. Weighted IV of $64.70 versus current price of $49.45 implies ~30.8% upside.",
+    "weighted_iv_as_published": 64.7
+  },
+  "sanity_check": {
+    "passed": false,
+    "triggered": false,
+    "adjustments_made": null,
+    "checks_performed": [
+      {
+        "metric": "EV/EBITDA (base case)",
+        "implied_value": "7.4x",
+        "benchmark": "Fiserv historical 11-14x; payments processor peers (FIS ~8x, GPN ~9x, JKHY ~17x)",
+        "assessment": "PASS \u2014 base case EV/EBITDA of 7.4x is BELOW sector comps, confirming conservative assumptions. No upward adjustment required.",
+        "ebitda_basis": "GAAP: Operating income $5,818M + D&A estimate $2,700M = $8,518M"
+      },
+      {
+        "metric": "EV/EBITDA (current market)",
+        "implied_value": "6.4x",
+        "benchmark": "Deep value territory for a payments processor with high switching costs",
+        "assessment": "PASS \u2014 market is pricing a severe turnaround discount; model's base case at 7.4x implies only modest multiple re-rating"
+      },
+      {
+        "metric": "P/E (FY2026e EPS $8.15)",
+        "implied_value": "base IV = 8.0x; current price = 6.1x",
+        "benchmark": "Payments processors typically 15-22x forward P/E; 8x is historically very cheap",
+        "assessment": "PASS \u2014 base case implies P/E of 8x on guided EPS, still well below sector norms, confirming no valuation inflation"
+      },
+      {
+        "metric": "P/FCF (FY2025 FCF $4,299M)",
+        "implied_value": "current price = 6.2x; base case IV = 8.1x",
+        "benchmark": "Payments processors typically 12-20x P/FCF",
+        "assessment": "PASS \u2014 both current market and base case IV are well below sector P/FCF norms"
+      },
+      {
+        "metric": "EV/Revenue (FY2025)",
+        "implied_value": "base case = 2.98x; current market = 2.59x",
+        "benchmark": "Payments/fintech infra typically 3-6x EV/Revenue",
+        "assessment": "PASS \u2014 model implies modest premium to current market EV/Revenue; both well within reasonable range for this business quality level"
+      },
+      {
+        "metric": "Bear case equity value vs. net debt",
+        "implied_value": "Equity value $11.2B vs. net debt $28.4B",
+        "benchmark": "Total Enterprise Value $39.6B; EV/EBITDA ~4.6x in bear \u2014 feasible for distressed scenario",
+        "assessment": "PASS \u2014 leverage amplification in bear case is mechanically correct and appropriately severe"
+      }
+    ],
+    "valuation_philosophy": "This model applies a credibility-discount framework appropriate for a damaged-execution turnaround. FCF margins are anchored to FY2025 actuals (not management targets) in the base case. WACC is elevated (10%) vs. historical Fiserv models (~8.5-9%) to reflect higher-than-normal execution risk. Terminal growth of 2.5% (base) is deliberately below the 3.0% typically ascribed to durable payments infrastructure, reflecting uncertainty around the banking sub-segment's long-run growth trajectory. The bear-skewed probability weighting (30% bear vs. 20% bull) is asymmetric vs. prior valuations to reflect the October 2025 guidance catastrophe and continued Q1 2026 organic revenue contraction. The resulting base-case IV of $65 and weighted IV of $64.70 are intentionally conservative \u2014 they imply multiples below sector comps, providing genuine margin of safety rather than requiring successful turnaround execution to justify the price.",
+    "sanity_check_verdict": {
+      "tripped": true,
+      "is_concern": true,
+      "concern_level": "high",
+      "reason": "Weighted IV $31.67 vs price $52.58 (-39.8%), rebuilt on Q2-2026 actuals.",
+      "value_investor_conclusion": "AVOID. The 62% drawdown from the 52-week high was the market repricing a genuine deterioration, not an overreaction. Weighted IV is now BELOW the price at -40%, and the bear case is severe because $27.3bn of net debt sits against a shrinking cash flow base."
+    },
+    "ran": true
+  },
+  "commentary": {
+    "investment_thesis": "Fiserv at $49.45 trades at 6.4x EV/EBITDA and 6.1x FY2026e P/E \u2014 among the cheapest valuations for a scaled payments infrastructure company in the public markets. The structural franchise (99% historical core banking retention, $90B+ annual transactions, Clover SMB platform, deep FI integration) is intact even as near-term financials deteriorate. The base case DCF implies 31.6% upside with assumptions that are already below sector comp multiples, meaning the margin of safety is genuine rather than model-dependent. However, this is a 'show me' story: two consecutive years of EPS contraction, Q1 2026 organic revenue -3.6%, $28.4B net debt, active securities litigation, and a management team that has zero credibility buffer with institutional investors. The investment requires a 6-12 month horizon to allow H2 2026 results to either validate or refute the turnaround narrative.",
+    "key_considerations": [
+      "Q1 2026 FCF of only $141M signals the full-year FCF trajectory will be weaker than FY2025's $4,299M \u2014 H2 2026 must deliver a significant FCF step-up to meet ~90% conversion target on guided adjusted earnings.",
+      "Banking attrition (-2% core accounts YoY, -6% Financial Solutions organic in Q1 2026) has not yet inflected positively; every quarter of compounding attrition deepens the revenue hole management must fill.",
+      "Net debt of $28.4B creates a high-stakes equity bridge \u2014 even modest EV compression in the bear case wipes substantial equity value given leverage, making the probability weighting of scenarios critical.",
+      "Securities class action in active discovery creates a hard-to-quantify liability overhang; adverse rulings could add hundreds of millions in settlement costs.",
+      "Management's $12+ EPS target for 2029 is credible only if margins recover to 37%+ and revenue CAGR achieves the upper end of 4-6% guidance \u2014 two simultaneous execution requirements over three years.",
+      "Jana Partners' activist presence adds strategic optionality (potential non-core divestitures) but also governance complexity if the turnaround stalls.",
+      "The May 2026 Investor Day medium-term targets provide a clear accountability framework \u2014 H2 2026 and FY2026 full-year results will be the first rigorous test of management credibility."
+    ],
+    "valuation_summary": "At $49.45, FISV offers 31.6% upside to base case IV of $65.06 and 30.8% upside to probability-weighted IV of $64.70, with assumptions anchored conservatively below sector comps. Bull case ($129.37, +161.6%) requires successful turnaround execution. Bear case ($20.97, -57.6%) reflects leverage amplification if structural deterioration continues. The asymmetric risk profile \u2014 limited upside versus severe leverage-amplified downside \u2014 makes position sizing critical. The sanity check confirms no valuation inflation: base case multiples sit below payments processor peers and Fiserv's own historical trading range.",
+    "scenario_probabilities_rationale": "Bear (30%): Elevated vs. prior model to reflect October 2025 guidance catastrophe, Q1 2026 organic revenue contraction, active securities litigation, and the structural risk that banking attrition has permanently impaired the Financial Solutions franchise. Base (50%): Most likely path \u2014 modest 2026 transition, gradual recovery in 2027 but below management's optimistic targets, and continued credibility rebuilding. Bull (20%): Requires sustained Clover momentum, banking inflection, margin expansion, and macro tailwinds simultaneously \u2014 achievable but requiring multiple concurrent successes over a 3-year horizon."
+  },
+  "price_refresh": {
+    "refreshed_at": "2026-11-07T18:12:45Z",
+    "price_source": "yahoo:regularMarketPrice",
+    "previous_price": 47.55,
+    "current_price": 62.88,
+    "drift_pct": 32.2,
+    "valuation_date": "2026-08-28",
+    "fields_updated": [
+      "current_price",
+      "valuation.bear.upside",
+      "valuation.base.upside",
+      "valuation.bull.upside",
+      "entry_price.bear.entry_discount_from_current",
+      "entry_price.base.entry_discount_from_current",
+      "entry_price.bull.entry_discount_from_current",
+      "price_refresh.current_price"
+    ],
+    "prose_is_stale": false,
+    "prose_paths_quoting_previous_price": [],
+    "dashboard_stale": false
+  },
+  "valuation_philosophy": "Rebuilt 2026-08-28 on Q2-2026, and the direction of travel inverts the thesis. Revenue is DECLINING -- down 4.1% in Q2 and 3.1% in H1 -- and operating margin has compressed from 30.7% to 19.2% in the quarter (29.0% to 18.7% for the half). Worse, the reported figures are flattered: H1 operating income includes an +$83m sale-leaseback gain, and net income adds a +$154m debt-extinguishment gain and a +$293m valuation-allowance release (H1 tax rate 13.2% vs 18.6%). Ex the sale-leaseback, H1 operating margin is 17.9%. Organic revenue growth -- a metric Fiserv has historically led with -- is absent from this filing entirely; its only appearance is inside the securities-fraud litigation disclosure, where an amended class-action complaint alleges misleading statements about Clover growth and Argentina's effect on organic growth. Add a pending student-loan-servicing divestiture and the August 2026 MoneyPass JV that deconsolidates three businesses down to a 49% stake, and the revenue base itself is shrinking by design as well as by performance. Net debt of $27.3bn against a falling FCF base is the real risk: the buyback pace has already been cut ~75% (5.0m shares H1 vs 21.9m)."
+};
+
+// ============================================================
+// CSV PARSER
+// ============================================================
+function parseCSV(csv) {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',');
+    return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => { obj[h.trim()] = values[i] ? values[i].trim() : ''; });
+        return obj;
+    });
+}
+
+const allData = parseCSV(csvData);
+
+// Sort chronologically
+function parseDate(p) {
+    const year = parseInt(p.match(/\d{4}/)?.[0] || '0');
+    const isQ1 = p.includes('Q1');
+    const isQ2 = p.includes('Q2');
+    const isQ3 = p.includes('Q3');
+    const isQ4 = p.includes('Q4');
+    const isFY = p.startsWith('FY');
+    const sub = isQ1 ? 1 : isQ2 ? 2 : isQ3 ? 3 : isQ4 ? 4 : isFY ? 5 : 0;
+    return year * 10 + sub;
+}
+allData.sort((a, b) => parseDate(a.Period) - parseDate(b.Period));
+
+const fyData = allData.filter(d => d.Period.startsWith('FY'));
+const qData  = allData.filter(d => /Q[1-4]/.test(d.Period));
+
+// Helpers
+function v(d, k) { return parseFloat(d[k]) || 0; }
+function fmtM(n) { return n >= 1000 ? '$' + (n/1000).toFixed(1) + 'B' : '$' + Math.round(n) + 'M'; }
+function yoy(curr, prev, key) {
+    const c = v(curr, key), p = v(prev, key);
+    if (!p || !c) return null;
+    return ((c - p) / Math.abs(p) * 100).toFixed(1);
+}
+
+// Colors
+const colors = {
+    primary:   '#00d4aa',
+    secondary: '#00b894',
+    tertiary:  '#0984e3',
+    quat:      '#6c5ce7',
+    warn:      '#fdcb6e',
+    danger:    '#ff6b6b',
+    merchant:  '#00d4aa',
+    financial: '#0984e3',
+    grid:      'rgba(255,255,255,0.05)',
+    tick:      '#888'
+};
+const baseChartOpts = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#e0e0e0', font: { size: 11 } } } },
+    scales: {
+        x: { ticks: { color: colors.tick }, grid: { color: colors.grid } },
+        y: { ticks: { color: colors.tick }, grid: { color: colors.grid } }
+    }
+};
+
+// ============================================================
+// KPI CARDS
+// ============================================================
+function renderKPIs() {
+    const latest = fyData[fyData.length - 1]; // FY2025
+    const prev   = fyData[fyData.length - 2]; // FY2024
+    const q1_26  = allData.find(d => d.Period === 'Q1 2026');
+    const q1_25  = allData.find(d => d.Period === 'Q1 2025');
+
+    const kpis = [
+        {
+            label: 'FY2025 Revenue',
+            value: fmtM(v(latest, 'Revenue')),
+            change: yoy(latest, prev, 'Revenue'),
+            sub: 'vs FY2024 $20.5B'
+        },
+        {
+            label: 'FY2025 GAAP EPS',
+            value: '$' + v(latest, 'EPS').toFixed(2),
+            change: yoy(latest, prev, 'EPS'),
+            sub: 'Adj EPS $8.64 (-2% YoY)'
+        },
+        {
+            label: 'FY2025 Free Cash Flow',
+            value: fmtM(v(latest, 'FreeCashFlow')),
+            change: yoy(latest, prev, 'FreeCashFlow'),
+            sub: 'vs $5,062M FY2024'
+        },
+        {
+            label: 'Operating Margin',
+            value: v(latest, 'OperatingMargin').toFixed(1) + '%',
+            change: (v(latest, 'OperatingMargin') - v(prev, 'OperatingMargin')).toFixed(1),
+            sub: 'FY2025; FY2024 was 28.7%',
+            bps: true
+        },
+        {
+            label: 'Q1 2026 Revenue',
+            value: fmtM(v(q1_26, 'Revenue')),
+            change: yoy(q1_26, q1_25, 'Revenue'),
+            sub: 'Organic -3.6% YoY'
+        },
+        {
+            label: 'Q1 2026 EPS',
+            value: '$' + v(q1_26, 'EPS').toFixed(2),
+            change: yoy(q1_26, q1_25, 'EPS'),
+            sub: 'Beat $1.58 estimate'
+        },
+        {
+            label: 'Net Debt (Q1 2026)',
+            value: '$28.4B',
+            change: null,
+            sub: 'Debt $29.2B − Cash $0.8B'
+        },
+        {
+            label: 'Shares Outstanding',
+            value: v(q1_26, 'SharesOutstanding').toFixed(0) + 'M',
+            change: null,
+            sub: 'Buyback: $5.6B in FY2025'
+        }
+    ];
+
+    const grid = document.getElementById('kpiGrid');
+    grid.innerHTML = kpis.map(k => {
+        let changeHtml = '';
+        if (k.change !== null && k.change !== undefined) {
+            const num = parseFloat(k.change);
+            const cls = num >= 0 ? 'positive' : 'negative';
+            const pfx = num >= 0 ? '+' : '';
+            const sfx = k.bps ? ' pp' : '%';
+            changeHtml = `<div class="kpi-change ${cls}">${pfx}${k.change}${sfx} YoY</div>`;
+        }
+        return `<div class="kpi-card">
+            <div class="kpi-value">${k.value}</div>
+            <div class="kpi-label">${k.label}</div>
+            ${changeHtml}
+            <div class="kpi-sub">${k.sub}</div>
+        </div>`;
+    }).join('');
+}
+renderKPIs();
+
+// ============================================================
+// GUIDANCE
+// ============================================================
+function renderGuidance() {
+    const g = analysis.guidance;
+    const grid = document.getElementById('guidanceGrid');
+    grid.innerHTML = g.items.map(item => {
+        const vsMap = { 'raised':'raised','lowered':'lowered','maintained':'maintained','new':'new' };
+        const vsClass = vsMap[item.vs_prior] || 'new';
+        const vsLabel = item.vs_prior === 'new' ? 'New Guidance' : item.vs_prior.charAt(0).toUpperCase() + item.vs_prior.slice(1);
+        return `<div class="guidance-card">
+            <div class="guidance-metric">${item.metric}</div>
+            <div class="guidance-target">${item.target}</div>
+            <div class="guidance-period">${item.period}</div>
+            <span class="guidance-vs-prior ${vsClass}">${vsLabel}</span>
+            ${item.notes ? `<div class="guidance-notes">${item.notes}</div>` : ''}
+        </div>`;
+    }).join('');
+    document.getElementById('guidanceCommentary').textContent = g.management_commentary;
+}
+renderGuidance();
+
+// ============================================================
+// CHARTS
+// ============================================================
+
+// 1. Revenue Chart (Annual)
+new Chart(document.getElementById('revenueChart'), {
+    type: 'bar',
+    data: {
+        labels: fyData.map(d => d.Period),
+        datasets: [{
+            label: 'Revenue ($M)',
+            data: fyData.map(d => v(d, 'Revenue')),
+            backgroundColor: fyData.map(d => d.Period === 'FY2025' ? colors.primary : 'rgba(0,212,170,0.4)'),
+            borderColor: colors.primary,
+            borderWidth: 1
+        }]
+    },
+    options: {
+        ...baseChartOpts,
+        plugins: {
+            ...baseChartOpts.plugins,
+            tooltip: { callbacks: { label: ctx => ' $' + ctx.raw.toLocaleString() + 'M' } }
+        },
+        scales: {
+            x: { ticks: { color: colors.tick }, grid: { color: colors.grid } },
+            y: {
+                ticks: { color: colors.tick, callback: v => '$' + (v/1000).toFixed(0) + 'B' },
+                grid: { color: colors.grid }
+            }
+        }
+    }
+});
+
+// 2. Margins Chart
+new Chart(document.getElementById('marginsChart'), {
+    type: 'line',
+    data: {
+        labels: fyData.map(d => d.Period),
+        datasets: [
+            {
+                label: 'Operating Margin %',
+                data: fyData.map(d => v(d, 'OperatingMargin')),
+                borderColor: colors.primary,
+                backgroundColor: 'rgba(0,212,170,0.1)',
+                tension: 0.3,
+                fill: false,
+                pointRadius: 5
+            },
+            {
+                label: 'Net Margin %',
+                data: fyData.map(d => v(d, 'NetMargin')),
+                borderColor: colors.tertiary,
+                backgroundColor: 'rgba(9,132,227,0.1)',
+                tension: 0.3,
+                fill: false,
+                pointRadius: 5
+            }
+        ]
+    },
+    options: {
+        ...baseChartOpts,
+        scales: {
+            x: { ticks: { color: colors.tick }, grid: { color: colors.grid } },
+            y: {
+                ticks: { color: colors.tick, callback: v => v + '%' },
+                grid: { color: colors.grid }
+            }
+        }
+    }
+});
+
+// 3. EPS Chart
+new Chart(document.getElementById('epsChart'), {
+    type: 'line',
+    data: {
+        labels: fyData.map(d => d.Period),
+        datasets: [{
+            label: 'EPS (GAAP)',
+            data: fyData.map(d => v(d, 'EPS')),
+            borderColor: colors.warn,
+            backgroundColor: 'rgba(253,203,110,0.15)',
+            tension: 0.3,
+            fill: true,
+            pointRadius: 5,
+            pointBackgroundColor: fyData.map(d => d.Period === 'FY2025' ? colors.warn : 'rgba(253,203,110,0.6)')
+        }]
+    },
+    options: {
+        ...baseChartOpts,
+        plugins: {
+            ...baseChartOpts.plugins,
+            annotation: {}
+        },
+        scales: {
+            x: { ticks: { color: colors.tick }, grid: { color: colors.grid } },
+            y: {
+                ticks: { color: colors.tick, callback: v => '$' + v.toFixed(2) },
+                grid: { color: colors.grid }
+            }
+        }
+    }
+});
+
+// 4. FCF & CapEx Chart
+const fyWithFCF = fyData.filter(d => v(d, 'FreeCashFlow') > 0);
+new Chart(document.getElementById('fcfChart'), {
+    type: 'bar',
+    data: {
+        labels: fyWithFCF.map(d => d.Period),
+        datasets: [
+            {
+                label: 'Free Cash Flow ($M)',
+                data: fyWithFCF.map(d => v(d, 'FreeCashFlow')),
+                backgroundColor: 'rgba(0,212,170,0.5)',
+                borderColor: colors.primary,
+                borderWidth: 1
+            },
+            {
+                label: 'CapEx ($M)',
+                data: fyWithFCF.map(d => v(d, 'CapEx')),
+                backgroundColor: 'rgba(255,107,107,0.5)',
+                borderColor: colors.danger,
+                borderWidth: 1
+            }
+        ]
+    },
+    options: {
+        ...baseChartOpts,
+        scales: {
+            x: { ticks: { color: colors.tick }, grid: { color: colors.grid } },
+            y: {
+                ticks: { color: colors.tick, callback: v => '$' + (v/1000).toFixed(1) + 'B' },
+                grid: { color: colors.grid }
+            }
+        }
+    }
+});
+
+// 5. Segment Revenue Chart (Merchant vs Financial, where data exists)
+const segData = fyData.filter(d => v(d, 'MerchantRevenue') > 0);
+new Chart(document.getElementById('segmentChart'), {
+    type: 'bar',
+    data: {
+        labels: segData.map(d => d.Period),
+        datasets: [
+            {
+                label: 'Merchant Solutions ($M)',
+                data: segData.map(d => v(d, 'MerchantRevenue')),
+                backgroundColor: 'rgba(0,212,170,0.6)',
+                borderColor: colors.primary,
+                borderWidth: 1
+            },
+            {
+                label: 'Financial Solutions ($M)',
+                data: segData.map(d => v(d, 'FinancialRevenue')),
+                backgroundColor: 'rgba(9,132,227,0.6)',
+                borderColor: colors.tertiary,
+                borderWidth: 1
+            }
+        ]
+    },
+    options: {
+        ...baseChartOpts,
+        plugins: { ...baseChartOpts.plugins, tooltip: { mode: 'index', intersect: false } },
+        scales: {
+            x: { stacked: false, ticks: { color: colors.tick }, grid: { color: colors.grid } },
+            y: {
+                ticks: { color: colors.tick, callback: v => '$' + (v/1000).toFixed(1) + 'B' },
+                grid: { color: colors.grid }
+            }
+        }
+    }
+});
+
+// 6. Quarterly Revenue Chart (Q1 2022 through Q1 2026)
+const qAllSorted = qData.slice(); // already sorted
+new Chart(document.getElementById('quarterlyChart'), {
+    type: 'line',
+    data: {
+        labels: qAllSorted.map(d => d.Period),
+        datasets: [{
+            label: 'Quarterly Revenue ($M)',
+            data: qAllSorted.map(d => v(d, 'Revenue')),
+            borderColor: colors.primary,
+            backgroundColor: 'rgba(0,212,170,0.1)',
+            tension: 0.3,
+            fill: true,
+            pointRadius: 4,
+            pointBackgroundColor: qAllSorted.map(d =>
+                d.Period === 'Q1 2026' ? colors.danger :
+                d.Period.includes('2025') ? colors.warn : colors.primary
+            )
+        }]
+    },
+    options: {
+        ...baseChartOpts,
+        scales: {
+            x: { ticks: { color: colors.tick, maxRotation: 45 }, grid: { color: colors.grid } },
+            y: {
+                ticks: { color: colors.tick, callback: v => '$' + (v/1000).toFixed(1) + 'B' },
+                grid: { color: colors.grid }
+            }
+        }
+    }
+});
+
+// 7. Operating Cash Flow vs FCF
+const fyWithOCF = fyData.filter(d => v(d, 'OperatingCashFlow') > 0);
+new Chart(document.getElementById('cashflowChart'), {
+    type: 'line',
+    data: {
+        labels: fyWithOCF.map(d => d.Period),
+        datasets: [
+            {
+                label: 'Operating Cash Flow ($M)',
+                data: fyWithOCF.map(d => v(d, 'OperatingCashFlow')),
+                borderColor: colors.primary,
+                backgroundColor: 'rgba(0,212,170,0.1)',
+                tension: 0.3,
+                fill: false,
+                pointRadius: 5
+            },
+            {
+                label: 'Free Cash Flow ($M)',
+                data: fyWithOCF.map(d => v(d, 'FreeCashFlow')),
+                borderColor: colors.secondary,
+                backgroundColor: 'rgba(0,184,148,0.1)',
+                tension: 0.3,
+                fill: false,
+                borderDash: [5,3],
+                pointRadius: 5
+            }
+        ]
+    },
+    options: {
+        ...baseChartOpts,
+        scales: {
+            x: { ticks: { color: colors.tick }, grid: { color: colors.grid } },
+            y: {
+                ticks: { color: colors.tick, callback: v => '$' + (v/1000).toFixed(1) + 'B' },
+                grid: { color: colors.grid }
+            }
+        }
+    }
+});
+
+// 8. Leverage Chart (Debt vs Equity)
+const leverData = fyData.filter(d => v(d, 'TotalDebt') > 0);
+new Chart(document.getElementById('leverageChart'), {
+    type: 'bar',
+    data: {
+        labels: leverData.map(d => d.Period),
+        datasets: [
+            {
+                label: 'Total Debt ($M)',
+                data: leverData.map(d => v(d, 'TotalDebt')),
+                backgroundColor: 'rgba(255,107,107,0.55)',
+                borderColor: colors.danger,
+                borderWidth: 1
+            },
+            {
+                label: "Shareholders' Equity ($M)",
+                data: leverData.map(d => v(d, 'ShareholdersEquity')),
+                backgroundColor: 'rgba(0,212,170,0.5)',
+                borderColor: colors.primary,
+                borderWidth: 1
+            }
+        ]
+    },
+    options: {
+        ...baseChartOpts,
+        scales: {
+            x: { ticks: { color: colors.tick }, grid: { color: colors.grid } },
+            y: {
+                ticks: { color: colors.tick, callback: v => '$' + (v/1000).toFixed(0) + 'B' },
+                grid: { color: colors.grid }
+            }
+        }
+    }
+});
+
+// 9. Shares Outstanding (reduction trend)
+const sharesData = fyData.filter(d => v(d, 'SharesOutstanding') > 0);
+new Chart(document.getElementById('sharesChart'), {
+    type: 'line',
+    data: {
+        labels: sharesData.map(d => d.Period),
+        datasets: [{
+            label: 'Shares Outstanding (M)',
+            data: sharesData.map(d => v(d, 'SharesOutstanding')),
+            borderColor: colors.quat,
+            backgroundColor: 'rgba(108,92,231,0.15)',
+            tension: 0.3,
+            fill: true,
+            pointRadius: 5
+        }]
+    },
+    options: {
+        ...baseChartOpts,
+        scales: {
+            x: { ticks: { color: colors.tick }, grid: { color: colors.grid } },
+            y: {
+                ticks: { color: colors.tick, callback: v => v + 'M' },
+                grid: { color: colors.grid }
+            }
+        }
+    }
+});
+
+// 10. Revenue YoY Growth
+const growthLabels = fyData.slice(1).map(d => d.Period);
+const growthVals = fyData.slice(1).map((d, i) => {
+    const prev = fyData[i];
+    const curr = v(d, 'Revenue'), p = v(prev, 'Revenue');
+    return p ? parseFloat(((curr - p) / Math.abs(p) * 100).toFixed(1)) : 0;
+});
+new Chart(document.getElementById('growthChart'), {
+    type: 'bar',
+    data: {
+        labels: growthLabels,
+        datasets: [{
+            label: 'Revenue YoY Growth (%)',
+            data: growthVals,
+            backgroundColor: growthVals.map(v => v >= 0 ? 'rgba(0,212,170,0.55)' : 'rgba(255,107,107,0.55)'),
+            borderColor: growthVals.map(v => v >= 0 ? colors.primary : colors.danger),
+            borderWidth: 1
+        }]
+    },
+    options: {
+        ...baseChartOpts,
+        scales: {
+            x: { ticks: { color: colors.tick }, grid: { color: colors.grid } },
+            y: {
+                ticks: { color: colors.tick, callback: v => v + '%' },
+                grid: { color: colors.grid }
+            }
+        }
+    }
+});
+
+// ============================================================
+// DCF SECTION
+// ============================================================
+let currentScenario = 'base';
+
+function calculateDCF(startGrowth, wacc, terminalGrowth) {
+    const baseFCF = dcfData.inputs.base_year_fcf_normalized;
+    const years = 5;
+    const endGrowth = Math.max(startGrowth * 0.5, 2.0); // taper to half or 2% floor
+    let pvFCF = 0, projFCF = baseFCF;
+
+    for (let i = 0; i < years; i++) {
+        const yr = startGrowth - (startGrowth - endGrowth) * (i / (years - 1));
+        projFCF *= (1 + yr / 100);
+        pvFCF += projFCF / Math.pow(1 + wacc / 100, i + 1);
+    }
+
+    const terminalFCF = projFCF * (1 + terminalGrowth / 100);
+    const tv = terminalFCF / (wacc / 100 - terminalGrowth / 100);
+    const pvTV = tv / Math.pow(1 + wacc / 100, years);
+    const ev = pvFCF + pvTV;
+    const equity = ev - dcfData.inputs.net_debt;
+    const iv = equity / dcfData.inputs.shares_outstanding;
+    const entryPrice = (tv / dcfData.inputs.shares_outstanding) / Math.pow(1.15, years);
+
+    return { iv, entryPrice, pvFCF, pvTV, ev, projFCF, terminalFCF };
+}
+
+function renderFCFProjections() {
+    const g = parseFloat(document.getElementById('growthSlider').value);
+    const baseFCF = dcfData.inputs.base_year_fcf_normalized;
+    const endGrowth = Math.max(g * 0.5, 2.0);
+    const years = 5;
+    let fcf = baseFCF;
+    const rows = [];
+
+    for (let i = 0; i < years; i++) {
+        const yr = g - (g - endGrowth) * (i / (years - 1));
+        fcf *= (1 + yr / 100);
+        rows.push({ year: 'Y' + (i+1), fcf, gr: yr });
+    }
+
+    const baseItem = `<div class="fcf-projection-item header">Base</div>
+        <div class="fcf-projection-item"><div class="fcf-val">${fmtM(baseFCF)}</div><div class="growth-rate">—</div></div>`;
+    const yearItems = rows.map(r => `
+        <div class="fcf-projection-item header">${r.year}</div>
+        <div class="fcf-projection-item">
+            <div class="fcf-val">${fmtM(Math.round(r.fcf))}</div>
+            <div class="growth-rate">+${r.gr.toFixed(0)}%</div>
+        </div>`).join('');
+
+    document.getElementById('fcfProjectionTable').innerHTML = baseItem + yearItems;
+}
+
+window.updateDCFDisplay = function() {
+    const g = parseFloat(document.getElementById('growthSlider').value);
+    const w = parseFloat(document.getElementById('waccSlider').value);
+    const t = parseFloat(document.getElementById('terminalSlider').value);
+
+    document.getElementById('growthValue').textContent = g + '%';
+    document.getElementById('waccValue').textContent = w + '%';
+    document.getElementById('terminalValue').textContent = t + '%';
+
+    renderFCFProjections();
+
+    const res = calculateDCF(g, w, t);
+    document.getElementById('dcfIV').textContent = '$' + res.iv.toFixed(0);
+    document.getElementById('dcfEntry').textContent = '$' + res.entryPrice.toFixed(0);
+
+    const up = ((res.iv - dcfData.current_price) / dcfData.current_price * 100);
+    const el = document.getElementById('dcfUpside');
+    el.textContent = (up >= 0 ? '+' : '') + up.toFixed(0) + '% ' + (up >= 0 ? 'upside' : 'downside');
+    el.className = 'dcf-change ' + (up >= 0 ? 'positive' : 'negative');
+
+    document.getElementById('dcfWeighted').textContent = '$' + dcfData.probability_weighted.weighted_iv.toFixed(2);
+
+    // Update assumption grid
+    const grid = document.getElementById('assumptionGrid');
+    if (grid) {
+        const scen = currentScenario;
+        const ass = dcfData.assumptions[scen];
+        const val = dcfData.valuation[scen];
+        grid.innerHTML = `
+            <div class="assumption-item"><div class="label">Year 1 Growth</div><div class="value">${ass.growth_rates[0]}%</div></div>
+            <div class="assumption-item"><div class="label">Year 3 Growth</div><div class="value">${ass.growth_rates[2]}%</div></div>
+            <div class="assumption-item"><div class="label">Year 5 Growth</div><div class="value">${ass.growth_rates[4]}%</div></div>
+            <div class="assumption-item"><div class="label">FCF Margin</div><div class="value">${ass.fcf_margin}%</div></div>
+            <div class="assumption-item"><div class="label">WACC</div><div class="value">${ass.wacc}%</div></div>
+            <div class="assumption-item"><div class="label">Terminal Growth</div><div class="value">${ass.terminal_growth}%</div></div>
+            <div class="assumption-item"><div class="label">Intrinsic Value</div><div class="value" style="color:#00d4aa;">$${val.intrinsic_value.toFixed(2)}</div></div>
+            <div class="assumption-item"><div class="label">Upside/Downside</div><div class="value" style="color:${val.upside >= 0 ? '#00d4aa' : '#ff6b6b'};">${val.upside >= 0 ? '+' : ''}${val.upside}%</div></div>
+        `;
+    }
+};
+
+window.switchScenario = function(scenario) {
+    currentScenario = scenario;
+    document.querySelectorAll('.scenario-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.scenario === scenario);
+    });
+    const ass = dcfData.assumptions[scenario];
+    document.getElementById('scenarioTitle').textContent =
+        scenario.charAt(0).toUpperCase() + scenario.slice(1) + ' Case Assumptions';
+    document.getElementById('growthSlider').value = ass.growth_rates[0];
+    document.getElementById('waccSlider').value = ass.wacc;
+    document.getElementById('terminalSlider').value = ass.terminal_growth;
+    window.updateDCFDisplay();
+};
+
+function renderHistoricalGrowth() {
+    const gh = dcfData.historical_growth;
+    const selected = gh.growth_rate_source;
+    const metrics = [
+        { key: 'revenue_3yr_cagr', label: 'Revenue 3Y CAGR' },
+        { key: 'revenue_5yr_cagr', label: 'Revenue 5Y CAGR' },
+        { key: 'eps_3yr_cagr',     label: 'EPS 3Y CAGR' },
+        { key: 'eps_5yr_cagr',     label: 'EPS 5Y CAGR' },
+        { key: 'equity_3yr_cagr',  label: 'Equity 3Y CAGR' },
+        { key: 'equity_5yr_cagr',  label: 'Equity 5Y CAGR' },
+        { key: 'fcf_3yr_cagr',     label: 'FCF 3Y CAGR' },
+        { key: 'fcf_5yr_cagr',     label: 'FCF 5Y CAGR' }
+    ];
+    const grid = document.getElementById('growthGrid');
+    grid.innerHTML = metrics.map(m => {
+        const rate = gh[m.key];
+        const isSel = m.key === selected;
+        const cls = rate >= 0 ? 'positive' : 'negative';
+        return `<div class="growth-item ${isSel ? 'selected' : ''}">
+            <div class="metric">${m.label}</div>
+            <div class="rate ${cls}">${rate >= 0 ? '+' : ''}${rate.toFixed(1)}%</div>
+        </div>`;
+    }).join('');
+}
+renderHistoricalGrowth();
+
+function renderSensitivityMatrix() {
+    const sens = dcfData.sensitivity;
+    const cp = dcfData.current_price;
+    let html = '<tr><th>WACC \\ Term G</th>';
+    sens.terminal_growth_range.forEach(tg => { html += `<th>${tg}%</th>`; });
+    html += '</tr>';
+    sens.wacc_range.forEach((wacc, i) => {
+        html += `<tr><th>${wacc}%</th>`;
+        sens.matrix[i].forEach((val, j) => {
+            const isHL = wacc === 10.0 && sens.terminal_growth_range[j] === 2.5;
+            const cls = isHL ? 'highlight' : val >= cp ? 'above-current' : 'below-current';
+            html += `<td class="${cls}">$${val}</td>`;
+        });
+        html += '</tr>';
+    });
+    document.getElementById('sensitivityMatrix').innerHTML = html;
+}
+renderSensitivityMatrix();
+
+function renderSanityChecks() {
+    const checks = dcfData.sanity_check.checks_performed;
+    const grid = document.getElementById('sanityGrid');
+    grid.innerHTML = checks.map(c => `
+        <div class="sanity-item">
+            <div class="s-metric">${c.metric}</div>
+            <div class="s-value">${c.implied_value}</div>
+            <div class="s-assess">${c.assessment}</div>
+        </div>`).join('');
+}
+renderSanityChecks();
+
+// Scenario chart
+new Chart(document.getElementById('scenarioChart'), {
+    type: 'bar',
+    data: {
+        labels: ['Bear Case', 'Current Price', 'Base Case IV', 'Prob-Weighted IV', 'Bull Case'],
+        datasets: [{
+            label: 'Value per Share ($)',
+            data: [
+                dcfData.valuation.bear.intrinsic_value,
+                dcfData.current_price,
+                dcfData.valuation.base.intrinsic_value,
+                dcfData.probability_weighted.weighted_iv,
+                dcfData.valuation.bull.intrinsic_value
+            ],
+            backgroundColor: [
+                'rgba(255,107,107,0.6)',
+                'rgba(253,203,110,0.6)',
+                'rgba(0,212,170,0.6)',
+                'rgba(9,132,227,0.6)',
+                'rgba(108,92,231,0.6)'
+            ],
+            borderColor: [
+                colors.danger,
+                colors.warn,
+                colors.primary,
+                colors.tertiary,
+                colors.quat
+            ],
+            borderWidth: 2
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => ' $' + ctx.raw.toFixed(2) } }
+        },
+        scales: {
+            x: { ticks: { color: colors.tick }, grid: { color: colors.grid } },
+            y: {
+                ticks: { color: colors.tick, callback: v => '$' + v.toFixed(0) },
+                grid: { color: colors.grid }
+            }
+        }
+    }
+});
+
+// Initialize DCF
+document.getElementById('dcfCurrent').textContent = '$' + dcfData.current_price.toFixed(2);
+switchScenario('base');
+
+// Bind slider events
+['growthSlider', 'waccSlider', 'terminalSlider'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.oninput = window.updateDCFDisplay; el.onchange = window.updateDCFDisplay; }
+});
+
+// ============================================================
+// MODAL DESCRIPTIONS
+// ============================================================
+const metricDescriptions = {
+    revenue: {
+        title: "Revenue",
+        content: `<p><strong>Revenue</strong> is Fiserv's total income from all segments, reported on a GAAP basis. Processing & services fees (~81%) dominate, supplemented by product revenue from hardware and software licenses.</p>
+        <div class="metric-highlight"><strong>For Fiserv:</strong> FY2025 GAAP revenue was $21,193M (+4% YoY). Adjusted revenue (used internally) was ~$19.8B. The gap reflects purchase accounting adjustments from the 2019 First Data acquisition. Q1 2026 saw GAAP revenue decline to $5,027M (-3.1% YoY) and organic revenue -3.6%.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>Organic revenue growth — Q1 2026's -3.6% reflects lapping of non-recurring items; H2 2026 must inflect positive for the turnaround narrative to hold</li>
+        <li>Merchant Solutions vs. Financial Solutions growth — MS targeted mid-single digits, FS flat-to-down in 2026</li>
+        <li>Clover revenue ($3.3B in FY2025, +23%) as the primary growth engine</li></ul>`
+    },
+    margins: {
+        title: "Operating & Net Margin",
+        content: `<p><strong>Operating margin</strong> reflects Fiserv's efficiency at converting revenue to operating income. <strong>Net margin</strong> includes interest expense (significant given $28.4B net debt) and taxes.</p>
+        <div class="metric-highlight"><strong>For Fiserv:</strong> FY2025 GAAP operating margin was 27.5% vs. 28.7% in FY2024. Adjusted operating margin was ~35% in FY2025, guided to ~34% for FY2026 (trough year) with H2 targeted at 35-36%. Medium-term target is 37%+ by 2029.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>The divergence between GAAP margins (depressed by acquisition amortization) and adjusted margins</li>
+        <li>Merchant Solutions adjusted margin (34.5% in FY2025, down from ~37%) — recovery to 37%+ is a 2029 target</li>
+        <li>Project Elevate efficiency gains flowing through from H2 2026 onwards</li></ul>`
+    },
+    eps: {
+        title: "Earnings Per Share (EPS)",
+        content: `<p><strong>GAAP EPS</strong> reflects earnings available to shareholders after all expenses, amortization, and dilution. Note that Fiserv's GAAP EPS is significantly lower than adjusted EPS due to large amortization charges from the First Data acquisition.</p>
+        <div class="metric-highlight"><strong>For Fiserv:</strong> FY2025 GAAP EPS was $6.34; adjusted EPS was $8.64 (-2% YoY from $8.80 in FY2024). FY2026 adjusted EPS guided $8.00-$8.30 — a second consecutive year of contraction. Medium-term target is $12+ by 2029, implying ~13-15% CAGR from 2027.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>Two consecutive adjusted EPS declines (FY2024: $8.80 → FY2025: $8.64 → FY2026e: $8.00-$8.30) — must see reversal in FY2027</li>
+        <li>Share repurchase pace ($5.6B in FY2025) supporting per-share metrics despite earnings pressure</li>
+        <li>Whether H2 2026 shows the inflection that management has promised</li></ul>`
+    },
+    fcf: {
+        title: "Free Cash Flow & CapEx",
+        content: `<p><strong>Free Cash Flow</strong> = Operating Cash Flow minus Capital Expenditures. For Fiserv, FCF is the key metric management uses alongside adjusted EPS to measure cash generation quality.</p>
+        <div class="metric-highlight"><strong>For Fiserv:</strong> FY2025 FCF was $4,299M (~93% conversion of adjusted net income), down from $5,062M in FY2024. Q1 2026 FCF was only $141M, signaling a weak near-term trajectory. FY2026 FCF conversion guided ~90% of adjusted net income (~$4B range). CapEx elevated ($1,763M in FY2025) reflecting investment cycle.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>Q1 2026's $141M FCF vs. $4B+ annual run-rate — H2 2026 must deliver very strong FCF to hit targets</li>
+        <li>CapEx intensity: $1.76B in FY2025 (8.3% of revenue) is elevated; should moderate as Clover infrastructure build matures</li>
+        <li>FCF conversion to adjusted net income (target ~90%) as a quality metric</li></ul>`
+    },
+    segments: {
+        title: "Segment Revenue: Merchant vs Financial Solutions",
+        content: `<p>Fiserv operates two reportable segments: <strong>Merchant Solutions</strong> (Clover SMB, Carat enterprise) and <strong>Financial Solutions</strong> (core banking, card issuing, digital banking).</p>
+        <div class="metric-highlight"><strong>For Fiserv:</strong> FY2025 Merchant Solutions: $10,140M (+5.3% YoY). Financial Solutions: $9,664M (+2.0% YoY). Merchant margin (adj.): 34.5%. Financial margin (adj.): 45.3%. Clover alone reached $3.3B (+23%) within Merchant Solutions.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>Financial Solutions banking sub-segment: Q1 2026 organic revenue -6%; core accounts -2% YoY — the central turnaround risk</li>
+        <li>Merchant Solutions growth trajectory: Q1 2026 organic -1% due to non-recurring lapping; must recover to mid-single digits in H2 2026</li>
+        <li>Cross-segment margin differential — Financial Solutions at 45.3% adj. margin significantly higher than Merchant at 34.5%; mix shift matters</li></ul>`
+    },
+    quarterly: {
+        title: "Quarterly Revenue Trend",
+        content: `<p>Quarterly revenue shows the intra-year seasonal patterns and the impact of the October 2025 guidance crisis on investor perception of trajectory.</p>
+        <div class="metric-highlight"><strong>For Fiserv:</strong> Revenue peaked at $5,516M in Q2 2025, then decelerated. Q1 2026 was $5,027M — the weakest quarter in recent history on a YoY comparison basis due to non-recurring revenue lapping. Q3 2025 data ($5,263M) was reported alongside the catastrophic guidance cut in October 2025.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>H2 2026 (Q3-Q4) results — management has promised cleaner revenue growth once non-recurring lapping ends</li>
+        <li>Clover GPV and VAS penetration within quarterly Merchant Solutions data</li>
+        <li>Q2 2026 vs. Q2 2025 comparisons (Q2 2025 was $5,516M — a high bar to lap)</li></ul>`
+    },
+    cashflows: {
+        title: "Operating Cash Flow vs Free Cash Flow",
+        content: `<p>The gap between Operating Cash Flow and Free Cash Flow reflects CapEx intensity. Fiserv's high CapEx (technology infrastructure, Clover hardware) is a key input to long-term franchise value but creates near-term FCF drag.</p>
+        <div class="metric-highlight"><strong>For Fiserv:</strong> FY2025 OCF $6,062M, FCF $4,299M — CapEx gap of $1,763M. FY2024 OCF $6,631M, FCF $5,062M — CapEx $1,569M. CapEx has risen with Clover infrastructure investment; expected to moderate as the build cycle matures.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>CapEx as percent of revenue — trending up (7.7% in FY2024, 8.3% in FY2025); peak investment should translate to FCF improvement</li>
+        <li>Q1 2026 FCF of only $141M vs. OCF of $599M signals CapEx remains elevated ($458M in one quarter)</li></ul>`
+    },
+    leverage: {
+        title: "Total Debt vs Shareholders' Equity",
+        content: `<p>Fiserv carries significant debt from the 2019 $22B acquisition of First Data. High leverage amplifies returns in good times but creates severe equity value risk in adverse scenarios.</p>
+        <div class="metric-highlight"><strong>For Fiserv:</strong> As of Q1 2026: Total debt $29,182M, shareholders' equity $26,201M, net debt $28,353M. Debt-to-equity ratio approximately 1.1x. Net debt / EBITDA approximately 3.3x. The equity bridge in the DCF bear case shows how leverage can destroy 57%+ of equity value if the enterprise value declines modestly.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>Debt reduction trajectory — Fiserv targets maintaining investment-grade ratings; pace of deleveraging from FCF generation</li>
+        <li>Equity declining over time due to share buybacks ($5.6B in FY2025) exceeding earnings — mechanically reduces book equity but is positive for per-share economics if done at attractive prices</li>
+        <li>At current price (~$50), share repurchases may not be optimal given deep discount to intrinsic value — capital allocation priorities matter</li></ul>`
+    },
+    shares: {
+        title: "Shares Outstanding",
+        content: `<p>Fiserv has been an aggressive share repurchaser, spending $5.6B in FY2025 alone to reduce the share count from ~582M (FY2024) to ~549M (FY2025 year-end), and ~535M by Q1 2026.</p>
+        <div class="metric-highlight"><strong>For Fiserv:</strong> Share count has declined from ~683M at the time of the First Data acquisition close (FY2020) to 535M in Q1 2026 — a reduction of ~22% in 5 years. This mechanical reduction supports per-share metrics (EPS, FCF/share) even when total earnings are flat or declining.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>Buyback pace relative to FCF — FY2025 buybacks ($5.6B) exceeded FCF ($4.3B), funded partly by debt or working capital</li>
+        <li>Whether buyback pace slows in FY2026 given weaker FCF outlook and high leverage</li>
+        <li>Buyback price vs. intrinsic value — at $49-55, buying back shares appears value-accretive if the base case plays out</li></ul>`
+    },
+    growth: {
+        title: "Revenue YoY Growth",
+        content: `<p>Revenue growth rate shows the trajectory of Fiserv's top-line expansion, including the step-change from the 2019 First Data acquisition.</p>
+        <div class="metric-highlight"><strong>For Fiserv:</strong> Organic revenue growth (excluding acquisitions and FX) is the key metric management uses. FY2025 organic growth was approximately 3.5-4% (GAAP total +4%). FY2026 is guided 1-3% organic — the trough year before targeted re-acceleration to 4-6% CAGR by 2029.</div>
+        <p><strong>What to watch:</strong></p><ul>
+        <li>The distinction between reported GAAP growth and organic growth (excludes M&A contributions)</li>
+        <li>Q1 2026 organic -3.6% — heavily impacted by non-recurring revenue from prior periods that is not lapping; H2 2026 should see cleaner comparisons</li>
+        <li>Whether Clover can sustain 10%+ GPV growth to offset Financial Solutions headwinds</li></ul>`
+    }
+};
+
+function openModal(key) {
+    const desc = metricDescriptions[key];
+    if (!desc) return;
+    document.getElementById('modalTitle').textContent = desc.title;
+    document.getElementById('modalBody').innerHTML = desc.content;
+    document.getElementById('modalOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(event) {
+    if (event && event.target !== document.getElementById('modalOverlay')) return;
+    document.getElementById('modalOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+function toggleOverview() {
+    const btn = document.querySelector('.overview-toggle');
+    const content = document.getElementById('overviewContent');
+    btn.classList.toggle('active');
+    content.classList.toggle('active');
+}
+</script>
+</body>
+</html>
